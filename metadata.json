@@ -1,0 +1,8 @@
+{
+  "name": "Space Station",
+  "description": "An online multiplayer text-based space strategy game. Colonize planets, construct stations, build fleets, trade resources, and battle for galactic dominance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

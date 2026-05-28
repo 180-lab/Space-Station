@@ -1,0 +1,148 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Custom glow effects for Elegant Dark theme */
+.glow-cyan {
+  text-shadow: 0 0 8px #22d3ee;
+}
+.glow-purple {
+  text-shadow: 0 0 8px #c084fc;
+}
+.glow-amber {
+  text-shadow: 0 0 8px #fbbf24;
+}
+.bg-elegant-dark {
+  background-color: #05070A;
+}
+.bg-elegant-panel {
+  background-color: #0A0F1D;
+}
+.border-elegant-border {
+  border-color: #1E293B;
+}
+
+body {
+  background-color: #05070A;
+  color: #cbd5e1;
+}
+
+/* ==========================================================================
+   LIGHT THEME STYLING OVERRIDES (Pure clean paper off-white styling)
+   ========================================================================== */
+.theme-light {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.theme-light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Panels */
+.theme-light .bg-\[\#0A0F1D\]\/80,
+.theme-light .bg-elegant-panel,
+.theme-light .bg-\[\#0A0F1D\] {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Sub-panels, list items and table rows */
+.theme-light .bg-\[\#05070A\]\/95,
+.theme-light .bg-\[\#05070A\]\,
+.theme-light .bg-slate-950,
+.theme-light .bg-slate-900,
+.theme-light .bg-\[\#05070A\]\/60,
+.theme-light .bg-\[\#030508\]\/60 {
+  background-color: #edf2f7 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light .hover\:bg-white\/5:hover,
+.theme-light .hover\:bg-\[\#1E293B\]\/45:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Card frames & borders */
+.theme-light .border-elegant-border,
+.theme-light .border-\[\#1E293B\],
+.theme-light .border-\[\#1E293B\]\/30,
+.theme-light .border-white\/5 {
+  border-color: #cbd5e1 !important;
+}
+
+/* Dark color texts forced to dark slate */
+.theme-light .text-slate-100,
+.theme-light .text-slate-200,
+.theme-light .text-slate-300,
+.theme-light .text-white {
+  color: #0f172a !important;
+}
+
+.theme-light .text-slate-405,
+.theme-light .text-slate-400 {
+  color: #334155 !important;
+}
+
+.theme-light .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Form input elements */
+.theme-light input,
+.theme-light select,
+.theme-light textarea {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Navigation footer bar and right panels */
+.theme-light footer,
+.theme-light .bg-\[\#0D1527\] {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light .text-slate-350,
+.theme-light .text-slate-300 {
+  color: #1e293b !important;
+}
+
+/* ==========================================================================
+   DARK BLACK THEME STYLING OVERRIDES (Obsidian Pitch Black Space theme)
+   ========================================================================== */
+.theme-dark {
+  background-color: #000000 !important;
+  color: #e2e8f0 !important;
+}
+
+.theme-dark body {
+  background-color: #000000 !important;
+  color: #e2e8f0 !important;
+}
+
+.theme-dark .bg-\[\#0A0F1D\]\/80,
+.theme-dark .bg-elegant-panel,
+.theme-dark .bg-\[\#0A0F1D\] {
+  background-color: #09090b !important;
+  border-color: #27272a !important;
+}
+
+.theme-dark .bg-\[\#05070A\],
+.theme-dark .bg-slate-950,
+.theme-dark .bg-slate-900 {
+  background-color: #040405 !important;
+  border-color: #27272a !important;
+}
+
+.theme-dark .border-elegant-border,
+.theme-dark .border-\[\#1E293B\],
+.theme-dark .border-white\/5 {
+  border-color: #27272a !important;
+}
