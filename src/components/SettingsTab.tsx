@@ -10,7 +10,10 @@ import {
   RotateCcw,
   CheckCircle,
   HelpCircle,
-  Laptop
+  Laptop,
+  User,
+  Home,
+  Check
 } from 'lucide-react';
 
 interface SettingsTabProps {
@@ -22,6 +25,7 @@ interface SettingsTabProps {
   fontSizeScale: string;
   setFontSizeScale: (scale: string) => void;
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+  onRefreshState?: () => void;
 }
 
 const COSMETIC_SKINS = [
@@ -39,8 +43,82 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   setSkinId,
   fontSizeScale,
   setFontSizeScale,
-  showToast
+  showToast,
+  onRefreshState
 }) => {
+  // Rename commander name and base colony names state
+  const [commanderName, setCommanderName] = useState(player.username);
+  const [selectedRenamePlanetId, setSelectedRenamePlanetId] = useState(player.planets[0]?.id || '');
+  const [planetNewName, setPlanetNewName] = useState(player.planets[0]?.name || '');
+
+  // Track changes of base profile
+  useEffect(() => {
+    setCommanderName(player.username);
+  }, [player.username]);
+
+  useEffect(() => {
+    const selectedPl = player.planets.find(pl => pl.id === selectedRenamePlanetId);
+    if (selectedPl) {
+      setPlanetNewName(selectedPl.name);
+    }
+  }, [selectedRenamePlanetId, player.planets]);
+
+  // Rename Commander submission handler
+  const handleRenameCommander = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commanderName.trim()) {
+      showToast('Commander name cannot be empty!', 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/player/rename', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ newUsername: commanderName })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Commander registered as: ${commanderName}`, 'success');
+        if (onRefreshState) onRefreshState();
+      } else {
+        showToast(data.error || 'Failed to rename commander', 'error');
+      }
+    } catch (err) {
+      showToast('Network error during renaming', 'error');
+    }
+  };
+
+  // Rename Base submission handler
+  const handleRenameBase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!planetNewName.trim() || !selectedRenamePlanetId) {
+      showToast('Base colony name cannot be empty!', 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/planet/rename', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ planetId: selectedRenamePlanetId, newName: planetNewName })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Base renamed successfully: ${planetNewName}`, 'success');
+        if (onRefreshState) onRefreshState();
+      } else {
+        showToast(data.error || 'Failed to rename base colony', 'error');
+      }
+    } catch (err) {
+      showToast('Network error during renaming', 'error');
+    }
+  };
+
   // Audio settings derived from localStorage
   const [soundEnabled, setSoundEnabled] = useState(() => {
     return localStorage.getItem('moonbase_sound_enabled') !== 'false';
@@ -254,13 +332,95 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
       </div>
 
+      {/* COMMANDER & BASE COLONY NAMES SPECIFICATION SECTION */}
+      <div className="p-5 bg-[#0A0F1D] border border-[#1E293B] rounded-2xl space-y-5 shadow-lg text-left">
+        <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2 border-b border-[#1E293B]/60 pb-2">
+          <User size={14} className="text-cyan-400" /> Commander Registry & Colony Station Names
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Commander Name Form */}
+          <form onSubmit={handleRenameCommander} className="space-y-3">
+            <div>
+              <label className="text-xs font-bold text-slate-300 block uppercase tracking-wide">
+                Calibrate Commander Name
+              </label>
+              <p className="text-[10.5px] text-slate-500 leading-relaxed mt-0.5">
+                Alters your formal signature and username across global star alliances, communications, and battle alerts.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                maxLength={25}
+                value={commanderName}
+                onChange={(e) => setCommanderName(e.target.value)}
+                className="flex-1 px-3 py-2 bg-slate-950 border border-[#1E293B] hover:border-cyan-500/40 focus:border-cyan-500 focus:outline-none text-xs text-white font-mono rounded-xl transition shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)]"
+                placeholder="Enter commander name"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 bg-gradient-to-r from-cyan-500/10 to-indigo-500/10 hover:from-cyan-500/20 hover:to-indigo-500/20 border border-cyan-500/30 hover:border-cyan-500/60 text-cyan-400 font-bold text-[10px] uppercase font-mono tracking-wider rounded-xl transition cursor-pointer shrink-0 flex items-center gap-1"
+              >
+                <Check size={11} /> Save Name
+              </button>
+            </div>
+          </form>
+
+          {/* Colony Stations Renaming Form */}
+          <form onSubmit={handleRenameBase} className="space-y-3">
+            <div>
+              <label className="text-xs font-bold text-[#10b981] block uppercase tracking-wide">
+                Rename Active Colony Bases
+              </label>
+              <p className="text-[10.5px] text-slate-500 leading-relaxed mt-0.5">
+                Renames any coordinates station base you have colonized. Your empire spans up to 5 strategic sectors.
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-2">
+              {/* Select Colony dropdown */}
+              <select
+                value={selectedRenamePlanetId}
+                onChange={(e) => setSelectedRenamePlanetId(e.target.value)}
+                className="px-2.5 py-1.5 bg-slate-950 border border-[#1E293B] text-slate-300 rounded-xl text-xs font-sans focus:outline-none cursor-pointer"
+              >
+                {player.planets.map((pl) => (
+                  <option key={pl.id} value={pl.id} className="text-slate-300 bg-slate-950">
+                    {pl.name} [{pl.sectorX}, {pl.sectorY}]
+                  </option>
+                ))}
+              </select>
+
+              {/* Name input */}
+              <div className="flex-grow flex gap-1.5">
+                <input
+                  type="text"
+                  maxLength={30}
+                  value={planetNewName}
+                  onChange={(e) => setPlanetNewName(e.target.value)}
+                  className="flex-grow px-3 py-2 bg-slate-950 border border-[#1E293B] hover:border-cyan-500/40 focus:border-cyan-500 focus:outline-none text-xs text-white font-mono rounded-xl transition shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)]"
+                  placeholder="New Colony Base Name"
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-gradient-to-r from-[#10b981]/10 to-indigo-500/10 hover:from-[#10b981]/20 hover:to-indigo-500/20 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-400 font-bold text-[10px] uppercase font-mono tracking-wider rounded-xl transition cursor-pointer shrink-0 flex items-center gap-1"
+                >
+                  <Home size={11} /> Save Base
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
       {/* Support informational badge */}
       <div className="p-4 bg-[#0A0F1D]/50 border border-[#1E293B]/60 rounded-xl flex items-center gap-3 max-w-lg mx-auto text-left">
         <span className="text-xl">🛡️</span>
         <div className="space-y-0.5">
           <span className="text-[10.5px] font-bold text-slate-300">Space Terminal Secured</span>
           <p className="text-[10px] text-slate-500 leading-normal">
-            Your connection details are bound to physical station profile <span className="text-cyan-400 font-mono font-bold">{player.username}</span> ({player.faction}). Unauthorized parsec monitoring is blocked.
+            Your connection details are bound to physical station profile <span className="text-cyan-400 font-mono font-bold">{player.username}</span>. Unauthorized parsec monitoring is blocked.
           </p>
         </div>
       </div>

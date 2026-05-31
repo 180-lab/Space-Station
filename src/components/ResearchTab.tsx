@@ -131,9 +131,13 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
     if (!endTimestamp) return '';
     const diff = Math.max(0, endTimestamp - serverTime);
     const secs = Math.floor(diff / 1000);
-    const m = Math.floor(secs / 60);
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
     const s = secs % 60;
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
+    const hText = h === 1 ? 'hour' : 'hours';
+    const mText = m === 1 ? 'minute' : 'minutes';
+    const sText = s === 1 ? 'second' : 'seconds';
+    return `${h} ${hText}, ${m} ${mText}, ${s} ${sText}`;
   };
 
   const getTechCost = (tech: TechDef, lvl: number) => {

@@ -43,6 +43,7 @@ interface GalaxyTabProps {
     troops: Record<string, number>;
     targetId?: string;
     targetName?: string;
+    targetBuilding?: string;
   }) => void;
   onSendChat: (channel: 'global' | 'alliance' | 'private', content: string, receiverId?: string) => void;
   onCreateAlliance: (name: string, tag: string, bannerColor: string, bannerSymbol: string) => void;
@@ -148,6 +149,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   // Selected Sector details for fleet launch modal
   const [selectedTarget, setSelectedTarget] = useState<any | null>(null);
   const [fleetType, setFleetType] = useState<'attack' | 'colonize' | 'recon'>('recon');
+  const [targetBuilding, setTargetBuilding] = useState<string>('random');
   const [fleetTroops, setFleetTroops] = useState<Record<string, number>>({
     defender: 0,
     attacker: 0,
@@ -218,6 +220,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const openDispatchFleet = (target: any, type: 'attack' | 'colonize' | 'recon') => {
     setSelectedTarget(target);
     setFleetType(type);
+    setTargetBuilding('random');
     
     // Set smart default troops count
     const initial: Record<string, number> = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
@@ -241,7 +244,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
       missionType: fleetType,
       troops: fleetTroops,
       targetId: selectedTarget.id || undefined,
-      targetName: selectedTarget.planetName || `Sector [${selectedTarget.coords.x}, ${selectedTarget.coords.y}]`
+      targetName: selectedTarget.planetName || `Sector [${selectedTarget.coords.x}, ${selectedTarget.coords.y}]`,
+      targetBuilding: (fleetTroops.tank || 0) > 0 ? targetBuilding : undefined
     });
     setSelectedTarget(null);
   };
@@ -266,11 +270,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   // Leaderboard formatting helpers
   const rankedState = Object.values(alliances) as Alliance[];  return (
     <div className="space-y-8 pb-24 font-mono">
-      {/* Visual Navigation Pill Bars with Elegant Dark Accent */}
-      <div className="flex bg-[#0A0F1D] p-1.5 rounded-xl border border-[#1E293B] shrink-0 text-xs">
+      {/* Visual Navigation Pill Bars as a 2-rowed layout assembly to fit mobile viewports exactly */}
+      <div className="grid grid-cols-2 gap-1.5 bg-[#0A0F1D] p-1.5 rounded-xl border border-[#1E293B] shrink-0 text-xs">
         <button 
           onClick={() => { setSubTab('scanner'); handleScan(targetCoords.x, targetCoords.y); }}
-          className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'scanner' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+          className={`py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'scanner' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
           title="Surveillance arrays: survey adjacent coordinates, sectors, and cosmic features"
         >
           <Radar size={13} className={subTab === 'scanner' && isScanning ? 'animate-spin' : ''} title="Scanning Radar sweep line" />
@@ -278,7 +282,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         </button>
         <button 
           onClick={() => setSubTab('ranking')}
-          className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'ranking' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+          className={`py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'ranking' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
           title="Sovereignty Leaderboard: inspect combined firepower rank standings of galactic alliances"
         >
           <Trophy size={13} title="Trophy award leader prize" />
@@ -286,7 +290,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         </button>
         <button 
           onClick={() => setSubTab('comms')}
-          className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'comms' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+          className={`py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'comms' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
           title="Alliance Core Hub: form coalitions, manage treaties and covenants"
         >
           <Users size={13} title="Group of astronauts Alliance icon" />
@@ -294,7 +298,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         </button>
         <button 
           onClick={() => setSubTab('news')}
-          className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'news' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+          className={`py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'news' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
           title="Sector DEC_LINKS: review decrypted battle reports and public newsletters feed"
         >
           <Radio size={13} title="Radio waves beacon transceiver" />
@@ -400,8 +404,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           <div className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-3">
                               <div 
-                                className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 border uppercase font-mono shadow-inner"
-                                style={{ borderColor: target.factionColor, color: target.factionColor, backgroundColor: target.factionColor + '10' }}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 border border-cyan-500/45 text-cyan-400 bg-cyan-500/10 uppercase font-mono shadow-inner shadow-cyan-500/15"
                               >
                                 {target.planetName[0]}
                               </div>
@@ -413,7 +416,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   {target.isHabitable ? (
                                     <span className="text-emerald-450 font-bold uppercase tracking-wide text-[10px] text-emerald-400 font-sans">Habitable Planetary Target</span>
                                   ) : (
-                                    <>Commander: <span style={{ color: target.factionColor }} className="font-bold font-mono">{target.username}</span></>
+                                    <>Commander: <span className="text-cyan-400 font-bold font-mono">{target.username}</span></>
                                   )}
                                 </p>
                               </div>
@@ -591,19 +594,17 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 <thead>
                   <tr className="border-b border-[#1E293B] text-slate-500 pb-2">
                     <th className="py-3">COMMANDER</th>
-                    <th className="py-3 text-center">FACTION</th>
                     <th className="py-3 text-right">POPULATION</th>
-                    <th className="py-3 text-right">RAIDS (HP KILLED)</th>
-                    <th className="py-3 text-right">DEFENSE (HP SAVED)</th>
+                    <th className="py-3 text-right">ATTACK POINTS</th>
+                    <th className="py-3 text-right">DEFENSE POINTS</th>
                     <th className="py-3 text-right">LOOT CORES</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-900/60 font-medium">
                   <tr className="bg-indigo-950/15 text-indigo-300 border-b border-indigo-500/20">
                     <td className="py-3.5 px-2 flex items-center gap-1.5 font-bold">
-                      <span className="text-yellow-400">★</span> {player.username} <span className="text-[10px] text-slate-500">(You)</span>
+                       <span className="text-yellow-400">★</span> {player.username} <span className="text-[10px] text-slate-500">(You)</span>
                     </td>
-                    <td className="py-3.5 text-center" style={{ color: player.factionColor }}>{player.faction}</td>
                     <td className="py-3.5 text-right text-white font-bold">{player.scores.population.toLocaleString()}</td>
                     <td className="py-3.5 text-right text-red-400">{player.scores.attack.toLocaleString()}</td>
                     <td className="py-3.5 text-right text-blue-400">{player.scores.defence.toLocaleString()}</td>
@@ -613,7 +614,6 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   {/* Simulated top other players */}
                   <tr className="border-b border-[#1E293B] hover:bg-white/5 transition duration-150">
                     <td className="py-3">VoidLord <span className="text-[10px] text-slate-500">[*AI*]</span></td>
-                    <td className="py-3 text-center text-pink-500">Nexus Syndicate</td>
                     <td className="py-3 text-right text-slate-300">12,450</td>
                     <td className="py-3 text-right text-slate-300">540,000</td>
                     <td className="py-3 text-right text-slate-400">220,000</td>
@@ -621,7 +621,6 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   </tr>
                   <tr className="border-b border-[#1E293B] hover:bg-white/5 transition duration-150">
                     <td className="py-3">Astraea <span className="text-[10px] text-slate-500">[*AI*]</span></td>
-                    <td className="py-3 text-center text-cyan-400 font-bold">Solar Alliance</td>
                     <td className="py-3 text-right text-slate-300">10,200</td>
                     <td className="py-3 text-right text-slate-300">240,000</td>
                     <td className="py-3 text-right text-slate-400">450,000</td>
@@ -629,7 +628,6 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   </tr>
                   <tr className="border-b border-[#1E293B] hover:bg-white/5 transition duration-150">
                     <td className="py-3">CosmoPirate <span className="text-[10px] text-slate-500">[*AI*]</span></td>
-                    <td className="py-3 text-center text-yellow-500">Eclipse Vanguard</td>
                     <td className="py-3 text-right text-slate-300">8,500</td>
                     <td className="py-3 text-right text-slate-300">950,000</td>
                     <td className="py-3 text-right text-slate-400">15,000</td>
@@ -637,7 +635,6 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   </tr>
                   <tr className="border-b border-[#1E293B] hover:bg-white/5 transition duration-150">
                     <td className="py-3">NovaSlayer <span className="text-[10px] text-slate-500">[*AI*]</span></td>
-                    <td className="py-3 text-center text-yellow-500">Eclipse Vanguard</td>
                     <td className="py-3 text-right text-slate-300">6,100</td>
                     <td className="py-3 text-right text-slate-300">420,000</td>
                     <td className="py-3 text-right text-slate-400">90,000</td>
@@ -742,7 +739,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     type="submit"
                     className="w-full px-4 py-3 bg-gradient-to-r from-pink-900/10 to-pink-500/10 hover:from-pink-900/20 hover:to-pink-500/20 border border-pink-500/40 hover:border-pink-500/60 text-pink-400 hover:text-pink-300 font-bold font-mono tracking-widest text-[10px] uppercase rounded-xl transition cursor-pointer"
                   >
-                    Found Faction Alliance
+                    Found Star Alliance
                   </button>
                 </form>
 
@@ -1122,23 +1119,6 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             )}
           </div>
 
-          {/* Galaxy news events */}
-          <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-1.5 font-mono" title="Public broad transmission reports and sector updates">
-              <Flag size={16} title="Broadcast military flag icon" /> BROADCAST WAVELENGTH FEED
-            </h3>
-            <div className="space-y-3 max-h-[300px] overflow-y-auto text-xs pr-1 font-mono">
-              {newsEvents.map((evt) => (
-                <div key={evt.id} className="p-3 border border-[#1E293B] bg-[#05070A]/60 rounded-xl flex items-start gap-3">
-                  <span className="text-[10px] text-slate-500 font-bold shrink-0 mt-0.5">{new Date(evt.timestamp).toLocaleTimeString()}</span>
-                  <div>
-                    <span className="font-bold text-slate-300 uppercase tracking-wider">{evt.title}</span>
-                    <p className="text-slate-400 leading-relaxed text-[11px] mt-1">{evt.content}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
 
@@ -1235,6 +1215,41 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   })}
                 </div>
               </div>
+
+              {/* Bomber Tank Targeting configuration */}
+              {(fleetTroops.tank || 0) > 0 && (
+                <div className="p-3 border border-amber-600/35 bg-[#0C0F1A] rounded-xl space-y-2 mt-2 z-10 relative">
+                  <div className="flex items-center gap-1.5 text-[10px] text-amber-400 font-mono font-bold uppercase tracking-wider">
+                    <span className="text-xs">💣</span>
+                    <span>Bomber Tank Demolition Target</span>
+                  </div>
+                  <p className="text-[9px] text-slate-400 font-sans leading-relaxed">
+                    Choose which structural system or extraction mine this Bomber Tank should prioritize to sabotage and degrade in level upon successful deployment.
+                  </p>
+                  <select
+                    value={targetBuilding}
+                    onChange={(e) => setTargetBuilding(e.target.value)}
+                    className="w-full bg-[#05070A] text-xs text-amber-400 font-mono font-bold py-1.5 px-3 rounded-lg border border-amber-500/20 focus:border-amber-500 focus:outline-[#f59e0b] cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.05)] hover:border-amber-500/40 transition"
+                    id="bomber-tank-target-select"
+                  >
+                    <option value="random">Random Structure (Default)</option>
+                    <optgroup label="Colony Buildings" className="bg-[#05070A] text-slate-300">
+                      <option value="commsHub">Communications Hub</option>
+                      <option value="researchCenter">Research Center</option>
+                      <option value="armyBase">Army Base</option>
+                      <option value="repository">Storage Repository</option>
+                      <option value="radar">Active radar scans</option>
+                    </optgroup>
+                    <optgroup label="Extraction Mines" className="bg-[#05070A] text-slate-300">
+                      <option value="mines.water">Water Condenser Mine</option>
+                      <option value="mines.plasma">Plasma Synthesizer Mine</option>
+                      <option value="mines.fuel">Thermonuclear Fuel Mine</option>
+                      <option value="mines.food">Hydroponic Food Mine</option>
+                      <option value="mines.respirant">Aerosol Respirant Mine</option>
+                    </optgroup>
+                  </select>
+                </div>
+              )}
 
               {/* Interactive Mission Options - COMPLETELY CLICKABLE ALWAYS */}
               <div className="space-y-2">
@@ -1393,8 +1408,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           {msg.allianceTag && (
                             <span className="text-yellow-400 font-bold">[{msg.allianceTag}]</span>
                           )}
-                          <span className="font-bold underline" style={{ color: msg.senderFactionColor }}>{msg.senderName}</span>
-                          <span className="text-slate-500 text-[10px]">({msg.senderFaction}):</span>
+                          <span className="font-bold underline text-cyan-400">{msg.senderName}</span>
+                          <span className="text-slate-500 text-[10px]">:</span>
                         </div>
                         <p className="text-slate-350 mt-1 pl-2 border-l border-cyan-500/40">{msg.content}</p>
                       </div>

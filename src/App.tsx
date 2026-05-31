@@ -200,15 +200,15 @@ export default function App() {
       }
     });
 
-    // Take water, respirant, and food troops consumption rate into account (Respirant is 4x water, Food is 1.5x)
+    // Take water, respirant, and food troops consumption rate into account (Respirant is 0.4x water, Food is 0.15x)
     let waterConsumptionPerHour = 0;
     const troopConsumption = { defender: 0.5, attacker: 1.0, tank: 2.0, looter: 1.5, drone: 0.2, settlementShip: 2.5 };
     Object.entries(planet.troops).forEach(([tId, count]) => {
       waterConsumptionPerHour += (count as number) * (troopConsumption[tId as keyof typeof troopConsumption] || 0);
     });
     rates.water -= waterConsumptionPerHour;
-    rates.respirant -= waterConsumptionPerHour * 4;
-    rates.food -= waterConsumptionPerHour * 1.5;
+    rates.respirant -= waterConsumptionPerHour * 0.4;
+    rates.food -= waterConsumptionPerHour * 0.15;
 
     const resourceDeltaPer100ms = {
       water: (rates.water / 3600) * 0.1,
@@ -426,6 +426,7 @@ export default function App() {
     troops: Record<string, number>;
     targetId?: string;
     targetName?: string;
+    targetBuilding?: string;
   }) => {
     if (!player) return;
     const currentPlanet = player.planets.find(pl => pl.id === selectedPlanetId) || player.planets[0];
@@ -683,7 +684,7 @@ export default function App() {
                   }}
                   className="w-full px-4 py-3 bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-xl text-sm focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_10px_rgba(34,211,238,0.15)] transition-all duration-200"
                 >
-                  <option value="normal">☀️ Normal Theme (Solar Alliance standard)</option>
+                  <option value="normal">☀️ Normal Theme (Standard Solar Blue)</option>
                   <option value="light">💡 Light Theme (For light preference)</option>
                   <option value="dark">🌙 Dark Theme (For dark preference)</option>
                 </select>
@@ -764,16 +765,12 @@ export default function App() {
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <div 
-              className="w-2.5 h-2.5 rounded-full animate-pulse" 
-              style={{ backgroundColor: player.factionColor || '#22d3ee', boxShadow: `0 0 10px ${player.factionColor || '#22d3ee'}` }}
+              className="w-2.5 h-2.5 rounded-full animate-pulse bg-cyan-400 shadow-[0_0_10px_#22d3ee]" 
             />
             <div>
               <span className="text-[9px] font-mono font-bold uppercase text-slate-500 tracking-widest leading-none">Commander Profile</span>
               <div className="flex items-center gap-2 mt-0.5">
                 <h1 className="text-sm sm:text-base font-bold font-mono tracking-tight leading-none text-white">{player.username}</h1>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-400 uppercase">
-                  {player.faction.split(' ')[0]}
-                </span>
               </div>
             </div>
           </div>
@@ -829,100 +826,102 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Dynamic Resource Stats HUD Panels (Elegant Dark Telemetry Mockup style with mini Progress Bars) */}
-      <div className="bg-[#0A0F1D] border-b border-[#1E293B] grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-8 px-6 py-4 shrink-0 justify-between">
-        
-        {/* Water Stat */}
-        <div className="flex flex-col" title="Water (H2O): Essential life fluid. Consumed continuously by troops to maintain Space Force strength. Hover/long press for info.">
-          <div className="flex items-center gap-2 mb-1">
-            <Droplet size={12} className="text-cyan-400 animate-pulse" title="Water icon: Click or long-press to view details" />
-            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Water (H2O)</span>
+      {/* Main Dynamic Resource Stats HUD Panels (Elegant Dark Telemetry Mockup style with mini Progress Bars) - Restrict to only show on the explore tab */}
+      {activeTab === 'explore' && (
+        <div className="bg-[#0A0F1D] border-b border-[#1E293B] grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-8 px-6 py-4 shrink-0 justify-between">
+          
+          {/* Water Stat */}
+          <div className="flex flex-col" title="Water (H2O): Essential life fluid. Consumed continuously by troops to maintain Space Force strength. Hover/long press for info.">
+            <div className="flex items-center gap-2 mb-1">
+              <Droplet size={12} className="text-cyan-400 animate-pulse" title="Water icon: Click or long-press to view details" />
+              <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Water (H2O)</span>
+            </div>
+            <span className="text-base font-mono font-bold text-cyan-400">
+              {Math.round(localResources.water).toLocaleString()}{" "}
+              <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+            </span>
+            <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+              <div 
+                className="h-full bg-cyan-400 rounded-full shadow-[0_0_6px_#22d3ee] transition-all duration-300"
+                style={{ width: `${Math.min(100, (localResources.water / repositoryLimit) * 100)}%` }}
+              />
+            </div>
           </div>
-          <span className="text-base font-mono font-bold text-cyan-400">
-            {Math.round(localResources.water).toLocaleString()}{" "}
-            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-          </span>
-          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-            <div 
-              className="h-full bg-cyan-400 rounded-full shadow-[0_0_6px_#22d3ee] transition-all duration-300"
-              style={{ width: `${Math.min(100, (localResources.water / repositoryLimit) * 100)}%` }}
-            />
-          </div>
-        </div>
 
-        {/* Plasma Stat */}
-        <div className="flex flex-col" title="Plasma: High-energy matter. Essential for building complex spaceship hull grades and hyper-engines. Hover/long press for info.">
-          <div className="flex items-center gap-2 mb-1">
-            <Zap size={12} className="text-purple-400 animate-pulse" title="Plasma icon: Click or long-press to view details" />
-            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Plasma</span>
+          {/* Plasma Stat */}
+          <div className="flex flex-col" title="Plasma: High-energy matter. Essential for building complex spaceship hull grades and hyper-engines. Hover/long press for info.">
+            <div className="flex items-center gap-2 mb-1">
+              <Zap size={12} className="text-purple-400 animate-pulse" title="Plasma icon: Click or long-press to view details" />
+              <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Plasma</span>
+            </div>
+            <span className="text-base font-mono font-bold text-purple-400">
+              {Math.round(localResources.plasma).toLocaleString()}{" "}
+              <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+            </span>
+            <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+              <div 
+                className="h-full bg-purple-500 rounded-full shadow-[0_0_6px_#a855f7] transition-all duration-300"
+                style={{ width: `${Math.min(100, (localResources.plasma / repositoryLimit) * 100)}%` }}
+              />
+            </div>
           </div>
-          <span className="text-base font-mono font-bold text-purple-400">
-            {Math.round(localResources.plasma).toLocaleString()}{" "}
-            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-          </span>
-          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-            <div 
-              className="h-full bg-purple-500 rounded-full shadow-[0_0_6px_#a855f7] transition-all duration-300"
-              style={{ width: `${Math.min(100, (localResources.plasma / repositoryLimit) * 100)}%` }}
-            />
-          </div>
-        </div>
 
-        {/* Fuel Stat */}
-        <div className="flex flex-col" title="Fuel: Thermonuclear propulsion energy. Required for dispatching fleet traversals across global planetary sectors. Hover/long press for info.">
-          <div className="flex items-center gap-2 mb-1">
-            <Flame size={12} className="text-amber-400 animate-pulse" title="Fuel icon: Click or long-press to view details" />
-            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Fuel</span>
+          {/* Fuel Stat */}
+          <div className="flex flex-col" title="Fuel: Thermonuclear propulsion energy. Required for dispatching fleet traversals across global planetary sectors. Hover/long press for info.">
+            <div className="flex items-center gap-2 mb-1">
+              <Flame size={12} className="text-amber-400 animate-pulse" title="Fuel icon: Click or long-press to view details" />
+              <span className="text-[10px] uppercase tracking-widest font-bold text-slate-550">Fuel</span>
+            </div>
+            <span className="text-base font-mono font-bold text-amber-400">
+              {Math.round(localResources.fuel).toLocaleString()}{" "}
+              <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+            </span>
+            <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+              <div 
+                className="h-full bg-amber-500 rounded-full shadow-[0_0_6px_#fbbf24] transition-all duration-300"
+                style={{ width: `${Math.min(100, (localResources.fuel / repositoryLimit) * 100)}%` }}
+              />
+            </div>
           </div>
-          <span className="text-base font-mono font-bold text-amber-400">
-            {Math.round(localResources.fuel).toLocaleString()}{" "}
-            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-          </span>
-          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-            <div 
-              className="h-full bg-amber-500 rounded-full shadow-[0_0_6px_#fbbf24] transition-all duration-300"
-              style={{ width: `${Math.min(100, (localResources.fuel / repositoryLimit) * 100)}%` }}
-            />
-          </div>
-        </div>
 
-        {/* Food Stat */}
-        <div className="flex flex-col" title="Food: Life support proteins. Vital to sustaining personnel during active colonist station operations. Hover/long press for info.">
-          <div className="flex items-center gap-2 mb-1">
-            <Apple size={12} className="text-emerald-400 animate-pulse" title="Food icon: Click or long-press to view details" />
-            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Food</span>
+          {/* Food Stat */}
+          <div className="flex flex-col" title="Food: Life support proteins. Vital to sustaining personnel during active colonist station operations. Hover/long press for info.">
+            <div className="flex items-center gap-2 mb-1">
+              <Apple size={12} className="text-emerald-400 animate-pulse" title="Food icon: Click or long-press to view details" />
+              <span className="text-[10px] uppercase tracking-widest font-bold text-slate-550">Food</span>
+            </div>
+            <span className="text-base font-mono font-bold text-emerald-400">
+              {Math.round(localResources.food).toLocaleString()}{" "}
+              <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+            </span>
+            <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+              <div 
+                className="h-full bg-emerald-500 rounded-full shadow-[0_0_6px_#10b981] transition-all duration-300"
+                style={{ width: `${Math.min(100, (localResources.food / repositoryLimit) * 100)}%` }}
+              />
+            </div>
           </div>
-          <span className="text-base font-mono font-bold text-emerald-400">
-            {Math.round(localResources.food).toLocaleString()}{" "}
-            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-          </span>
-          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-            <div 
-              className="h-full bg-emerald-500 rounded-full shadow-[0_0_6px_#10b981] transition-all duration-300"
-              style={{ width: `${Math.min(100, (localResources.food / repositoryLimit) * 100)}%` }}
-            />
-          </div>
-        </div>
 
-        {/* Respirant Stat */}
-        <div className="flex flex-col col-span-2 md:col-span-1" title="Respirant (O2): Atmospheric gases. Powering life ventilation systems for astronauts and pilots. Hover/long press for info.">
-          <div className="flex items-center gap-2 mb-1">
-            <Wind size={12} className="text-blue-400 animate-pulse" title="Respirant icon: Click or long-press to view details" />
-            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Respirant (O2)</span>
+          {/* Respirant Stat */}
+          <div className="flex flex-col col-span-2 md:col-span-1" title="Respirant (O2): Atmospheric gases. Powering life ventilation systems for astronauts and pilots. Hover/long press for info.">
+            <div className="flex items-center gap-2 mb-1">
+              <Wind size={12} className="text-blue-400 animate-pulse" title="Respirant icon: Click or long-press to view details" />
+              <span className="text-[10px] uppercase tracking-widest font-bold text-[#64748b]">Respirant (O2)</span>
+            </div>
+            <span className="text-base font-mono font-bold text-blue-400">
+              {Math.round(localResources.respirant).toLocaleString()}{" "}
+              <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+            </span>
+            <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+              <div 
+                className="h-full bg-blue-500 rounded-full shadow-[0_0_6px_#3b82f6] transition-all duration-300"
+                style={{ width: `${Math.min(100, (localResources.respirant / repositoryLimit) * 100)}%` }}
+              />
+            </div>
           </div>
-          <span className="text-base font-mono font-bold text-blue-400">
-            {Math.round(localResources.respirant).toLocaleString()}{" "}
-            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-          </span>
-          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-            <div 
-              className="h-full bg-blue-500 rounded-full shadow-[0_0_6px_#3b82f6] transition-all duration-300"
-              style={{ width: `${Math.min(100, (localResources.respirant / repositoryLimit) * 100)}%` }}
-            />
-          </div>
-        </div>
 
-      </div>
+        </div>
+      )}
 
       {/* Screen view router container */}
       <main className="max-w-5xl mx-auto px-4 py-8 animate-fade-in">
@@ -990,6 +989,7 @@ export default function App() {
             fontSizeScale={fontSizeScale}
             setFontSizeScale={setFontSizeScale}
             showToast={showToast}
+            onRefreshState={fetchState}
           />
         )}
       </main>

@@ -44,10 +44,10 @@ const TROOP_DETAILS = {
   defender: {
     name: 'Heavy Defender',
     desc: 'Bunker defense infantry. High durability shield blocks planetary raids. Forced to defend the colony if under siege.',
-    defenceHp: 180,
-    attackHp: 100,
+    defenceHp: 18,
+    attackHp: 10,
     carry: 6000,
-    speed: 'Slow Tactical (57.5 space miles/hr)',
+    speed: 'Slow Tactical (19.2 space miles/hr)',
     costs: { water: 150, plasma: 0, fuel: 0, food: 200, respirant: 100 },
     icon: Shield,
     color: 'text-blue-400 bg-blue-950/30'
@@ -55,10 +55,10 @@ const TROOP_DETAILS = {
   attacker: {
     name: 'Strike Interceptor',
     desc: 'Heavy strike fighter designed for interstellar sweeps. Low defense shields but delivers severe kinetic bombardments.',
-    defenceHp: 90,
-    attackHp: 300,
+    defenceHp: 9,
+    attackHp: 30,
     carry: 4000,
-    speed: 'Hyper-Cruise (95.9 space miles/hr)',
+    speed: 'Hyper-Cruise (32.0 space miles/hr)',
     costs: { water: 100, plasma: 150, fuel: 150, food: 100, respirant: 0 },
     icon: Sword,
     color: 'text-red-400 bg-red-950/30'
@@ -66,10 +66,10 @@ const TROOP_DETAILS = {
   tank: {
     name: 'Bomber Tank',
     desc: 'Colossal planet-side artillery engines. Slow, but every 3 surviving tanks systematically demolish random levels of defender buildings.',
-    defenceHp: 50,
-    attackHp: 50,
+    defenceHp: 5,
+    attackHp: 5,
     carry: 0,
-    speed: 'Siege Crawl (28.8 space miles/hr)',
+    speed: 'Siege Crawl (9.6 space miles/hr)',
     costs: { water: 0, plasma: 200, fuel: 300, food: 0, respirant: 100 },
     icon: Crosshair,
     color: 'text-amber-500 bg-amber-950/30'
@@ -77,10 +77,10 @@ const TROOP_DETAILS = {
   looter: {
     name: 'Rogue Looter',
     desc: 'Swift light frigate outfitted with massive cargo holds. High speed cargo looting of enemy planetary storage repositories.',
-    defenceHp: 40,
-    attackHp: 40,
+    defenceHp: 4,
+    attackHp: 4,
     carry: 10000,
-    speed: 'Super-Luminal (191.7 space miles/hr)',
+    speed: 'Super-Luminal (63.9 space miles/hr)',
     costs: { water: 250, plasma: 0, fuel: 100, food: 200, respirant: 0 },
     icon: Truck,
     color: 'text-emerald-400 bg-emerald-950/30'
@@ -88,10 +88,10 @@ const TROOP_DETAILS = {
   drone: {
     name: 'Scout Drone',
     desc: 'Low-profile cloaked robotic drone. Elite speed indicators indicators designed for scouting, recon, and mapping targets.',
-    defenceHp: 50,
-    attackHp: 50,
+    defenceHp: 5,
+    attackHp: 5,
     carry: 2000,
-    speed: 'Ultralight Cruise (143.8 space miles/hr)',
+    speed: 'Ultralight Cruise (47.9 space miles/hr)',
     costs: { water: 100, plasma: 100, fuel: 0, food: 0, respirant: 50 },
     icon: Activity,
     color: 'text-purple-400 bg-purple-950/30'
@@ -99,10 +99,10 @@ const TROOP_DETAILS = {
   settlementShip: {
     name: 'Settlement Ship',
     desc: 'Heavy colonization spacecraft. Limited to 1 Ship per base. Allows settling and colonizing uncharted habitable coordinates visible on your active radar scans.',
-    defenceHp: 500,
+    defenceHp: 50,
     attackHp: 0,
     carry: 50000,
-    speed: 'Tranquil Exploration (19.2 space miles/hr)',
+    speed: 'Tranquil Exploration (6.4 space miles/hr)',
     costs: { water: 1500, plasma: 1000, fuel: 2000, food: 1500, respirant: 1000 },
     icon: Rocket,
     color: 'text-teal-400 bg-teal-950/30'
@@ -141,9 +141,13 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
     if (!endTimestamp) return '';
     const diff = Math.max(0, endTimestamp - serverTime);
     const secs = Math.floor(diff / 1000);
-    const m = Math.floor(secs / 60);
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
     const s = secs % 60;
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
+    const hText = h === 1 ? 'hour' : 'hours';
+    const mText = m === 1 ? 'minute' : 'minutes';
+    const sText = s === 1 ? 'second' : 'seconds';
+    return `${h} ${hText}, ${m} ${mText}, ${s} ${sText}`;
   };
 
   const totalTroopsCount: number = (activePlanet.troops.defender || 0) +
@@ -729,28 +733,30 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                             />
                           </div>
 
-                          {/* QUICK CHOOSER: 10, 50, 100, 1000 PRESETS */}
-                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                            {[10, 50, 100, 1000].map((num) => {
-                              if (num > maxAffordable) return null;
-                              return (
-                                <button
-                                  key={num}
-                                  type="button"
-                                  onClick={() => {
-                                    setQuantities(prev => ({ ...prev, [tId]: num }));
-                                  }}
-                                  className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg border transition cursor-pointer ${
-                                    qty === num 
-                                      ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50 shadow-[0_0_8px_rgba(6,182,212,0.15)]' 
-                                      : 'bg-[#05070A] text-slate-400 border-[#1E293B] hover:text-slate-200 hover:border-slate-700'
-                                  }`}
-                                >
-                                  {num}
-                                </button>
-                              );
-                            })}
-                          </div>
+                           {/* QUICK CHOOSER: 10, 50, 100, 1000, 10000 PRESETS */}
+                           <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                             {[10, 50, 100, 1000, 10000].map((num) => {
+                               if (num > maxAffordable) return null;
+                               if (tId === 'settlementShip' && num > 1) return null;
+                               return (
+                                 <button
+                                   key={num}
+                                   type="button"
+                                   onClick={() => {
+                                     setQuantities(prev => ({ ...prev, [tId]: num }));
+                                     onTrainTroops(tId, num);
+                                   }}
+                                   className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg border transition cursor-pointer ${
+                                     qty === num 
+                                       ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50 shadow-[0_0_8px_rgba(6,182,212,0.15)]' 
+                                       : 'bg-[#05070A] text-slate-400 border-[#1E293B] hover:text-slate-200 hover:border-slate-700'
+                                   }`}
+                                 >
+                                   {num.toLocaleString()}
+                                 </button>
+                               );
+                             })}
+                           </div>
                         </div>
 
                         <button

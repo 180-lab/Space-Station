@@ -145,6 +145,7 @@ export interface FleetMission {
   arrivesAt: number;
   isReturning: boolean;
   isWaitingToSettle?: boolean;
+  targetBuilding?: string;
   lootCarried?: {
     water: number;
     plasma: number;

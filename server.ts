@@ -31,17 +31,31 @@ let state: GameState = {
   chatMessages: [],
   fleets: [],
   battleReports: [],
-  newsEvents: []
+  newsEvents: [],
+  habitablePlanets: [
+    { id: "hab_12_18", name: "Habitable Gaia Aurelia", coords: { x: 12, y: 18 }, isColonized: false },
+    { id: "hab_34_72", name: "Habitable Station Kepler-Prime", coords: { x: 34, y: 72 }, isColonized: false },
+    { id: "hab_45_19", name: "Habitable Outpost Gliese-91", coords: { x: 45, y: 19 }, isColonized: false },
+    { id: "hab_67_82", name: "Habitable Station New Hope", coords: { x: 67, y: 82 }, isColonized: false },
+    { id: "hab_15_55", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 55 }, isColonized: false },
+    { id: "hab_85_44", name: "Habitable Station Zephyr-9", coords: { x: 85, y: 44 }, isColonized: false },
+    { id: "hab_52_63", name: "Habitable Planet Arcadia", coords: { x: 52, y: 63 }, isColonized: false },
+    { id: "hab_29_31", name: "Habitable Core Dome-A", coords: { x: 29, y: 31 }, isColonized: false },
+    { id: "hab_73_25", name: "Habitable Station Oasis-1", coords: { x: 73, y: 25 }, isColonized: false },
+    { id: "hab_91_85", name: "Habitable Planet Eden-X", coords: { x: 91, y: 85 }, isColonized: false },
+    { id: "hab_8_92", name: "Habitable Outpost Genesis", coords: { x: 8, y: 92 }, isColonized: false },
+    { id: "hab_40_40", name: "Habitable Station Midway", coords: { x: 40, y: 40 }, isColonized: false }
+  ]
 };
 
 // Default Troop Specifications
 const TROOP_SPECS = {
-  defender: { name: "Heavy Defender", defenceHp: 180, attackHp: 100, carry: 6000, speed: 30, waterConsumption: 0.5 },
-  attacker: { name: "Strike Interceptor", defenceHp: 90, attackHp: 300, carry: 4000, speed: 50, waterConsumption: 1.0 },
-  tank: { name: "Bomber Tank", defenceHp: 50, attackHp: 50, carry: 0, speed: 15, waterConsumption: 2.0 },
-  looter: { name: "Rogue Looter", defenceHp: 40, attackHp: 40, carry: 10000, speed: 100, waterConsumption: 1.5 },
-  drone: { name: "Scout Drone", defenceHp: 50, attackHp: 50, carry: 2000, speed: 75, waterConsumption: 0.2 },
-  settlementShip: { name: "Settlement Ship", defenceHp: 500, attackHp: 0, carry: 50000, speed: 20, waterConsumption: 2.5 }
+  defender: { name: "Heavy Defender", defenceHp: 18, attackHp: 10, carry: 6000, speed: 10, waterConsumption: 0.5 },
+  attacker: { name: "Strike Interceptor", defenceHp: 9, attackHp: 30, carry: 4000, speed: 16.66, waterConsumption: 1.0 },
+  tank: { name: "Bomber Tank", defenceHp: 5, attackHp: 5, carry: 0, speed: 5, waterConsumption: 2.0 },
+  looter: { name: "Rogue Looter", defenceHp: 4, attackHp: 4, carry: 10000, speed: 33.33, waterConsumption: 1.5 },
+  drone: { name: "Scout Drone", defenceHp: 5, attackHp: 5, carry: 2000, speed: 25, waterConsumption: 0.2 },
+  settlementShip: { name: "Settlement Ship", defenceHp: 50, attackHp: 0, carry: 50000, speed: 6.66, waterConsumption: 2.5 }
 };
 
 // Help helper for repository capacity
@@ -92,6 +106,9 @@ function loadState() {
                 if (pl.troops.settlementShip === undefined) {
                   pl.troops.settlementShip = 0;
                 }
+              }
+              if (pl && !pl.trainingQueue) {
+                pl.trainingQueue = [];
               }
             });
           }
@@ -185,6 +202,20 @@ function bootstrapUniverse() {
   state.chatMessages = [];
   state.fleets = [];
   state.battleReports = [];
+  state.habitablePlanets = [
+    { id: "hab_12_18", name: "Habitable Gaia Aurelia", coords: { x: 12, y: 18 }, isColonized: false },
+    { id: "hab_34_72", name: "Habitable Station Kepler-Prime", coords: { x: 34, y: 72 }, isColonized: false },
+    { id: "hab_45_19", name: "Habitable Outpost Gliese-91", coords: { x: 45, y: 19 }, isColonized: false },
+    { id: "hab_67_82", name: "Habitable Station New Hope", coords: { x: 67, y: 82 }, isColonized: false },
+    { id: "hab_15_55", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 55 }, isColonized: false },
+    { id: "hab_85_44", name: "Habitable Station Zephyr-9", coords: { x: 85, y: 44 }, isColonized: false },
+    { id: "hab_52_63", name: "Habitable Planet Arcadia", coords: { x: 52, y: 63 }, isColonized: false },
+    { id: "hab_29_31", name: "Habitable Core Dome-A", coords: { x: 29, y: 31 }, isColonized: false },
+    { id: "hab_73_25", name: "Habitable Station Oasis-1", coords: { x: 73, y: 25 }, isColonized: false },
+    { id: "hab_91_85", name: "Habitable Planet Eden-X", coords: { x: 91, y: 85 }, isColonized: false },
+    { id: "hab_8_92", name: "Habitable Outpost Genesis", coords: { x: 8, y: 92 }, isColonized: false },
+    { id: "hab_40_40", name: "Habitable Station Midway", coords: { x: 40, y: 40 }, isColonized: false }
+  ];
   state.newsEvents = [
     {
       id: "news_0",
@@ -371,10 +402,10 @@ function tickPlayerState(playerId: string, now: number): boolean {
         });
       }
 
-      // Deduct consumption rates (Water, Respirant 4x, Food 1.5x)
+      // Deduct consumption rates (Water, Respirant 0.4x, Food 0.15x - divided by 10 as requested)
       const waterConsumed = waterConsumptionPerHour * deltaHours;
-      const respirantConsumed = waterConsumptionPerHour * 4 * deltaHours;
-      const foodConsumed = waterConsumptionPerHour * 1.5 * deltaHours;
+      const respirantConsumed = waterConsumptionPerHour * 0.4 * deltaHours;
+      const foodConsumed = waterConsumptionPerHour * 0.15 * deltaHours;
 
       planet.resources.water = planet.resources.water - waterConsumed;
       planet.resources.respirant = planet.resources.respirant - respirantConsumed;
@@ -432,58 +463,43 @@ function tickPlayerState(playerId: string, now: number): boolean {
         }
       }
 
-      // Troop training queue handling (Sequential Processing)
-      if (planet.trainingQueue.length > 0) {
+      // Troop training queue handling (Parallel Processing: build different troop types at the same time)
+      if (planet.trainingQueue && planet.trainingQueue.length > 0) {
         const baseTimes = { defender: 30, attacker: 20, tank: 60, looter: 40, drone: 15, settlementShip: 120 };
-        
-        let activeItem = planet.trainingQueue[0];
-        while (activeItem && now >= activeItem.completedAt) {
-          // This queue item is fully completed
-          planet.troops[activeItem.troopId as keyof typeof planet.troops] += activeItem.count;
-          changed = true;
-          planet.trainingQueue.shift(); // Remove completed item
-          
-          const prevCompletionTime = activeItem.completedAt;
-          activeItem = planet.trainingQueue[0];
-          if (activeItem) {
-            // Shift the new active item's timestamps to start from the end of the previous one
-            const duration = activeItem.completedAt - activeItem.startedAt;
-            activeItem.startedAt = prevCompletionTime;
-            activeItem.completedAt = prevCompletionTime + duration;
-          }
-        }
+        const remainingQueue: typeof planet.trainingQueue = [];
 
-        // Process fractional progress on the active item at index 0
-        if (activeItem) {
-          const bTime = baseTimes[activeItem.troopId as keyof typeof baseTimes] || 30;
-          const rcLevel = planet.buildings.researchCenter.level;
-          const reductionFrac = Math.min(0.7, 0.7 * (rcLevel / 20));
-          const unitDurationMs = Math.max(1000, Math.round(bTime * (1 - reductionFrac) * 1000));
+        planet.trainingQueue.forEach(item => {
+          if (now >= item.completedAt) {
+            // Fully completed
+            planet.troops[item.troopId as keyof typeof planet.troops] += item.count;
+            changed = true;
+          } else {
+            // Process fractional progress
+            const bTime = baseTimes[item.troopId as keyof typeof baseTimes] || 30;
+            const rcLevel = planet.buildings.researchCenter.level;
+            const reductionFrac = Math.min(0.7, 0.7 * (rcLevel / 20));
+            const unitDurationMs = Math.max(1000, Math.round(bTime * (1 - reductionFrac) * 1000));
 
-          const timePassedSinceStart = now - activeItem.startedAt;
-          const completedUnits = Math.floor(timePassedSinceStart / unitDurationMs);
+            const timePassedSinceStart = now - item.startedAt;
+            const completedUnits = Math.floor(timePassedSinceStart / unitDurationMs);
 
-          if (completedUnits > 0) {
-            const actualCompleted = Math.min(activeItem.count, completedUnits);
-            if (actualCompleted > 0) {
-              planet.troops[activeItem.troopId as keyof typeof planet.troops] += actualCompleted;
-              activeItem.count -= actualCompleted;
-              activeItem.startedAt += actualCompleted * unitDurationMs;
-              changed = true;
+            if (completedUnits > 0) {
+              const actualCompleted = Math.min(item.count, completedUnits);
+              if (actualCompleted > 0) {
+                planet.troops[item.troopId as keyof typeof planet.troops] += actualCompleted;
+                item.count -= actualCompleted;
+                item.startedAt += actualCompleted * unitDurationMs;
+                changed = true;
+              }
+            }
+
+            if (item.count > 0) {
+              remainingQueue.push(item);
             }
           }
+        });
 
-          if (activeItem.count <= 0) {
-            planet.trainingQueue.shift();
-            // Start next item if exists
-            const nextItem = planet.trainingQueue[0];
-            if (nextItem) {
-              const duration = nextItem.completedAt - nextItem.startedAt;
-              nextItem.startedAt = now;
-              nextItem.completedAt = now + duration;
-            }
-          }
-        }
+        planet.trainingQueue = remainingQueue;
       }
     }
   });
@@ -864,12 +880,58 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       // Every 3 surviving tanks destroys 1 level of a random building
       const destructionPower = Math.floor(combat.attackerRemaining.tank / 3);
       if (destructionPower > 0) {
-        const destructibleBuildings = Object.keys(defPlanet.buildings) as (keyof typeof defPlanet.buildings)[];
+        const target = fleet.targetBuilding || "random";
         
         for (let i = 0; i < destructionPower; i++) {
+          let chosenTarget = target;
+          
+          if (chosenTarget === "random") {
+            const choices = ["commsHub", "researchCenter", "armyBase", "repository", "radar", "mines.water", "mines.plasma", "mines.fuel", "mines.food", "mines.respirant"];
+            chosenTarget = choices[Math.floor(Math.random() * choices.length)];
+          }
+          
+          if (chosenTarget.startsWith("mines.")) {
+            const mineType = chosenTarget.split(".")[1];
+            const mineList = defPlanet.mines[mineType as keyof typeof defPlanet.mines];
+            if (mineList && mineList.length > 0) {
+              let highestMine = mineList[0];
+              for (const mine of mineList) {
+                if (mine.level > highestMine.level) {
+                  highestMine = mine;
+                }
+              }
+              if (highestMine.level > 1) {
+                const prevLvl = highestMine.level;
+                highestMine.level -= 1;
+                buildingDamageReports.push({
+                  buildingName: `${mineType} Mine #${highestMine.index + 1}`,
+                  levelsDestroyed: 1,
+                  previousLevel: prevLvl,
+                  newLevel: highestMine.level
+                });
+                continue;
+              }
+            }
+          } else {
+            const bState = defPlanet.buildings[chosenTarget as keyof typeof defPlanet.buildings];
+            if (bState && bState.level > 1) {
+              const prevLvl = bState.level;
+              bState.level -= 1;
+              buildingDamageReports.push({
+                buildingName: chosenTarget,
+                levelsDestroyed: 1,
+                previousLevel: prevLvl,
+                newLevel: bState.level
+              });
+              continue;
+            }
+          }
+          
+          // Fallback: if selected target could not be damaged, try any destructible building
+          const destructibleBuildings = Object.keys(defPlanet.buildings) as (keyof typeof defPlanet.buildings)[];
           const bKey = destructibleBuildings[Math.floor(Math.random() * destructibleBuildings.length)];
           const bState = defPlanet.buildings[bKey];
-          if (bState.level > 1) {
+          if (bState && bState.level > 1) {
             const prevLvl = bState.level;
             bState.level -= 1;
             buildingDamageReports.push({
@@ -1379,6 +1441,7 @@ app.post("/api/train/troop", (req, res) => {
     planet.resources[k] -= currentCosts[k] * costMultiplier;
   });
 
+  // Base times are aligned with processing times to ensure duration matches tick completions exactly
   const baseTimes = { defender: 30, attacker: 20, tank: 60, looter: 40, drone: 15, settlementShip: 120 };
   const baseSecs = baseTimes[troopId as keyof typeof baseTimes] * count;
   
@@ -1387,23 +1450,14 @@ app.post("/api/train/troop", (req, res) => {
   const reductionFrac = Math.min(0.7, 0.7 * (rcLevel / 20));
   const buildDurationMs = Math.round(baseSecs * (1 - reductionFrac) * 1000);
 
-  // If there's an existing item for this troopId, add to it and shift later dependencies
+  // If there's an existing item for this troopId, combine them; otherwise start training immediately in parallel
   const existingIndex = planet.trainingQueue.findIndex(item => item.troopId === troopId);
   if (existingIndex !== -1) {
     const existingItem = planet.trainingQueue[existingIndex];
     existingItem.count += count;
     existingItem.completedAt += buildDurationMs;
-    // Shift start and end times of any subsequent items in the queue
-    for (let i = existingIndex + 1; i < planet.trainingQueue.length; i++) {
-      planet.trainingQueue[i].startedAt += buildDurationMs;
-      planet.trainingQueue[i].completedAt += buildDurationMs;
-    }
   } else {
-    // Determine start timestamp: after the last item completes, or right now if queue is empty
-    let startTimestamp = Date.now();
-    if (planet.trainingQueue.length > 0) {
-      startTimestamp = planet.trainingQueue[planet.trainingQueue.length - 1].completedAt;
-    }
+    const startTimestamp = Date.now();
     const endTimestamp = startTimestamp + buildDurationMs;
 
     planet.trainingQueue.push({
@@ -1588,7 +1642,7 @@ app.post("/api/fleet/send", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { planetId, missionType, troops, targetId, targetName } = req.body;
+  const { planetId, missionType, troops, targetId, targetName, targetBuilding } = req.body;
   const targetX = parseInt(String(req.body.targetX), 10);
   const targetY = parseInt(String(req.body.targetY), 10);
   const planet = p.planets.find(pl => pl.id === planetId);
@@ -1712,11 +1766,58 @@ app.post("/api/fleet/send", (req, res) => {
       if (combat.winner === "attacker" && combat.attackerRemaining.tank > 0 && defPlanet) {
         const destructionPower = Math.floor(combat.attackerRemaining.tank / 3);
         if (destructionPower > 0) {
-          const destructibleBuildings = Object.keys(defPlanet.buildings) as (keyof typeof defPlanet.buildings)[];
+          const target = targetBuilding || "random";
+          
           for (let i = 0; i < destructionPower; i++) {
+            let chosenTarget = target;
+            
+            if (chosenTarget === "random") {
+              const choices = ["commsHub", "researchCenter", "armyBase", "repository", "radar", "mines.water", "mines.plasma", "mines.fuel", "mines.food", "mines.respirant"];
+              chosenTarget = choices[Math.floor(Math.random() * choices.length)];
+            }
+            
+            if (chosenTarget.startsWith("mines.")) {
+              const mineType = chosenTarget.split(".")[1];
+              const mineList = defPlanet.mines[mineType as keyof typeof defPlanet.mines];
+              if (mineList && mineList.length > 0) {
+                let highestMine = mineList[0];
+                for (const mine of mineList) {
+                  if (mine.level > highestMine.level) {
+                    highestMine = mine;
+                  }
+                }
+                if (highestMine.level > 1) {
+                  const prevLvl = highestMine.level;
+                  highestMine.level -= 1;
+                  buildingDamageReports.push({
+                    buildingName: `${mineType} Mine #${highestMine.index + 1}`,
+                    levelsDestroyed: 1,
+                    previousLevel: prevLvl,
+                    newLevel: highestMine.level
+                  });
+                  continue;
+                }
+              }
+            } else {
+              const bState = defPlanet.buildings[chosenTarget as keyof typeof defPlanet.buildings];
+              if (bState && bState.level > 1) {
+                const prevLvl = bState.level;
+                bState.level -= 1;
+                buildingDamageReports.push({
+                  buildingName: chosenTarget,
+                  levelsDestroyed: 1,
+                  previousLevel: prevLvl,
+                  newLevel: bState.level
+                });
+                continue;
+              }
+            }
+            
+            // Fallback: if selected target could not be damaged, try any destructible building
+            const destructibleBuildings = Object.keys(defPlanet.buildings) as (keyof typeof defPlanet.buildings)[];
             const bKey = destructibleBuildings[Math.floor(Math.random() * destructibleBuildings.length)];
             const bState = defPlanet.buildings[bKey];
-            if (bState.level > 1) {
+            if (bState && bState.level > 1) {
               const prevLvl = bState.level;
               bState.level -= 1;
               buildingDamageReports.push({
@@ -1949,6 +2050,70 @@ app.post("/api/fleet/settle", (req, res) => {
 
   saveState();
   return res.json({ player: p, success: true, fleets: state.fleets });
+});
+
+// Rename Commander / Player Profile Username
+app.post("/api/player/rename", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { newUsername } = req.body;
+  if (!newUsername || !newUsername.trim()) {
+    return res.status(400).json({ error: "Commander name is required" });
+  }
+
+  const desiredName = newUsername.trim();
+  if (desiredName.length > 25) {
+    return res.status(400).json({ error: "Commander name must be 25 characters or less" });
+  }
+
+  // Check if someone else already has this username
+  const exists = Object.values(state.players).some(
+    player => player.id !== p.id && player.username.toLowerCase() === desiredName.toLowerCase()
+  );
+  if (exists) {
+    return res.status(400).json({ error: "That commander name is already registered in the database!" });
+  }
+
+  // Update name in player profile state
+  p.username = desiredName;
+  state.players[p.id].username = desiredName;
+
+  // Sync alliance members and chat sender records dynamically
+  if (p.allianceId && state.alliances[p.allianceId]) {
+    const alliance = state.alliances[p.allianceId];
+    const member = alliance.members.find(m => m.playerId === p.id);
+    if (member) member.username = desiredName;
+    if (alliance.leaderId === p.id) alliance.leaderName = desiredName;
+  }
+
+  saveState();
+  res.json({ player: p, success: true });
+});
+
+// Rename Space Colony Base/Station
+app.post("/api/planet/rename", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId, newName } = req.body;
+  if (!planetId || !newName || !newName.trim()) {
+    return res.status(400).json({ error: "Base name is required" });
+  }
+
+  const targetName = newName.trim();
+  if (targetName.length > 30) {
+    return res.status(400).json({ error: "Colony base name must be 30 characters or less" });
+  }
+
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) {
+    return res.status(404).json({ error: "Base planet colony not found" });
+  }
+
+  planet.name = targetName;
+  saveState();
+  res.json({ player: p, success: true });
 });
 
 // Chat Send
