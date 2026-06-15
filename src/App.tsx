@@ -261,6 +261,17 @@ export default function App() {
     return localStorage.getItem('moonbase_interactive_tabs') === 'true';
   });
   const [isScrolling, setIsScrolling] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(() => {
+    return typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileView(window.innerWidth < 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('moonbase_interactive_tabs', String(interactiveTabs));
@@ -2343,7 +2354,7 @@ export default function App() {
       </main>
 
       {/* BOTTOM TAB MENU NAVIGATION PANEL (Elegant Dark Mockup matched exact style) */}
-      <footer className={`fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#0A0F1D]/95 backdrop-blur-md border-t border-[#1E293B] flex items-center shrink-0 px-2 justify-between transition-all duration-500 ease-in-out ${(!interactiveTabs || isScrolling) ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
+      <footer className={`fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#0A0F1D]/95 backdrop-blur-md border-t border-[#1E293B] flex items-center shrink-0 px-2 justify-between transition-all duration-500 ease-in-out ${(!interactiveTabs || isScrolling || isMobileView) ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
         <div className="flex-1 flex h-full">
           
           {/* Tab 1: Explore */}

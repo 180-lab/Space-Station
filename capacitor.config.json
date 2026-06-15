@@ -2,7 +2,6 @@
   "appId": "com.galactose.tacticalgame",
   "appName": "Space Station Commander",
   "webDir": "dist",
-  "bundledWebRuntime": false,
   "server": {
     "androidScheme": "http",
     "allowNavigation": [

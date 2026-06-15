@@ -15,6 +15,7 @@ import {
   ResourceType,
 } from "./src/types";
 import { getUpgradeResourceCost } from "./src/gameUtils";
+import { loadStateFromDB, saveStateToDB } from "./src/db/state-sync.ts";
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
@@ -105,10 +106,27 @@ function saveState() {
   } catch (err) {
     console.error("Failed to save state", err);
   }
+  // Safe Cloud SQL replication
+  saveStateToDB(state).catch(err => {
+    console.error("Failed async Cloud SQL save session:", err);
+  });
 }
 
 // Load state helper
-function loadState() {
+async function loadState() {
+  try {
+    console.log("Attempting to restore active state from Cloud SQL...");
+    const dbState = await loadStateFromDB();
+    if (dbState && Object.keys(dbState.players).length > 0) {
+      state = dbState;
+      console.log("Successfully restored active state from Cloud SQL! Players count:", Object.keys(state.players).length);
+      return;
+    }
+    console.log("Cloud SQL database is empty. Fallback seeding...");
+  } catch (err) {
+    console.error("Cloud SQL load failed, preparing backup files restore...", err);
+  }
+
   try {
     if (fs.existsSync(STATE_FILE)) {
       const data = fs.readFileSync(STATE_FILE, "utf8");
@@ -167,16 +185,19 @@ function loadState() {
         ];
       }
 
-      saveState(); // Persist migrated names back to file
+      // Initial save to seed Cloud SQL
+      saveState();
       
-      console.log("State loaded successfully. Players count:", Object.keys(state.players).length);
+      console.log("backup state loaded successfully. Players count:", Object.keys(state.players).length);
     } else {
       console.log("No existing state file found. Bootstrapping universe...");
       bootstrapUniverse();
+      saveState();
     }
   } catch (err) {
     console.error("Failed to load state", err);
     bootstrapUniverse();
+    saveState();
   }
 }
 
@@ -1686,7 +1707,9 @@ function runAISimulatedActivity(now: number) {
 }
 
 // Global loop logic
-loadState();
+loadState().then(() => {
+  console.log("Game Engine database/file systems synced and initialized!");
+});
 setInterval(() => {
   const now = Date.now();
   
