@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import welcomeBanner from './assets/images/welcome_banner_clean_1780971855115.png';
 import { 
   Alliance, 
   BattleReport, 
@@ -7,7 +8,8 @@ import {
   FleetMission, 
   NewsEvent, 
   PlayerProfile, 
-  ResourceType 
+  ResourceType,
+  LeaderboardPlayer
 } from './types';
 import { ExploreTab } from './components/ExploreTab';
 import { ArmyBaseTab } from './components/ArmyBaseTab';
@@ -32,34 +34,113 @@ import {
   Coins,
   CreditCard,
   ShieldCheck,
-  ChevronDown
+  ChevronDown,
+  User,
+  LogOut,
+  AlertTriangle
 } from 'lucide-react';
 
+const TROOP_NAME_MAPPING: Record<string, string> = {
+  defender: 'Interceptor',
+  attacker: 'Assault Drone',
+  tank: 'Disrupter',
+  looter: 'Matter Extractor',
+  drone: 'Missile Launcher',
+  settlementShip: 'Settlement Ship'
+};
+
 async function safeParseJson(res: Response): Promise<any> {
-  const contentType = res.headers.get('content-type');
-  if (!contentType || !contentType.includes('application/json')) {
-    const text = await res.text();
-    const hasCookieCheck = 
-      text.includes('Cookie check') || 
-      text.includes('blocking a required security cookie') ||
-      text.includes('Action required to load your app');
-    if (hasCookieCheck) {
-      throw new Error('Galactic Sandbox security check: Please grant iframe cookie permissions or refresh the page.');
-    }
-    throw new Error(`Server gateway is currently stabilizing. Reconnecting... (Expected JSON, received ${contentType || 'text/html'})`);
+  let text = '';
+  try {
+    text = await res.text();
+  } catch (err) {
+    if (res.ok) return {};
+    throw new Error(`Failed to read response body: ${res.statusText || 'Unknown Connection'}`);
   }
-  return res.json();
+
+  // Check for the ngrok warning or cookie block
+  const hasCookieCheck = 
+    text.includes('Cookie check') || 
+    text.includes('blocking a required security cookie') ||
+    text.includes('Action required to load your app') ||
+    text.includes('ngrok-skip-browser-warning');
+    
+  if (hasCookieCheck) {
+    throw new Error('Galactic Sandbox security check: Please grant iframe cookie permissions or refresh the page.');
+  }
+  
+  if (!text.trim()) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (jsonErr) {
+    if (res.ok) {
+      console.warn("Received non-JSON OK response", text.substring(0, 200));
+    }
+    const contentType = res.headers.get('content-type') || 'text/html';
+    throw new Error(`Gateway response was not readable. Reconnecting... (Expected JSON, received ${contentType})`);
+  }
 }
 
 export default function App() {
   // Authentication & player session
   const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('moonbase_userId'));
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [faction, setFaction] = useState('Solar Alliance');
   const [showSignup, setShowSignup] = useState(true);
 
+  // Connection error handling
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  // Advanced Server Connection Settings
+  const [backendUrl, setBackendUrl] = useState(() => localStorage.getItem('space_station_backend_url') || '');
+  const [showServerSettings, setShowServerSettings] = useState(false);
+
+  // Google Sign-In & Payments Dialog states
+  const [showGoogleDialog, setShowGoogleDialog] = useState(false);
+  const [deviceGoogleAccounts, setDeviceGoogleAccounts] = useState<{ email: string; name: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('moonbase_device_google_accounts');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      // Ignore
+    }
+    return [];
+  });
+
+  const addDeviceGoogleAccount = (email: string, name: string) => {
+    setDeviceGoogleAccounts(prev => {
+      const exists = prev.some(acc => acc.email.toLowerCase() === email.toLowerCase());
+      if (exists) return prev;
+      const updated = [...prev, { email, name }];
+      localStorage.setItem('moonbase_device_google_accounts', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const removeDeviceGoogleAccount = (email: string) => {
+    setDeviceGoogleAccounts(prev => {
+      const updated = prev.filter(acc => acc.email.toLowerCase() !== email.toLowerCase());
+      localStorage.setItem('moonbase_device_google_accounts', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPaymentTier, setSelectedPaymentTier] = useState<{ amount: number; label: string; price: string; desc: string; bonus?: string } | null>(null);
+  const [paymentState, setPaymentState] = useState<'idle' | 'input' | 'processing' | 'success'>('idle');
+  const [paymentStepsLog, setPaymentStepsLog] = useState<string>('');
+  const [creditCardData, setCreditCardData] = useState({ number: '', name: '', expiry: '', cvc: '', method: 'card' });
+
   // Synced state from server
   const [player, setPlayer] = useState<PlayerProfile | null>(null);
+  const [appConfirmModal, setAppConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [playersList, setPlayersList] = useState<LeaderboardPlayer[]>([]);
   const [alliances, setAlliances] = useState<Record<string, Alliance>>({});
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [fleets, setFleets] = useState<FleetMission[]>([]);
@@ -67,12 +148,97 @@ export default function App() {
   const [newsEvents, setNewsEvents] = useState<NewsEvent[]>([]);
   const [serverTime, setServerTime] = useState<number>(Date.now());
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [viewingPlayerId, setViewingPlayerId] = useState<string | null>(null);
 
   // Active Screen / Navigation Tab selector: 'explore' | 'army' | 'galaxy' | 'research' | 'settings'
   const [activeTab, setActiveTab] = useState<'explore' | 'army' | 'galaxy' | 'research' | 'settings'>('explore');
 
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
+  // Mobile swipe gestures handler for seamless tab switching
+  useEffect(() => {
+    const touchStartCoords = { x: 0, y: 0 };
+
+    const handleWindowTouchStart = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      touchStartCoords.x = touch.clientX;
+      touchStartCoords.y = touch.clientY;
+    };
+
+    const handleWindowTouchEnd = (e: TouchEvent) => {
+      const touch = e.changedTouches[0];
+      const diffX = touch.clientX - touchStartCoords.x;
+      const diffY = touch.clientY - touchStartCoords.y;
+
+      // Ensure it is primarily a horizontal gesture
+      if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 80) {
+        return;
+      }
+
+      const minSwipeDistance = 75; // px horizontal threshold
+      if (Math.abs(diffX) < minSwipeDistance) return;
+
+      // Exclude form controls/buttons so we don't interfere with slider interactions
+      const target = e.target as HTMLElement;
+      if (
+        !target ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'SELECT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'BUTTON' ||
+        target.closest('input') ||
+        target.closest('select') ||
+        target.closest('textarea') ||
+        target.closest('button') ||
+        target.closest('.no-swipe')
+      ) {
+        return;
+      }
+
+      const tabsOrder: ('explore' | 'army' | 'galaxy' | 'research' | 'settings')[] = [
+        'explore',
+        'army',
+        'galaxy',
+        'research',
+        'settings'
+      ];
+
+      const currentIndex = tabsOrder.indexOf(activeTabRef.current);
+      if (currentIndex === -1) return;
+
+      if (diffX > 0) {
+        // Swiped right -> go to previous tab
+        const prevIndex = currentIndex - 1;
+        if (prevIndex >= 0) {
+          setActiveTab(tabsOrder[prevIndex]);
+        }
+      } else {
+        // Swiped left -> go to next tab
+        const nextIndex = currentIndex + 1;
+        if (nextIndex < tabsOrder.length) {
+          setActiveTab(tabsOrder[nextIndex]);
+        }
+      }
+    };
+
+    window.addEventListener('touchstart', handleWindowTouchStart, { passive: true });
+    window.addEventListener('touchend', handleWindowTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener('touchstart', handleWindowTouchStart);
+      window.removeEventListener('touchend', handleWindowTouchEnd);
+    };
+  }, []);
+
   // Selected active colony planet ID
   const [selectedPlanetId, setSelectedPlanetId] = useState<string | null>(null);
+  const [showInitialStationNaming, setShowInitialStationNaming] = useState(false);
+  const [initialStationName, setInitialStationName] = useState('');
+  const [settleFleetId, setSettleFleetId] = useState<string | null>(null);
+  const [customColonyName, setCustomColonyName] = useState('');
 
   // Set initial selected planet or sync when planets lists scale
   useEffect(() => {
@@ -91,13 +257,81 @@ export default function App() {
   const [fontSizeScale, setFontSizeScale] = useState<string>(() => {
     return localStorage.getItem('moonbase_font_size') || '100%';
   });
+  const [interactiveTabs, setInteractiveTabs] = useState<boolean>(() => {
+    return localStorage.getItem('moonbase_interactive_tabs') === 'true';
+  });
   const [isScrolling, setIsScrolling] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('moonbase_interactive_tabs', String(interactiveTabs));
+  }, [interactiveTabs]);
+
+  // Profile dropdown state
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [stationDropdownOpen, setStationDropdownOpen] = useState(false);
+  const [expandedDropdownPlanetIds, setExpandedDropdownPlanetIds] = useState<Record<string, boolean>>({});
+
+  // Battle report read/saved lists
+  const [readReports, setReadReports] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('moonbase_read_reports') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  const [savedReports, setSavedReports] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('moonbase_saved_reports') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  const markReportRead = (reportId: string) => {
+    setReadReports(prev => {
+      const updated = { ...prev, [reportId]: true };
+      localStorage.setItem('moonbase_read_reports', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const markReportUnread = (reportId: string) => {
+    setReadReports(prev => {
+      const updated = { ...prev, [reportId]: false };
+      localStorage.setItem('moonbase_read_reports', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const toggleSaveReport = (reportId: string) => {
+    setSavedReports(prev => {
+      const updated = { ...prev, [reportId]: !prev[reportId] };
+      localStorage.setItem('moonbase_saved_reports', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleForwardReport = async (report: BattleReport, channel: 'global' | 'alliance') => {
+    if (!player) return;
+    const isWin = (report.winner === 'attacker' && report.attackerId === player.id) || (report.winner === 'defender' && report.defenderId === player.id);
+    const winStr = isWin ? 'VICTORY' : 'DEFEAT';
+    const coordinateOrigin = `[${report.attackerCoords.x}, ${report.attackerCoords.y}]`;
+    const coordinateTarget = `[${report.defenderCoords.x}, ${report.defenderCoords.y}]`;
+
+    const content = `📬 [FORWARDED BATTLE REPORT ID: ${report.id.substring(0,6).toUpperCase()}] Outcome: ${winStr}. Attacker ${report.attackerName} vs Defender ${report.defenderName}. Coordinates: ${coordinateOrigin} -> ${coordinateTarget}. Winner: ${report.winner.toUpperCase()}!`;
+    
+    await handleSendChat(channel, content);
+    showToast(`Combat Report forwarded to ${channel} channel successfully!`, 'success');
+  };
 
   // Apply Font Size accessibility scaling
   useEffect(() => {
     localStorage.setItem('moonbase_font_size', fontSizeScale);
     let size = '16px';
-    if (fontSizeScale === '75%') {
+    if (fontSizeScale === '125%') {
+      size = '20px';
+    } else if (fontSizeScale === '75%') {
       size = '12px';
     } else if (fontSizeScale === '50%') {
       size = '8px';
@@ -161,6 +395,35 @@ export default function App() {
     respirant: 0
   });
 
+  // Dynamic Space Gateway Heartbeat Poller
+  useEffect(() => {
+    let active = true;
+    const checkConnectionHealth = async () => {
+      try {
+        const res = await fetch('/api/health');
+        const data = await safeParseJson(res);
+        if (active && data && data.status === "ok") {
+          setConnectionError(null);
+        }
+      } catch (err: any) {
+        if (active) {
+          // If connection is broken, set readable warning descriptor
+          setConnectionError(err?.message || 'Gateway connection timeout');
+        }
+      }
+    };
+
+    // Run first verification check immediately
+    checkConnectionHealth();
+
+    // Recheck connection health every 6 seconds
+    const checkInterval = setInterval(checkConnectionHealth, 6000);
+    return () => {
+      active = false;
+      clearInterval(checkInterval);
+    };
+  }, []);
+
   // Local storage load
   useEffect(() => {
     if (userId) {
@@ -193,18 +456,22 @@ export default function App() {
     // Calculate total hourly rates
     const rates = { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
     (Object.keys(rates) as ResourceType[]).forEach(res => {
-      if (isOtherMaxed) {
-        rates[res] = res === 'water' ? 84000 : 42000;
-      } else {
-        rates[res] = planet.mines[res].reduce((sum, m) => sum + (m.level / 15) * (res === 'water' ? 14000 : 8333.33), 0);
-      }
+      const minesList = planet.mines[res] || [];
+      rates[res] = minesList.reduce((sum, m) => {
+        const isMineBoosted = m.boostedUntil && Date.now() < Number(m.boostedUntil);
+        const baseProd = isOtherMaxed 
+          ? (res === 'water' ? 14000 : 42000)
+          : ((m.level / 15) * (res === 'water' ? 14000 : 8333.33));
+        const finalProd = isMineBoosted ? baseProd * 1.14 : baseProd;
+        return sum + finalProd;
+      }, 0);
     });
 
-    // Take water, respirant, and food troops consumption rate into account (Respirant is 0.4x water, Food is 0.15x)
+    // Take water, respirant, and food troops consumption rate into account (Respirant is 0.4x water, Food is 0.15x - divided by 10 as requested)
     let waterConsumptionPerHour = 0;
-    const troopConsumption = { defender: 0.5, attacker: 1.0, tank: 2.0, looter: 1.5, drone: 0.2, settlementShip: 2.5 };
+    const troopConsumption = { defender: 0.05, attacker: 0.1, tank: 0.2, looter: 0.15, drone: 0.02, settlementShip: 0.25 };
     Object.entries(planet.troops).forEach(([tId, count]) => {
-      waterConsumptionPerHour += (count as number) * (troopConsumption[tId as keyof typeof troopConsumption] || 0);
+      waterConsumptionPerHour += (Number(count) || 0) * (troopConsumption[tId as keyof typeof troopConsumption] || 0);
     });
     rates.water -= waterConsumptionPerHour;
     rates.respirant -= waterConsumptionPerHour * 0.4;
@@ -224,7 +491,12 @@ export default function App() {
         const updated = { ...prev };
         (Object.keys(updated) as ResourceType[]).forEach(res => {
           const newVal = prev[res] + resourceDeltaPer100ms[res];
-          updated[res] = Math.max(0, Math.min(capacity, newVal));
+          if ((res === 'water' || res === 'respirant' || res === 'food') && rates[res] < 0) {
+            // Negative production: allow stockpiles to drop below zero
+            updated[res] = Math.min(capacity, newVal);
+          } else {
+            updated[res] = Math.max(0, Math.min(capacity, newVal));
+          }
         });
         return updated;
       });
@@ -257,6 +529,114 @@ export default function App() {
     }, 4000);
   };
 
+  // Building and Mine upgrade completed detector effect
+  const lastLevelsRef = useRef<{
+    planetId: string;
+    buildings: Record<string, number>;
+    mines: Record<string, number[]>;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!player) {
+      lastLevelsRef.current = null;
+      return;
+    }
+    const activePlanet = player.planets.find(p => p.id === selectedPlanetId) || player.planets[0];
+    if (!activePlanet) return;
+
+    // Collect current levels
+    const currentBuildings: Record<string, number> = {};
+    Object.entries(activePlanet.buildings).forEach(([key, state]: [string, any]) => {
+      currentBuildings[key] = state.level;
+    });
+
+    const currentMines: Record<string, number[]> = {};
+    Object.entries(activePlanet.mines).forEach(([key, list]: [string, any[]]) => {
+      currentMines[key] = list.map(m => m.level);
+    });
+
+    const last = lastLevelsRef.current;
+    if (last && last.planetId === activePlanet.id) {
+      // Compare buildings
+      Object.entries(currentBuildings).forEach(([key, lvl]) => {
+        const prevLvl = last.buildings[key];
+        if (prevLvl !== undefined && lvl > prevLvl) {
+          const bNames: Record<string, string> = {
+            commsHub: 'Communications Hub',
+            researchCenter: 'Research Center',
+            armyBase: 'War Room',
+            repository: 'Repository',
+            radar: 'Radar Array',
+            supplyNexus: 'Supply Nexus'
+          };
+          const bName = bNames[key] || key;
+          showToast(`🚀 CONSTRUCTION RESOLVED: ${bName} construction finished! Upgraded to Level ${lvl}.`, 'success');
+        }
+      });
+
+      // Compare mines
+      Object.entries(currentMines).forEach(([key, levels]) => {
+        const prevLevels = last.mines[key];
+        if (prevLevels) {
+          levels.forEach((lvl, idx) => {
+            const prevLvl = prevLevels[idx];
+            if (prevLvl !== undefined && lvl > prevLvl) {
+              const mineNames: Record<string, string> = {
+                water: 'Water Siphon Extraction Mine',
+                plasma: 'Plasma Injector Refinery',
+                fuel: 'Deuterium Fuel Synthesizer',
+                food: 'Quantum Food Bio-Synthesizer',
+                respirant: 'Air Scrubber Oxygen Generator'
+              };
+              const mName = mineNames[key] || `${key.toUpperCase()} Extractor`;
+              showToast(`⛏️ EXTRACTION UPGRADE: ${mName} (Slot #${idx + 1}) upgraded to Level ${lvl}!`, 'success');
+            }
+          });
+        }
+      });
+    }
+
+    // Save current levels for the next tick
+    lastLevelsRef.current = {
+      planetId: activePlanet.id,
+      buildings: currentBuildings,
+      mines: currentMines
+    };
+  }, [player, selectedPlanetId]);
+
+  // Incoming attacks notification monitor effect
+  const lastAttackFleetsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    if (!player || !fleets || fleets.length === 0) {
+      lastAttackFleetsRef.current = [];
+      return;
+    }
+    
+    // Find all active incoming attacks against any of our colonized planets
+    const myPlanetIds = player.planets.map(p => p.id);
+    const activeIncomingAttacks = fleets.filter(f => 
+      myPlanetIds.includes(f.targetId) && 
+      f.missionType === 'attack' && 
+      !f.isReturning && 
+      f.arrivesAt > serverTime
+    );
+
+    const currentAttackIds = activeIncomingAttacks.map(f => f.id);
+    const prevAttackIds = lastAttackFleetsRef.current;
+
+    // Detect if we have any NEW incoming attacks
+    activeIncomingAttacks.forEach(f => {
+      if (!prevAttackIds.includes(f.id)) {
+        const targetPlanet = player.planets.find(p => p.id === f.targetId);
+        const pName = targetPlanet ? targetPlanet.name : "Station Core";
+        showToast(`⚠️ TACTICAL ALERT: Hostile space fleet from Commander ${f.senderName} detected on attack trajectory to ${pName}! Arriving in ${Math.round((f.arrivesAt - serverTime) / 1000)} seconds!`, 'error');
+      }
+    });
+
+    lastAttackFleetsRef.current = currentAttackIds;
+  }, [fleets, player, serverTime]);
+
   // Fetch full MMO State API
   const fetchState = async () => {
     try {
@@ -268,17 +648,26 @@ export default function App() {
       const data = await safeParseJson(res);
       if (res.ok) {
         setPlayer(data.player);
+        setPlayersList(data.playersList || []);
         setAlliances(data.alliances);
         setChatMessages(data.chatMessages);
         setFleets(data.fleets);
         setBattleReports(data.battleReports);
         setNewsEvents(data.newsEvents);
         setServerTime(data.serverTime);
+        setConnectionError(null);
       } else {
-        localStorage.removeItem('moonbase_userId');
-        setUserId(null);
+        // Only wipe the user ID if the server explicitly tells us the user profile doesn't exist or is unauthenticated (401/404)
+        if (res.status === 401 || res.status === 404) {
+          localStorage.removeItem('moonbase_userId');
+          setUserId(null);
+          setPlayer(null);
+        } else {
+          console.warn(`Gateway returned status ${res.status}. Keeping session active.`);
+        }
       }
     } catch (err: any) {
+      setConnectionError(err?.message || 'Gateway connection error');
       if (err?.message?.includes('security check') || err?.message?.includes('cookie') || err?.message?.includes('stabilizing')) {
         console.warn("Connection warning:", err.message);
       } else {
@@ -288,8 +677,8 @@ export default function App() {
   };
 
   // Auth: Register
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRegister = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!username.trim()) return;
 
     try {
@@ -298,13 +687,15 @@ export default function App() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ username, faction })
+        body: JSON.stringify({ username, faction, password })
       });
       const data = await safeParseJson(res);
       if (res.ok) {
         localStorage.setItem('moonbase_userId', data.player.id);
         setUserId(data.player.id);
         setPlayer(data.player);
+        setInitialStationName(`${data.player.username}'s Station`);
+        setShowInitialStationNaming(true);
         showToast(`Commander registration approved! Welcome of Eclipse.`, 'success');
       } else {
         showToast(data.error || 'Registration failed', 'error');
@@ -315,8 +706,8 @@ export default function App() {
   };
 
   // Auth: Login
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!username.trim()) return;
 
     try {
@@ -325,7 +716,7 @@ export default function App() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ username })
+        body: JSON.stringify({ username, password })
       });
       const data = await safeParseJson(res);
       if (res.ok) {
@@ -341,8 +732,101 @@ export default function App() {
     }
   };
 
+  // Auth: Google Sign-In
+  const handleGoogleSignIn = async (email: string, selectName?: string) => {
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email,
+          username: selectName,
+          faction
+        })
+      });
+      const data = await safeParseJson(res);
+      if (res.ok) {
+        localStorage.setItem('moonbase_userId', data.player.id);
+        setUserId(data.player.id);
+        setPlayer(data.player);
+        addDeviceGoogleAccount(email, data.player.username);
+        showToast(`Google sync complete! Welcome, Commander ${data.player.username}.`, 'success');
+        setShowGoogleDialog(false);
+        if (data.isNew) {
+          setInitialStationName(`${data.player.username}'s Station`);
+          setShowInitialStationNaming(true);
+        }
+      } else {
+        showToast(data.error || 'Google Sync failed.', 'error');
+      }
+    } catch (err) {
+      showToast('Verify network connection with terminal gateway.', 'error');
+    }
+  };
+
+  // Initial Station Naming handler
+  const handleInitialStationNamingSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!player || player.planets.length === 0) return;
+    const nameToSubmit = initialStationName.trim();
+    if (!nameToSubmit) {
+      showToast('Station name cannot be empty!', 'error');
+      return;
+    }
+    if (nameToSubmit.length > 30) {
+      showToast('Station name must be 30 characters or less', 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/planet/rename', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ planetId: player.planets[0].id, newName: nameToSubmit })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Station established and designated as: ${nameToSubmit}`, 'success');
+        setShowInitialStationNaming(false);
+        setPlayer(data.player);
+      } else {
+        showToast(data.error || 'Failed to designate station', 'error');
+      }
+    } catch (err) {
+      showToast('Network communications failure designating station.', 'error');
+    }
+  };
+
+  // Link Google Account inside Settings
+  const handleLinkGoogleAccount = async (email: string) => {
+    if (!player) return;
+    try {
+      const res = await fetch('/api/player/link-google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ email })
+      });
+      const data = await safeParseJson(res);
+      if (res.ok) {
+        setPlayer(data.player);
+        showToast(`Terminal keys permanently locked to Google email: ${email}`, 'success');
+      } else {
+        showToast(data.error || 'Could not bind Google key.', 'error');
+      }
+    } catch (err) {
+      showToast('Secure sync linking error.', 'error');
+    }
+  };
+
   // Actions: Upgrade Mine
-  const handleUpgradeMine = async (resType: ResourceType, mineIndex: number) => {
+  const handleUpgradeMine = async (resType: ResourceType, mineIndex: number, queue: boolean = false) => {
     if (!player) return;
     const currentPlanet = player.planets.find(pl => pl.id === selectedPlanetId) || player.planets[0];
     try {
@@ -352,12 +836,16 @@ export default function App() {
           'Content-Type': 'application/json',
           'x-user-id': player.id
         },
-        body: JSON.stringify({ planetId: currentPlanet.id, resType, mineIndex })
+        body: JSON.stringify({ planetId: currentPlanet.id, resType, mineIndex, queue })
       });
       const data = await safeParseJson(res);
       if (res.ok) {
         setPlayer(data.player);
-        showToast('Extractor upgrade project initiated and scheduled!', 'success');
+        if (queue) {
+          showToast('Extractor upgrade project successfully queued (Charged 15 Space Gold)!', 'success');
+        } else {
+          showToast('Extractor upgrade project initiated and scheduled!', 'success');
+        }
       } else {
         showToast(data.error || 'Upgrade blocked', 'error');
       }
@@ -367,7 +855,7 @@ export default function App() {
   };
 
   // Actions: Upgrade Building
-  const handleUpgradeBuilding = async (buildingKey: string) => {
+  const handleUpgradeBuilding = async (buildingKey: string, queue: boolean = false) => {
     if (!player) return;
     const currentPlanet = player.planets.find(pl => pl.id === selectedPlanetId) || player.planets[0];
     try {
@@ -377,12 +865,16 @@ export default function App() {
           'Content-Type': 'application/json',
           'x-user-id': player.id
         },
-        body: JSON.stringify({ planetId: currentPlanet.id, buildingKey })
+        body: JSON.stringify({ planetId: currentPlanet.id, buildingKey, queue })
       });
       const data = await safeParseJson(res);
       if (res.ok) {
         setPlayer(data.player);
-        showToast(`${buildingKey.toUpperCase()} upgrade project is active!`, 'success');
+        if (queue) {
+          showToast(`${buildingKey.toUpperCase()} upgrade project successfully queued (Charged 15 Space Gold)!`, 'success');
+        } else {
+          showToast(`${buildingKey.toUpperCase()} upgrade project is active!`, 'success');
+        }
       } else {
         showToast(data.error || 'Upgrade blocked', 'error');
       }
@@ -395,6 +887,18 @@ export default function App() {
   const handleTrainTroops = async (troopId: string, quantity: number) => {
     if (!player) return;
     const currentPlanet = player.planets.find(pl => pl.id === selectedPlanetId) || player.planets[0];
+
+    let manufacturingSpeedLevel = 1;
+    try {
+      const savedTech = localStorage.getItem(`moonbase_tech_${player.id}`);
+      if (savedTech) {
+        const parsed = JSON.parse(savedTech);
+        manufacturingSpeedLevel = parsed.manufacturing_speed || 1;
+      }
+    } catch {
+      // fallback
+    }
+
     try {
       const res = await fetch('/api/train/troop', {
         method: 'POST',
@@ -402,7 +906,12 @@ export default function App() {
           'Content-Type': 'application/json',
           'x-user-id': player.id
         },
-        body: JSON.stringify({ planetId: currentPlanet.id, troopId, quantity })
+        body: JSON.stringify({ 
+          planetId: currentPlanet.id, 
+          troopId, 
+          quantity,
+          manufacturingSpeedLevel 
+        })
       });
       const data = await safeParseJson(res);
       if (res.ok) {
@@ -422,41 +931,177 @@ export default function App() {
   const handleSendFleet = async (mission: {
     targetX: number;
     targetY: number;
-    missionType: 'attack' | 'colonize' | 'recon';
+    missionType: 'attack' | 'colonize' | 'recon' | 'move';
     troops: Record<string, number>;
     targetId?: string;
     targetName?: string;
     targetBuilding?: string;
+    numFleets?: number;
   }) => {
     if (!player) return;
     const currentPlanet = player.planets.find(pl => pl.id === selectedPlanetId) || player.planets[0];
+    
+    let troopSpeedLevel = 1;
+    let defenseShieldsLevel = 1;
     try {
-      const res = await fetch('/api/fleet/send', {
+      const savedTech = localStorage.getItem(`moonbase_tech_${player.id}`);
+      if (savedTech) {
+        const parsed = JSON.parse(savedTech);
+        troopSpeedLevel = parsed.troop_speed || 1;
+        defenseShieldsLevel = parsed.defense_shields || 1;
+      }
+    } catch {
+      // fallback
+    }
+
+    const numFleets = mission.numFleets || 1;
+
+    if (numFleets <= 1) {
+      try {
+        const res = await fetch('/api/fleet/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': player.id
+          },
+          body: JSON.stringify({
+            planetId: currentPlanet.id,
+            troopSpeedLevel,
+            defenseShieldsLevel,
+            ...mission
+          })
+        });
+        const data = await safeParseJson(res);
+        if (res.ok) {
+          setPlayer(data.player);
+          showToast(`FLEET DEPLOYED! Mission: ${mission.missionType.toUpperCase()} dispatched.`, 'success');
+          setActiveTab('galaxy'); // Swapp tab to allow monitoring of travels!
+        } else {
+          showToast(data.error || 'Fleet blocked by flight control', 'error');
+        }
+      } catch (err) {
+        showToast('Launch failure', 'error');
+      }
+    } else {
+      // Split troops across standard separate fleets
+      const fleetsToSend: Record<string, number>[] = Array.from({ length: numFleets }, () => ({
+        defender: 0,
+        attacker: 0,
+        tank: 0,
+        looter: 0,
+        drone: 0,
+        settlementShip: 0
+      }));
+
+      for (const [tId, totalQty] of Object.entries(mission.troops)) {
+        const qty = totalQty || 0;
+        if (qty > 0) {
+          const baseQty = Math.floor(qty / numFleets);
+          const remainder = qty % numFleets;
+          for (let i = 0; i < numFleets; i++) {
+            fleetsToSend[i][tId] = baseQty + (i < remainder ? 1 : 0);
+          }
+        }
+      }
+
+      let latestPlayer = player;
+      let anySuccess = false;
+      let errorMsg = '';
+
+      for (let i = 0; i < numFleets; i++) {
+        const subTroops = fleetsToSend[i];
+        const hasAny = Object.values(subTroops).some(v => v > 0);
+        if (!hasAny) continue;
+
+        try {
+          const res = await fetch('/api/fleet/send', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': player.id
+            },
+            body: JSON.stringify({
+              planetId: currentPlanet.id,
+              troopSpeedLevel,
+              defenseShieldsLevel,
+              targetX: mission.targetX,
+              targetY: mission.targetY,
+              missionType: mission.missionType,
+              troops: subTroops,
+              targetId: mission.targetId,
+              targetName: mission.targetName,
+              targetBuilding: mission.targetBuilding
+            })
+          });
+          const data = await safeParseJson(res);
+          if (res.ok) {
+            latestPlayer = data.player;
+            anySuccess = true;
+          } else {
+            errorMsg = data.error || 'Sub-fleet blocked';
+          }
+        } catch (err) {
+          errorMsg = 'Launch failure';
+        }
+      }
+
+      if (anySuccess) {
+        setPlayer(latestPlayer);
+        showToast(`DISPATCHED MULTIPLE FLEETS! Created ${numFleets} distinct en-route tactical squadrons.`, 'success');
+        setActiveTab('galaxy');
+      } else {
+        showToast(errorMsg || 'Failed to dispatch plural fleets', 'error');
+      }
+    }
+  };
+
+  const handleRerouteFleet = async (fleetId: string, targetX: number, targetY: number, missionType?: string) => {
+    if (!player) return;
+    try {
+      const res = await fetch('/api/fleet/reroute', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-user-id': player.id
         },
         body: JSON.stringify({
-          planetId: currentPlanet.id,
-          ...mission
+          fleetId,
+          targetX,
+          targetY,
+          missionType
         })
       });
       const data = await safeParseJson(res);
       if (res.ok) {
         setPlayer(data.player);
-        showToast(`FLEET DEPLOYED! Mission: ${mission.missionType.toUpperCase()} dispatched.`, 'success');
-        setActiveTab('galaxy'); // Swapp tab to allow monitoring of travels!
+        fetchState();
+        showToast('TACTICAL CO-ORDINATES RE-ROUTED! Fleet vectors updated.', 'success');
       } else {
-        showToast(data.error || 'Fleet blocked by flight control', 'error');
+        showToast(data.error || 'Coordinates reroute refused', 'error');
       }
     } catch (err) {
-      showToast('Launch failure', 'error');
+      showToast('Network error on rerouting', 'error');
     }
   };
 
-  const handleSettle = async (fleetId: string) => {
-    if (!player) return;
+  const handleStartSettleFlow = (fleetId: string) => {
+    setSettleFleetId(fleetId);
+    setCustomColonyName(''); // Ensure it starts completely empty with no default name
+  };
+
+  const handleExecuteSettle = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!player || !settleFleetId) return;
+    const trimmedName = customColonyName.trim();
+    if (!trimmedName) {
+      showToast('A custom station name is required!', 'error');
+      return;
+    }
+    if (trimmedName.length > 30) {
+      showToast('Station name must be 30 characters or less', 'error');
+      return;
+    }
+
     try {
       const res = await fetch('/api/fleet/settle', {
         method: 'POST',
@@ -464,7 +1109,7 @@ export default function App() {
           'Content-Type': 'application/json',
           'x-user-id': player.id
         },
-        body: JSON.stringify({ fleetId })
+        body: JSON.stringify({ fleetId: settleFleetId, customName: trimmedName })
       });
       const data = await safeParseJson(res);
       if (res.ok) {
@@ -472,7 +1117,9 @@ export default function App() {
         if (data.fleets) {
           setFleets(data.fleets);
         }
-        showToast('PLANET SETTLED! Your new research colony is established.', 'success');
+        showToast(`COLONY ESTABLISHED! Connected to station: ${trimmedName}`, 'success');
+        setSettleFleetId(null);
+        setCustomColonyName('');
       } else {
         showToast(data.error || 'Failed to settle coordinates', 'error');
       }
@@ -641,28 +1288,119 @@ export default function App() {
 
   // Login signup routing
   if (!userId || !player) {
+    const hasCustomBackend = typeof window !== 'undefined' && !!localStorage.getItem('space_station_backend_url');
+    const activeCustomUrl = typeof window !== 'undefined' ? localStorage.getItem('space_station_backend_url') : '';
+
     return (
-      <div className={`min-h-screen bg-[#05070A] text-slate-300 flex items-center justify-center p-4 font-mono select-none theme-${theme}`}>
+      <div className={`min-h-screen bg-[#05070A] text-slate-300 flex flex-col items-center justify-center p-4 font-mono select-none theme-${theme}`}>
         <div className="w-full max-w-lg p-8 bg-[#0A0F1D] border border-[#1E293B] rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.05)] backdrop-blur-md relative overflow-hidden">
           {/* Glowing particle background accent */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
           <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-pink-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+          {/* Connection diagnostics alert */}
+          {hasCustomBackend && (
+            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-2.5 relative z-10">
+              <div className="flex items-center gap-2">
+                <span className="text-amber-400 animate-pulse text-sm">⚠️</span>
+                <span className="font-bold uppercase tracking-wider text-[10px] text-amber-300 font-sans">Custom Server Redirect Active</span>
+              </div>
+              <p className="leading-relaxed font-sans text-slate-300">
+                Your game client has been redirected to link with your custom private server endpoint:
+              </p>
+              <div className="bg-[#05070A] p-2.5 rounded font-mono text-[11px] text-cyan-400 select-all border border-slate-900 break-all">
+                {activeCustomUrl}
+              </div>
+              <p className="text-slate-400 text-[10px] font-sans leading-normal">
+                If your local tunnel client (localtunnel, ngrok, portwarden) is offline or currently throwing a <span className="text-rose-400 font-bold">"Bad Gateway"</span>, the game cannot load.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('space_station_backend_url');
+                  setBackendUrl('');
+                  showToast('Reverted Game Client to Default Gateway!', 'success');
+                  setTimeout(() => {
+                    window.location.reload();
+                  }, 800);
+                }}
+                className="w-full py-2.5 px-3 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:brightness-110 active:scale-[0.98] text-white font-bold text-[10px] tracking-wider uppercase rounded-lg transition duration-150 cursor-pointer shadow-md mt-1 flex items-center justify-center gap-1 font-sans"
+              >
+                🔄 Restore Default Gateway & Reconnect
+              </button>
+            </div>
+          )}
+
+          {connectionError && !hasCustomBackend && (
+            <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 text-xs space-y-2.5 relative z-10">
+              <div className="flex items-center gap-2">
+                <span className="text-rose-400 animate-pulse text-sm">⚠️</span>
+                <span className="font-bold uppercase tracking-wider text-[10px] text-rose-300 font-sans">Space Gateway Connection Issue</span>
+              </div>
+              <p className="leading-relaxed font-sans text-slate-300">
+                The terminal is struggling to communicate with the central server:
+              </p>
+              <div className="bg-[#05070A] p-2.5 rounded font-mono text-[10px] text-rose-400 border border-rose-950/40 break-all select-all">
+                {connectionError}
+              </div>
+              <p className="text-slate-450 text-[10px] font-sans leading-normal text-slate-400">
+                This often occurs if the container server is currently re-building, sleeping, or if local browser cookie permissions are blocking request frames.
+              </p>
+              <div className="flex gap-2 font-sans">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConnectionError(null);
+                    showToast('Initiating emergency system sync...', 'info');
+                    window.location.reload();
+                  }}
+                  className="flex-1 py-2 px-3 bg-rose-955/40 bg-rose-950/40 border border-rose-500/30 hover:border-rose-400 hover:text-white rounded text-[10px] font-semibold transition text-rose-350 cursor-pointer text-center"
+                >
+                  ⚡ Emergency Reload
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem('space_station_backend_url');
+                    setBackendUrl('');
+                    setConnectionError(null);
+                    showToast('Repaired space-station terminal routing!', 'success');
+                    setTimeout(() => window.location.reload(), 600);
+                  }}
+                  className="flex-1 py-2 px-3 bg-cyan-955/40 bg-cyan-950/40 border border-cyan-500/30 hover:border-cyan-400 hover:text-white rounded text-[10px] font-semibold transition text-cyan-400 cursor-pointer text-center"
+                >
+                  🛠️ Reset Gateway Config
+                </button>
+              </div>
+            </div>
+          )}
           
-          <div className="text-center mb-8 space-y-1 relative">
-            <span className="text-[10px] font-bold tracking-widest text-cyan-400 uppercase">INTERACTIVE SECTOR MMO</span>
-            <h1 className="text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2 mt-1">
-              <span>🌌</span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-indigo-300 to-pink-500">SPACE STATION</span>
-            </h1>
-            <p className="text-xs text-slate-400 font-sans mt-2 max-w-[340px] mx-auto leading-relaxed">
-              Synthesize thermonuclear reactors, recruit orbital heavy infantry division forces, and synchronize with alliances across parsec coordinates.
-            </p>
+          <div className="mb-8 relative">
+            <div className="text-left font-sans text-xs sm:text-sm text-slate-300 space-y-3.5 mb-4 leading-relaxed border-b border-[#1E293B]/40 pb-4 pr-1 select-text">
+              <p className="text-cyan-400 font-extrabold font-mono tracking-wider text-sm">Year 2095</p>
+              <p>Earth is no longer the center of civilization.</p>
+              <p>Hundreds of worlds have been settled, thousands remain unexplored, and powerful alliances compete for control of the galaxy's most valuable sectors.</p>
+              <p>As commander of a newly commissioned Station, you have been granted rights to establish a colony on an unclaimed planet.</p>
+              <p>Your station is small. Your resources are limited.</p>
+              <p className="border-l-2 border-cyan-500/40 pl-3 italic text-slate-400">But every galactic empire began as a single colony.</p>
+              <p>Expand your territory. Develop advanced technology. Form alliances. Conquer the stars.</p>
+              <p className="text-cyan-300 font-semibold font-mono text-xs">The galaxy is waiting.</p>
+            </div>
+            
+            <div className="text-center mt-4 flex flex-col items-center justify-center">
+              <img 
+                src={welcomeBanner} 
+                alt="Space Station Commander Logo Banner" 
+                className="w-full max-w-md h-auto rounded-xl border border-cyan-500/20 shadow-[0_0_20px_rgba(6,182,212,0.15)] object-contain"
+                referrerPolicy="no-referrer"
+              />
+            </div>
           </div>
 
           {showSignup ? (
-            <form onSubmit={handleRegister} className="space-y-5 relative">
+            <form onSubmit={(e) => { e.preventDefault(); handleRegister(); }} className="space-y-5 relative">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Commander Username</label>
+                <label className="text-[10px] font-bold text-sky-400 uppercase tracking-widest font-mono">Commander Name</label>
                 <input 
                   type="text" 
                   value={username}
@@ -673,7 +1411,18 @@ export default function App() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Choose your Theme</label>
+                <label className="text-[10px] font-bold text-sky-400 uppercase tracking-widest font-mono">Terminal Passkey (Optional password)</label>
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter simple password to protect account..."
+                  className="w-full px-4 py-3 bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-xl text-sm focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_10px_rgba(34,211,238,0.15)] transition-all duration-200"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-sky-400 uppercase tracking-widest font-mono">Choose your Theme</label>
                 <select 
                   value={theme}
                   onChange={(e) => {
@@ -684,9 +1433,9 @@ export default function App() {
                   }}
                   className="w-full px-4 py-3 bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-xl text-sm focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_10px_rgba(34,211,238,0.15)] transition-all duration-200"
                 >
-                  <option value="normal">☀️ Normal Theme (Standard Solar Blue)</option>
-                  <option value="light">💡 Light Theme (For light preference)</option>
-                  <option value="dark">🌙 Dark Theme (For dark preference)</option>
+                  <option value="light">☀️ Original Theme (White Light)</option>
+                  <option value="normal">🌌 Classic Solar Blue Theme</option>
+                  <option value="dark">⬛ Obsidian Pitch Black Theme</option>
                 </select>
               </div>
 
@@ -708,14 +1457,25 @@ export default function App() {
               </div>
             </form>
           ) : (
-            <form onSubmit={handleLogin} className="space-y-5 relative">
+            <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-5 relative">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Commander Username Approval</label>
+                <label className="text-[10px] font-bold text-sky-400 uppercase tracking-widest font-mono">Commander Name</label>
                 <input 
                   type="text" 
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Registered username..."
+                  className="w-full px-4 py-3 bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-xl text-sm focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_10px_rgba(34,211,238,0.15)] transition-all duration-200"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-sky-400 uppercase tracking-widest font-mono">Terminal Passkey (Password)</label>
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your passkey..."
                   className="w-full px-4 py-3 bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-xl text-sm focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_10px_rgba(34,211,238,0.15)] transition-all duration-200"
                 />
               </div>
@@ -739,7 +1499,297 @@ export default function App() {
             </form>
           )}
 
+          {/* Google Sign-In Option Divider */}
+          <div className="relative my-6 select-none">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-[#1E293B]"></div>
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest">
+              <span className="px-3 bg-[#0A0F1D] text-slate-500 font-mono">Or secure sync via</span>
+            </div>
+          </div>
+
+          {/* Branded Google Login button */}
+          <button 
+            type="button"
+            onClick={() => setShowGoogleDialog(true)}
+            className="w-full py-3 px-4 bg-white hover:bg-slate-100 text-[#1F2937] font-bold text-xs tracking-wider uppercase rounded-xl flex items-center justify-center gap-3 active:scale-[0.98] transition duration-150 cursor-pointer shadow-md"
+          >
+            <svg className="w-4 h-4 text-rose-500" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+              <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.13-.07-.25-.15-.35-.22" fill="#FBBC05" />
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+            </svg>
+            <span>Continue with Google Account</span>
+          </button>
+
+          {/* Advanced Server Vector settings */}
+          <div className="mt-8 pt-6 border-t border-[#1E293B]/60 text-center">
+            <button 
+              type="button"
+              onClick={() => setShowServerSettings(!showServerSettings)}
+              className="text-xs text-slate-500 hover:text-cyan-400 font-mono flex items-center justify-center gap-1.5 mx-auto transition duration-200 cursor-pointer"
+            >
+              <Settings size={12} className={showServerSettings ? "animate-spin text-cyan-400" : ""} />
+              <span>{showServerSettings ? "Hide Advanced Connection Ports" : "Configure Custom Game Server IP"}</span>
+            </button>
+
+            {showServerSettings && (
+              <div className="mt-4 p-4 rounded-xl bg-[#05070A] border border-[#1E293B] text-left space-y-3">
+                <p className="text-[10px] text-slate-400 leading-normal font-sans">
+                  By default, the emulator connects to the cloud workspace. If your server is running locally under <code className="bg-slate-900 px-1 py-0.5 rounded text-cyan-400 font-mono">PM2</code> or on a remote VPS, enter your server's endpoint vector below:
+                </p>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-sky-400 uppercase tracking-wider font-mono block">Custom Server URL</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={backendUrl}
+                      onChange={(e) => setBackendUrl(e.target.value)}
+                      placeholder="E.g. http://10.0.2.2:3000"
+                      className="flex-1 px-3 py-2 bg-[#0A0F1D] border border-[#1E293B] text-slate-100 rounded-lg text-xs font-mono focus:outline-none focus:border-cyan-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmed = backendUrl.trim();
+                        if (trimmed) {
+                          localStorage.setItem('space_station_backend_url', trimmed);
+                          showToast(`Linked backend to: ${trimmed}`, 'success');
+                          setTimeout(() => window.location.reload(), 1000);
+                        } else {
+                          localStorage.removeItem('space_station_backend_url');
+                          showToast(`Reset to Default Cloud Server gateway`, 'info');
+                          setTimeout(() => window.location.reload(), 1000);
+                        }
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:brightness-110 active:scale-95 text-white rounded-lg text-xs font-bold font-sans cursor-pointer transition select-none flex items-center justify-center shadow-lg shadow-cyan-500/20"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1 font-sans">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBackendUrl('https://cold-areas-flow.loca.lt');
+                        localStorage.setItem('space_station_backend_url', 'https://cold-areas-flow.loca.lt');
+                        showToast(`Pointed to Live Localtunnel (https://cold-areas-flow.loca.lt)`, 'success');
+                        setTimeout(() => window.location.reload(), 1000);
+                      }}
+                      className="px-2.5 py-1.5 bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 hover:text-white rounded text-[10px] font-mono font-bold transition cursor-pointer select-none"
+                    >
+                      ⚓ Localtunnel (cold-areas-flow)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBackendUrl('https://eighty-towns-count.loca.lt');
+                        localStorage.setItem('space_station_backend_url', 'https://eighty-towns-count.loca.lt');
+                        showToast(`Pointed to Localtunnel (https://eighty-towns-count.loca.lt)`, 'success');
+                        setTimeout(() => window.location.reload(), 1000);
+                      }}
+                      className="px-2.5 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded text-[10px] font-mono transition cursor-pointer select-none"
+                    >
+                      ⚓ Localtunnel (eighty-towns)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBackendUrl('https://ais-dev-b3fusvtmpzbes4i5sek2jk-304053633303.europe-west2.run.app');
+                        localStorage.setItem('space_station_backend_url', 'https://ais-dev-b3fusvtmpzbes4i5sek2jk-304053633303.europe-west2.run.app');
+                        showToast(`Pointed to Cloud Run Dev Server (https://ais-dev-b3fusvtmpzbes4i5sek2jk-304053633303.europe-west2.run.app)`, 'success');
+                        setTimeout(() => window.location.reload(), 1000);
+                      }}
+                      className="px-2.5 py-1.5 bg-cyan-950/40 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:text-white rounded text-[10px] font-mono transition cursor-pointer select-none font-bold"
+                    >
+                      🚀 Dev Server (Cloud Run)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBackendUrl('http://10.0.2.2:3000');
+                        localStorage.setItem('space_station_backend_url', 'http://10.0.2.2:3000');
+                        showToast(`Pointed to emulator Host computer (http://10.0.2.2:3000)`, 'success');
+                        setTimeout(() => window.location.reload(), 1000);
+                      }}
+                      className="px-2.5 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded text-[10px] font-mono transition cursor-pointer select-none"
+                    >
+                      Local Emulator (10.0.2.2:3000)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBackendUrl('http://10.0.2.2:3001');
+                        localStorage.setItem('space_station_backend_url', 'http://10.0.2.2:3001');
+                        showToast(`Pointed to emulator Host computer (http://10.0.2.2:3001)`, 'success');
+                        setTimeout(() => window.location.reload(), 1000);
+                      }}
+                      className="px-2.5 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded text-[10px] font-mono transition cursor-pointer select-none"
+                    >
+                      Local Emulator (10.0.2.2:3001)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBackendUrl('');
+                        localStorage.removeItem('space_station_backend_url');
+                        showToast(`Reverted game client to fallback cloud default.`, 'info');
+                        setTimeout(() => window.location.reload(), 1000);
+                      }}
+                      className="px-2.5 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded text-[10px] font-mono transition cursor-pointer select-none ml-auto"
+                    >
+                      Reset Gateway
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="mt-3 pt-3 border-t border-slate-800/60 space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-cyan-400 text-xs">⚡</span>
+                    <span className="text-[10px] font-bold tracking-wider uppercase text-slate-300 font-sans">Setup Backend Tunnels with PM2</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
+                    Prevent background connection crashes. Manage your Node.js application and localtunnel instance permanently using standard PM2 scripts:
+                  </p>
+                  <div className="bg-[#030508] border border-slate-800 p-2.5 rounded text-[10px] space-y-1.5 font-mono">
+                    <div>
+                      <span className="text-slate-500 select-none"># 1. Install PM2 daemon</span>
+                      <div className="text-cyan-300 select-all">npm install -g pm2</div>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 select-none"># 2. Stop any stale background setups</span>
+                      <div className="text-cyan-300 select-all">pm2 delete all</div>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 select-none"># 3. Run Space Server on free port 3001</span>
+                      <div className="text-cyan-300 select-all">PORT=3001 pm2 start "node dist/server.cjs" --name "space-station-server"</div>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 select-none"># 4. Keep localtunnel active & auto-restarted</span>
+                      <div className="text-cyan-300 select-all">pm2 start "npx localtunnel --port 3001" --name "space-station-tunnel"</div>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 select-none"># 5. Check real-time URL and status</span>
+                      <div className="text-cyan-300 select-all">pm2 status && pm2 log space-station-tunnel</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
+
+        {/* Google Authentication Dialog Overlay */}
+        {showGoogleDialog && (
+          <div className="fixed inset-0 bg-[#05070A]/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 font-sans text-gray-800 border border-gray-100 flex flex-col items-center">
+              {/* Google Brand Logo in color */}
+              <div className="flex items-center gap-1 mb-6">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                  <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.13-.07-.25-.15-.35-.22" fill="#FBBC05" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                </svg>
+                <span className="font-semibold text-sm text-gray-700">Google Credentials</span>
+              </div>
+
+              <h2 className="text-xl font-bold text-gray-900 text-center">Choose Google Account</h2>
+              <p className="text-xs text-gray-500 text-center mt-1 mb-6">to continue to Space Station</p>
+
+              {/* Accounts list */}
+              <div className="w-full space-y-2.5">
+                {deviceGoogleAccounts.length === 0 ? (
+                  <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                    <p className="text-xs text-gray-400">No active device Google sessions detected.</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const customEmail = window.prompt("Please enter your Google account email:");
+                        if (customEmail && customEmail.includes("@")) {
+                          const customName = window.prompt("Please choose your Commander name for this Google Account:", customEmail.split("@")[0]);
+                          handleGoogleSignIn(customEmail, customName || undefined);
+                        } else if (customEmail) {
+                          window.alert("Invalid email format!");
+                        }
+                      }}
+                      className="mt-3.5 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold font-mono text-[11px] uppercase tracking-wider hover:bg-slate-800 transition cursor-pointer"
+                    >
+                      + ADD GOOGLE ACCOUNT
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {deviceGoogleAccounts.map((acc) => (
+                      <div 
+                        key={acc.email}
+                        className="group w-full p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 flex items-center justify-between gap-2 transition"
+                      >
+                        <button 
+                          type="button"
+                          onClick={() => handleGoogleSignIn(acc.email, acc.name)}
+                          className="flex-1 text-left flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-cyan-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                            {acc.name ? acc.name.charAt(0).toUpperCase() : acc.email.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0 pr-2">
+                            <div className="text-xs font-bold text-gray-800 truncate">{acc.name}</div>
+                            <div className="text-[10px] text-gray-500 truncate">{acc.email}</div>
+                          </div>
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeDeviceGoogleAccount(acc.email);
+                          }}
+                          className="p-1 text-gray-300 hover:text-red-500 rounded hover:bg-gray-100 transition duration-150"
+                          title="Remove from this device"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Custom input or cancel options */}
+                <div className="pt-3 border-t border-gray-100 flex justify-between w-full">
+                  {deviceGoogleAccounts.length > 0 && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const customEmail = window.prompt("Please enter your custom Google account email:");
+                        if (customEmail && customEmail.includes("@")) {
+                          const customName = window.prompt("Please choose your Commander name for this Google Account:", customEmail.split("@")[0]);
+                          handleGoogleSignIn(customEmail, customName || undefined);
+                        } else if (customEmail) {
+                          window.alert("Invalid email format!");
+                        }
+                      }} 
+                      className="text-xs text-cyan-600 font-bold hover:underline"
+                    >
+                      Use another account
+                    </button>
+                  )}
+                  <button 
+                    type="button"
+                    onClick={() => setShowGoogleDialog(false)}
+                    className="text-xs text-gray-400 hover:text-gray-650 hover:underline ml-auto"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     );
   }
@@ -749,7 +1799,7 @@ export default function App() {
   const repositoryLimit = Math.round(10000 * Math.pow(500, (activePlanet.buildings.repository.level - 1) / 44));
 
   return (
-    <div className={`min-h-screen font-sans bg-[#05070A] text-slate-350 selection:bg-cyan-500/25 pb-24 theme-${theme}`}>
+    <div className={`min-h-screen max-w-full overflow-x-hidden font-sans bg-[#05070A] text-slate-350 selection:bg-cyan-500/25 pb-24 theme-${theme}`}>
       
       {/* Toast Notice alerts */}
       {toast && (
@@ -757,6 +1807,43 @@ export default function App() {
           <Info size={16} className={toast.type === 'error' ? 'text-red-400' : 'text-cyan-400'} />
           <span className="text-slate-100 flex-1 font-sans">{toast.message}</span>
           <button onClick={() => setToast(null)} className="text-slate-500 hover:text-white font-sans text-lg">&times;</button>
+        </div>
+      )}
+
+      {/* Connection Failure Diagnostic Banner */}
+      {connectionError && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 p-4 border rounded-xl font-mono text-xs flex flex-col gap-2.5 max-w-md w-full bg-[#0F0C0D] border-rose-500/40 shadow-[0_0_30px_rgba(239,68,68,0.25)]">
+          <div className="flex items-center gap-2.5">
+            <span className="text-rose-500 animate-pulse text-sm">⚠️</span>
+            <span className="text-slate-200 flex-1 font-sans font-bold text-xs uppercase tracking-wider">Communication Interrupted</span>
+          </div>
+          <p className="text-slate-400 font-sans text-[11px] leading-relaxed">
+            The space-station terminal lost contact with the server. Error details: <code className="text-rose-400 break-all">{connectionError}</code>
+          </p>
+          <div className="flex gap-2 font-sans mt-0.5">
+            <button 
+              onClick={() => {
+                setConnectionError(null);
+                showToast('Rechecking communications channels...', 'info');
+                fetchState();
+              }} 
+              className="flex-1 py-1.5 bg-rose-950/30 hover:bg-rose-900/30 border border-rose-500/30 text-rose-300 rounded text-[10px] font-bold transition cursor-pointer"
+            >
+              🔄 Recheck Connection
+            </button>
+            <button 
+              onClick={() => {
+                localStorage.removeItem('space_station_backend_url');
+                setBackendUrl('');
+                setConnectionError(null);
+                showToast('Reverted Game Client to Default Gateway!', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+              }} 
+              className="flex-1 py-1.5 bg-cyan-950/30 hover:bg-[#0E2034] border border-cyan-500/30 text-cyan-400 rounded text-[10px] font-bold transition cursor-pointer"
+            >
+              🛠️ Reset to Default
+            </button>
+          </div>
         </div>
       )}
 
@@ -775,54 +1862,285 @@ export default function App() {
             </div>
           </div>
 
-          {/* New Planet Selector in Top Bar Header */}
-          {player.planets.length > 1 ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-slate-500 font-bold hidden md:inline">ACTIVE SECTOR:</span>
-              <div className="relative">
-                <select 
-                  value={selectedPlanetId || player.planets[0].id}
-                  onChange={(e) => {
-                    setSelectedPlanetId(e.target.value);
-                    showToast(`Switched active command site to Sector station [${player.planets.find(pl => pl.id === e.target.value)?.sectorX}, ${player.planets.find(pl => pl.id === e.target.value)?.sectorY}]`, 'success');
-                  }}
-                  className="bg-[#05070A] text-xs text-cyan-400 font-mono font-bold py-1.5 px-3 rounded-lg border border-[#1E293B] focus:border-cyan-500 focus:outline-none cursor-pointer pr-8 appearance-none shadow-[0_0_15px_rgba(34,211,238,0.1)] hover:border-cyan-500/40 transition text-right"
+          {/* Slick unified Custom Station Selector Dropdown */}
+          <div className="relative font-mono leading-none flex items-center">
+            <button
+              id="active-station-selector-btn"
+              type="button"
+              onClick={() => setStationDropdownOpen(!stationDropdownOpen)}
+              className="bg-[#05070A]/90 hover:bg-[#1E293B]/40 text-cyan-404 text-cyan-400 hover:text-white text-xs font-bold py-2 px-3 rounded-xl border border-cyan-500/15 focus:border-cyan-500/50 hover:border-cyan-500/40 focus:outline-none cursor-pointer transition flex items-center gap-2 shadow-[0_0_15px_rgba(34,211,238,0.06)] active:scale-95"
+            >
+              <span className="text-[9px] text-slate-500 tracking-wider">STATION:</span>
+              <span className="truncate max-w-[125px] text-slate-100 font-black tracking-tight">{activePlanet.name}</span>
+              <span className="text-cyan-400 text-[10px] font-bold">[{activePlanet.sectorX}, {activePlanet.sectorY}]</span>
+              <ChevronDown size={12} className={`text-cyan-400 transition-transform duration-200 shrink-0 ${stationDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {stationDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40 bg-transparent cursor-default" onClick={() => setStationDropdownOpen(false)} />
+                <div 
+                  id="station-selector-popup-list"
+                  className="absolute left-0 top-11 mt-1 w-64 bg-[#0A0F1D]/98 border border-cyan-500/40 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.85)] p-2 z-50 text-left font-mono backdrop-blur-md animate-fade-in flex flex-col gap-1"
                 >
-                  {player.planets.map((pl, idx) => (
-                    <option key={pl.id} value={pl.id} className="bg-[#0A0F1D] text-slate-200">
-                      {idx === 0 ? "★ " : "🛰️ "}{pl.name} [{pl.sectorX}, {pl.sectorY}]
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-cyan-400">
-                  <ChevronDown size={14} />
+                  <div className="px-2.5 py-1.5 border-b border-[#1E293B]/45 mb-1">
+                    <span className="text-[8.5px] text-slate-500 font-bold uppercase tracking-widest">Select Tactical Station</span>
+                  </div>
+                  {player.planets.map((pl, idx) => {
+                    const isActive = pl.id === activePlanet.id;
+                    return (
+                      <button
+                        key={pl.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPlanetId(pl.id);
+                          setStationDropdownOpen(false);
+                          showToast(`Switched active command site to ${pl.name}`, 'success');
+                        }}
+                        className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left text-xs transition duration-150 cursor-pointer ${isActive ? 'bg-cyan-500/10 border border-cyan-500/25 text-white' : 'hover:bg-white/5 border border-transparent text-slate-400 hover:text-slate-200'}`}
+                      >
+                        <div className="flex flex-col gap-0.5 truncate min-w-0 pr-2">
+                          <span className={`font-bold text-[11px] truncate ${isActive ? 'text-cyan-400 font-black' : 'text-slate-200'}`}>
+                            {idx === 0 ? "★ " : "🛰️ "}{pl.name}
+                          </span>
+                          <span className="text-[9px] text-[#22D3EE] font-mono tracking-wide">
+                            Sector Grid Coordinates: [{pl.sectorX}, {pl.sectorY}]
+                          </span>
+                        </div>
+                        {isActive && (
+                          <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 text-[8px] font-black uppercase shrink-0">ACTIVE</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
-            </div>
-          ) : (
-            <div className="px-3 py-1.5 bg-[#05070A] rounded-lg border border-[#1E293B] text-xs font-mono text-emerald-400 font-bold flex items-center gap-1.5 tracking-wide">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>STATION: {activePlanet.name} [{activePlanet.sectorX}, {activePlanet.sectorY}]</span>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Global Rank and Profile Badge exactly like mock */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/25 rounded-xl text-amber-400 font-mono text-xs font-bold shadow-[0_0_10px_rgba(245,158,11,0.05)]">
-            <Coins size={13} className="text-amber-400 animate-pulse animate-duration-[3000ms]" />
-            <span>{(player.credits !== undefined ? player.credits : 1250).toLocaleString()} <span className="text-[9px] text-amber-500/75 uppercase font-sans font-bold">Space Gold</span></span>
+        {/* Profile Badge with User icon next to interactive Rank indicator */}
+        <div className="flex items-center gap-2 relative">
+          <div className="flex flex-col items-end font-mono">
+            <span className="text-[8px] text-slate-500 uppercase tracking-widest font-bold">Commander Rank</span>
+            <span className="text-[11px] font-black text-cyan-400">
+              #{Math.abs(parseInt(player.id.substring(0, 4), 16) % 150) || 48}
+            </span>
           </div>
 
-          <div className="text-right hidden sm:block">
-            <div className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">Global Rank</div>
-            <div className="text-base sm:text-lg font-bold italic text-white font-mono">
-              #{Math.abs(parseInt(player.id.substring(0, 4), 16) % 150) || 48}
+          <button 
+            type="button"
+            onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+            className="w-10 h-10 border border-cyan-500/40 flex items-center justify-center rounded bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20 active:scale-95 transition-all duration-150 cursor-pointer relative z-50"
+            title="Open Commander Stations & HP status"
+          >
+            <User size={18} className="text-cyan-400" />
+            
+            {/* Pulsing indicator to show it's interactive */}
+            <span className="absolute -bottom-1 -right-1 flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+            </span>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => {
+              setAppConfirmModal({
+                title: 'CONFIRM SESSION DE-SYNCHRONIZATION',
+                message: 'Are you sure you want to log out of your session? Your current account session reference will be purged from LocalStorage and you will be re-routed to registration.',
+                onConfirm: () => {
+                  localStorage.removeItem('moonbase_userId');
+                  showToast('Commander keys de-synchronized. Reloading terminal...', 'info');
+                  setTimeout(() => {
+                    window.location.reload();
+                  }, 600);
+                }
+              });
+            }}
+            className="w-10 h-10 border border-red-500/30 hover:border-red-500/60 flex items-center justify-center rounded bg-red-950/10 hover:bg-red-950/25 active:scale-95 transition-all duration-150 cursor-pointer text-red-400"
+            title="Log Out & Create/Use a New Username"
+          >
+            <LogOut size={16} />
+          </button>
+
+          {/* Invisible backdrop to support closing the dropdown */}
+          {profileDropdownOpen && (
+            <div 
+              className="fixed inset-0 z-40 bg-transparent cursor-default" 
+              onClick={() => setProfileDropdownOpen(false)}
+            />
+          )}
+
+          {/* Commander Stations & HP/troop dropdown card */}
+          {profileDropdownOpen && (
+            <div className="absolute right-0 top-12 mt-2 w-72 bg-[#0A0F1D]/95 border border-cyan-500/35 rounded-xl shadow-[0_4px_30px_rgba(34,211,238,0.35)] p-4.5 z-50 text-left font-mono backdrop-blur-md animate-fade-in space-y-3 max-h-[80vh] overflow-y-auto">
+              <div className="border-b border-[#1E293B] pb-2.5">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[#22D3EE] flex items-center gap-1.5">
+                  🛰️ Commander Stations Hub
+                </h3>
+                <p className="text-[9px] text-[#94A3B8] leading-tight font-sans mt-1">
+                  Active tactical deployment & garrison strength overview.
+                </p>
+              </div>
+
+              {/* Planets detailed listing */}
+              <div className="space-y-2">
+                {player.planets.map((planet, index) => {
+                  const isPlExpanded = expandedDropdownPlanetIds[planet.id] || false;
+                  
+                  // HP & Firepower mapping details
+                  const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
+                  const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
+                  const troops = planet.troops || {};
+                  
+                  const planetDefHp = Object.entries(troops).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (defHpMap[k] || 0), 0);
+                  const planetAtkHp = Object.entries(troops).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (atkHpMap[k] || 0), 0);
+                  
+                  return (
+                    <div key={planet.id} className="bg-slate-950/50 border border-[#1E293B]/60 rounded-lg overflow-hidden transition hover:border-[#1E293B]">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedDropdownPlanetIds(prev => ({ ...prev, [planet.id]: !isPlExpanded }))}
+                        className="w-full p-2.5 flex items-center justify-between text-left text-xs text-slate-300 font-bold hover:text-cyan-300 transition-colors duration-150 cursor-pointer"
+                      >
+                        <div className="flex flex-col gap-0.5 truncate pr-2">
+                          <span className="truncate text-white font-mono text-[11px]">
+                            {index === 0 ? "★ " : index === 1 ? "★★ " : "🛰️ "}{planet.name}
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-mono tracking-wide">
+                            Sector [{planet.sectorX}, {planet.sectorY}]
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 font-mono text-[10px]">
+                          <span className="text-blue-400 font-bold" title="Defensive Shields (Defense HP)">
+                            🛡️ {planetDefHp.toLocaleString()}
+                          </span>
+                          <span className="text-slate-600">/</span>
+                          <span className="text-orange-400 font-bold" title="Strike Firepower (Attack HP)">
+                            ⚔️ {planetAtkHp.toLocaleString()}
+                          </span>
+                          <span className="text-[8px] text-slate-500 font-bold ml-1">
+                            {isPlExpanded ? '▲' : '▼'}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Expandable Planet troops */}
+                      {isPlExpanded && (
+                        <div className="px-2.5 pb-2.5 pt-1 space-y-2 text-[10.5px] border-t border-[#1E293B]/40 bg-black/40 text-slate-400">
+                          {Object.entries(troops).filter(([_, qty]) => (Number(qty) || 0) > 0).length === 0 ? (
+                            <p className="text-[9.5px] text-slate-500 italic py-1 text-center">Garrison is currently empty.</p>
+                          ) : (
+                            <div className="space-y-1">
+                              {Object.entries(troops).map(([type, qty]) => {
+                                if (!qty) return null;
+                                const uDefHp = defHpMap[type] || 10;
+                                const uAtkHp = atkHpMap[type] || 10;
+                                const quantityNum = Number(qty) || 0;
+                                return (
+                                  <div key={type} className="flex justify-between text-[10px] leading-relaxed">
+                                    <span className="text-slate-400 font-sans">{TROOP_NAME_MAPPING[type] || type}:</span>
+                                    <span className="font-bold text-slate-200 font-mono text-right">
+                                      {quantityNum.toLocaleString()} <span className="text-[8.5px] text-blue-400">({(quantityNum * uDefHp).toLocaleString()} DEF)</span> <span className="text-[8.5px] text-orange-400">({(quantityNum * uAtkHp).toLocaleString()} ATK)</span>
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Cumulative forces section */}
+              <div className="pt-2.5 pb-1 border-t border-[#1E293B] space-y-1">
+                <span className="text-[9.5px] text-cyan-400 font-mono font-bold uppercase tracking-widest block mb-1">CUMULATIVE COMBAT FORCES</span>
+                <div className="space-y-1 bg-[#05070A]/50 p-2 rounded-lg border border-[#1E293B]/40">
+                  {(() => {
+                    const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
+                    const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
+                    const cumulativeCounts: Record<string, number> = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+                    
+                    player.planets.forEach(pl => {
+                      Object.entries(pl.troops || {}).forEach(([k, v]) => {
+                        if (cumulativeCounts[k] !== undefined) {
+                          cumulativeCounts[k] += (Number(v) || 0);
+                        }
+                      });
+                    });
+
+                    const activeTroops = Object.entries(cumulativeCounts).filter(([_, qty]) => qty > 0);
+                    if (activeTroops.length === 0) {
+                      return <p className="text-[9.5px] text-slate-500 italic py-1 text-center">No active garrisons across all stations.</p>;
+                    }
+
+                    return activeTroops.map(([type, qty]) => {
+                      const uDefHp = defHpMap[type] || 10;
+                      const uAtkHp = atkHpMap[type] || 10;
+                      return (
+                        <div key={type} className="flex justify-between text-[10px] leading-relaxed">
+                          <span className="text-slate-400 font-sans">{TROOP_NAME_MAPPING[type] || type}:</span>
+                          <span className="font-bold text-slate-200 font-mono text-right">
+                            {qty.toLocaleString()} <span className="text-[8.5px] text-blue-400">({(qty * uDefHp).toLocaleString()} DEF)</span> <span className="text-[8.5px] text-orange-400">({(qty * uAtkHp).toLocaleString()} ATK)</span>
+                          </span>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              {/* Total cumulative HP footer */}
+              <div className="pt-2.5 border-t border-[#1E293B] flex flex-col gap-1.5 text-xs text-slate-400 font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">CUMULATIVE DEFENSE</span>
+                  <span className="text-blue-400 font-black text-right tracking-tight bg-blue-950/20 px-2 py-0.5 rounded border border-blue-500/20">
+                    {player.planets.reduce((sum, pl) => {
+                      const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
+                      return sum + Object.entries(pl.troops || {}).reduce((subSum, [k, v]) => subSum + (Number(v) || 0) * (defHpMap[k] || 0), 0);
+                    }, 0).toLocaleString()} DEF
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">CUMULATIVE ATTACK</span>
+                  <span className="text-orange-400 font-black text-right tracking-tight bg-orange-950/20 px-2 py-0.5 rounded border border-orange-500/20">
+                    {player.planets.reduce((sum, pl) => {
+                      const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
+                      return sum + Object.entries(pl.troops || {}).reduce((subSum, [k, v]) => subSum + (Number(v) || 0) * (atkHpMap[k] || 0), 0);
+                    }, 0).toLocaleString()} ATK
+                  </span>
+                </div>
+              </div>
+
+              {/* Quick Logout and New Commander activation button */}
+              <div className="pt-2.5 border-t border-[#1E293B]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAppConfirmModal({
+                      title: 'CONFIRM SESSION DE-SYNCHRONIZATION',
+                      message: 'Are you sure you want to log out of your session? Your current account session reference will be purged from LocalStorage and you will be re-routed to registration.',
+                      onConfirm: () => {
+                        localStorage.removeItem('moonbase_userId');
+                        setProfileDropdownOpen(false);
+                        showToast('Commander keys de-synchronized. Reloading terminal...', 'info');
+                        setTimeout(() => {
+                          window.location.reload();
+                        }, 600);
+                      }
+                    });
+                  }}
+                  className="w-full py-2 bg-gradient-to-r from-red-950/40 to-red-900/40 hover:from-red-950/60 hover:to-red-900/60 border border-red-500/30 text-red-400 rounded-lg text-[9.5px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <LogOut size={11} /> Log Out / Register New Name
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="w-10 h-10 border border-cyan-500/40 flex items-center justify-center rounded bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.2)]">
-            <span className="text-cyan-400 font-mono font-bold text-sm uppercase">{player.username[0]}</span>
-          </div>
+          )}
         </div>
       </header>
 
@@ -924,7 +2242,7 @@ export default function App() {
       )}
 
       {/* Screen view router container */}
-      <main className="max-w-5xl mx-auto px-4 py-8 animate-fade-in">
+      <main className="max-w-5xl mx-auto px-4 pt-8 pb-24 animate-fade-in">
         {activeTab === 'explore' && (
           <ExploreTab 
             player={player}
@@ -933,7 +2251,10 @@ export default function App() {
             onUpgradeBuilding={handleUpgradeBuilding}
             serverTime={serverTime}
             fleets={fleets}
-            onSettle={handleSettle}
+            onSettle={handleStartSettleFlow}
+            showToast={showToast}
+            onRefreshState={fetchState}
+            onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
           />
         )}
 
@@ -944,6 +2265,15 @@ export default function App() {
             onTrainTroops={handleTrainTroops}
             serverTime={serverTime}
             battleReports={battleReports}
+            readReports={readReports}
+            savedReports={savedReports}
+            onMarkRead={markReportRead}
+            onMarkUnread={markReportUnread}
+            onToggleSave={toggleSaveReport}
+            onForwardReport={handleForwardReport}
+            fleets={fleets}
+            onSendFleet={handleSendFleet}
+            onSettle={handleStartSettleFlow}
           />
         )}
 
@@ -952,18 +2282,28 @@ export default function App() {
             player={player}
             activePlanet={activePlanet}
             alliances={alliances}
+            playersList={playersList}
             chatMessages={chatMessages}
             fleets={fleets}
             battleReports={battleReports}
             newsEvents={newsEvents}
             serverTime={serverTime}
             onSendFleet={handleSendFleet}
+            onRerouteFleet={handleRerouteFleet}
             onSendChat={handleSendChat}
             onCreateAlliance={handleCreateAlliance}
             onJoinAlliance={handleJoinAlliance}
             onLeaveAlliance={handleLeaveAlliance}
             onDeclareWar={handleDeclareWar}
             onRefreshState={fetchState}
+            showToast={showToast}
+            readReports={readReports}
+            savedReports={savedReports}
+            onMarkRead={markReportRead}
+            onMarkUnread={markReportUnread}
+            onToggleSave={toggleSaveReport}
+            onForwardReport={handleForwardReport}
+            onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
           />
         )}
 
@@ -988,14 +2328,22 @@ export default function App() {
             setSkinId={setSkinId}
             fontSizeScale={fontSizeScale}
             setFontSizeScale={setFontSizeScale}
+            interactiveTabs={interactiveTabs}
+            setInteractiveTabs={setInteractiveTabs}
             showToast={showToast}
             onRefreshState={fetchState}
+            onLinkGoogle={handleLinkGoogleAccount}
+            onOpenPayments={() => {
+              setSelectedPaymentTier(null);
+              setPaymentState('idle');
+              setShowPaymentModal(true);
+            }}
           />
         )}
       </main>
 
       {/* BOTTOM TAB MENU NAVIGATION PANEL (Elegant Dark Mockup matched exact style) */}
-      <footer className={`fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#0A0F1D]/95 backdrop-blur-md border-t border-[#1E293B] flex items-center shrink-0 px-2 justify-between transition-all duration-500 ease-in-out ${isScrolling ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
+      <footer className={`fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#0A0F1D]/95 backdrop-blur-md border-t border-[#1E293B] flex items-center shrink-0 px-2 justify-between transition-all duration-500 ease-in-out ${(!interactiveTabs || isScrolling) ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
         <div className="flex-1 flex h-full">
           
           {/* Tab 1: Explore */}
@@ -1004,8 +2352,8 @@ export default function App() {
             className={`flex-1 h-full flex flex-col items-center justify-center gap-1 border-r border-[#1E293B] group relative transition-colors duration-150 cursor-pointer ${activeTab === 'explore' ? 'bg-cyan-500/10' : ''}`}
           >
             {activeTab === 'explore' && <div className="absolute top-0 inset-x-0 h-[3px] bg-cyan-400 shadow-[0_0_10px_#22d3ee]"></div>}
-            <span className={`text-[9px] uppercase tracking-widest font-semibold ${activeTab === 'explore' ? 'text-cyan-450' : 'text-slate-500 group-hover:text-slate-300'}`}>01</span>
-            <span className={`text-[10px] font-bold tracking-widest ${activeTab === 'explore' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>EXPLORE</span>
+            <span className="text-base sm:text-lg filter drop-shadow-[0_0_5px_rgba(34,211,238,0.5)] transform group-hover:scale-125 transition-transform duration-150 leading-none">🪐</span>
+            <span className={`text-[9px] font-bold tracking-widest ${activeTab === 'explore' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>XPL</span>
           </button>
 
           {/* Tab 2: Army command */}
@@ -1014,8 +2362,8 @@ export default function App() {
             className={`flex-1 h-full flex flex-col items-center justify-center gap-1 border-r border-[#1E293B] group relative transition-colors duration-150 cursor-pointer ${activeTab === 'army' ? 'bg-cyan-500/10' : ''}`}
           >
             {activeTab === 'army' && <div className="absolute top-0 inset-x-0 h-[3px] bg-cyan-400 shadow-[0_0_10px_#22d3ee]"></div>}
-            <span className={`text-[9px] uppercase tracking-widest font-semibold ${activeTab === 'army' ? 'text-cyan-400' : 'text-slate-500 group-hover:text-slate-300'}`}>02</span>
-            <span className={`text-[10px] font-bold tracking-widest ${activeTab === 'army' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>COMMAND CENTER</span>
+            <span className="text-base sm:text-lg filter drop-shadow-[0_0_5px_rgba(244,63,94,0.5)] transform group-hover:scale-125 transition-transform duration-150 leading-none">🛡️</span>
+            <span className={`text-[9px] font-bold tracking-widest ${activeTab === 'army' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>CMD</span>
           </button>
 
           {/* Tab 3: Galaxy Scan Map */}
@@ -1024,8 +2372,8 @@ export default function App() {
             className={`flex-1 h-full flex flex-col items-center justify-center gap-1 border-r border-[#1E293B] group relative transition-colors duration-150 cursor-pointer ${activeTab === 'galaxy' ? 'bg-cyan-500/10' : ''}`}
           >
             {activeTab === 'galaxy' && <div className="absolute top-0 inset-x-0 h-[3px] bg-cyan-400 shadow-[0_0_10px_#22d3ee]"></div>}
-            <span className={`text-[9px] uppercase tracking-widest font-semibold ${activeTab === 'galaxy' ? 'text-cyan-400' : 'text-slate-500 group-hover:text-slate-300'}`}>03</span>
-            <span className={`text-[10px] font-bold tracking-widest ${activeTab === 'galaxy' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>COMMS HUB</span>
+            <span className="text-base sm:text-lg filter drop-shadow-[0_0_5px_rgba(168,85,247,0.5)] transform group-hover:scale-125 transition-transform duration-150 leading-none">📡</span>
+            <span className={`text-[9px] font-bold tracking-widest ${activeTab === 'galaxy' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>RDR</span>
           </button>
 
           {/* Tab 4: Research Center */}
@@ -1034,8 +2382,8 @@ export default function App() {
             className={`flex-1 h-full flex flex-col items-center justify-center gap-1 group relative transition-colors duration-150 cursor-pointer ${activeTab === 'research' ? 'bg-cyan-500/10' : ''}`}
           >
             {activeTab === 'research' && <div className="absolute top-0 inset-x-0 h-[3px] bg-cyan-400 shadow-[0_0_10px_#22d3ee]"></div>}
-            <span className={`text-[9px] uppercase tracking-widest font-semibold ${activeTab === 'research' ? 'text-cyan-400' : 'text-slate-500 group-hover:text-slate-300'}`}>04</span>
-            <span className={`text-[10px] font-bold tracking-widest ${activeTab === 'research' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>RESEARCH CENTER</span>
+            <span className="text-base sm:text-lg filter drop-shadow-[0_0_5px_rgba(234,179,8,0.5)] transform group-hover:scale-125 transition-transform duration-150 leading-none">🔬</span>
+            <span className={`text-[9px] font-bold tracking-widest ${activeTab === 'research' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>Res</span>
           </button>
 
         </div>
@@ -1077,6 +2425,596 @@ export default function App() {
           </button>
         </div>
       </footer>
+
+      {/* SECURE MOONBASE STRIPE PAYMENT MODAL */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-[#05070A]/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-[#0A0F1D] border border-cyan-500/20 rounded-2xl shadow-[0_0_60px_rgba(34,211,238,0.1)] p-6 font-sans text-slate-100 flex flex-col relative overflow-hidden">
+            
+            {/* Glowing effect inside modal */}
+            <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl pointer-events-none"></div>
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-4 mb-5">
+              <div className="flex items-center gap-2">
+                <Coins className="text-amber-400 animate-bounce" size={20} />
+                <div>
+                  <h3 className="text-sm font-mono font-black uppercase tracking-widest text-white">Galactic Funding Secure Gateway</h3>
+                  <p className="text-[10px] text-slate-500 font-mono">100% SECURE SSL STRIPE ENCRYPTED LEDGER CONNECTIONS ONLY</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+                className="text-slate-400 hover:text-white transition text-lg bg-[#05070A] hover:bg-[#1E293B] border border-[#1E293B] w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            {paymentState === 'idle' && (
+              <div className="space-y-4">
+                <div className="text-xs text-slate-400 font-sans leading-relaxed">
+                  Support the development of Space Station! Choose any of the following quantum financial funding packages to load premium **Space Gold (Credits)** directly into your commander ledger account.
+                </div>
+
+                {/* Tiers List */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {[
+                    { amount: 1500, label: "Bronze Cargo Carrier", price: "$4.99", desc: "Acquire standardized supplies & extra gold credits booster for minor resource upgrades.", bonus: "Bronze Badge" },
+                    { amount: 6000, label: "Commander's Tactical Cache", price: "$14.99", desc: "Gain massive tactical advantages. Adds premium credits plus unlocks high-tech HUD styling skin options.", bonus: "Unlock Sol Novacore Skin + Purple cosmetic tag", popular: true },
+                    { amount: 25000, label: "Supreme Emperor's Core Vault", price: "$49.99", desc: "Ultimate financial supply crates bulk. Immediately provides unlimited credits for high-tier upgrades.", bonus: "Unlock Void Amethyst Skin + Emperor Badge" }
+                  ].map((tier) => (
+                    <button
+                      key={tier.label}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPaymentTier(tier);
+                        setPaymentState('input');
+                      }}
+                      className={`relative text-left p-4 bg-[#05070A] border rounded-xl hover:bg-slate-900/50 hover:border-amber-500/40 transition-all duration-150 flex flex-col justify-between cursor-pointer group ${tier.popular ? 'border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'border-[#1E293B]'}`}
+                    >
+                      {tier.popular && (
+                        <span className="absolute -top-2.5 right-3 bg-amber-500 text-slate-950 font-bold text-[8px] font-mono tracking-widest uppercase px-2 py-0.5 rounded-full shadow-md z-10 animate-pulse">
+                          BEST DEAL
+                        </span>
+                      )}
+                      <div>
+                        <div className="text-xs text-slate-500 font-mono font-bold uppercase tracking-wider">{tier.label}</div>
+                        <div className="text-2xl font-black text-white font-mono mt-2 mb-1 group-hover:text-amber-400 transition-colors">{tier.price}</div>
+                        <div className="text-[10px] text-amber-400 font-mono font-bold flex items-center gap-1 mb-2">
+                          <Coins size={11} /> +{tier.amount.toLocaleString()} Space Gold
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-sans leading-normal">{tier.desc}</p>
+                      </div>
+                      <div className="mt-4 pt-3 border-t border-[#1e293b]/70 w-full text-[9px] font-bold text-emerald-400 font-mono uppercase tracking-widest">
+                        🎁 Bonus: {tier.bonus}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {paymentState === 'input' && selectedPaymentTier && (
+              <div className="space-y-4">
+                <div className="text-xs text-slate-400 font-sans flex items-center justify-between bg-[#05070A] p-3 border border-[#1E293B] rounded-xl mb-2">
+                  <div>
+                    <span className="text-slate-500">SELECTED PACKAGE:</span>
+                    <div className="text-sm font-bold text-white uppercase">{selectedPaymentTier.label}</div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-slate-500">TOTAL COST:</span>
+                    <div className="text-base font-black text-amber-400 font-mono">{selectedPaymentTier.price}</div>
+                  </div>
+                </div>
+
+                {/* Payment Methods */}
+                <div className="grid grid-cols-3 gap-2.5">
+                  {[
+                    { id: 'card', name: 'Credit / Debit Card' },
+                    { id: 'google', name: 'Google Pay' },
+                    { id: 'apple', name: 'Apple Pay' }
+                  ].map((method) => (
+                    <button
+                      key={method.id}
+                      type="button"
+                      onClick={() => setCreditCardData(prev => ({ ...prev, method: method.id }))}
+                      className={`py-2 px-3 border rounded-xl text-center font-mono text-xs font-bold transition-all duration-150 cursor-pointer ${creditCardData.method === method.id ? 'bg-amber-500/10 border-amber-500 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.05)]' : 'bg-[#05070A] border-[#1E293B] text-slate-400 hover:bg-slate-900/40'}`}
+                    >
+                      {method.name}
+                    </button>
+                  ))}
+                </div>
+
+                {creditCardData.method === 'card' ? (
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!creditCardData.number || !creditCardData.name) {
+                      showToast('Please enter all required credit card parameters', 'error');
+                      return;
+                    }
+                    
+                    // Simulate Stripe Transaction Processing
+                    setPaymentState('processing');
+                    setPaymentStepsLog('Establishing SSL handshake sequence...');
+                    setTimeout(() => {
+                      setPaymentStepsLog('Authorizing Stripe transaction parameters...');
+                      setTimeout(() => {
+                        setPaymentStepsLog('Acquiring digital Space Gold token allocation...');
+                        setTimeout(async () => {
+                          setPaymentStepsLog('Updating commander cloud database ledgers...');
+                          await handleBuyCredits(selectedPaymentTier.amount, selectedPaymentTier.label);
+                          setPaymentState('success');
+                        }, 800);
+                      }, 800);
+                    }, 800);
+                  }} className="space-y-3.5 pt-2">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">Cardholder Name (Secure SSL Name)</label>
+                      <input 
+                        type="text"
+                        required
+                        value={creditCardData.name}
+                        onChange={(e) => setCreditCardData(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Commander E.g. Jane Doe"
+                        className="w-full px-4 py-2.5 bg-[#05070A] border border-[#1E293B] rounded-xl text-xs text-white focus:outline-none focus:border-amber-550 focus:shadow-[0_0_10px_rgba(245,158,11,0.1)] transition"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">Card Number (Stripe Encrypted)</label>
+                      <div className="relative">
+                        <input 
+                          type="text"
+                          required
+                          maxLength={19}
+                          value={creditCardData.number}
+                          onChange={(e) => {
+                            // Automatically insert spaces for formatting
+                            const val = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+                            const matches = val.match(/\d{4,16}/g);
+                            const match = (matches && matches[0]) || '';
+                            const parts = [];
+
+                            for (let i = 0, len = match.length; i < len; i += 4) {
+                              parts.push(match.substring(i, i + 4));
+                            }
+
+                            if (parts.length > 0) {
+                              setCreditCardData(prev => ({ ...prev, number: parts.join(' ') }));
+                            } else {
+                              setCreditCardData(prev => ({ ...prev, number: val }));
+                            }
+                          }}
+                          placeholder="4000 1234 5678 9010"
+                          className="w-full px-4 py-2.5 bg-[#05070A] border border-[#1E293B] rounded-xl text-xs text-white focus:outline-none focus:border-amber-550 focus:shadow-[0_0_10px_rgba(245,158,11,0.1)] transition pl-10"
+                        />
+                        <span className="absolute left-3.5 top-3 text-slate-505 font-mono text-[9px] font-bold uppercase">CARD</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3.5">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">Expiry MM/YY</label>
+                        <input 
+                          type="text"
+                          required
+                          maxLength={5}
+                          placeholder="12/28"
+                          value={creditCardData.expiry}
+                          onChange={(e) => {
+                            let val = e.target.value.replace(/[^0-9]/g, '');
+                            if (val.length > 2) {
+                              val = val.substring(0, 2) + '/' + val.substring(2, 4);
+                            }
+                            setCreditCardData(prev => ({ ...prev, expiry: val }));
+                          }}
+                          className="w-full px-4 py-2.5 bg-[#05070A] border border-[#1E293B] rounded-xl text-xs text-white focus:outline-none focus:border-amber-550 focus:shadow-[0_0_10px_rgba(245,158,11,0.1)] transition"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">CVC / CVV</label>
+                        <input 
+                          type="password"
+                          required
+                          maxLength={4}
+                          placeholder="999"
+                          value={creditCardData.cvc}
+                          onChange={(e) => setCreditCardData(prev => ({ ...prev, cvc: e.target.value.replace(/[^0-9]/g, '') }))}
+                          className="w-full px-4 py-2.5 bg-[#05070A] border border-[#1E293B] rounded-xl text-xs text-white focus:outline-none focus:border-amber-550 focus:shadow-[0_0_10px_rgba(245,158,11,0.1)] transition"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1 font-sans">
+                      <input type="checkbox" required id="secure-terms" className="rounded bg-[#05070A] border-[#1E293B]" />
+                      <label htmlFor="secure-terms" className="text-[10px] text-slate-500 cursor-pointer">I authorize this simulated space transaction process via encrypted quantum rails.</label>
+                    </div>
+
+                    <div className="pt-2 flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentState('idle')}
+                        className="flex-1 py-3 border border-[#1E293B] text-slate-300 font-bold font-mono text-xs tracking-widest uppercase rounded-xl hover:bg-slate-900 transition cursor-pointer"
+                      >
+                        BACK
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 font-bold font-mono text-xs tracking-widest uppercase rounded-xl hover:brightness-110 active:scale-[0.98] transition shadow-[0_0_15px_rgba(245,158,11,0.2)] cursor-pointer"
+                      >
+                        PAY {selectedPaymentTier.price}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="space-y-5 py-6 text-center font-sans">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#FBBF24]">Quick Sync Authorized</span>
+                    <h4 className="text-sm font-bold text-white">Mobile Wallet Payment Simulation</h4>
+                    <p className="text-xs text-slate-400 max-w-[360px] mx-auto leading-relaxed">
+                      Sync directly with Apple Pay or Google Pay to purchase this Space Gold block securely. No physical credit card input is required.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentState('processing');
+                        setPaymentStepsLog('Checking mobile biometric sensors...');
+                        setTimeout(() => {
+                          setPaymentStepsLog('Acquiring secure single-use payment token block...');
+                          setTimeout(async () => {
+                            setPaymentStepsLog('Updating commander cloud database ledgers...');
+                            await handleBuyCredits(selectedPaymentTier.amount, selectedPaymentTier.label);
+                            setPaymentState('success');
+                          }, 900);
+                        }, 900);
+                      }}
+                      className="px-8 py-3.5 bg-white text-slate-950 font-bold text-xs font-mono tracking-widest uppercase rounded-xl hover:bg-slate-100 transition inline-flex items-center gap-2 active:scale-95 cursor-pointer shadow-lg"
+                    >
+                      <span>🚀</span> AUTHORIZE VIA BIOMETRIC SYNC
+                    </button>
+                    <div className="text-center pt-2">
+                      <button type="button" onClick={() => setPaymentState('idle')} className="text-xs text-slate-500 hover:text-slate-350 underline cursor-pointer">Choose another package</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {paymentState === 'processing' && (
+              <div className="py-12 flex flex-col items-center justify-center space-y-6">
+                {/* Immersive Pulsing Reactor / Atom visual */}
+                <div className="relative w-24 h-24 flex items-center justify-center">
+                  <div className="absolute inset-0 border-2 border-dashed border-amber-500/20 rounded-full animate-spin animate-duration-[10000ms]"></div>
+                  <div className="absolute inset-2 border-2 border-yellow-500/35 rounded-full animate-spin animate-reverse animate-duration-[5000ms]"></div>
+                  <div className="w-12 h-12 bg-amber-500/10 border border-amber-500 rounded-full flex items-center justify-center animate-ping text-transparent absolute">.</div>
+                  <div className="w-10 h-10 bg-[#0A0F1D] border-2 border-amber-400 rounded-full flex items-center justify-center text-amber-400 font-bold font-mono text-xs shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+                    99%
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 text-center">
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Processing Quantum Funds</h4>
+                  <div className="text-xs text-amber-400 font-mono tracking-wide mt-1 animate-pulse">
+                    {paymentStepsLog}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {paymentState === 'success' && selectedPaymentTier && (
+              <div className="py-10 flex flex-col items-center justify-center space-y-5 text-center">
+                <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500 text-emerald-400 rounded-full flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                  ✓
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="text-base font-bold text-white uppercase font-mono tracking-wide">Ledger Synchronization Successful!</h4>
+                  <p className="text-xs text-slate-400 max-w-[380px] leading-relaxed">
+                    Transaction authorized and ledger updated. **+{selectedPaymentTier.amount.toLocaleString()} Space Gold (Credits)** loaded securely!
+                  </p>
+                </div>
+
+                <div className="bg-[#05070A] p-3 rounded-xl border border-[#1E293B] font-mono text-[10px] text-slate-500 text-left w-full max-w-sm space-y-1">
+                  <div>TRANSACTION ID: <span className="text-slate-350">TXN_{Math.random().toString(36).substr(2, 12).toUpperCase()}</span></div>
+                  <div>SECURITY KEY: <span className="text-slate-350">STRIPE_SSL_VALIDATED_OK</span></div>
+                  <div>AUTHORIZED PACKAGE: <span className="text-amber-400">{selectedPaymentTier.label}</span></div>
+                </div>
+
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    setPaymentState('idle');
+                  }}
+                  className="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs tracking-widest uppercase rounded-xl transition duration-150 active:scale-95 cursor-pointer shadow-lg"
+                >
+                  RETURN TO SECTOR STATION COMMAND
+                </button>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* GLOBAL PLAYER PROFILE STATS MODAL */}
+      {viewingPlayerId && (() => {
+        const targetPlayer = playersList.find(p => p.id === viewingPlayerId) || 
+          (player?.id === viewingPlayerId ? {
+             id: player.id,
+             username: player.username,
+             faction: player.faction,
+             factionColor: player.factionColor,
+             allianceId: player.allianceId,
+             allianceRole: player.allianceRole,
+             scores: player.scores,
+             achievements: player.achievements || [],
+             planetsCount: player.planets?.length || 1,
+             lastActive: Date.now()
+          } : null);
+
+        if (!targetPlayer) return null;
+
+        const isOnline = !targetPlayer.lastActive || (Date.now() - targetPlayer.lastActive < 120000);
+        const factionColor = targetPlayer.factionColor || '#22d3ee';
+        const targetAlliance = targetPlayer.allianceId ? alliances[targetPlayer.allianceId] : null;
+
+        return (
+          <div className="fixed inset-0 bg-[#05070A]/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div className="w-full max-w-lg bg-[#0A0F1D] border border-cyan-500/20 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.15)] overflow-hidden font-sans relative flex flex-col">
+              
+              {/* Header Banner representing player Faction */}
+              <div 
+                className="h-28 relative flex items-end p-5"
+                style={{ backgroundColor: factionColor + '15', borderBottom: `2px solid ${factionColor}` }}
+              >
+                {/* Visual grid accent */}
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:14px_14px] opacity-10 pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0A0F1D] to-transparent" />
+                
+                <div className="relative z-10 flex items-center gap-4.5">
+                  <div 
+                    className="w-16 h-16 rounded-xl border-2 flex items-center justify-center text-2xl font-bold font-mono select-none shadow-lg bg-[#05070A]"
+                    style={{ borderColor: factionColor, color: factionColor }}
+                  >
+                    {targetPlayer.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black font-mono tracking-tight text-white flex items-center gap-2">
+                      {targetPlayer.username}
+                      <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: isOnline ? '#10b981' : '#64748b' }} title={isOnline ? 'Active Commander Online' : 'Commander Offline'} />
+                    </h2>
+                    <p className="text-[11px] font-mono font-bold tracking-widest uppercase" style={{ color: factionColor }}>
+                      {targetPlayer.faction} Agent • {isOnline ? 'ONLINE' : 'OFFLINE'}
+                    </p>
+                  </div>
+                </div>
+
+                <button 
+                  type="button"
+                  onClick={() => setViewingPlayerId(null)}
+                  className="absolute top-4 right-4 text-slate-400 hover:text-white bg-[#05070A] hover:bg-slate-900 border border-[#1E293B] w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition"
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Stats & Metadata */}
+              <div className="p-6 space-y-5 font-mono text-xs">
+                
+                {/* Alliance association banner */}
+                {targetAlliance ? (
+                  <div className="p-3 bg-[#05070a]/60 border border-yellow-500/10 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider block">Alliance Covenant</span>
+                      <span className="text-yellow-400 font-bold">[{targetAlliance.tag}] {targetAlliance.name}</span>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-[10px] uppercase font-bold">
+                      {targetPlayer.allianceRole?.toUpperCase() || 'MEMBER'}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-[#05070a]/30 border border-[#1E293B]/60 rounded-xl text-center text-slate-500 text-[11px] font-bold">
+                    🛡️ UNALIGNED INDEPENDENT OPERATOR
+                  </div>
+                )}
+
+                {/* Main Core Statistics */}
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Core Ledger Statistics</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex flex-col justify-between">
+                      <span className="text-[10px] text-slate-500">Colony Count</span>
+                      <span className="text-base font-bold text-slate-200 mt-1">{targetPlayer.planetsCount || 1} Starbases</span>
+                    </div>
+                    <div className="p-3 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex flex-col justify-between">
+                      <span className="text-[10px] text-slate-500">Combined Population</span>
+                      <span className="text-base font-bold text-cyan-400 mt-1">{(targetPlayer.scores.population || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="p-3 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex flex-col justify-between">
+                      <span className="text-[10px] text-red-500/70">Offensive Destructions</span>
+                      <span className="text-base font-bold text-red-400 mt-1">{(targetPlayer.scores.attack || 0).toLocaleString()} HP Killed</span>
+                    </div>
+                    <div className="p-3 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex flex-col justify-between">
+                      <span className="text-[10px] text-blue-500/70">Defensive resiliency</span>
+                      <span className="text-base font-bold text-blue-400 mt-1">{(targetPlayer.scores.defence || 0).toLocaleString()} HP Absorbed</span>
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex items-center justify-between mt-2">
+                    <span className="text-[10px] text-slate-500 uppercase font-black">Maritime Raiders Score</span>
+                    <span className="text-amber-400 font-bold">{(targetPlayer.scores.raiders || 0).toLocaleString()} cargo stolen</span>
+                  </div>
+                </div>
+
+                {/* Achievements List */}
+                <div className="space-y-2.5">
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Classified Achievements ({targetPlayer.achievements?.length || 0})</h4>
+                  {targetPlayer.achievements && targetPlayer.achievements.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 max-h-[85px] overflow-y-auto pr-1">
+                      {targetPlayer.achievements.map((ach, idx) => (
+                        <span key={idx} className="bg-cyan-950/20 text-cyan-400 px-2 py-1 rounded border border-cyan-500/10 text-[9px] font-bold tracking-tight uppercase flex items-center gap-1">
+                          ⚓ {ach}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-600 italic">No planetary campaign achievements unlocked yet.</p>
+                  )}
+                </div>
+
+                {/* Last Detected Activity */}
+                <div className="pt-3 border-t border-[#1E293B] text-[10px] text-slate-500 flex justify-between items-center text-right sm:text-left gap-2 flex-wrap">
+                  <span>TELEMETRY STABILIZATION GRID</span>
+                  <span>
+                    {targetPlayer.lastActive ? (
+                      `LAST DETECTED: ${new Date(targetPlayer.lastActive).toLocaleTimeString()}`
+                    ) : (
+                      'ACTIVITY INDEX CLASSIFIED'
+                    )}
+                  </span>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Settle/Colony Custom Station Naming Modal */}
+      {settleFleetId && (
+        <div className="fixed inset-0 bg-[#05070A]/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#0A0F1D] border border-cyan-500/30 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.15)] p-6 font-sans text-slate-100 flex flex-col relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div className="flex items-center gap-2 border-b border-[#1E293B] pb-4 mb-5">
+              <span className="text-xl">🛰️</span>
+              <div>
+                <h3 className="text-sm font-mono font-black uppercase tracking-widest text-[#00F0FF]">NEW STATION DESIGNATION</h3>
+                <p className="text-[10px] uppercase font-mono text-slate-500">Formally designate your new colony station</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleExecuteSettle} className="space-y-4">
+              <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                Your settlement crew has arrived at destination coordinates! Please authorize the official station designation to construct the main command headquarters:
+              </p>
+              
+              <div className="space-y-2 focus-within:text-cyan-400 text-slate-500 font-mono">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-sky-400">Station Name (Required)</label>
+                <input 
+                  type="text" 
+                  value={customColonyName}
+                  onChange={(e) => setCustomColonyName(e.target.value)}
+                  placeholder="Enter a unique station name..."
+                  maxLength={30}
+                  className="w-full px-4 py-3 bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-xl text-sm focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_10px_rgba(34,211,238,0.15)] transition-all duration-200"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setSettleFleetId(null);
+                    setCustomColonyName('');
+                  }}
+                  className="flex-1 py-3 bg-slate-900 border border-[#1E293B] hover:bg-slate-800 text-slate-300 font-mono font-bold text-xs tracking-widest uppercase rounded-xl transition cursor-pointer"
+                >
+                  ABORT
+                </button>
+                <button 
+                  type="submit"
+                  disabled={!customColonyName.trim()}
+                  className="flex-1 py-3 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:brightness-110 active:scale-[0.98] disabled:from-slate-800 disabled:to-slate-900 text-white disabled:text-slate-500 font-mono font-bold text-xs tracking-widest uppercase rounded-xl transition cursor-pointer disabled:cursor-not-allowed shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                >
+                  SETTLE STATION
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Post-Registration Initial Station Naming Modal */}
+      {showInitialStationNaming && (
+        <div className="fixed inset-0 bg-[#05070A]/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#0A0F1D] border border-cyan-500/30 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.15)] p-6 font-sans text-slate-100 flex flex-col relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div className="flex items-center gap-2 border-b border-[#1E293B] pb-4 mb-5">
+              <span className="text-xl">🌌</span>
+              <div>
+                <h3 className="text-sm font-mono font-black uppercase tracking-widest text-[#00F0FF]">COMMISSION STATION DESIGNATION</h3>
+                <p className="text-[10px] uppercase font-mono text-slate-500">Formally name your sovereign Space Station</p>
+              </div>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleInitialStationNamingSubmit(); }} className="space-y-4">
+              <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                As newly initialized Commander, you have been granted rights to establish a colony on an unclaimed planet. Name your central Station below:
+              </p>
+              
+              <div className="space-y-1.5 focus-within:text-cyan-400 text-slate-500 font-mono">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-sky-400">Station Name</label>
+                <input 
+                  type="text" 
+                  value={initialStationName}
+                  onChange={(e) => setInitialStationName(e.target.value)}
+                  placeholder="E.g. Alpha Outpost"
+                  maxLength={30}
+                  className="w-full px-4 py-3 bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-xl text-sm focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_10px_rgba(34,211,238,0.15)] transition-all duration-200"
+                  required
+                />
+              </div>
+
+              <div className="pt-2">
+                <button 
+                  type="submit"
+                  className="w-full py-3 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:brightness-110 active:scale-[0.98] text-white font-mono font-bold text-xs tracking-widest uppercase rounded-xl transition cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                >
+                  Register Station & Establish Command
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {appConfirmModal && (
+        <div id="app-confirm-modal-overlay" className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#0D1527] border border-red-500/30 rounded-2xl p-6 flex flex-col space-y-4 shadow-2xl relative text-left">
+            <h3 className="text-sm font-extrabold text-red-400 font-mono tracking-wider flex items-center gap-2">
+              <AlertTriangle size={16} /> {appConfirmModal.title}
+            </h3>
+            <p className="text-xs text-slate-300 font-sans leading-relaxed">
+              {appConfirmModal.message}
+            </p>
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setAppConfirmModal(null)}
+                className="px-4 py-2 hover:bg-slate-900 border border-slate-800 text-slate-400 rounded-lg text-xs font-mono transition cursor-pointer"
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const cb = appConfirmModal.onConfirm;
+                  setAppConfirmModal(null);
+                  cb();
+                }}
+                className="px-4 py-2 bg-red-950/40 hover:bg-red-950 border border-red-500/40 text-red-400 rounded-lg text-xs font-mono font-bold transition cursor-pointer"
+              >
+                CONFIRM ACTION
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

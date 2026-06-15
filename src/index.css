@@ -26,6 +26,11 @@
   border-color: #1E293B;
 }
 
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
 body {
   background-color: #05070A;
   color: #cbd5e1;
@@ -47,25 +52,36 @@ body {
 /* Panels */
 .theme-light .bg-\[\#0A0F1D\]\/80,
 .theme-light .bg-elegant-panel,
+.theme-light .bg-\[\#0C0F1A\],
+.theme-light .bg-\[\#0c0f1a\],
+.theme-light .bg-\[\#0A0F1D\]\/95,
 .theme-light .bg-\[\#0A0F1D\] {
-  background-color: rgba(255, 255, 255, 0.96) !important;
+  background-color: rgba(255, 255, 255, 0.98) !important;
   border-color: #cbd5e1 !important;
 }
 
 /* Sub-panels, list items and table rows */
 .theme-light .bg-\[\#05070A\]\/95,
-.theme-light .bg-\[\#05070A\]\,
+.theme-light .bg-\[\#05070A\],
+.theme-light .bg-\[\#05070A\]\/80,
+.theme-light .bg-\[\#05070A\]\/50,
+.theme-light .bg-\[\#05070A\]\/30,
+.theme-light .bg-\[\#111827\],
 .theme-light .bg-slate-950,
 .theme-light .bg-slate-900,
 .theme-light .bg-\[\#05070A\]\/60,
+.theme-light .bg-black\/30,
+.theme-light .bg-black\/40,
+.theme-light .bg-black\/50,
 .theme-light .bg-\[\#030508\]\/60 {
   background-color: #edf2f7 !important;
   border-color: #cbd5e1 !important;
 }
 
 .theme-light .hover\:bg-white\/5:hover,
-.theme-light .hover\:bg-\[\#1E293B\]\/45:hover {
-  background-color: rgba(0, 0, 0, 0.04) !important;
+.theme-light .hover\:bg-\[\#1E293B\]\/45:hover,
+.theme-light .hover\:bg-\[\#1E293B\]\/40:hover {
+  background-color: rgba(15, 23, 42, 0.06) !important;
 }
 
 /* Card frames & borders */
@@ -76,10 +92,50 @@ body {
   border-color: #cbd5e1 !important;
 }
 
+/* Color highlights readability overrides for light theme */
+.theme-light .text-cyan-400,
+.theme-light .text-\[\#22D3EE\],
+.theme-light .text-\[\#00F0FF\] {
+  color: #0891b2 !important; /* cyan-600 */
+}
+
+.theme-light .text-amber-400,
+.theme-light .text-amber-500 {
+  color: #b45309 !important; /* amber-700 */
+}
+
+.theme-light .text-emerald-400,
+.theme-light .text-emerald-500 {
+  color: #047857 !important; /* emerald-700 */
+}
+
+.theme-light .text-purple-400,
+.theme-light .text-purple-500,
+.theme-light .text-fuchsia-400 {
+  color: #701a75 !important; /* fuchsia-800 */
+}
+
+.theme-light .text-red-400,
+.theme-light .text-red-500 {
+  color: #b91c1c !important; /* red-700 */
+}
+
+.theme-light .text-blue-400,
+.theme-light .text-blue-500 {
+  color: #1d4ed8 !important; /* blue-700 */
+}
+
+.theme-light .text-teal-400,
+.theme-light .text-teal-500 {
+  color: #0f766e !important; /* teal-700 */
+}
+
 /* Dark color texts forced to dark slate */
 .theme-light .text-slate-100,
 .theme-light .text-slate-200,
 .theme-light .text-slate-300,
+.theme-light .text-slate-205,
+.theme-light .text-slate-350,
 .theme-light .text-white {
   color: #0f172a !important;
 }
@@ -107,11 +163,6 @@ body {
 .theme-light .bg-\[\#0D1527\] {
   background-color: rgba(255, 255, 255, 0.98) !important;
   border-color: #cbd5e1 !important;
-}
-
-.theme-light .text-slate-350,
-.theme-light .text-slate-300 {
-  color: #1e293b !important;
 }
 
 /* ==========================================================================
@@ -146,3 +197,65 @@ body {
 .theme-dark .border-white\/5 {
   border-color: #27272a !important;
 }
+
+/* ==========================================================================
+   CLASSIC BLUE THEME STYLING OVERRIDES (Celestial Midnight Navy Space theme)
+   ========================================================================== */
+.theme-normal {
+  background-color: #030816 !important;
+  color: #e0f2fe !important;
+}
+
+.theme-normal body {
+  background-color: #030816 !important;
+  color: #e0f2fe !important;
+}
+
+/* Main panels */
+.theme-normal .bg-\[\#0A0F1D\]\/80,
+.theme-normal .bg-elegant-panel,
+.theme-normal .bg-\[\#0C0F1A\],
+.theme-normal .bg-\[\#0c0f1a\],
+.theme-normal .bg-\[\#0A0F1D\] {
+  background-color: #0a1733 !important;
+  border-color: #1e3a8a !important;
+}
+
+/* Base backgrounds & Sub containers */
+.theme-normal .bg-\[\#05070A\]\/95,
+.theme-normal .bg-\[\#05070A\],
+.theme-normal .bg-\[\#05070A\]\/80,
+.theme-normal .bg-\[\#05070A\]\/50,
+.theme-normal .bg-\[\#05070A\]\/30,
+.theme-normal .bg-\[\#111827\],
+.theme-normal .bg-slate-950,
+.theme-normal .bg-slate-900,
+.theme-normal .bg-\[\#030508\]\/60 {
+  background-color: #071024 !important;
+  border-color: #1e3a8a !important;
+}
+
+/* Borders & Dividers */
+.theme-normal .border-elegant-border,
+.theme-normal .border-\[\#1E293B\],
+.theme-normal .border-\[\#1E293B\]\/30,
+.theme-normal .border-white\/5 {
+  border-color: #1e40af !important;
+}
+
+/* Inputs & Forms */
+.theme-normal input,
+.theme-normal select,
+.theme-normal textarea {
+  background-color: #040d21 !important;
+  border-color: #1e40af !important;
+  color: #38bdf8 !important;
+}
+
+/* Hover effects */
+.theme-normal .hover\:bg-white\/5:hover,
+.theme-normal .hover\:bg-\[\#1E293B\]\/45:hover,
+.theme-normal .hover\:bg-\[\#1E293B\]\/40:hover {
+  background-color: rgba(30, 64, 175, 0.25) !important;
+}
+

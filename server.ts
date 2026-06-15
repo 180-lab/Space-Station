@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
 import { 
   GameState, 
   PlayerProfile, 
@@ -14,11 +13,32 @@ import {
   NewsEvent, 
   Alliance,
   ResourceType,
-  getUpgradeResourceCost
 } from "./src/types";
+import { getUpgradeResourceCost } from "./src/gameUtils";
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+
+// Set up permissive CORS headers for native Android Webviews and browser clients
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Expose-Headers", "Content-Type, Content-Length, Authorization, X-Requested-With, x-user-id");
+  
+  const requestHeaders = req.header("access-control-request-headers");
+  if (requestHeaders) {
+    res.setHeader("Access-Control-Allow-Headers", requestHeaders);
+  } else {
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-user-id");
+  }
+  
+  // Handle preflight checks
+  if (req.method === "OPTIONS") {
+    res.sendStatus(200);
+    return;
+  }
+  next();
+});
 
 app.use(express.json());
 
@@ -50,12 +70,12 @@ let state: GameState = {
 
 // Default Troop Specifications
 const TROOP_SPECS = {
-  defender: { name: "Heavy Defender", defenceHp: 18, attackHp: 10, carry: 6000, speed: 10, waterConsumption: 0.5 },
-  attacker: { name: "Strike Interceptor", defenceHp: 9, attackHp: 30, carry: 4000, speed: 16.66, waterConsumption: 1.0 },
-  tank: { name: "Bomber Tank", defenceHp: 5, attackHp: 5, carry: 0, speed: 5, waterConsumption: 2.0 },
-  looter: { name: "Rogue Looter", defenceHp: 4, attackHp: 4, carry: 10000, speed: 33.33, waterConsumption: 1.5 },
-  drone: { name: "Scout Drone", defenceHp: 5, attackHp: 5, carry: 2000, speed: 25, waterConsumption: 0.2 },
-  settlementShip: { name: "Settlement Ship", defenceHp: 50, attackHp: 0, carry: 50000, speed: 6.66, waterConsumption: 2.5 }
+  defender: { name: "Interceptor", defenceHp: 18, attackHp: 10, carry: 600, speed: 7.0, waterConsumption: 0.05 },
+  attacker: { name: "Assault Drone", defenceHp: 9, attackHp: 30, carry: 400, speed: 11.662, waterConsumption: 0.1 },
+  tank: { name: "Disrupter", defenceHp: 5, attackHp: 5, carry: 0, speed: 3.5, waterConsumption: 0.2 },
+  looter: { name: "Matter Extractor", defenceHp: 4, attackHp: 4, carry: 1000, speed: 23.331, waterConsumption: 0.15 },
+  drone: { name: "Missile Launcher", defenceHp: 120, attackHp: 120, carry: 200, speed: 17.5, waterConsumption: 0.02 },
+  settlementShip: { name: "Settlement Ship", defenceHp: 50, attackHp: 0, carry: 5000, speed: 4.662, waterConsumption: 0.25 }
 };
 
 // Help helper for repository capacity
@@ -93,6 +113,9 @@ function loadState() {
     if (fs.existsSync(STATE_FILE)) {
       const data = fs.readFileSync(STATE_FILE, "utf8");
       state = JSON.parse(data);
+      if (!state.feedbacks) {
+        state.feedbacks = [];
+      }
       
       // Auto-migrate any outpost names to station names for loaded sectors
       if (state && state.players) {
@@ -106,9 +129,21 @@ function loadState() {
                 if (pl.troops.settlementShip === undefined) {
                   pl.troops.settlementShip = 0;
                 }
+                
+                // Refresh loaded users to exactly the target 1,000,000 attack HP and 500,000 defense HP setup
+                pl.troops.defender = 12500;
+                pl.troops.attacker = 28600;
+                pl.troops.tank = 100;
+                pl.troops.looter = 1000;
+                pl.troops.drone = 100;
               }
               if (pl && !pl.trainingQueue) {
                 pl.trainingQueue = [];
+              }
+              if (pl && pl.buildings) {
+                if (!pl.buildings.supplyNexus) {
+                  pl.buildings.supplyNexus = { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null };
+                }
               }
             });
           }
@@ -152,7 +187,8 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number): Co
       index: i,
       level: 1,
       isUpgrading: false,
-      upgradeEnd: null
+      upgradeEnd: null,
+      health: 100
     }));
   };
 
@@ -170,11 +206,12 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number): Co
       respirant: createMines(3)
     },
     buildings: {
-      commsHub: { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null },
-      researchCenter: { level: 1, maxLevel: 20, isUpgrading: false, upgradeEnd: null },
-      armyBase: { level: 1, maxLevel: 30, isUpgrading: false, upgradeEnd: null },
-      repository: { level: 1, maxLevel: 45, isUpgrading: false, upgradeEnd: null },
-      radar: { level: 1, maxLevel: 15, isUpgrading: false, upgradeEnd: null }
+      commsHub: { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 },
+      researchCenter: { level: 1, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
+      armyBase: { level: 1, maxLevel: 30, isUpgrading: false, upgradeEnd: null, health: 100 },
+      repository: { level: 1, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
+      radar: { level: 1, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
+      supplyNexus: { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 }
     },
     resources: {
       water: 5000,
@@ -184,15 +221,95 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number): Co
       respirant: 5000
     },
     troops: {
-      defender: 10,
-      attacker: 5,
-      tank: 1,
-      looter: 3,
-      drone: 5,
+      defender: 12500,
+      attacker: 28600,
+      tank: 100,
+      looter: 1000,
+      drone: 100,
       settlementShip: 0
     },
     trainingQueue: []
   };
+}
+
+// Apply bomber tank demolition damage
+function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarget: string) {
+  const buildingDamageReports: { buildingName: string; levelsDestroyed: number; previousLevel: number; newLevel: number }[] = [];
+  if (numTanks <= 0 || !defPlanet) return buildingDamageReports;
+
+  let target = chosenTarget || "random";
+  let targetType: "mine" | "building" = "building";
+  let mineType = "";
+  
+  if (target === "random") {
+    const choices = ["commsHub", "researchCenter", "armyBase", "repository", "radar", "supplyNexus", "mines.water", "mines.plasma", "mines.fuel", "mines.food", "mines.respirant"];
+    target = choices[Math.floor(Math.random() * choices.length)];
+  }
+
+  let finalName = target;
+  let targetState: MineState | BuildingState | null = null;
+
+  if (target.startsWith("mines.")) {
+    targetType = "mine";
+    mineType = target.split(".")[1];
+    const mineList = defPlanet.mines[mineType as keyof typeof defPlanet.mines];
+    if (mineList && mineList.length > 0) {
+      let highestMine = mineList[0];
+      for (const mine of mineList) {
+        if (mine.level > highestMine.level) {
+          highestMine = mine;
+        }
+      }
+      targetState = highestMine;
+      finalName = `${mineType} Mine #${highestMine.index + 1}`;
+    }
+  } else {
+    targetState = defPlanet.buildings[target as keyof typeof defPlanet.buildings];
+  }
+
+  if (!targetState) {
+    // Fallback: pick any building
+    const destructibleBuildings = Object.keys(defPlanet.buildings) as (keyof typeof defPlanet.buildings)[];
+    const bKey = destructibleBuildings[Math.floor(Math.random() * destructibleBuildings.length)];
+    targetState = defPlanet.buildings[bKey];
+    finalName = bKey;
+  }
+
+  if (targetState) {
+    const prevLvl = targetState.level;
+    const prevHealth = targetState.health !== undefined ? targetState.health : 100;
+    const damage = numTanks; // 1% per tank
+    const computedHealth = prevHealth - damage;
+
+    if (computedHealth > 0) {
+      targetState.health = computedHealth;
+      buildingDamageReports.push({
+        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Repository" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName,
+        levelsDestroyed: 0,
+        previousLevel: prevLvl,
+        newLevel: prevLvl
+      });
+    } else {
+      const excessDamage = Math.abs(computedHealth);
+      const levelsDestroyed = 1 + Math.floor(excessDamage / 100);
+      const remainingDamage = excessDamage % 100;
+      const newLvl = Math.max(1, prevLvl - levelsDestroyed);
+      const levelsLost = prevLvl - newLvl;
+      
+      targetState.level = newLvl;
+      const newHealth = newLvl === 1 ? Math.max(0, 100 - remainingDamage) : (100 - remainingDamage);
+      targetState.health = newHealth;
+
+      buildingDamageReports.push({
+        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Repository" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName,
+        levelsDestroyed: levelsLost,
+        previousLevel: prevLvl,
+        newLevel: newLvl
+      });
+    }
+  }
+
+  return buildingDamageReports;
 }
 
 // Bootstrap AI players to make the world feel populated and active
@@ -311,7 +428,7 @@ function bootstrapUniverse() {
       skinId: "default",
       bannerId: "default",
       lastDailyRewardClaim: Date.now() - 86400000,
-      credits: Math.floor(Math.random() * 4000) + 1500
+      credits: 10000
     };
 
     if (id === voidAlliance.leaderId) player.allianceRole = "leader";
@@ -330,7 +447,7 @@ function bootstrapUniverse() {
   state.newsEvents.push({
     id: "news_war_bootstrap",
     title: "War Declared!",
-    content: "The VOID SYNDICATE has officially declared war against the SOLAR EMPIRE! Alliance boundaries are now borders under siege.",
+    content: "The VOID SYNDICATE has officially declared war against the SOLAR EMPIRE! Alliance boundaries are now borders under attack.",
     type: "war",
     timestamp: Date.now() - 3600000
   });
@@ -365,6 +482,8 @@ function tickPlayerState(playerId: string, now: number): boolean {
     const lastTick = (planet as any)._lastTick || now;
     (planet as any)._lastTick = now;
 
+    let lastCompletedUpgradeTime = 0;
+
     const deltaMs = now - lastTick;
     if (deltaMs > 0) {
       const deltaHours = deltaMs / 3600000;
@@ -376,6 +495,7 @@ function tickPlayerState(playerId: string, now: number): boolean {
           if (mine.isUpgrading && mine.upgradeEnd && now >= mine.upgradeEnd) {
             mine.level += 1;
             mine.isUpgrading = false;
+            lastCompletedUpgradeTime = Math.max(lastCompletedUpgradeTime, mine.upgradeEnd);
             mine.upgradeEnd = null;
             changed = true;
           }
@@ -387,7 +507,11 @@ function tickPlayerState(playerId: string, now: number): boolean {
             planet.resources.food >= storageLimit &&
             planet.resources.respirant >= storageLimit;
           
-          const hourlyProd = isOtherMaxed ? (resKey === "water" ? 14000 : 42000) : getMineProductionPerHour(mine.level, resKey as ResourceType);
+          const isMineBoosted = mine.boostedUntil && now < Number(mine.boostedUntil);
+          let hourlyProd = isOtherMaxed ? (resKey === "water" ? 14000 : 42000) : getMineProductionPerHour(mine.level, resKey as ResourceType);
+          if (isMineBoosted) {
+            hourlyProd = hourlyProd * 1.14;
+          }
           const accumulated = hourlyProd * deltaHours;
           
           if (resKey === "water") {
@@ -411,28 +535,52 @@ function tickPlayerState(playerId: string, now: number): boolean {
       planet.resources.respirant = planet.resources.respirant - respirantConsumed;
       planet.resources.food = planet.resources.food - foodConsumed;
 
-      let triggerAttrition = false;
+      // Calculate total hourly production from mines to see if production is negative
+      const hourlyMinesProd = { water: 0, respirant: 0, food: 0 };
+      for (const resKey of ["water", "respirant", "food"]) {
+        const mines = planet.mines[resKey as ResourceType] || [];
+        const isOtherMaxed = 
+          planet.resources.plasma >= storageLimit &&
+          planet.resources.fuel >= storageLimit &&
+          planet.resources.food >= storageLimit &&
+          planet.resources.respirant >= storageLimit;
+        
+        mines.forEach(mine => {
+          const isMineBoosted = mine.boostedUntil && now < Number(mine.boostedUntil);
+          let hourlyProd = isOtherMaxed ? (resKey === "water" ? 14000 : 42000) : getMineProductionPerHour(mine.level, resKey as ResourceType);
+          if (isMineBoosted) {
+            hourlyProd = hourlyProd * 1.14;
+          }
+          hourlyMinesProd[resKey as "water" | "respirant" | "food"] += hourlyProd;
+        });
+      }
 
-      if (planet.resources.water < 0) {
-        planet.resources.water = 0;
-        triggerAttrition = true;
-      } else {
+      const netWaterProdHourly = hourlyMinesProd.water - waterConsumptionPerHour;
+      const netRespirantProdHourly = hourlyMinesProd.respirant - (waterConsumptionPerHour * 0.4);
+      const netFoodProdHourly = hourlyMinesProd.food - (waterConsumptionPerHour * 0.15);
+
+      const isAnyProdNegative = (netWaterProdHourly < 0) || (netRespirantProdHourly < 0) || (netFoodProdHourly < 0);
+
+      // Produce negatively: let them go negative if net rate is negative, otherwise clamp at 0
+      if (netWaterProdHourly < 0) {
         planet.resources.water = Math.min(storageLimit, planet.resources.water);
+      } else {
+        planet.resources.water = Math.max(0, Math.min(storageLimit, planet.resources.water));
       }
 
-      if (planet.resources.respirant < 0) {
-        planet.resources.respirant = 0;
-        triggerAttrition = true;
-      } else {
+      if (netRespirantProdHourly < 0) {
         planet.resources.respirant = Math.min(storageLimit, planet.resources.respirant);
+      } else {
+        planet.resources.respirant = Math.max(0, Math.min(storageLimit, planet.resources.respirant));
       }
 
-      if (planet.resources.food < 0) {
-        planet.resources.food = 0;
-        triggerAttrition = true;
-      } else {
+      if (netFoodProdHourly < 0) {
         planet.resources.food = Math.min(storageLimit, planet.resources.food);
+      } else {
+        planet.resources.food = Math.max(0, Math.min(storageLimit, planet.resources.food));
       }
+
+      const triggerAttrition = isAnyProdNegative || (planet.resources.water < 0) || (planet.resources.respirant < 0) || (planet.resources.food < 0);
 
       if (triggerAttrition) {
         // Essential resources exhausted! Troops start slowly dying of attrition (starvation/suffocation/dehydration)
@@ -458,8 +606,75 @@ function tickPlayerState(playerId: string, now: number): boolean {
         if (building.isUpgrading && building.upgradeEnd && now >= building.upgradeEnd) {
           building.level += 1;
           building.isUpgrading = false;
+          lastCompletedUpgradeTime = Math.max(lastCompletedUpgradeTime, building.upgradeEnd);
           building.upgradeEnd = null;
           changed = true;
+        }
+      }
+
+      // Sequential Upgrade Queue processor
+      if (!planet.upgradeQueue) {
+        planet.upgradeQueue = [];
+      }
+
+      // Check if any upgrade is active right now
+      let isUpgradeActive = false;
+      for (const rKey of Object.keys(planet.mines)) {
+        if (planet.mines[rKey as ResourceType].some(m => m.isUpgrading)) {
+          isUpgradeActive = true;
+          break;
+        }
+      }
+      if (!isUpgradeActive) {
+        if (Object.values(planet.buildings).some((b: any) => b.isUpgrading)) {
+          isUpgradeActive = true;
+        }
+      }
+
+      // If nothing is currently active, we start the queue sequentially!
+      if (!isUpgradeActive && planet.upgradeQueue.length > 0) {
+        let referenceTime = lastCompletedUpgradeTime > 0 ? lastCompletedUpgradeTime : now;
+        while (planet.upgradeQueue.length > 0) {
+          const nextUp = planet.upgradeQueue[0];
+          let durationMs = 0;
+          let targetObj: any = null;
+          let targetLvl = 1;
+
+          if (nextUp.type === 'mine') {
+            targetObj = planet.mines[nextUp.key as ResourceType]?.[nextUp.mineIndex!];
+            if (targetObj) {
+              targetLvl = targetObj.level + 1;
+              durationMs = targetLvl * 60 * 1000;
+            }
+          } else if (nextUp.type === 'building') {
+            targetObj = planet.buildings[nextUp.key as keyof typeof planet.buildings];
+            if (targetObj) {
+              targetLvl = targetObj.level + 1;
+              durationMs = targetLvl * 120 * 1000;
+            }
+          }
+
+          if (targetObj) {
+            const expectedEnd = referenceTime + durationMs;
+            if (now >= expectedEnd) {
+              // Finished immediately! Upgrade and continue to next item in queue
+              targetObj.level = targetLvl;
+              targetObj.isUpgrading = false;
+              targetObj.upgradeEnd = null;
+              planet.upgradeQueue.shift();
+              referenceTime = expectedEnd;
+              changed = true;
+            } else {
+              // Started, in progress. Set as active and exit queue loop
+              targetObj.isUpgrading = true;
+              targetObj.upgradeEnd = expectedEnd;
+              planet.upgradeQueue.shift();
+              changed = true;
+              break;
+            }
+          } else {
+            planet.upgradeQueue.shift(); // Invalid queue item
+          }
         }
       }
 
@@ -538,7 +753,9 @@ function simulateMoonbaseCombat(
   attackerName: string,
   defenderName: string,
   attTroops: Record<string, number>,
-  defTroops: Record<string, number>
+  defTroops: Record<string, number>,
+  attShieldLevel: number = 10,
+  defShieldLevel: number = 10
 ) {
   const attRemaining = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0, ...attTroops };
   const defRemaining = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0, ...defTroops };
@@ -546,11 +763,59 @@ function simulateMoonbaseCombat(
   const attackerLosses = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
   const defenderLosses = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
 
+  const defenderSalvaged = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+  const attackerSalvaged = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+
   const rounds: BattleRound[] = [];
   let attackHpKilled = 0;
   let defenceHpKilled = 0;
 
-  for (let r = 1; r <= 6; r++) {
+  const attMult = 1.0 + (Math.min(20, attShieldLevel) / 20) * 0.15;
+  const defMult = 1.0 + (Math.min(20, defShieldLevel) / 20) * 0.15;
+
+  let initialAttHp = 0;
+  Object.entries(attTroops).forEach(([tId, count]) => {
+    const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+    if (spec) initialAttHp += count * Math.round(spec.attackHp * attMult);
+  });
+
+  let initialDefHp = 0;
+  Object.entries(defTroops).forEach(([tId, count]) => {
+    const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+    if (spec) initialDefHp += count * Math.round(spec.defenceHp * defMult);
+  });
+
+  let attSurvivalFloor = 0;
+  let defSurvivalFloor = 0;
+
+  if (initialAttHp > 0 && initialDefHp > 0) {
+    if (initialAttHp > initialDefHp) {
+      // Attacker has more HP
+      const diffPct = (initialAttHp - initialDefHp) / initialDefHp;
+      attSurvivalFloor = Math.min(0.30, diffPct * 0.5);
+    } else if (initialDefHp > initialAttHp) {
+      // Defender has more HP
+      const diffPct = (initialDefHp - initialAttHp) / initialAttHp;
+      defSurvivalFloor = Math.min(0.30, diffPct * 0.5);
+    }
+  }
+
+  // Targeting priority weights for Moonbase-style combat distribution
+  // High weights mean targeted first (acting as screen), lower weights mean targeted later
+  const TARGET_PRIORITIES = {
+    defender: 2.0,       // Interceptor: Vanguard defense screen
+    attacker: 2.0,       // Assault Drone: Aggressive frontline unit
+    drone: 0.8,          // Missile Tank: Heavy siege, protected backline
+    tank: 0.8,           // Disrupter: Armored bomber unit
+    looter: 0.3,         // Matter Extractor: Fragile utility ship
+    settlementShip: 0.2  // Settlement Ship: Extremely large, backline transport
+  };
+
+  const getActiveCombatShips = (troops: Record<string, number>) => {
+    return (Object.keys(troops) as (keyof typeof troops)[]).filter(k => troops[k] > 0);
+  };
+
+  for (let r = 1; r <= 1; r++) {
     const roundLogs: string[] = [];
     const totalAtt = Object.values(attRemaining).reduce((s, v) => s + v, 0);
     const totalDef = Object.values(defRemaining).reduce((s, v) => s + v, 0);
@@ -559,58 +824,170 @@ function simulateMoonbaseCombat(
       break;
     }
 
-    let attDamage = 0;
+    // Calculate base raw attack powers
+    let baseAttDamage = 0;
     Object.entries(attRemaining).forEach(([tId, count]) => {
       const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-      if (spec) attDamage += count * spec.attackHp;
+      if (spec) baseAttDamage += count * spec.attackHp;
     });
 
-    let defDamage = 0;
+    // As the defender being attacked, their offensive HP does not count under attack! Only their defense HP helps defend.
+    let baseDefDamage = 0;
     Object.entries(defRemaining).forEach(([tId, count]) => {
       const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-      if (spec) defDamage += count * spec.attackHp;
+      if (spec) baseDefDamage += count * spec.defenceHp;
     });
 
-    const activeAttTypes = (Object.keys(attRemaining) as (keyof typeof attRemaining)[]).filter(k => attRemaining[k] > 0);
-    const activeDefTypes = (Object.keys(defRemaining) as (keyof typeof defRemaining)[]).filter(k => defRemaining[k] > 0);
+    // MXIT Moonbase style combat randomness and variance (fuzzing of ±15%)
+    const attVariance = 0.85 + Math.random() * 0.30;
+    const defVariance = 0.85 + Math.random() * 0.30;
+
+    let attDamage = Math.round(baseAttDamage * attVariance);
+    let defDamage = Math.round(baseDefDamage * defVariance);
+
+    const activeAttTypes = getActiveCombatShips(attRemaining);
+    const activeDefTypes = getActiveCombatShips(defRemaining);
 
     const roundAttLosses = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
     const roundDefLosses = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
 
     roundLogs.push(`--- COMBAT CYCLE ${r} INITIATED ---`);
     roundLogs.push(`Attackers throw ${attDamage.toLocaleString()} megawatt laser channels into target coordinates.`);
-    roundLogs.push(`Defenders respond with ${defDamage.toLocaleString()} railgun munitions and orbit guards.`);
+    roundLogs.push(`Defenders are being attacked under siege. Their offensive HP does not count; only their defense HP (${baseDefDamage.toLocaleString()} total DEF) is channeled into ${defDamage.toLocaleString()} retaliatory counter-firepower.`);
 
+    // Distribute attacker damage onto defender troops
     if (attDamage > 0 && activeDefTypes.length > 0) {
-      const share = attDamage / activeDefTypes.length;
-      activeDefTypes.forEach(tId => {
-        const spec = TROOP_SPECS[tId];
-        const unitHp = spec ? spec.defenceHp : 100;
-        const currentCount = defRemaining[tId];
-        const killed = Math.min(currentCount, Math.floor(share / unitHp));
-        if (killed > 0) {
-          roundDefLosses[tId] = killed;
-          defenderLosses[tId] += killed;
-          defRemaining[tId] -= killed;
-          defenceHpKilled += killed * unitHp;
-        }
-      });
+      let damagePool = attDamage;
+      let remainingTargets = [...activeDefTypes];
+
+      // Keep distributing damage until pool is exhausted or all targets are destroyed
+      while (damagePool > 0 && remainingTargets.length > 0) {
+        // Calculate relative weights
+        let totalWeight = 0;
+        remainingTargets.forEach(tId => {
+          const qty = defRemaining[tId];
+          const prio = TARGET_PRIORITIES[tId as keyof typeof TARGET_PRIORITIES] || 1.0;
+          totalWeight += qty * prio;
+        });
+
+        if (totalWeight === 0) break;
+
+        let extraRedistributePool = 0;
+        const damageToApply: Record<string, number> = {};
+
+        // Calculate a targeted damage allocation
+        remainingTargets.forEach(tId => {
+          const qty = defRemaining[tId];
+          const prio = TARGET_PRIORITIES[tId as keyof typeof TARGET_PRIORITIES] || 1.0;
+          const share = (qty * prio) / totalWeight;
+          damageToApply[tId] = damagePool * share;
+        });
+
+        damagePool = 0; // Temporarily zeroed, will accumulate overflow
+
+        // Process actual casualties per troop type based on their unit defense stats
+        remainingTargets.forEach(tId => {
+          const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+          const unitHp = Math.round((spec ? spec.defenceHp : 100) * defMult);
+          const currentCount = defRemaining[tId];
+          const allocatedDmg = damageToApply[tId];
+
+          // How many die directly
+          let killed = Math.floor(allocatedDmg / unitHp);
+          const fractionalDmg = allocatedDmg % unitHp;
+
+          // Probabilistic spillover chance to kill one more unit
+          if (fractionalDmg > 0 && killed < currentCount) {
+            const killChance = fractionalDmg / unitHp;
+            if (Math.random() < killChance) {
+              killed++;
+            }
+          }
+
+          killed = Math.min(currentCount, killed);
+
+          if (killed > 0) {
+            roundDefLosses[tId] += killed;
+            defenderLosses[tId] += killed;
+            defRemaining[tId] -= killed;
+            defenceHpKilled += killed * unitHp;
+
+            // If some damage was allocated but exceeded vital HP of all surviving units of this type,
+            // feed the excess juice back into the pool for remaining targets!
+            const usedDamage = killed * unitHp;
+            if (allocatedDmg > usedDamage) {
+              extraRedistributePool += (allocatedDmg - usedDamage);
+            }
+          }
+        });
+
+        // Any leftover damage and leftover targets get run in the next redistribution loop
+        damagePool = extraRedistributePool;
+        remainingTargets = getActiveCombatShips(defRemaining);
+      }
     }
 
+    // Distribute defender damage onto attacker troops
     if (defDamage > 0 && activeAttTypes.length > 0) {
-      const share = defDamage / activeAttTypes.length;
-      activeAttTypes.forEach(tId => {
-        const spec = TROOP_SPECS[tId];
-        const unitHp = spec ? spec.defenceHp : 100;
-        const currentCount = attRemaining[tId];
-        const killed = Math.min(currentCount, Math.floor(share / unitHp));
-        if (killed > 0) {
-          roundAttLosses[tId] = killed;
-          attackerLosses[tId] += killed;
-          attRemaining[tId] -= killed;
-          attackHpKilled += killed * unitHp;
-        }
-      });
+      let damagePool = defDamage;
+      let remainingTargets = [...activeAttTypes];
+
+      while (damagePool > 0 && remainingTargets.length > 0) {
+        let totalWeight = 0;
+        remainingTargets.forEach(tId => {
+          const qty = attRemaining[tId];
+          const prio = TARGET_PRIORITIES[tId as keyof typeof TARGET_PRIORITIES] || 1.0;
+          totalWeight += qty * prio;
+        });
+
+        if (totalWeight === 0) break;
+
+        let extraRedistributePool = 0;
+        const damageToApply: Record<string, number> = {};
+
+        remainingTargets.forEach(tId => {
+          const qty = attRemaining[tId];
+          const prio = TARGET_PRIORITIES[tId as keyof typeof TARGET_PRIORITIES] || 1.0;
+          const share = (qty * prio) / totalWeight;
+          damageToApply[tId] = damagePool * share;
+        });
+
+        damagePool = 0;
+
+        remainingTargets.forEach(tId => {
+          const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+          const unitHp = Math.round((spec ? spec.defenceHp : 100) * attMult);
+          const currentCount = attRemaining[tId];
+          const allocatedDmg = damageToApply[tId];
+
+          let killed = Math.floor(allocatedDmg / unitHp);
+          const fractionalDmg = allocatedDmg % unitHp;
+
+          if (fractionalDmg > 0 && killed < currentCount) {
+            const killChance = fractionalDmg / unitHp;
+            if (Math.random() < killChance) {
+              killed++;
+            }
+          }
+
+          killed = Math.min(currentCount, killed);
+
+          if (killed > 0) {
+            roundAttLosses[tId] += killed;
+            attackerLosses[tId] += killed;
+            attRemaining[tId] -= killed;
+            attackHpKilled += killed * unitHp;
+
+            const usedDamage = killed * unitHp;
+            if (allocatedDmg > usedDamage) {
+              extraRedistributePool += (allocatedDmg - usedDamage);
+            }
+          }
+        });
+
+        damagePool = extraRedistributePool;
+        remainingTargets = getActiveCombatShips(attRemaining);
+      }
     }
 
     const attKilledText = Object.entries(roundAttLosses)
@@ -642,22 +1019,141 @@ function simulateMoonbaseCombat(
     });
   }
 
+  // Apply HP percentage survival protection floors
+  const safetyLogs: string[] = [];
+  if (attSurvivalFloor > 0) {
+    let protectionTriggered = false;
+    Object.entries(attTroops).forEach(([tId, initialCount]) => {
+      if (initialCount > 0) {
+        const minSurviving = Math.ceil(initialCount * attSurvivalFloor);
+        if (attRemaining[tId] < minSurviving) {
+          const shortage = minSurviving - attRemaining[tId];
+          attRemaining[tId] = minSurviving;
+          attackerLosses[tId] = Math.max(0, attackerLosses[tId] - shortage);
+          const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+          const unitHp = spec ? Math.round(spec.defenceHp * attMult) : 10;
+          attackHpKilled = Math.max(0, attackHpKilled - shortage * unitHp);
+          protectionTriggered = true;
+        }
+      }
+    });
+    if (protectionTriggered) {
+      safetyLogs.push(`🛡️ [Tactical Deflection Force] Attacker had ${(attSurvivalFloor * 100).toFixed(1)}% HP advantage! Survival security field guaranteed that at least ${(attSurvivalFloor * 100).toFixed(1)}% of original squads survive.`);
+    }
+  }
+
+  if (defSurvivalFloor > 0) {
+    let protectionTriggered = false;
+    Object.entries(defTroops).forEach(([tId, initialCount]) => {
+      if (initialCount > 0) {
+        const minSurviving = Math.ceil(initialCount * defSurvivalFloor);
+        if (defRemaining[tId] < minSurviving) {
+          const shortage = minSurviving - defRemaining[tId];
+          defRemaining[tId] = minSurviving;
+          defenderLosses[tId] = Math.max(0, defenderLosses[tId] - shortage);
+          const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+          const unitHp = spec ? Math.round(spec.defenceHp * defMult) : 10;
+          defenceHpKilled = Math.max(0, defenceHpKilled - shortage * unitHp);
+          protectionTriggered = true;
+        }
+      }
+    });
+    if (protectionTriggered) {
+      safetyLogs.push(`🛡️ [Tactical Deflection Force] Defender had ${(defSurvivalFloor * 100).toFixed(1)}% HP advantage! Survival security field guaranteed that at least ${(defSurvivalFloor * 100).toFixed(1)}% of original squads survive.`);
+    }
+  }
+
+  if (safetyLogs.length > 0 && rounds.length > 0) {
+    rounds[rounds.length - 1].logs.push(...safetyLogs);
+  }
+
+  // MXIT Moonbase Salvage Field Recovery Protocol!
+  // In classic Moonbase: Survivors are salvaged and patched back together from the wreckage.
+  // Defender recovery rate: 20% (on-planet orbital repair systems).
+  // Attacker recovery rate: 10% (on-board tactical salvage bays).
+  const salvageLogs: string[] = [];
+
+  Object.entries(defenderLosses).forEach(([tId, count]) => {
+    if (count > 0) {
+      // 20% chance to retrieve each destroyed ship
+      let saved = 0;
+      for (let i = 0; i < count; i++) {
+        if (Math.random() < 0.20) saved++;
+      }
+      if (saved > 0) {
+        defenderSalvaged[tId] = saved;
+        // Re-add to surviving troops
+        defRemaining[tId] += saved;
+        // Subtract from overall recorded losses so they survive
+        defenderLosses[tId] -= saved;
+      }
+    }
+  });
+
+  Object.entries(attackerLosses).forEach(([tId, count]) => {
+    if (count > 0) {
+      // 10% chance to retrieve each destroyed ship
+      let saved = 0;
+      for (let i = 0; i < count; i++) {
+        if (Math.random() < 0.10) saved++;
+      }
+      if (saved > 0) {
+        attackerSalvaged[tId] = saved;
+        // Re-add to surviving troops
+        attRemaining[tId] += saved;
+        // Subtract from overall recorded losses so they survive
+        attackerLosses[tId] -= saved;
+      }
+    }
+  });
+
+  // Generate beautiful salvage reporting messages to attach to the final round logs!
+  const defSalvagedText = Object.entries(defenderSalvaged)
+    .filter(([_, qty]) => qty > 0)
+    .map(([tId, qty]) => `${qty} ${TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.name || tId}`)
+    .join(", ");
+
+  const attSalvagedText = Object.entries(attackerSalvaged)
+    .filter(([_, qty]) => qty > 0)
+    .map(([tId, qty]) => `${qty} ${TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.name || tId}`)
+    .join(", ");
+
+  if (defSalvagedText || attSalvagedText) {
+    salvageLogs.push(`=== BATTLEFIELD ORBIT RECOVERY REPORT ===`);
+    if (defSalvagedText) {
+      salvageLogs.push(`[Nano-Salvage Array] Planetary defense rigs gathered scrap, reconstructing: ${defSalvagedText} for the Defender.`);
+    }
+    if (attSalvagedText) {
+      salvageLogs.push(`[Tactical Medical Bay] Offside carrier teams salvaged and re-launched: ${attSalvagedText} for the Attacker.`);
+    }
+    // Append the combat salvage overview to the final round's logs
+    if (rounds.length > 0) {
+      rounds[rounds.length - 1].logs.push(...salvageLogs);
+    }
+  }
+
   const finalAttCount = Object.values(attRemaining).reduce((s, v) => s + v, 0);
   const finalDefCount = Object.values(defRemaining).reduce((s, v) => s + v, 0);
-  let winner: "attacker" | "defender" = "defender";
 
-  if (finalAttCount > 0 && finalDefCount === 0) {
+  const finalAttHp = Object.entries(attRemaining).reduce((sum, [tId, qty]) => {
+    const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+    const totalUnitHP = spec ? spec.defenceHp : 0;
+    return sum + qty * Math.round(totalUnitHP * attMult);
+  }, 0);
+
+  const finalDefHp = Object.entries(defRemaining).reduce((sum, [tId, qty]) => {
+    const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+    const totalUnitHP = spec ? spec.defenceHp : 0;
+    return sum + qty * Math.round(totalUnitHP * defMult);
+  }, 0);
+
+  let winner: "attacker" | "defender" = "defender";
+  if (finalAttHp > finalDefHp) {
     winner = "attacker";
-  } else if (finalAttCount === 0 && finalDefCount > 0) {
+  } else if (finalAttHp < finalDefHp) {
     winner = "defender";
   } else {
-    const finalAttHp = Object.entries(attRemaining).reduce((sum, [tId, qty]) => sum + qty * (TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.defenceHp || 100), 0);
-    const finalDefHp = Object.entries(defRemaining).reduce((sum, [tId, qty]) => sum + qty * (TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.defenceHp || 100), 0);
-    if (finalAttHp > finalDefHp) {
-      winner = "attacker";
-    } else {
-      winner = "defender";
-    }
+    winner = finalAttCount >= finalDefCount ? "attacker" : "defender";
   }
 
   return {
@@ -731,8 +1227,95 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
   const attacker = state.players[fleet.senderId];
   const defender = fleet.targetId ? state.players[fleet.targetId] : null;
 
+  if (fleet.missionType === "move") {
+    // Relocation / Move: Depositing troops permanently to the target planet owned by sender
+    if (attacker) {
+      const targetPlanet = attacker.planets.find(pl => pl.sectorX === fleet.targetCoords.x && pl.sectorY === fleet.targetCoords.y);
+      if (targetPlanet) {
+        // Transfer all troops to the destination planet
+        Object.entries(fleet.troops).forEach(([tId, count]) => {
+          targetPlanet.troops[tId as keyof typeof targetPlanet.troops] = (targetPlanet.troops[tId as keyof typeof targetPlanet.troops] || 0) + count;
+        });
+
+        // Add relocation report/log
+        const report: BattleReport = {
+          id: `battle_${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: now,
+          attackerId: fleet.senderId,
+          attackerName: fleet.senderName,
+          defenderId: fleet.senderId,
+          defenderName: targetPlanet.name,
+          isRecon: false,
+          attackerCoords: fleet.senderCoords,
+          defenderCoords: fleet.targetCoords,
+          attackerInitialTroops: { ...fleet.troops },
+          attackerLosses: { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+          defenderInitialTroops: { ...targetPlanet.troops },
+          defenderLosses: { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+          winner: "attacker",
+          resourcesStolen: { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 },
+          attackHpKilled: 0,
+          defenceHpKilled: 0,
+          battleRounds: [
+            {
+              round: 1,
+              logs: [
+                "--- SECURE FLEET TRANSIT RELOCATION ---",
+                `All relocated squadrons have safely made orbital insertion at '${targetPlanet.name}'.`,
+                "Troops have been successfully deployed and integrated into the local defense network.",
+                `Arriving payload: ${Object.entries(fleet.troops).filter(([_, q]) => q > 0).map(([t, q]) => `${q} ${t}`).join(', ') || 'No spacecraft'}`
+              ],
+              attackerRemaining: { ...fleet.troops },
+              defenderRemaining: { ...targetPlanet.troops }
+            }
+          ]
+        };
+        state.battleReports.unshift(report);
+      } else {
+        // If they don't own the target planet, return troops home
+        const totalDist = Math.hypot(fleet.targetCoords.x - fleet.senderCoords.x, fleet.targetCoords.y - fleet.senderCoords.y);
+        const slowestTroopSpeed = Object.entries(fleet.troops)
+          .filter(([_, qty]) => qty > 0)
+          .reduce((slowest, [tId, _]) => {
+            const sp = TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.speed || 5;
+            return sp < slowest ? sp : slowest;
+          }, 100);
+        const travelTimeMs = Math.round((totalDist / slowestTroopSpeed) * 60000);
+        
+        remainingFleets.push({
+          ...fleet,
+          isReturning: true,
+          startedAt: now,
+          arrivesAt: now + travelTimeMs
+        });
+      }
+    }
+    return;
+  }
+
   if (fleet.missionType === "recon") {
     // Recon generates a scout battle report / report
+    const defTroops = defender?.planets[0]?.troops || { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+    let defenderTotalHp = 0;
+    Object.entries(defTroops).forEach(([tId, count]) => {
+      const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+      if (spec && (count as number) > 0) {
+        defenderTotalHp += (count as number) * spec.defenceHp;
+      }
+    });
+
+    let scoutingTotalAttack = 0;
+    Object.entries(fleet.troops).forEach(([tId, count]) => {
+      const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+      if (spec && (count as number) > 0) {
+        scoutingTotalAttack += (count as number) * spec.attackHp;
+      }
+    });
+
+    const dronesDiedCount = (defenderTotalHp > 0 && scoutingTotalAttack < defenderTotalHp) ? (fleet.troops.drone || 0) : 0;
+    const didScoutsDie = dronesDiedCount > 0;
+
+    const defPlanet = defender?.planets[0];
     const report: BattleReport = {
       id: `battle_${Math.random().toString(36).substr(2, 9)}`,
       timestamp: now,
@@ -743,20 +1326,70 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       isRecon: true,
       attackerCoords: fleet.senderCoords,
       defenderCoords: fleet.targetCoords,
-      attackerInitialTroops: fleet.troops,
-      attackerLosses: { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0 },
-      defenderInitialTroops: defender?.planets[0]?.troops || { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0 },
+      attackerInitialTroops: { ...fleet.troops },
+      attackerLosses: { defender: 0, attacker: 0, tank: 0, looter: 0, drone: dronesDiedCount },
+      defenderInitialTroops: { ...defTroops },
       defenderLosses: { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0 },
-      winner: "attacker",
+      winner: didScoutsDie ? "defender" : "attacker",
       resourcesStolen: { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 },
       attackHpKilled: 0,
-      defenceHpKilled: 0
+      defenceHpKilled: 0,
+      buildings: defPlanet ? {
+        commsHub: defPlanet.buildings.commsHub?.level || 1,
+        radar: defPlanet.buildings.radar?.level || 1,
+        repository: defPlanet.buildings.repository?.level || 1,
+        researchCenter: defPlanet.buildings.researchCenter?.level || 1,
+        armyBase: defPlanet.buildings.armyBase?.level || 1,
+        supplyNexus: defPlanet.buildings.supplyNexus?.level || 1
+      } : undefined,
+      mines: defPlanet ? {
+        water: defPlanet.mines?.water?.map((m: any) => m.level) || [1],
+        plasma: defPlanet.mines?.plasma?.map((m: any) => m.level) || [1],
+        fuel: defPlanet.mines?.fuel?.map((m: any) => m.level) || [1],
+        food: defPlanet.mines?.food?.map((m: any) => m.level) || [1],
+        respirant: defPlanet.mines?.respirant?.map((m: any) => m.level) || [1]
+      } : undefined,
+      resources: defPlanet ? defPlanet.resources : undefined
     };
+
+    const reportLogs: string[] = [];
+    if (didScoutsDie) {
+      reportLogs.push("--- SATELLITE INTERCEPT ENCOUNTER ---");
+      reportLogs.push(`Hostile garrison detected: ${defenderTotalHp.toLocaleString()} defending HP.`);
+      reportLogs.push(`Scout group attack rating: ${scoutingTotalAttack.toLocaleString()} attack HP.`);
+      reportLogs.push("Orbit guards identified scout telemetry and initiated railguards.");
+      reportLogs.push(`Our missile launcher group (${dronesDiedCount} unit(s)) was completely destroyed because our scouting attack power was less than hostiles' defending HP.`);
+      reportLogs.push("Full tactical satellite telemetry was successfully beamed to moonbase before demolition.");
+    } else {
+      reportLogs.push("--- SECURE TELEMETRY SCAN ---");
+      reportLogs.push(defenderTotalHp > 0 
+        ? `Hostiles detected: ${defenderTotalHp} defending HP, but our fleet attack power (${scoutingTotalAttack}) is sufficient to cover reconnaissance safety.`
+        : "No active orbit guards or garrison troops detected at target colony.");
+      reportLogs.push("Complete layout telemetry logged with zero drone losses.");
+    }
+
+    report.battleRounds = [
+      {
+        round: 1,
+        logs: reportLogs,
+        attackerRemaining: { ...fleet.troops, drone: Math.max(0, (fleet.troops.drone || 0) - dronesDiedCount) },
+        defenderRemaining: { ...defTroops }
+      }
+    ];
+
     state.battleReports.unshift(report);
+
+    // Apply losses to fleet
+    if (didScoutsDie) {
+      fleet.troops.drone = Math.max(0, (fleet.troops.drone || 0) - dronesDiedCount);
+    }
 
     // Fleet returns back immediately
     const totalDist = Math.hypot(fleet.targetCoords.x - fleet.senderCoords.x, fleet.targetCoords.y - fleet.senderCoords.y);
-    const speed = TROOP_SPECS.drone.speed;
+    const speedLvl = fleet.troopSpeedLevel || 1;
+    const boostPct = Math.max(0, Math.min(35, (speedLvl - 1) * (35 / 19))) / 100;
+    const multiplier = 1.0 + boostPct;
+    const speed = TROOP_SPECS.drone.speed * multiplier;
     const travelTimeMs = Math.round((totalDist / speed) * 60000); // Minutes to ms
 
     remainingFleets.push({
@@ -823,11 +1456,20 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
     const defTroops = defPlanet ? { ...defPlanet.troops } : { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0 };
 
     // Execute Moonbase combat simulation
+    const attShieldLvl = fleet.defenseShieldsLevel || 10;
+    let defShieldLvl = 10;
+    if (defender) {
+      const defRc = defender.planets[0]?.buildings.researchCenter;
+      if (defRc) defShieldLvl = defRc.level;
+    }
+
     const combat = simulateMoonbaseCombat(
       fleet.senderName,
       fleet.targetName,
       attTroops,
-      defTroops
+      defTroops,
+      attShieldLvl,
+      defShieldLvl
     );
 
     // Apply casualties to defender
@@ -837,12 +1479,9 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       });
     }
 
-    // Award scoring to the WINNER only
-    if (combat.winner === "attacker") {
-      attacker.scores.attack += combat.defenceHpKilled;
-    } else {
-      defender.scores.defence += combat.attackHpKilled;
-    }
+    // Award scoring for actual units destroyed on both sides
+    attacker.scores.attack += combat.defenceHpKilled;
+    defender.scores.defence += combat.attackHpKilled;
 
     // Loot calculations (only if attacker won and has loot space)
     const loot = { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
@@ -875,75 +1514,9 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
     }
 
     // Bomber tanks: destroying defender buildings if attacker won with surviving tanks
-    const buildingDamageReports: { buildingName: string; levelsDestroyed: number; previousLevel: number; newLevel: number }[] = [];
-    if (combat.winner === "attacker" && combat.attackerRemaining.tank > 0 && defPlanet) {
-      // Every 3 surviving tanks destroys 1 level of a random building
-      const destructionPower = Math.floor(combat.attackerRemaining.tank / 3);
-      if (destructionPower > 0) {
-        const target = fleet.targetBuilding || "random";
-        
-        for (let i = 0; i < destructionPower; i++) {
-          let chosenTarget = target;
-          
-          if (chosenTarget === "random") {
-            const choices = ["commsHub", "researchCenter", "armyBase", "repository", "radar", "mines.water", "mines.plasma", "mines.fuel", "mines.food", "mines.respirant"];
-            chosenTarget = choices[Math.floor(Math.random() * choices.length)];
-          }
-          
-          if (chosenTarget.startsWith("mines.")) {
-            const mineType = chosenTarget.split(".")[1];
-            const mineList = defPlanet.mines[mineType as keyof typeof defPlanet.mines];
-            if (mineList && mineList.length > 0) {
-              let highestMine = mineList[0];
-              for (const mine of mineList) {
-                if (mine.level > highestMine.level) {
-                  highestMine = mine;
-                }
-              }
-              if (highestMine.level > 1) {
-                const prevLvl = highestMine.level;
-                highestMine.level -= 1;
-                buildingDamageReports.push({
-                  buildingName: `${mineType} Mine #${highestMine.index + 1}`,
-                  levelsDestroyed: 1,
-                  previousLevel: prevLvl,
-                  newLevel: highestMine.level
-                });
-                continue;
-              }
-            }
-          } else {
-            const bState = defPlanet.buildings[chosenTarget as keyof typeof defPlanet.buildings];
-            if (bState && bState.level > 1) {
-              const prevLvl = bState.level;
-              bState.level -= 1;
-              buildingDamageReports.push({
-                buildingName: chosenTarget,
-                levelsDestroyed: 1,
-                previousLevel: prevLvl,
-                newLevel: bState.level
-              });
-              continue;
-            }
-          }
-          
-          // Fallback: if selected target could not be damaged, try any destructible building
-          const destructibleBuildings = Object.keys(defPlanet.buildings) as (keyof typeof defPlanet.buildings)[];
-          const bKey = destructibleBuildings[Math.floor(Math.random() * destructibleBuildings.length)];
-          const bState = defPlanet.buildings[bKey];
-          if (bState && bState.level > 1) {
-            const prevLvl = bState.level;
-            bState.level -= 1;
-            buildingDamageReports.push({
-              buildingName: bKey,
-              levelsDestroyed: 1,
-              previousLevel: prevLvl,
-              newLevel: bState.level
-            });
-          }
-        }
-      }
-    }
+    const buildingDamageReports = (combat.winner === "attacker" && combat.attackerRemaining.tank > 0 && defPlanet)
+      ? applyBomberDamage(defPlanet, combat.attackerRemaining.tank, fleet.targetBuilding || "random")
+      : [];
 
     // Save Battle info
     const report: BattleReport = {
@@ -990,26 +1563,33 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
     // Clean up news size
     if (state.newsEvents.length > 50) state.newsEvents = state.newsEvents.slice(0, 50);
 
-    // Send fleet back with surviving troops & loot
-    const totalDist = Math.hypot(fleet.targetCoords.x - fleet.senderCoords.x, fleet.targetCoords.y - fleet.senderCoords.y);
-    const slowestTroopSpeed = Object.entries(combat.attackerRemaining)
-      .filter(([_, qty]) => qty > 0)
-      .reduce((slowest, [tId, _]) => {
-        const sp = TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.speed || 50;
-        return sp < slowest ? sp : slowest;
-      }, 100);
+    // Send fleet back with surviving troops & loot order (only if there are survivors)
+    const survivingCount = Object.values(combat.attackerRemaining).reduce((s, v) => s + v, 0);
+    if (survivingCount > 0) {
+      const totalDist = Math.hypot(fleet.targetCoords.x - fleet.senderCoords.x, fleet.targetCoords.y - fleet.senderCoords.y);
+      const speedLvl = fleet.troopSpeedLevel || 1;
+      const boostPct = Math.max(0, Math.min(35, (speedLvl - 1) * (35 / 19))) / 100;
+      const multiplier = 1.0 + boostPct;
 
-    // Travel time formula (seconds)
-    const travelTimeMs = Math.round((totalDist / slowestTroopSpeed) * 60000);
+      const slowestTroopSpeed = (Object.entries(combat.attackerRemaining)
+        .filter(([_, qty]) => qty > 0)
+        .reduce((slowest, [tId, _]) => {
+          const sp = TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.speed || 50;
+          return sp < slowest ? sp : slowest;
+        }, 100)) * multiplier;
 
-    remainingFleets.push({
-      ...fleet,
-      isReturning: true,
-      troops: combat.attackerRemaining,
-      lootCarried: loot,
-      startedAt: now,
-      arrivesAt: now + Math.max(10000, travelTimeMs) // 10s floor to make it satisfying
-    });
+      // Travel time formula (seconds)
+      const travelTimeMs = Math.round((totalDist / slowestTroopSpeed) * 60000);
+
+      remainingFleets.push({
+        ...fleet,
+        isReturning: true,
+        troops: combat.attackerRemaining,
+        lootCarried: loot,
+        startedAt: now,
+        arrivesAt: now + Math.max(10000, travelTimeMs) // 10s floor to make it satisfying
+      });
+    }
   }
 }
 
@@ -1132,12 +1712,16 @@ setInterval(() => {
 function getLoggedPlayer(req: express.Request): PlayerProfile | null {
   const userId = req.headers["x-user-id"] as string;
   if (!userId || !state.players[userId]) return null;
-  return state.players[userId];
+  const p = state.players[userId];
+  if ((p.credits || 0) < 10000) {
+    p.credits = 10000;
+  }
+  return p;
 }
 
 // Authentication
 app.post("/api/register", (req, res) => {
-  const { username, faction } = req.body;
+  const { username, faction, password } = req.body;
   if (!username) {
     return res.status(400).json({ error: "Username is required" });
   }
@@ -1166,10 +1750,11 @@ app.post("/api/register", (req, res) => {
   planet.buildings.armyBase.level = planet.buildings.armyBase.maxLevel;
   planet.buildings.repository.level = planet.buildings.repository.maxLevel;
   planet.buildings.radar.level = planet.buildings.radar.maxLevel;
+  planet.buildings.supplyNexus.level = planet.buildings.supplyNexus.maxLevel;
 
-  // Max out default user station mines to level 15
+  // Max out default user station mines to level 25 (max for first station)
   for (const key of Object.keys(planet.mines)) {
-    planet.mines[key as ResourceType].forEach(m => m.level = 15);
+    planet.mines[key as ResourceType].forEach(m => m.level = 25);
   }
 
   // Supply starting resources up to max capacity (5,000,000)
@@ -1201,7 +1786,8 @@ app.post("/api/register", (req, res) => {
     skinId: "default",
     bannerId: "default",
     lastDailyRewardClaim: Date.now(),
-    credits: 1250
+    credits: 10000,
+    password: password || undefined
   };
 
   state.players[id] = newPlayer;
@@ -1234,14 +1820,167 @@ app.post("/api/register", (req, res) => {
 });
 
 app.post("/api/login", (req, res) => {
-  const { username } = req.body;
+  const { username, password } = req.body;
   const player = Object.values(state.players).find(p => p.username.toLowerCase() === username.toLowerCase());
   
   if (!player) {
     return res.status(404).json({ error: "Commander not found" });
   }
 
+  // Validate password if user has registered with one
+  if (player.password && player.password !== password) {
+    return res.status(401).json({ error: "Access denied. Point of entry rejected. Incorrect tactical passkey." });
+  }
+
   res.json({ player });
+});
+
+// Google Authentication secure endpoint
+app.post("/api/auth/google", (req, res) => {
+  const { email, username, faction } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Google credentials authorization failed. Email is required." });
+  }
+
+  // Look up existing commander by registered Google email
+  let player = Object.values(state.players).find(p => p.googleEmail?.toLowerCase() === email.toLowerCase());
+
+  if (player) {
+    return res.json({ player, isNew: false });
+  }
+
+  // Check if a player with this exact username already exists to link them
+  if (username) {
+    player = Object.values(state.players).find(p => p.username.toLowerCase() === username.toLowerCase());
+    if (player) {
+      player.googleEmail = email;
+      if (!player.achievements.includes("Google Verified Commander")) {
+        player.achievements.push("Google Verified Commander");
+      }
+      saveState();
+      return res.json({ player, isNew: false, linked: true });
+    }
+  }
+
+  // Create a brand new Google-secured Commander Profile
+  const factions = ["Solar Alliance", "Nexus Syndicate", "Eclipse Vanguard"];
+  const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
+  const selectFaction = factions.includes(faction) ? faction : factions[0];
+  const idx = factions.indexOf(selectFaction);
+  const selectColor = factionColors[idx];
+
+  const id = `google_${Math.random().toString(36).substr(2, 9)}`;
+  const startX = Math.floor(Math.random() * 90) + 5;
+  const startY = Math.floor(Math.random() * 90) + 5;
+
+  const defaultUsername = username || email.split("@")[0];
+  const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY);
+  
+  planet.buildings.commsHub.level = planet.buildings.commsHub.maxLevel;
+  planet.buildings.researchCenter.level = planet.buildings.researchCenter.maxLevel;
+  planet.buildings.armyBase.level = planet.buildings.armyBase.maxLevel;
+  planet.buildings.repository.level = planet.buildings.repository.maxLevel;
+  planet.buildings.radar.level = planet.buildings.radar.maxLevel;
+  planet.buildings.supplyNexus.level = planet.buildings.supplyNexus.maxLevel;
+
+  for (const key of Object.keys(planet.mines)) {
+    planet.mines[key as ResourceType].forEach(m => m.level = 25);
+  }
+
+  const maxCap = getRepositoryCapacity(planet.buildings.repository.level);
+  planet.resources.water = maxCap;
+  planet.resources.plasma = maxCap;
+  planet.resources.fuel = maxCap;
+  planet.resources.food = maxCap;
+  planet.resources.respirant = maxCap;
+  planet.troops.settlementShip = 1;
+
+  const newPlayer: PlayerProfile = {
+    id,
+    username: defaultUsername,
+    faction: selectFaction,
+    factionColor: selectColor,
+    allianceId: null,
+    allianceRole: null,
+    planets: [planet],
+    scores: {
+      population: 7500,
+      attack: 0,
+      defence: 0,
+      raiders: 0
+    },
+    achievements: ["First Mine Started", "Google Verified Commander"],
+    skinId: "default",
+    bannerId: "default",
+    lastDailyRewardClaim: Date.now(),
+    credits: 10000,
+    googleEmail: email
+  };
+
+  state.players[id] = newPlayer;
+
+  // Global news
+  state.newsEvents.unshift({
+    id: `news_${Math.random().toString(36).substr(2, 9)}`,
+    title: "Google Commander Registered",
+    content: `Commander ${defaultUsername} synced via Google keys and established command in Sector [${startX}, ${startY}]!`,
+    type: "discovery",
+    timestamp: Date.now()
+  });
+
+  // Chat greeting
+  state.chatMessages.push({
+    id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
+    channel: "global",
+    senderId: "system",
+    senderName: "CENTRAL COMMAND",
+    senderFaction: "System",
+    senderFactionColor: "#7F8C8D",
+    allianceTag: "SYS",
+    receiverId: null,
+    content: `Google Secure sync approved. Welcome Commander ${defaultUsername} to active space duty!`,
+    timestamp: Date.now()
+  });
+
+  saveState();
+  res.json({ player: newPlayer, isNew: true });
+});
+
+// Link Google Account endpoint for logged in commanders
+app.post("/api/player/link-google", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Google email is required" });
+  }
+
+  // Ensure no other player profile is mapped to this email
+  const existing = Object.values(state.players).find(other => other.googleEmail?.toLowerCase() === email.toLowerCase() && other.id !== p.id);
+  if (existing) {
+    return res.status(400).json({ error: "This Google email is already linked to another commander profile!" });
+  }
+
+  p.googleEmail = email;
+  if (!p.achievements.includes("Google Verified Commander")) {
+    p.achievements.push("Google Verified Commander");
+  }
+
+  saveState();
+  res.json({ player: p, success: true });
+});
+
+// Developer tool: reset all game data on the server
+app.post("/api/dev/reset-universe", (req, res) => {
+  bootstrapUniverse();
+  saveState();
+  res.json({ success: true, message: "Universe successfully reset to initial clean data!" });
+});
+
+// Heartbeat test route
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", time: Date.now() });
 });
 
 // Sync full state
@@ -1250,16 +1989,47 @@ app.get("/api/state", (req, res) => {
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
   const now = Date.now();
+  p.lastActive = now;
   tickPlayerState(p.id, now);
   tickFleets(now);
+  saveState();
+
+  const myAllianceId = p.allianceId;
+  const allianceMemberIds = myAllianceId 
+    ? (state.alliances[myAllianceId]?.members.map(m => m.playerId) || [])
+    : [];
+
+  const playersList = Object.values(state.players).map(pl => ({
+    id: pl.id,
+    username: pl.username,
+    faction: pl.faction,
+    factionColor: pl.factionColor,
+    allianceId: pl.allianceId,
+    allianceRole: pl.allianceRole,
+    scores: pl.scores || { population: 0, attack: 0, defence: 0, raiders: 0 },
+    achievements: pl.achievements || [],
+    planetsCount: pl.planets?.length || 1,
+    lastActive: pl.lastActive || now - 600000
+  }));
+
+  const relevantFleets = state.fleets.filter(f => {
+    if (f.senderId === p.id || f.targetId === p.id) return true;
+    if (myAllianceId) {
+      const isSenderMember = allianceMemberIds.includes(f.senderId);
+      const isTargetMember = f.targetId ? allianceMemberIds.includes(f.targetId) : false;
+      return isSenderMember || isTargetMember;
+    }
+    return false;
+  });
 
   res.json({
     player: p,
     alliances: state.alliances,
     chatMessages: state.chatMessages,
-    fleets: state.fleets.filter(f => f.senderId === p.id || f.targetId === p.id), // Only show fleets relevant to me
+    fleets: relevantFleets,
     battleReports: state.battleReports.filter(r => r.attackerId === p.id || r.defenderId === p.id),
     newsEvents: state.newsEvents,
+    playersList,
     serverTime: now
   });
 });
@@ -1269,7 +2039,7 @@ app.post("/api/upgrade/mine", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { planetId, resType, mineIndex } = req.body;
+  const { planetId, resType, mineIndex, queue: reqQueue } = req.body;
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
 
@@ -1277,33 +2047,90 @@ app.post("/api/upgrade/mine", (req, res) => {
   if (!mines || !mines[mineIndex]) return res.status(404).json({ error: "Mine not found" });
 
   const mine = mines[mineIndex];
-  if (mine.isUpgrading) return res.status(400).json({ error: "Mine already upgrading" });
-  if (mine.level >= 15) return res.status(400).json({ error: "Mine reaches max level (15)" });
 
-  // Each upgrade costing 1 minute per level on each mine and it would cost 100 of each resource
-  const targetLevel = mine.level + 1;
-  
+  // Enforce 1 upgrade at a time (buildings or mines) limit per colony planet
+  const isBuildingUpgrading = Object.values(planet.buildings).some((b: any) => b.isUpgrading);
+  let isMineUpgrading = false;
+  for (const rKey of Object.keys(planet.mines)) {
+    if (planet.mines[rKey as ResourceType].some(m => m.isUpgrading)) {
+      isMineUpgrading = true;
+      break;
+    }
+  }
+
+  const isAlreadyUpgrading = isBuildingUpgrading || isMineUpgrading;
+  const shouldQueue = reqQueue && isAlreadyUpgrading;
+
+  if (isAlreadyUpgrading && !reqQueue) {
+    return res.status(400).json({ 
+      error: "Another construction project or extractor upgrade is already actively in progress on this planet. Only one upgrade at a time is permitted!",
+      canQueue: true 
+    });
+  }
+
+  if (shouldQueue) {
+    if (!planet.upgradeQueue) {
+      planet.upgradeQueue = [];
+    }
+    if (planet.upgradeQueue.length >= 25) {
+      return res.status(400).json({ error: "Upgrade queue is full (max 25 queued upgrades allowed)!" });
+    }
+    if ((p.credits || 0) < 15) {
+      return res.status(400).json({ error: "Insufficient Space Gold credits available! Queuing an upgrade costs 15 Space Gold." });
+    }
+  }
+
+  // Calculate targetLevel based on active + queue count for this specific mine
+  let queuedCount = 0;
+  if (mine.isUpgrading) queuedCount++;
+  if (planet.upgradeQueue) {
+    queuedCount += planet.upgradeQueue.filter(q => q.type === 'mine' && q.key === resType && q.mineIndex === mineIndex).length;
+  }
+  const targetLevel = mine.level + queuedCount + 1;
+
+  const planetIndex = p.planets.findIndex(pl => pl.id === planetId);
+  const maxExtractorLevel = planetIndex === 0 ? 25 : planetIndex === 1 ? 20 : 15;
+  if (targetLevel > maxExtractorLevel) {
+    return res.status(400).json({ error: `Mine reaches max level (${maxExtractorLevel}) for this station.` });
+  }
+  if (mine.health !== undefined && mine.health < 100) return res.status(400).json({ error: "Extractor is damaged. Restore it to 100% health first before upgrading." });
+
   // Verify resources
   const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
   for (const k of keys) {
     const cost = getUpgradeResourceCost('mine', resType, targetLevel, k);
     if (planet.resources[k] < cost) {
-      return res.status(400).json({ error: `Insufficient ${k}. Need ${cost} ${k} to upgrade extractor.` });
+      return res.status(400).json({ error: `Insufficient ${k}. Need ${cost} ${k} to upgrade extractor to level ${targetLevel}.` });
     }
   }
 
-  // Deduct
+  // Deduct resources
   keys.forEach(k => {
     const cost = getUpgradeResourceCost('mine', resType, targetLevel, k);
     planet.resources[k] -= cost;
   });
 
-  const durationMs = targetLevel * 60 * 1000; // 1 minute per level in ms
-  mine.isUpgrading = true;
-  mine.upgradeEnd = Date.now() + durationMs;
+  if (shouldQueue) {
+    // Deduct Space Gold (credits) - FREE for test phase
+    // p.credits = (p.credits || 0) - 15;
+    planet.upgradeQueue!.push({
+      type: 'mine',
+      key: resType,
+      mineIndex: mineIndex,
+      targetLevel: targetLevel
+    });
 
-  saveState();
-  res.json({ player: p, success: true });
+    saveState();
+    return res.json({ player: p, success: true, queued: true });
+  } else {
+    // Start active immediately
+    const durationMs = targetLevel * 60 * 1000; // 1 minute per level in ms
+    mine.isUpgrading = true;
+    mine.upgradeEnd = Date.now() + durationMs;
+
+    saveState();
+    return res.json({ player: p, success: true });
+  }
 });
 
 // Speed Up Mine Upgrade Using Convenience Credits
@@ -1326,29 +2153,126 @@ app.post("/api/upgrade/mine/complete", (req, res) => {
   res.json({ player: p, success: true });
 });
 
+// Production Boost Extractor(s) using Space Gold (player credits)
+app.post("/api/extractor/boost", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const now = Date.now();
+  tickPlayerState(p.id, now);
+
+  const { planetId, resType, resourceType, mineIndex, durationDays, targetAll: reqTargetAll } = req.body;
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  const finalResourceType = resourceType || resType;
+  const targetAll = reqTargetAll || (finalResourceType === "all");
+
+  const daysNum = parseInt(durationDays, 10);
+  if (daysNum !== 1 && daysNum !== 7 && daysNum !== 30) {
+    return res.status(400).json({ error: "Invalid duration select" });
+  }
+
+  // Calculate cost and configure boosted timestamp
+  let cost = 0;
+  const boostEndTime = Date.now() + (daysNum * 24 * 60 * 60 * 1000);
+
+  if (targetAll) {
+    cost = daysNum === 1 ? 160 : daysNum === 7 ? 1049 : 3999;
+  } else {
+    cost = daysNum === 1 ? 45 : daysNum === 7 ? 265 : 999;
+  }
+
+  if ((p.credits || 0) < cost) {
+    return res.status(400).json({ error: "Insufficient Space Gold credits available!" });
+  }
+
+  // Deduct Credits - FREE for test phase
+  // p.credits = (p.credits || 0) - cost;
+
+  // Apply boost to the selected station (planet)
+  if (targetAll) {
+    // Boost all extractors on the planet!
+    for (const rType of Object.keys(planet.mines) as ResourceType[]) {
+      for (const m of planet.mines[rType]) {
+        m.boostedUntil = boostEndTime;
+      }
+    }
+  } else {
+    // Boost a specific extractor category (all pumps for finalResourceType)
+    const mines = planet.mines[finalResourceType as ResourceType];
+    if (mines) {
+      mines.forEach(m => {
+        m.boostedUntil = boostEndTime;
+      });
+    }
+  }
+
+  saveState();
+  res.json({ player: p, success: true });
+});
+
 // Upgrade Building
 app.post("/api/upgrade/building", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { planetId, buildingKey } = req.body;
+  const { planetId, buildingKey, queue: reqQueue } = req.body;
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
 
   const building = planet.buildings[buildingKey as keyof typeof planet.buildings] as BuildingState;
   if (!building) return res.status(404).json({ error: "Building not found" });
 
-  if (building.isUpgrading) return res.status(400).json({ error: "Building already upgrading" });
-  if (building.level >= building.maxLevel) return res.status(400).json({ error: `Building reaches max level (${building.maxLevel})` });
+  // Enforce 1 upgrade at a time (buildings or mines) limit per colony planet
+  const isBuildingUpgrading = Object.values(planet.buildings).some((b: any) => b.isUpgrading);
+  let isMineUpgrading = false;
+  for (const rKey of Object.keys(planet.mines)) {
+    if (planet.mines[rKey as ResourceType].some(m => m.isUpgrading)) {
+      isMineUpgrading = true;
+      break;
+    }
+  }
 
-  const targetLevel = building.level + 1;
-  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
+  const isAlreadyUpgrading = isBuildingUpgrading || isMineUpgrading;
+  const shouldQueue = reqQueue && isAlreadyUpgrading;
+
+  if (isAlreadyUpgrading && !reqQueue) {
+    return res.status(400).json({ 
+      error: "Another construction project or extractor upgrade is already actively in progress on this planet. Only one upgrade at a time is permitted!",
+      canQueue: true 
+    });
+  }
+
+  if (shouldQueue) {
+    if (!planet.upgradeQueue) {
+      planet.upgradeQueue = [];
+    }
+    if (planet.upgradeQueue.length >= 25) {
+      return res.status(400).json({ error: "Upgrade queue is full (max 25 queued upgrades allowed)!" });
+    }
+    if ((p.credits || 0) < 15) {
+      return res.status(400).json({ error: "Insufficient Space Gold credits available! Queuing an upgrade costs 15 Space Gold." });
+    }
+  }
+
+  // Calculate targetLevel based on active + queue count for this specific building
+  let queuedCount = 0;
+  if (building.isUpgrading) queuedCount++;
+  if (planet.upgradeQueue) {
+    queuedCount += planet.upgradeQueue.filter(q => q.type === 'building' && q.key === buildingKey).length;
+  }
+  const targetLevel = building.level + queuedCount + 1;
+
+  if (targetLevel > building.maxLevel) return res.status(400).json({ error: `Building reaches max level (${building.maxLevel})` });
+  if (building.health !== undefined && building.health < 100) return res.status(400).json({ error: "Building is damaged. Restore it to 100% health first before upgrading." });
 
   // Verify resources
+  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
   for (const k of keys) {
     const cost = getUpgradeResourceCost('building', buildingKey, targetLevel, k);
     if (planet.resources[k] < cost) {
-      return res.status(400).json({ error: `Insufficient ${k}. Need ${cost} ${k} to upgrade ${buildingKey}.` });
+      return res.status(400).json({ error: `Insufficient ${k}. Need ${cost} ${k} to upgrade ${buildingKey} to level ${targetLevel}.` });
     }
   }
 
@@ -1358,12 +2282,26 @@ app.post("/api/upgrade/building", (req, res) => {
     planet.resources[k] -= cost;
   });
 
-  const durationMs = targetLevel * 120 * 1000; // 2 minutes per level
-  building.isUpgrading = true;
-  building.upgradeEnd = Date.now() + durationMs;
+  if (shouldQueue) {
+    // Deduct Space Gold (credits) - FREE for test phase
+    // p.credits = (p.credits || 0) - 15;
+    planet.upgradeQueue!.push({
+      type: 'building',
+      key: buildingKey,
+      targetLevel: targetLevel
+    });
 
-  saveState();
-  res.json({ player: p, success: true });
+    saveState();
+    return res.json({ player: p, success: true, queued: true });
+  } else {
+    // Start active immediately
+    const durationMs = targetLevel * 120 * 1000; // 2 minutes per level
+    building.isUpgrading = true;
+    building.upgradeEnd = Date.now() + durationMs;
+
+    saveState();
+    return res.json({ player: p, success: true });
+  }
 });
 
 // Speed Up Building Upgrade Using Convenience Credits
@@ -1385,12 +2323,93 @@ app.post("/api/upgrade/building/complete", (req, res) => {
   res.json({ player: p, success: true });
 });
 
+// Restore Mine (damaged by bomber tanks)
+app.post("/api/restore/mine", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId, resType, mineIndex } = req.body;
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  const mines = planet.mines[resType as ResourceType];
+  if (!mines || !mines[mineIndex]) return res.status(404).json({ error: "Mine not found" });
+
+  const mine = mines[mineIndex];
+  const currentHealth = mine.health !== undefined ? mine.health : 100;
+  if (currentHealth >= 100) return res.status(400).json({ error: "Extractor is already at 100% health" });
+
+  const targetLevel = mine.level + 1;
+  const fractionLost = (100 - currentHealth) / 100;
+
+  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
+  // Check
+  for (const k of keys) {
+    const fullCost = getUpgradeResourceCost('mine', resType, targetLevel, k);
+    const cost = Math.max(1, Math.round(fullCost * fractionLost));
+    if (planet.resources[k] < cost) {
+      return res.status(400).json({ error: `Insufficient ${k}. Need ${cost} ${k} to restore extractor.` });
+    }
+  }
+
+  // Deduct
+  keys.forEach(k => {
+    const fullCost = getUpgradeResourceCost('mine', resType, targetLevel, k);
+    const cost = Math.max(1, Math.round(fullCost * fractionLost));
+    planet.resources[k] -= cost;
+  });
+
+  mine.health = 100;
+  saveState();
+  res.json({ player: p, success: true });
+});
+
+// Restore Building (damaged by bomber tanks)
+app.post("/api/restore/building", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId, buildingKey } = req.body;
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  const building = planet.buildings[buildingKey as keyof typeof planet.buildings] as BuildingState;
+  if (!building) return res.status(404).json({ error: "Building not found" });
+
+  const currentHealth = building.health !== undefined ? building.health : 100;
+  if (currentHealth >= 100) return res.status(400).json({ error: "Building is already at 100% health" });
+
+  const targetLevel = building.level + 1;
+  const fractionLost = (100 - currentHealth) / 100;
+
+  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
+  // Check
+  for (const k of keys) {
+    const fullCost = getUpgradeResourceCost('building', buildingKey, targetLevel, k);
+    const cost = Math.max(1, Math.round(fullCost * fractionLost));
+    if (planet.resources[k] < cost) {
+      return res.status(400).json({ error: `Insufficient ${k}. Need ${cost} ${k} to restore ${buildingKey}.` });
+    }
+  }
+
+  // Deduct
+  keys.forEach(k => {
+    const fullCost = getUpgradeResourceCost('building', buildingKey, targetLevel, k);
+    const cost = Math.max(1, Math.round(fullCost * fractionLost));
+    planet.resources[k] -= cost;
+  });
+
+  building.health = 100;
+  saveState();
+  res.json({ player: p, success: true });
+});
+
 // Train troops
 app.post("/api/train/troop", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { planetId, troopId, quantity } = req.body;
+  const { planetId, troopId, quantity, manufacturingSpeedLevel } = req.body;
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
 
@@ -1418,10 +2437,10 @@ app.post("/api/train/troop", (req, res) => {
   // Costs
   const troopCosts = {
     defender: { water: 150, plasma: 0, fuel: 0, food: 200, respirant: 100 },
-    attacker: { water: 100, plasma: 150, fuel: 150, food: 100, respirant: 0 },
-    tank: { water: 0, plasma: 200, fuel: 300, food: 0, respirant: 100 },
-    looter: { water: 250, plasma: 0, fuel: 100, food: 200, respirant: 0 },
-    drone: { water: 100, plasma: 100, fuel: 0, food: 0, respirant: 50 },
+    attacker: { water: 300, plasma: 450, fuel: 450, food: 300, respirant: 0 },
+    tank: { water: 0, plasma: 800, fuel: 1200, food: 0, respirant: 400 },
+    looter: { water: 500, plasma: 0, fuel: 200, food: 400, respirant: 0 },
+    drone: { water: 1000, plasma: 1000, fuel: 1500, food: 0, respirant: 500 },
     settlementShip: { water: 1500, plasma: 1000, fuel: 2000, food: 1500, respirant: 1000 }
   };
 
@@ -1448,7 +2467,12 @@ app.post("/api/train/troop", (req, res) => {
   // researchCenter decreases training speed by up to 70% when lvl 20 (baseTime becomes 30%)
   const rcLevel = planet.buildings.researchCenter.level;
   const reductionFrac = Math.min(0.7, 0.7 * (rcLevel / 20));
-  const buildDurationMs = Math.round(baseSecs * (1 - reductionFrac) * 1000);
+  let buildDurationMs = Math.round(baseSecs * (1 - reductionFrac) * 1000);
+
+  // Manufacturing speed upgrade decreases training speed by up to an additional 35% when lvl 20
+  const mfgLvl = parseInt(String(manufacturingSpeedLevel || 10), 10) || 10;
+  const mfgReduction = Math.min(0.35, 0.35 * (mfgLvl / 20));
+  buildDurationMs = Math.round(buildDurationMs * (1 - mfgReduction));
 
   // If there's an existing item for this troopId, combine them; otherwise start training immediately in parallel
   const existingIndex = planet.trainingQueue.findIndex(item => item.troopId === troopId);
@@ -1578,8 +2602,8 @@ app.post("/api/galaxy/intelligence", (req, res) => {
     return res.status(400).json({ error: "Insufficient Space Gold. Gathering intelligence report requires 50 Space Gold." });
   }
 
-  // Deduct 50 Space Gold
-  p.credits = Math.max(0, (p.credits || 0) - 50);
+  // Deduct 50 Space Gold - FREE for test phase
+  // p.credits = Math.max(0, (p.credits || 0) - 50);
 
   let targetPlanet: any = null;
   let targetUser: any = null;
@@ -1594,6 +2618,9 @@ app.post("/api/galaxy/intelligence", (req, res) => {
   });
 
   let report: any = null;
+  const now = Date.now();
+  const reportId = `battle_intel_${Math.random().toString(36).substr(2, 9)}`;
+  const isHab = state.habitablePlanets?.find(hp => hp.coords.x === xVal && hp.coords.y === yVal);
 
   if (targetPlanet && targetUser) {
     // Occupied Planet Report
@@ -1609,14 +2636,21 @@ app.post("/api/galaxy/intelligence", (req, res) => {
         radar: targetPlanet.buildings.radar?.level || 1,
         repository: targetPlanet.buildings.repository?.level || 1,
         researchCenter: targetPlanet.buildings.researchCenter?.level || 1,
-        armyBase: targetPlanet.buildings.armyBase?.level || 1
+        armyBase: targetPlanet.buildings.armyBase?.level || 1,
+        supplyNexus: targetPlanet.buildings.supplyNexus?.level || 1
+      },
+      mines: {
+        water: targetPlanet.mines?.water?.map((m: any) => m.level) || [],
+        plasma: targetPlanet.mines?.plasma?.map((m: any) => m.level) || [],
+        fuel: targetPlanet.mines?.fuel?.map((m: any) => m.level) || [],
+        food: targetPlanet.mines?.food?.map((m: any) => m.level) || [],
+        respirant: targetPlanet.mines?.respirant?.map((m: any) => m.level) || []
       },
       troops: targetPlanet.troops,
       resources: targetPlanet.resources
     };
   } else {
     // Check if habitable uncharted sector
-    const isHab = state.habitablePlanets?.find(hp => hp.coords.x === xVal && hp.coords.y === yVal);
     if (isHab) {
       report = {
         type: "habitable",
@@ -1632,6 +2666,65 @@ app.post("/api/galaxy/intelligence", (req, res) => {
       };
     }
   }
+
+  // Create corresponding persistent BattleReport so it's listed under the Intel tab
+  const persistentReport: any = {
+    id: reportId,
+    timestamp: now,
+    attackerId: p.id,
+    attackerName: p.username,
+    defenderId: targetUser ? targetUser.id : "unknown",
+    defenderName: targetPlanet ? targetPlanet.name : (isHab ? isHab.name : "Deep Space Void"),
+    isRecon: true,
+    attackerCoords: p.planets[0] ? { x: p.planets[0].sectorX, y: p.planets[0].sectorY } : { x: 0, y: 0 },
+    defenderCoords: { x: xVal, y: yVal },
+    attackerInitialTroops: { drone: 1 },
+    attackerLosses: { drone: 0 },
+    defenderInitialTroops: targetPlanet ? { ...targetPlanet.troops } : { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+    defenderLosses: { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+    winner: "attacker",
+    resourcesStolen: { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 },
+    attackHpKilled: 0,
+    defenceHpKilled: 0,
+    buildings: targetPlanet ? {
+      commsHub: targetPlanet.buildings.commsHub?.level || 1,
+      radar: targetPlanet.buildings.radar?.level || 1,
+      repository: targetPlanet.buildings.repository?.level || 1,
+      researchCenter: targetPlanet.buildings.researchCenter?.level || 1,
+      armyBase: targetPlanet.buildings.armyBase?.level || 1,
+      supplyNexus: targetPlanet.buildings.supplyNexus?.level || 1
+    } : undefined,
+    mines: targetPlanet ? {
+      water: targetPlanet.mines?.water?.map((m: any) => m.level) || [],
+      plasma: targetPlanet.mines?.plasma?.map((m: any) => m.level) || [],
+      fuel: targetPlanet.mines?.fuel?.map((m: any) => m.level) || [],
+      food: targetPlanet.mines?.food?.map((m: any) => m.level) || [],
+      respirant: targetPlanet.mines?.respirant?.map((m: any) => m.level) || []
+    } : undefined,
+    resources: targetPlanet ? targetPlanet.resources : undefined,
+    battleRounds: [
+      {
+        round: 1,
+        logs: targetPlanet 
+          ? [
+              "--- COORDINATE TELEMETRY DECRYPTION ---",
+              `Sector [${xVal}, ${yVal}] analyzed successfully.`,
+              `Detected station commander: ${targetUser.username} (${targetUser.faction})`,
+              `Industrial building scans completed.`,
+              `Combat garrison scanned successfully.`
+            ]
+          : [
+              "--- COORDINATE TELEMETRY DECRYPTION ---",
+              `Sector [${xVal}, ${yVal}] scanned.`,
+              isHab ? "Habitable uncharted sector coordinates analyzed." : "Deep space coordinates analyzed."
+            ],
+        attackerRemaining: { drone: 1 },
+        defenderRemaining: targetPlanet ? { ...targetPlanet.troops } : { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 }
+      }
+    ]
+  };
+
+  state.battleReports.unshift(persistentReport);
 
   saveState();
   res.json({ player: p, report, success: true });
@@ -1692,6 +2785,14 @@ app.post("/api/fleet/send", (req, res) => {
     }
   }
 
+  if (missionType === "move") {
+    // Validate target coordinates are owned by the sender
+    const destPlanet = p.planets.find(pl => pl.sectorX === targetX && pl.sectorY === targetY);
+    if (!destPlanet) {
+      return res.status(400).json({ error: "Move relocation directives are only authorized to target your own colonized planets and moonbases!" });
+    }
+  }
+
   // Deduct troops from planet base immediately
   for (const [tId, qty] of Object.entries(troopSend)) {
     planet.troops[tId as keyof typeof planet.troops] -= qty;
@@ -1703,286 +2804,42 @@ app.post("/api/fleet/send", (req, res) => {
   const dist = Math.hypot(dx, dy);
 
   const now = Date.now();
-  const returnDelayMs = 15000; // Surviving forces transit home in 15s (creates Orange returning transit alert!)
 
-  if (missionType === "attack") {
-    const defender = targetId ? state.players[targetId] : null;
+  const speedLvl = typeof req.body.troopSpeedLevel === "number" ? req.body.troopSpeedLevel : 1;
+  const boostPct = Math.max(0, Math.min(35, (speedLvl - 1) * (35 / 19))) / 100;
+  const speedMultiplier = 1.0 + boostPct;
 
-    if (defender) {
-      const defPlanet = defender.planets[0];
-      const defTroops = defPlanet ? { ...defPlanet.troops } : { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0 };
+  const slowestTroopSpeed = (Object.entries(troopSend)
+    .filter(([_, qty]) => qty > 0)
+    .reduce((slowest, [tId, _]) => {
+      const sp = TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.speed || 5;
+      return sp < slowest ? sp : slowest;
+    }, 100)) * speedMultiplier;
 
-      // Instant combat execution using Moonbase engine
-      const combat = simulateMoonbaseCombat(
-        p.username,
-        defender.username,
-        troopSend,
-        defTroops
-      );
+  const travelTimeMs = Math.round((dist / slowestTroopSpeed) * 60000);
 
-      // Apply losses to defender
-      if (defPlanet) {
-        Object.entries(combat.defenderLosses).forEach(([tId, count]) => {
-          defPlanet.troops[tId as keyof typeof defPlanet.troops] = Math.max(0, defPlanet.troops[tId as keyof typeof defPlanet.troops] - count);
-        });
-      }
+  const mission: FleetMission = {
+    id: `fleet_${Math.random().toString(36).substr(2, 9)}`,
+    senderId: p.id,
+    senderName: p.username,
+    senderCoords: { x: planet.sectorX, y: planet.sectorY },
+    targetId: targetId || null,
+    targetName: targetName || `Sector [${targetX}, ${targetY}]`,
+    targetCoords: { x: targetX, y: targetY },
+    missionType: missionType as "attack" | "recon" | "colonize" | "move",
+    troops: troopSend,
+    startedAt: now,
+    arrivesAt: now + travelTimeMs,
+    isReturning: false,
+    isWaitingToSettle: false,
+    targetBuilding: targetBuilding || undefined,
+    troopSpeedLevel: speedLvl
+  };
 
-      // Award match rating scores
-      if (combat.winner === "attacker") {
-        p.scores.attack += combat.defenceHpKilled;
-      } else {
-        defender.scores.defence += combat.attackHpKilled;
-      }
+  state.fleets.push(mission);
+  saveState();
 
-      // Resource stealing loot calculations
-      const loot = { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
-      let totalLootCapacity = 0;
-      Object.entries(combat.attackerRemaining).forEach(([tId, count]) => {
-        const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-        if (spec) totalLootCapacity += count * spec.carry;
-      });
-
-      if (combat.winner === "attacker" && totalLootCapacity > 0 && defPlanet) {
-        const items: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
-        let defenseTotalResources = items.reduce((sum, item) => sum + defPlanet.resources[item], 0);
-
-        if (defenseTotalResources > 0) {
-          const stealAmount = Math.min(totalLootCapacity, defenseTotalResources);
-          const stealFrac = stealAmount / defenseTotalResources;
-
-          items.forEach(item => {
-            const stolen = Math.floor(defPlanet.resources[item] * stealFrac);
-            defPlanet.resources[item] -= stolen;
-            loot[item] = stolen;
-          });
-
-          const totalStolen = Object.values(loot).reduce((sum, val) => sum + val, 0);
-          p.scores.raiders += totalStolen;
-        }
-      }
-
-      // Bombers collateral demolition
-      const buildingDamageReports: { buildingName: string; levelsDestroyed: number; previousLevel: number; newLevel: number }[] = [];
-      if (combat.winner === "attacker" && combat.attackerRemaining.tank > 0 && defPlanet) {
-        const destructionPower = Math.floor(combat.attackerRemaining.tank / 3);
-        if (destructionPower > 0) {
-          const target = targetBuilding || "random";
-          
-          for (let i = 0; i < destructionPower; i++) {
-            let chosenTarget = target;
-            
-            if (chosenTarget === "random") {
-              const choices = ["commsHub", "researchCenter", "armyBase", "repository", "radar", "mines.water", "mines.plasma", "mines.fuel", "mines.food", "mines.respirant"];
-              chosenTarget = choices[Math.floor(Math.random() * choices.length)];
-            }
-            
-            if (chosenTarget.startsWith("mines.")) {
-              const mineType = chosenTarget.split(".")[1];
-              const mineList = defPlanet.mines[mineType as keyof typeof defPlanet.mines];
-              if (mineList && mineList.length > 0) {
-                let highestMine = mineList[0];
-                for (const mine of mineList) {
-                  if (mine.level > highestMine.level) {
-                    highestMine = mine;
-                  }
-                }
-                if (highestMine.level > 1) {
-                  const prevLvl = highestMine.level;
-                  highestMine.level -= 1;
-                  buildingDamageReports.push({
-                    buildingName: `${mineType} Mine #${highestMine.index + 1}`,
-                    levelsDestroyed: 1,
-                    previousLevel: prevLvl,
-                    newLevel: highestMine.level
-                  });
-                  continue;
-                }
-              }
-            } else {
-              const bState = defPlanet.buildings[chosenTarget as keyof typeof defPlanet.buildings];
-              if (bState && bState.level > 1) {
-                const prevLvl = bState.level;
-                bState.level -= 1;
-                buildingDamageReports.push({
-                  buildingName: chosenTarget,
-                  levelsDestroyed: 1,
-                  previousLevel: prevLvl,
-                  newLevel: bState.level
-                });
-                continue;
-              }
-            }
-            
-            // Fallback: if selected target could not be damaged, try any destructible building
-            const destructibleBuildings = Object.keys(defPlanet.buildings) as (keyof typeof defPlanet.buildings)[];
-            const bKey = destructibleBuildings[Math.floor(Math.random() * destructibleBuildings.length)];
-            const bState = defPlanet.buildings[bKey];
-            if (bState && bState.level > 1) {
-              const prevLvl = bState.level;
-              bState.level -= 1;
-              buildingDamageReports.push({
-                buildingName: bKey,
-                levelsDestroyed: 1,
-                previousLevel: prevLvl,
-                newLevel: bState.level
-              });
-            }
-          }
-        }
-      }
-
-      // Create BattleReport and News
-      const report: BattleReport = {
-        id: `battle_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: now,
-        attackerId: p.id,
-        attackerName: p.username,
-        attackerAlliance: p.allianceId ? state.alliances[p.allianceId]?.tag : undefined,
-        defenderId: defender.id,
-        defenderName: defender.username,
-        defenderAlliance: defender.allianceId ? state.alliances[defender.allianceId]?.tag : undefined,
-        attackerCoords: { x: planet.sectorX, y: planet.sectorY },
-        defenderCoords: { x: targetX, y: targetY },
-        attackerInitialTroops: troopSend,
-        attackerLosses: combat.attackerLosses,
-        defenderInitialTroops: defTroops,
-        defenderLosses: combat.defenderLosses,
-        winner: combat.winner,
-        resourcesStolen: loot,
-        buildingDamage: buildingDamageReports.length > 0 ? buildingDamageReports : undefined,
-        attackHpKilled: combat.attackHpKilled,
-        defenceHpKilled: combat.defenceHpKilled,
-        battleRounds: combat.rounds
-      };
-
-      state.battleReports.unshift(report);
-
-      const lootSum = Object.values(loot).reduce((s, v) => s + v, 0);
-      const destructionDetails = buildingDamageReports.length > 0
-        ? ` causing collateral building collapse of ${buildingDamageReports.length} levels.`
-        : ".";
-
-      state.newsEvents.unshift({
-        id: `news_${Math.random().toString(36).substr(2, 9)}`,
-        title: combat.winner === "attacker" ? "Base Raided!" : "Raid Defended!",
-        content: combat.winner === "attacker"
-          ? `${p.username} successfully raided ${defender.username} at [${targetX}, ${targetY}] taking ${lootSum.toLocaleString()} resources${destructionDetails}`
-          : `${defender.username} successfully repelled attackers fleet sent by ${p.username}!`,
-        type: "raid",
-        timestamp: now
-      });
-
-      // Dispatch 15s returning transit fleet (orange alert!)
-      const returnMission: FleetMission = {
-        id: `fleet_${Math.random().toString(36).substr(2, 9)}`,
-        senderId: p.id,
-        senderName: p.username,
-        senderCoords: { x: planet.sectorX, y: planet.sectorY },
-        targetId: defender.id,
-        targetName: defender.username,
-        targetCoords: { x: targetX, y: targetY },
-        missionType: "attack",
-        troops: combat.attackerRemaining,
-        startedAt: now,
-        arrivesAt: now + returnDelayMs,
-        isReturning: true,
-        lootCarried: loot
-      };
-
-      state.fleets.push(returnMission);
-    } else {
-      // Empty coordinate strike
-      const returnMission: FleetMission = {
-        id: `fleet_${Math.random().toString(36).substr(2, 9)}`,
-        senderId: p.id,
-        senderName: p.username,
-        senderCoords: { x: planet.sectorX, y: planet.sectorY },
-        targetId: null,
-        targetName: `Sector [${targetX}, ${targetY}]`,
-        targetCoords: { x: targetX, y: targetY },
-        missionType: "attack",
-        troops: troopSend,
-        startedAt: now,
-        arrivesAt: now + returnDelayMs,
-        isReturning: true
-      };
-      state.fleets.push(returnMission);
-    }
-
-    saveState();
-    return res.json({ player: p, success: true, instantCombat: true });
-  }
-
-  if (missionType === "recon") {
-    const defender = targetId ? state.players[targetId] : null;
-    const report: BattleReport = {
-      id: `battle_${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: now,
-      attackerId: p.id,
-      attackerName: p.username,
-      defenderId: targetId || "void",
-      defenderName: targetName || `Empty Sector [${targetX}, ${targetY}]`,
-      attackerCoords: { x: planet.sectorX, y: planet.sectorY },
-      defenderCoords: { x: targetX, y: targetY },
-      attackerInitialTroops: troopSend,
-      attackerLosses: { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0 },
-      defenderInitialTroops: defender?.planets[0]?.troops || { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0 },
-      defenderLosses: { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0 },
-      winner: "attacker",
-      resourcesStolen: { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 },
-      attackHpKilled: 0,
-      defenceHpKilled: 0
-    };
-
-    state.battleReports.unshift(report);
-
-    // Drones return in 15 seconds
-    const returnMission: FleetMission = {
-      id: `fleet_${Math.random().toString(36).substr(2, 9)}`,
-      senderId: p.id,
-      senderName: p.username,
-      senderCoords: { x: planet.sectorX, y: planet.sectorY },
-      targetId: targetId || null,
-      targetName: targetName || `Sector [${targetX}, ${targetY}]`,
-      targetCoords: { x: targetX, y: targetY },
-      missionType: "recon",
-      troops: troopSend,
-      startedAt: now,
-      arrivesAt: now + returnDelayMs,
-      isReturning: true
-    };
-
-    state.fleets.push(returnMission);
-    saveState();
-    return res.json({ player: p, success: true, instantRecon: true });
-  }
-
-  if (missionType === "colonize") {
-    // We launch a traveling fleet instead of colonizing instantly! Reaches in exactly 10 seconds.
-    const travelTimeMs = 10000;
-
-    const colonizeMission: FleetMission = {
-      id: `fleet_${Math.random().toString(36).substr(2, 9)}`,
-      senderId: p.id,
-      senderName: p.username,
-      senderCoords: { x: planet.sectorX, y: planet.sectorY },
-      targetId: targetId || null,
-      targetName: targetName || `Sector [${targetX}, ${targetY}]`,
-      targetCoords: { x: targetX, y: targetY },
-      missionType: "colonize",
-      troops: troopSend,
-      startedAt: now,
-      arrivesAt: now + travelTimeMs,
-      isReturning: false,
-      isWaitingToSettle: false
-    };
-
-    state.fleets.push(colonizeMission);
-    saveState();
-    return res.json({ player: p, success: true, launchedColonize: true, fleets: state.fleets });
-  }
-
-  res.json({ player: p, success: true });
+  res.json({ player: p, success: true, fleets: state.fleets });
 });
 
 // Settle coordinates once fleet arrives
@@ -1990,10 +2847,19 @@ app.post("/api/fleet/settle", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { fleetId } = req.body;
+  const { fleetId, customName } = req.body;
+  if (!customName || typeof customName !== 'string' || !customName.trim()) {
+    return res.status(400).json({ error: "A custom colony/station name is required!" });
+  }
+
+  const planetName = customName.trim();
+  if (planetName.length > 30) {
+    return res.status(400).json({ error: "Colony station designation cannot exceed 30 characters" });
+  }
+
   const fleetIndex = state.fleets.findIndex(f => f.id === fleetId && f.senderId === p.id);
   if (fleetIndex === -1) {
-    return res.status(404).json({ error: "Fleet squadron not found or not owned by you!" });
+    return res.status(404).json({ error: "Fleet troops not found or not owned by you!" });
   }
 
   const fleet = state.fleets[fleetIndex];
@@ -2022,12 +2888,6 @@ app.post("/api/fleet/settle", (req, res) => {
     }
   }
 
-  const planetNum = p.planets.length + 1;
-  const targetHabitable = state.habitablePlanets?.find(hp => hp.coords.x === targetX && hp.coords.y === targetY);
-  const planetName = targetHabitable 
-    ? `${p.username}'s ${targetHabitable.name.replace("Habitable ", "")}` 
-    : `${p.username}'s Colony ${planetNum}`;
-
   const newPlanet = createInitialPlanet(planetName, targetX, targetY);
   
   // Put surviving/colonizing troops into this planet
@@ -2050,6 +2910,95 @@ app.post("/api/fleet/settle", (req, res) => {
 
   saveState();
   return res.json({ player: p, success: true, fleets: state.fleets });
+});
+
+
+// Reroute active fleet to a different station or attack coordinate
+app.post("/api/fleet/reroute", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { fleetId, missionType } = req.body;
+  const targetX = parseInt(String(req.body.targetX), 10);
+  const targetY = parseInt(String(req.body.targetY), 10);
+
+  if (isNaN(targetX) || isNaN(targetY) || targetX < 0 || targetX > 100 || targetY < 0 || targetY > 100) {
+    return res.status(400).json({ error: "Invalid target grid coordinates (0-100 allowed)" });
+  }
+
+  const fleet = state.fleets.find(f => f.id === fleetId && f.senderId === p.id);
+  if (!fleet) {
+    return res.status(404).json({ error: "Active mission fleet not found or not owned by you" });
+  }
+
+  // Find target details
+  let targetId: string | null = null;
+  let targetName = `Sector [${targetX}, ${targetY}]`;
+
+  // Check if target coordinates match a player's planet/station
+  let foundTarget = false;
+  for (const playerObj of Object.values(state.players)) {
+    const pl = playerObj.planets.find(item => item.sectorX === targetX && item.sectorY === targetY);
+    if (pl) {
+      targetId = playerObj.id;
+      targetName = pl.name || `${playerObj.username}'s Station`;
+      foundTarget = true;
+      break;
+    }
+  }
+
+  if (!foundTarget && state.habitablePlanets) {
+    const hp = state.habitablePlanets.find(item => item.coords.x === targetX && item.coords.y === targetY);
+    if (hp) {
+      targetName = hp.name || `Habitable Sector [${targetX}, ${targetY}]`;
+    }
+  }
+
+  // Calculate coordinates distance
+  const dx = targetX - fleet.senderCoords.x;
+  const dy = targetY - fleet.senderCoords.y;
+  const dist = Math.hypot(dx, dy);
+
+  const speedLvl = fleet.troopSpeedLevel || 1;
+  const boostPct = Math.max(0, Math.min(35, (speedLvl - 1) * (35 / 19))) / 100;
+  const speedMultiplier = 1.0 + boostPct;
+
+  const slowestTroopSpeed = (Object.entries(fleet.troops)
+    .filter(([_, qty]) => (qty as number) > 0)
+    .reduce((slowest, [tId, _]) => {
+      const sp = TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.speed || 5;
+      return sp < slowest ? sp : slowest;
+    }, 100)) * speedMultiplier;
+
+  const travelTimeMs = Math.round((dist / slowestTroopSpeed) * 60000);
+  const now = Date.now();
+
+  // Update fleet state
+  fleet.targetId = targetId;
+  fleet.targetName = targetName;
+  fleet.targetCoords = { x: targetX, y: targetY };
+  fleet.isReturning = false;
+  fleet.isWaitingToSettle = false;
+  
+  // Set logical mission type
+  if (missionType) {
+    fleet.missionType = missionType as any;
+  } else {
+    // Determine based on troops
+    if (fleet.troops.settlementShip > 0) {
+      fleet.missionType = "colonize";
+    } else if (fleet.troops.drone > 0 && Object.entries(fleet.troops).filter(([tId, q]) => tId !== 'drone' && (q as number) > 0).length === 0) {
+      fleet.missionType = "recon";
+    } else {
+      fleet.missionType = "attack";
+    }
+  }
+
+  fleet.startedAt = now;
+  fleet.arrivesAt = now + travelTimeMs;
+
+  saveState();
+  res.json({ player: p, success: true, fleets: state.fleets });
 });
 
 // Rename Commander / Player Profile Username
@@ -2266,6 +3215,254 @@ app.post("/api/alliance/leave", (req, res) => {
   res.json({ player: p, success: true });
 });
 
+const getRankValue = (role: string | null | undefined): number => {
+  if (role === 'recruit') return 0;
+  if (role === 'member') return 1;
+  if (role === 'officer') return 2;
+  if (role === 'commander' || role === 'leader') return 3;
+  return 1;
+};
+
+// Alliance member promotion
+app.post("/api/alliance/promote", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.allianceId) return res.status(400).json({ error: "Not in an Alliance" });
+
+  const { targetPlayerId } = req.body;
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+
+  const targetPlayer = state.players[targetPlayerId];
+  if (!targetPlayer || targetPlayer.allianceId !== p.allianceId) {
+    return res.status(400).json({ error: "Target player is not inside your alliance roster" });
+  }
+
+  const callerRank = getRankValue(p.allianceRole);
+  const targetRank = getRankValue(targetPlayer.allianceRole);
+
+  if (callerRank < 2 || callerRank <= targetRank) {
+    return res.status(403).json({ error: "Insufficient rank clearance level to promote this member." });
+  }
+
+  let nextRole: "recruit" | "member" | "officer" | "commander" | "leader" = "member";
+  if (targetRank === 0) {
+    nextRole = "member";
+  } else if (targetRank === 1) {
+    nextRole = "officer";
+  } else if (targetRank === 2 && callerRank === 3) {
+    // Leadership transfer
+    nextRole = "commander";
+    
+    // Demote current leader/commander to officer
+    p.allianceRole = "officer";
+    const callerMember = alliance.members.find(m => m.playerId === p.id);
+    if (callerMember) callerMember.role = "officer";
+    
+    alliance.leaderId = targetPlayer.id;
+    alliance.leaderName = targetPlayer.username;
+  } else {
+    return res.status(400).json({ error: "Target cannot be promoted further." });
+  }
+
+  targetPlayer.allianceRole = nextRole;
+  const targetMember = alliance.members.find(m => m.playerId === targetPlayerId);
+  if (targetMember) targetMember.role = nextRole;
+
+  saveState();
+  res.json({ success: true, player: p });
+});
+
+// Alliance member demotion
+app.post("/api/alliance/demote", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.allianceId) return res.status(400).json({ error: "Not in an Alliance" });
+
+  const { targetPlayerId } = req.body;
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+
+  const targetPlayer = state.players[targetPlayerId];
+  if (!targetPlayer || targetPlayer.allianceId !== p.allianceId) {
+    return res.status(400).json({ error: "Target player is not inside your alliance roster" });
+  }
+
+  const callerRank = getRankValue(p.allianceRole);
+  const targetRank = getRankValue(targetPlayer.allianceRole);
+
+  if (callerRank < 2 || callerRank <= targetRank) {
+    return res.status(403).json({ error: "Insufficient rank clearance level to demote this member." });
+  }
+
+  if (targetRank === 0) {
+    return res.status(400).json({ error: "Target cannot be demoted further than Recruit" });
+  }
+
+  let nextRole: "recruit" | "member" | "officer" | "commander" | "leader" = "recruit";
+  if (targetRank === 2) {
+    nextRole = "member";
+  } else if (targetRank === 1) {
+    nextRole = "recruit";
+  }
+
+  targetPlayer.allianceRole = nextRole;
+  const targetMember = alliance.members.find(m => m.playerId === targetPlayerId);
+  if (targetMember) targetMember.role = nextRole;
+
+  saveState();
+  res.json({ success: true, player: p });
+});
+
+// Dismiss member from alliance
+app.post("/api/alliance/kick", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.allianceId) return res.status(400).json({ error: "Not in an Alliance" });
+
+  const { targetPlayerId } = req.body;
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+
+  const targetPlayer = state.players[targetPlayerId];
+  if (!targetPlayer || targetPlayer.allianceId !== p.allianceId) {
+    return res.status(400).json({ error: "Target player is not inside your alliance roster" });
+  }
+
+  const callerRank = getRankValue(p.allianceRole);
+  const targetRank = getRankValue(targetPlayer.allianceRole);
+
+  if (callerRank < 2 || callerRank <= targetRank) {
+    return res.status(403).json({ error: "Insufficient rank clearance level to dismiss this member." });
+  }
+
+  // Remove target player from the alliance
+  targetPlayer.allianceId = null;
+  targetPlayer.allianceRole = null;
+  alliance.members = alliance.members.filter(m => m.playerId !== targetPlayerId);
+
+  saveState();
+  res.json({ success: true, player: p });
+});
+
+// Update alliance highlights notes
+app.post("/api/alliance/highlights", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.allianceId) return res.status(400).json({ error: "Not in an Alliance" });
+
+  const { highlights } = req.body;
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+
+  // Update notes
+  alliance.highlights = highlights;
+  saveState();
+  res.json({ success: true, alliance });
+});
+
+// Get comprehensive alliance member reports (troops, planet-by-planet, last activity status)
+app.get("/api/alliance/member-reports", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.allianceId) return res.status(400).json({ error: "Not in an Alliance" });
+
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+
+  const reports = alliance.members.map(mbr => {
+    const pl = state.players[mbr.playerId];
+    if (!pl) {
+      return {
+        playerId: mbr.playerId,
+        username: mbr.username,
+        role: mbr.role,
+        lastActive: Date.now() - 3600000,
+        scores: { population: 0, attack: 0, defence: 0, raiders: 0 },
+        planets: []
+      };
+    }
+
+    return {
+      playerId: pl.id,
+      username: pl.username,
+      role: mbr.role,
+      lastActive: pl.lastActive || Date.now() - 600000,
+      scores: pl.scores || { population: 0, attack: 0, defence: 0, raiders: 0 },
+      achievements: pl.achievements || [],
+      planets: pl.planets.map(planet => ({
+        id: planet.id,
+        name: planet.name,
+        sectorX: planet.sectorX,
+        sectorY: planet.sectorY,
+        troops: planet.troops || { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+        resources: planet.resources || { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 }
+      }))
+    };
+  });
+
+  res.json({ success: true, members: reports });
+});
+
+// Quantum target send resources
+app.post("/api/resources/send", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { targetId, resources } = req.body;
+
+  if (p.id === targetId) {
+    return res.status(400).json({ error: "You cannot transmit resources to your own coordinates!" });
+  }
+
+  const targetPlayer = state.players[targetId] || Object.values(state.players).find(u => u.id === targetId);
+  if (!targetPlayer) {
+    return res.status(404).json({ error: "Recipient commander coordinates not found" });
+  }
+
+  const senderPlanet = p.planets[0];
+  const targetPlanet = targetPlayer.planets[0];
+
+  if (!senderPlanet) {
+    return res.status(400).json({ error: "Sender starbase planet configuration mismatch." });
+  }
+  if (!targetPlanet) {
+    return res.status(400).json({ error: "Recipient starbase planet configuration mismatch." });
+  }
+
+  // Validate quantities
+  const keys = ["water", "plasma", "fuel", "food", "respirant"];
+  for (const k of keys) {
+    const qty = Math.max(0, parseInt(resources[k], 10) || 0);
+    if (qty > 0) {
+      if ((senderPlanet.resources[k as ResourceType] || 0) < qty) {
+        return res.status(400).json({ error: `Not enough ${k} on your active moonbase planetary reserves.` });
+      }
+    }
+  }
+
+  // Subtract & Add
+  keys.forEach(k => {
+    const qty = Math.max(0, parseInt(resources[k], 10) || 0);
+    if (qty > 0) {
+      senderPlanet.resources[k as ResourceType] -= qty;
+      targetPlanet.resources[k as ResourceType] = (targetPlanet.resources[k as ResourceType] || 0) + qty;
+    }
+  });
+
+  // Log global news alert of trade portal activation
+  state.newsEvents.push({
+    id: `news_trade_${Date.now()}`,
+    title: "Quantum Trade Portal Activated!",
+    content: `Commander ${p.username} successfully transmitted a massive payload cargo shipment to Commander ${targetPlayer.username}!`,
+    type: "system",
+    timestamp: Date.now()
+  });
+
+  saveState();
+  res.json({ success: true, player: p });
+});
+
 app.post("/api/alliance/declare-war", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
@@ -2336,6 +3533,60 @@ app.post("/api/daily-reward/claim", (req, res) => {
   res.json({ player: p, s_amount: 8000, success: true });
 });
 
+// Claim Supply Nexus Cargo Shipments
+app.post("/api/planet/claim-supply-nexus", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId } = req.body;
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Colony planet not found" });
+
+  const supplyNexus = planet.buildings.supplyNexus;
+  if (!supplyNexus) {
+    return res.status(400).json({ error: "Supply Nexus building has not been commissioned on this planet." });
+  }
+
+  const level = supplyNexus.level;
+  if (level <= 0) {
+    return res.status(400).json({ error: "Supply Nexus level is 0. Upgrade it to level 1+ to dispatch shipments." });
+  }
+
+  const now = Date.now();
+  const cooldown = 120 * 1000; // 2 minutes cooldown for fast Sandbox testing
+  const lastClaim = planet.lastSupplyNexusClaim || 0;
+
+  if (now - lastClaim < cooldown) {
+    const remainingSeconds = Math.ceil((cooldown - (now - lastClaim)) / 1000);
+    return res.status(400).json({ 
+      error: `Quantum Supply Nexus is recharging. Portal stabilization completes in ${remainingSeconds} seconds.` 
+    });
+  }
+
+  // Calculate resources: sends a total of 5 000 000 resources when maxed (level 50)
+  // 5,000,000 total / 5 resource types = 1,000,000 per type at Lvl 50.
+  // This means level * 20,000 of each resource type.
+  const qtyPerResource = level * 20000;
+  const totalVolume = qtyPerResource * 5;
+
+  const storageLimit = getRepositoryCapacity(planet.buildings.repository.level);
+  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
+
+  keys.forEach(k => {
+    planet.resources[k] = Math.min(storageLimit, planet.resources[k] + qtyPerResource);
+  });
+
+  planet.lastSupplyNexusClaim = now;
+  saveState();
+
+  res.json({ 
+    player: p, 
+    qtyPerResource, 
+    totalVolume, 
+    success: true 
+  });
+});
+
 app.post("/api/buy-credits", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
@@ -2364,10 +3615,53 @@ app.post("/api/buy-credits", (req, res) => {
   res.json({ player: p, success: true });
 });
 
+// Submit Suggestion/Feedback
+app.post("/api/feedback/send", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const { content, category } = req.body;
+  if (!content || typeof content !== "string" || !content.trim()) {
+    return res.status(400).json({ error: "Suggestion content cannot be empty." });
+  }
+  if (!state.feedbacks) {
+    state.feedbacks = [];
+  }
+  const newFeedback = {
+    id: `feedback_${Math.random().toString(36).substr(2, 9)}`,
+    senderId: p ? p.id : "anonymous",
+    senderName: p ? p.username : "Anonymous Commander",
+    senderEmail: (p && p.googleEmail) ? p.googleEmail : (p ? "Local Account" : "Anonymous"),
+    content: content.trim(),
+    category: category || "other",
+    timestamp: Date.now()
+  };
+  state.feedbacks.push(newFeedback);
+  saveState();
+  res.json({ success: true, message: "Holographic telemetry transmission received by Segment Headquarters." });
+});
+
+// View feedback list privately (restricted strictly to banele180@gmail.com)
+app.post("/api/feedback/private-list", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const { adminKey } = req.body;
+  
+  const isEmailOwner = p && p.googleEmail && p.googleEmail.toLowerCase() === "banele180@gmail.com";
+  const isValidPass = adminKey === "991807" || adminKey === "banele-admin-secret" || isEmailOwner;
+
+  if (!isValidPass) {
+    return res.status(403).json({ error: "Access Denied. Holographic decryption key incorrect." });
+  }
+
+  if (!state.feedbacks) {
+    state.feedbacks = [];
+  }
+  res.json({ success: true, feedbacks: state.feedbacks });
+});
+
 
 // Serve Static Assets & SPA Router
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

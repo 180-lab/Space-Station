@@ -5,6 +5,8 @@ export interface MineState {
   level: number; // Max 15
   isUpgrading: boolean;
   upgradeEnd: number | null; // Timestamp
+  health?: number; // 0 to 100
+  boostedUntil?: number | null; // Timestamp
 }
 
 export interface BuildingState {
@@ -12,6 +14,7 @@ export interface BuildingState {
   maxLevel: number;
   isUpgrading: boolean;
   upgradeEnd: number | null; // Timestamp
+  health?: number; // 0 to 100
 }
 
 export interface TroopState {
@@ -30,6 +33,13 @@ export interface TrainingQueueItem {
   count: number;
   startedAt: number;
   completedAt: number;
+}
+
+export interface QueuedUpgrade {
+  type: 'mine' | 'building';
+  key: string;
+  mineIndex?: number;
+  targetLevel: number;
 }
 
 export interface ColonyPlanet {
@@ -51,6 +61,7 @@ export interface ColonyPlanet {
     armyBase: BuildingState;      // Displays troops
     repository: BuildingState;    // Max 45
     radar: BuildingState;         // Max 15
+    supplyNexus: BuildingState;   // Max 50
   };
   resources: {
     water: number;
@@ -68,6 +79,8 @@ export interface ColonyPlanet {
     settlementShip: number;
   };
   trainingQueue: TrainingQueueItem[];
+  lastSupplyNexusClaim?: number;
+  upgradeQueue?: QueuedUpgrade[];
 }
 
 export interface PlayerProfile {
@@ -76,7 +89,7 @@ export interface PlayerProfile {
   faction: string; // 'Alliance', 'Syndicate', 'Vanguard'
   factionColor: string; // HEX
   allianceId: string | null;
-  allianceRole: 'leader' | 'officer' | 'member' | null;
+  allianceRole: 'commander' | 'leader' | 'officer' | 'member' | 'recruit' | null;
   planets: ColonyPlanet[];
   scores: {
     population: number; // Mine levels * 10 + Building levels * 30
@@ -89,6 +102,9 @@ export interface PlayerProfile {
   bannerId: string; // Alliance/Player banner shape
   lastDailyRewardClaim: number;
   credits: number;
+  googleEmail?: string;
+  password?: string;
+  lastActive?: number;
 }
 
 export interface Alliance {
@@ -100,7 +116,7 @@ export interface Alliance {
   members: {
     playerId: string;
     username: string;
-    role: 'leader' | 'officer' | 'member';
+    role: 'commander' | 'leader' | 'officer' | 'member' | 'recruit';
   }[];
   wars: {
     targetAllianceId: string;
@@ -109,6 +125,7 @@ export interface Alliance {
   }[];
   bannerColor: string;
   bannerSymbol: string;
+  highlights?: string;
 }
 
 export interface ChatMessage {
@@ -132,7 +149,7 @@ export interface FleetMission {
   targetId: string | null; // Target player ID or Planet ID
   targetName: string;
   targetCoords: { x: number; y: number };
-  missionType: 'attack' | 'colonize' | 'recon';
+  missionType: 'attack' | 'colonize' | 'recon' | 'move';
   troops: {
     defender: number;
     attacker: number;
@@ -153,6 +170,8 @@ export interface FleetMission {
     food: number;
     respirant: number;
   };
+  troopSpeedLevel?: number;
+  defenseShieldsLevel?: number;
 }
 
 export interface BattleReport {
@@ -193,6 +212,15 @@ export interface BattleReport {
     attackerRemaining: Record<string, number>;
     defenderRemaining: Record<string, number>;
   }[];
+  buildings?: Record<string, number>;
+  mines?: Record<string, number[]>;
+  resources?: {
+    water: number;
+    plasma: number;
+    fuel: number;
+    food: number;
+    respirant: number;
+  };
 }
 
 export interface NewsEvent {
@@ -200,6 +228,16 @@ export interface NewsEvent {
   title: string;
   content: string;
   type: 'war' | 'system' | 'raid' | 'discovery';
+  timestamp: number;
+}
+
+export interface SuggestionFeedback {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderEmail: string;
+  content: string;
+  category: 'gameplay' | 'visuals' | 'balancing' | 'bugs' | 'other';
   timestamp: number;
 }
 
@@ -211,6 +249,7 @@ export interface GameState {
   battleReports: BattleReport[];
   newsEvents: NewsEvent[];
   habitablePlanets?: HabitablePlanet[];
+  feedbacks?: SuggestionFeedback[];
 }
 
 export interface HabitablePlanet {
@@ -220,32 +259,22 @@ export interface HabitablePlanet {
   isColonized: boolean;
 }
 
-export function getUpgradeWeights(type: 'mine' | 'building', key: string): Record<ResourceType, number> {
-  if (type === 'mine') {
-    const weights: Record<ResourceType, number> = {
-      water: 0.9,
-      plasma: 0.9,
-      fuel: 0.9,
-      food: 0.9,
-      respirant: 0.9
-    };
-    if (key in weights) {
-      weights[key as ResourceType] = 1.4;
-    }
-    return weights;
-  } else {
-    return {
-      water: 0.96929032,
-      plasma: 1.00767742,
-      fuel: 1.00767742,
-      food: 1.00767742,
-      respirant: 1.00767742
-    };
-  }
+export interface LeaderboardPlayer {
+  id: string;
+  username: string;
+  faction: string;
+  factionColor: string;
+  allianceId: string | null;
+  allianceRole: string | null;
+  scores: {
+    population: number;
+    attack: number;
+    defence: number;
+    raiders: number;
+  };
+  achievements?: string[];
+  planetsCount?: number;
+  lastActive?: number;
 }
 
-export function getUpgradeResourceCost(type: 'mine' | 'building', key: string, targetLevel: number, resKey: ResourceType): number {
-  const baseCost = type === 'mine' ? targetLevel * 100 : targetLevel * 150;
-  const weights = getUpgradeWeights(type, key);
-  return Math.round(baseCost * weights[resKey]);
-}
+export { getUpgradeWeights, getUpgradeResourceCost } from './gameUtils';

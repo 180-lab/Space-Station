@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import { ColonyPlanet, PlayerProfile, BattleReport } from '../types';
 
+import imgInterceptor from '../assets/images/defensive_interceptor_1780872114708.png';
+import imgAssaultDrone from '../assets/images/assault_drone_1780871759723.png';
+import imgDisrupter from '../assets/images/disrupter_tank_1780871773673.png';
+import imgMatterExtractor from '../assets/images/matter_extractor_1780871789535.png';
+import imgMissileLauncher from '../assets/images/missile_launcher_1780871805054.png';
+import imgSettlementShip from '../assets/images/settlement_ship_1780871819613.png';
+
 const TROOP_NAME_MAPPING: Record<string, string> = {
-  defender: 'Heavy Defender',
-  attacker: 'Strike Interceptor',
-  tank: 'Bomber Tank',
-  looter: 'Rogue Looter',
-  drone: 'Scout Drone',
+  defender: 'Interceptor',
+  attacker: 'Assault Drone',
+  tank: 'Disrupter',
+  looter: 'Matter Extractor',
+  drone: 'Missile Launcher',
   settlementShip: 'Settlement Ship'
 };
 import { 
@@ -38,74 +45,89 @@ interface ArmyBaseTabProps {
   onTrainTroops: (troopId: string, quantity: number) => void;
   serverTime: number;
   battleReports: BattleReport[];
+  readReports?: Record<string, boolean>;
+  savedReports?: Record<string, boolean>;
+  onMarkRead?: (reportId: string) => void;
+  onMarkUnread?: (reportId: string) => void;
+  onToggleSave?: (reportId: string) => void;
+  onForwardReport?: (report: BattleReport, channel: 'global' | 'alliance') => void;
+  fleets?: any[];
+  onSendFleet?: (mission: {
+    targetX: number;
+    targetY: number;
+    missionType: 'attack' | 'colonize' | 'recon' | 'move';
+    troops: Record<string, number>;
+    targetBuilding?: string;
+  }) => void;
+  onSettle?: (fleetId: string) => void;
 }
 
 const TROOP_DETAILS = {
   defender: {
-    name: 'Heavy Defender',
-    desc: 'Bunker defense infantry. High durability shield blocks planetary raids. Forced to defend the colony if under siege.',
+    name: 'Interceptor',
+    desc: 'Bunker defense infantry. High durability shield blocks planetary raids. Forced to defend the colony if under attack.',
     defenceHp: 18,
     attackHp: 10,
-    carry: 6000,
-    speed: 'Slow Tactical (19.2 space miles/hr)',
+    carry: 600,
     costs: { water: 150, plasma: 0, fuel: 0, food: 200, respirant: 100 },
     icon: Shield,
-    color: 'text-blue-400 bg-blue-950/30'
+    color: 'text-blue-400 bg-blue-950/30',
+    image: imgInterceptor
   },
   attacker: {
-    name: 'Strike Interceptor',
+    name: 'Assault Drone',
     desc: 'Heavy strike fighter designed for interstellar sweeps. Low defense shields but delivers severe kinetic bombardments.',
     defenceHp: 9,
     attackHp: 30,
-    carry: 4000,
-    speed: 'Hyper-Cruise (32.0 space miles/hr)',
-    costs: { water: 100, plasma: 150, fuel: 150, food: 100, respirant: 0 },
+    carry: 400,
+    costs: { water: 300, plasma: 450, fuel: 450, food: 300, respirant: 0 },
     icon: Sword,
-    color: 'text-red-400 bg-red-950/30'
+    color: 'text-red-400 bg-red-950/30',
+    image: imgAssaultDrone
   },
   tank: {
-    name: 'Bomber Tank',
+    name: 'Disrupter',
     desc: 'Colossal planet-side artillery engines. Slow, but every 3 surviving tanks systematically demolish random levels of defender buildings.',
     defenceHp: 5,
     attackHp: 5,
     carry: 0,
-    speed: 'Siege Crawl (9.6 space miles/hr)',
-    costs: { water: 0, plasma: 200, fuel: 300, food: 0, respirant: 100 },
+    costs: { water: 0, plasma: 800, fuel: 1200, food: 0, respirant: 400 },
     icon: Crosshair,
-    color: 'text-amber-500 bg-amber-950/30'
+    color: 'text-amber-500 bg-amber-950/30',
+    image: imgDisrupter
   },
   looter: {
-    name: 'Rogue Looter',
+    name: 'Matter Extractor',
     desc: 'Swift light frigate outfitted with massive cargo holds. High speed cargo looting of enemy planetary storage repositories.',
     defenceHp: 4,
     attackHp: 4,
-    carry: 10000,
-    speed: 'Super-Luminal (63.9 space miles/hr)',
-    costs: { water: 250, plasma: 0, fuel: 100, food: 200, respirant: 0 },
+    carry: 1000,
+    costs: { water: 500, plasma: 0, fuel: 200, food: 400, respirant: 0 },
     icon: Truck,
-    color: 'text-emerald-400 bg-emerald-950/30'
+    color: 'text-emerald-400 bg-emerald-950/30',
+    image: imgMatterExtractor
   },
   drone: {
-    name: 'Scout Drone',
+    name: 'Missile Launcher',
     desc: 'Low-profile cloaked robotic drone. Elite speed indicators indicators designed for scouting, recon, and mapping targets.',
-    defenceHp: 5,
-    attackHp: 5,
-    carry: 2000,
-    speed: 'Ultralight Cruise (47.9 space miles/hr)',
-    costs: { water: 100, plasma: 100, fuel: 0, food: 0, respirant: 50 },
+    defenceHp: 120,
+    attackHp: 120,
+    carry: 200,
+    costs: { water: 1000, plasma: 1000, fuel: 1500, food: 0, respirant: 500 },
     icon: Activity,
-    color: 'text-purple-400 bg-purple-950/30'
+    color: 'text-purple-400 bg-purple-950/30',
+    image: imgMissileLauncher
   },
   settlementShip: {
     name: 'Settlement Ship',
     desc: 'Heavy colonization spacecraft. Limited to 1 Ship per base. Allows settling and colonizing uncharted habitable coordinates visible on your active radar scans.',
     defenceHp: 50,
     attackHp: 0,
-    carry: 50000,
-    speed: 'Tranquil Exploration (6.4 space miles/hr)',
+    carry: 5000,
     costs: { water: 1500, plasma: 1000, fuel: 2000, food: 1500, respirant: 1000 },
     icon: Rocket,
-    color: 'text-teal-400 bg-teal-950/30'
+    color: 'text-teal-400 bg-teal-950/30',
+    image: imgSettlementShip
   }
 };
 
@@ -114,7 +136,16 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   activePlanet,
   onTrainTroops,
   serverTime,
-  battleReports
+  battleReports,
+  readReports = {},
+  savedReports = {},
+  onMarkRead,
+  onMarkUnread,
+  onToggleSave,
+  onForwardReport,
+  fleets = [],
+  onSendFleet,
+  onSettle
 }) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({
     defender: 1,
@@ -126,11 +157,75 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   });
 
   const [activeTroopInfo, setActiveTroopInfo] = useState<string | null>(null);
-  const [subTab, setSubTab] = useState<'troops' | 'fabricate'>('troops');
+  const [activeImageZoom, setActiveImageZoom] = useState<string | null>(null);
+  const [activeImageZoomTitle, setActiveImageZoomTitle] = useState<string | null>(null);
+  const [subTab, setSubTab] = useState<'troops' | 'fabricate' | 'fleet'>('troops');
   const [showReportsModal, setShowReportsModal] = useState(false);
+  const [savedCombatLogsFilter, setSavedCombatLogsFilter] = useState(false);
   const [expandedReportRounds, setExpandedReportRounds] = useState<Record<string, number>>({});
+  const [expandedReports, setExpandedReports] = useState<Record<string, boolean>>({});
   const [lastViewedReportTime, setLastViewedReportTime] = useState<number>(0);
-  const [isBuildQueueOpen, setIsBuildQueueOpen] = useState(true);
+
+  const [seenReports, setSeenReports] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('moonbase_seen_reports') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  const markReportSeen = (reportId: string) => {
+    setSeenReports(prev => {
+      const updated = { ...prev, [reportId]: true };
+      localStorage.setItem('moonbase_seen_reports', JSON.stringify(updated));
+      return updated;
+    });
+  };
+  const [isBuildQueueOpen, setIsBuildQueueOpen] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const [showBuildForces, setShowBuildForces] = useState(false);
+
+  // Fleet Launch Form States
+  const [targetX, setTargetX] = useState(activePlanet.sectorX);
+  const [targetY, setTargetY] = useState(activePlanet.sectorY);
+  const [missionType, setMissionType] = useState<'recon' | 'attack' | 'colonize' | 'move'>('move');
+  const [targetBuilding, setTargetBuilding] = useState('random');
+  const [fleetTroops, setFleetTroops] = useState<Record<string, number>>({
+    defender: 0,
+    attacker: 0,
+    tank: 0,
+    looter: 0,
+    drone: 0,
+    settlementShip: 0
+  });
+
+  const handleLaunchFleet = () => {
+    let totalSend = 0;
+    Object.values(fleetTroops).forEach(qty => { totalSend += Number(qty) || 0; });
+    if (totalSend === 0) {
+      alert("Must allocate at least 1 spacecraft to launch a fleet mission!");
+      return;
+    }
+
+    if (onSendFleet) {
+      onSendFleet({
+        targetX,
+        targetY,
+        missionType,
+        targetBuilding: missionType === 'attack' ? targetBuilding : undefined,
+        troops: fleetTroops
+      });
+      // Reset troops allocation inputs
+      setFleetTroops({
+        defender: 0,
+        attacker: 0,
+        tank: 0,
+        looter: 0,
+        drone: 0,
+        settlementShip: 0
+      });
+    }
+  };
 
   const handleQtyChange = (troopId: string, val: string) => {
     const num = Math.max(1, parseInt(val, 10) || 1);
@@ -157,6 +252,18 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                    (activePlanet.troops.drone || 0) +
                                    (activePlanet.troops.settlementShip || 0);
 
+  let shieldMultiplier = 1.0;
+  try {
+    const savedTech = localStorage.getItem(`moonbase_tech_${player.id}`);
+    if (savedTech) {
+      const parsed = JSON.parse(savedTech);
+      const shieldLvl = parsed.defense_shields || 1;
+      shieldMultiplier = 1.0 + (shieldLvl / 20) * 0.15;
+    }
+  } catch {
+    // fallback
+  }
+
   // Calculate global combined statistics for the active army view
   const globalStats = {
     totalAttack: (activePlanet.troops.defender || 0) * TROOP_DETAILS.defender.attackHp +
@@ -165,12 +272,12 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                  (activePlanet.troops.looter || 0) * TROOP_DETAILS.looter.attackHp +
                  (activePlanet.troops.drone || 0) * TROOP_DETAILS.drone.attackHp +
                  (activePlanet.troops.settlementShip || 0) * TROOP_DETAILS.settlementShip.attackHp,
-    totalDefence: (activePlanet.troops.defender || 0) * TROOP_DETAILS.defender.defenceHp +
+    totalDefence: Math.round(((activePlanet.troops.defender || 0) * TROOP_DETAILS.defender.defenceHp +
                   (activePlanet.troops.attacker || 0) * TROOP_DETAILS.attacker.defenceHp +
                   (activePlanet.troops.tank || 0) * TROOP_DETAILS.tank.defenceHp +
                   (activePlanet.troops.looter || 0) * TROOP_DETAILS.looter.defenceHp +
                   (activePlanet.troops.drone || 0) * TROOP_DETAILS.drone.defenceHp +
-                  (activePlanet.troops.settlementShip || 0) * TROOP_DETAILS.settlementShip.defenceHp,
+                  (activePlanet.troops.settlementShip || 0) * TROOP_DETAILS.settlementShip.defenceHp) * shieldMultiplier),
     totalCarry: (activePlanet.troops.defender || 0) * TROOP_DETAILS.defender.carry +
                 (activePlanet.troops.attacker || 0) * TROOP_DETAILS.attacker.carry +
                 (activePlanet.troops.tank || 0) * TROOP_DETAILS.tank.carry +
@@ -178,11 +285,6 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                 (activePlanet.troops.drone || 0) * TROOP_DETAILS.drone.carry +
                 (activePlanet.troops.settlementShip || 0) * TROOP_DETAILS.settlementShip.carry
   };
-
-  // Base training speed is reduced up to 70% based on Research Center level
-  const rcLevel = activePlanet.buildings.researchCenter.level;
-  const buildSpeedReduction = Math.min(0.7, 0.7 * (rcLevel / 20));
-  const speedString = `Lab Speed Buff: +${Math.round(buildSpeedReduction * 100)}%`;
 
   // Calculate total queued units per troop type
   const queuedCounts: Record<string, number> = {
@@ -206,33 +308,28 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
         <div>
           <span className="text-[9px] font-bold tracking-widest text-[#5bc0be] uppercase font-mono">Operations Wing</span>
           <h2 className="text-xl sm:text-2xl font-black text-white mt-1 leading-none tracking-tight">Fleet Commands Force</h2>
-          <span className="text-xs text-indigo-400 font-mono flex items-center gap-2 mt-3 bg-white/5 border border-white/5 py-1 px-2.5 rounded-lg w-fit" title="Structural build speed limits applied configuration.">
-            <Settings size={13} className="animate-spin text-indigo-400" title="Operations status setting: Rotating shows background task threads active." />
-            {speedString}
-          </span>
         </div>
 
         {/* COMBAT REPORTS ICON BUTTON TRIGGER */}
         <button
           onClick={() => {
-            setLastViewedReportTime(Date.now());
             setShowReportsModal(true);
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-xs font-bold shrink-0 shadow-lg justify-center w-full sm:w-auto relative cursor-pointer border transition duration-150 ${
-            battleReports.filter(r => r.timestamp > lastViewedReportTime).length > 0 
+            battleReports.filter(r => !seenReports[r.id]).length > 0 
               ? "bg-red-950/40 hover:bg-red-900/45 border-red-500/30 hover:border-red-500/65 text-red-400 hover:text-red-350"
               : "bg-emerald-950/40 hover:bg-emerald-900/45 border-emerald-500/30 hover:border-emerald-500/65 text-emerald-400 hover:text-emerald-350"
           }`}
           title="Decrypt and view local planetary security encounters."
         >
-          {battleReports.filter(r => r.timestamp > lastViewedReportTime).length > 0 && <ShieldAlert size={14} className="animate-pulse" />}
+          {battleReports.filter(r => !seenReports[r.id]).length > 0 && <ShieldAlert size={14} className="animate-pulse" />}
           <span>ATTACK REPORTS</span>
           <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-            battleReports.filter(r => r.timestamp > lastViewedReportTime).length > 0
+            battleReports.filter(r => !seenReports[r.id]).length > 0
               ? "bg-red-500 text-slate-950"
               : "bg-emerald-500 text-slate-950"
           }`}>
-            {battleReports.filter(r => r.timestamp > lastViewedReportTime).length}
+            {battleReports.filter(r => !seenReports[r.id]).length}
           </span>
         </button>
 
@@ -245,7 +342,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
         </div>
       </div>
 
-      {/* Dual Sub-Tabs System */}
+      {/* Triple Sub-Tabs System */}
       <div className="flex border border-[#1E293B] bg-[#0A0F1D]/80 p-1.5 rounded-2xl gap-2 shadow-inner">
         <button
           onClick={() => setSubTab('troops')}
@@ -280,6 +377,24 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
           <Wrench size={14} className={`${subTab === 'fabricate' ? 'text-indigo-400 animate-pulse' : 'text-slate-400'}`} title="Wrench build icon" />
           <span className="tracking-wider">BUILD</span>
         </button>
+
+        <button
+          onClick={() => setSubTab('fleet')}
+          className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-mono text-xs font-bold transition-all duration-250 cursor-pointer relative ${
+            subTab === 'fleet' 
+              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/35 shadow-[0_0_15px_rgba(16,185,129,0.15)]' 
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
+          }`}
+          title="Launch and monitor active space fleet missions"
+        >
+          <Rocket size={14} className={`${subTab === 'fleet' ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} title="Rocket fleet command icon" />
+          <span className="tracking-wider">FLEETS</span>
+          {fleets.filter(f => f.senderId === player.id).length > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-450 text-slate-950 font-sans animate-pulse">
+              {fleets.filter(f => f.senderId === player.id).length}
+            </span>
+          )}
+        </button>
       </div>
 
 
@@ -288,26 +403,26 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
         <div className="space-y-6 animate-fade-in">
           {/* Integrated Armed Force Tactical Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 bg-[#0A0F1D]/65 border border-[#1E293B] rounded-xl flex items-center gap-3.5" title="Combined Firepower: Total accumulated attack power rating across all spaceship units.">
-              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/15 text-red-400">
-                <Sword size={16} title="Sword firepower icon" />
-              </div>
-              <div>
-                <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest font-mono">Combined Firepower</div>
-                <div className="text-base font-black text-slate-100 font-mono mt-0.5">
-                  {globalStats.totalAttack.toLocaleString()} <span className="text-[9px] font-bold text-red-500">HP</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-[#0A0F1D]/65 border border-[#1E293B] rounded-xl flex items-center gap-3.5" title="Defense Absorption: Defense/shield strength point total absorbing enemy laser shots.">
+            <div className="p-4 bg-[#0A0F1D]/65 border border-[#1E293B] rounded-xl flex items-center gap-3.5" title="Defense Absorption: Defense/shield strength point total absorbing enemy scans and raids.">
               <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/15 text-blue-400">
                 <Shield size={16} title="Shield defensive icon" />
               </div>
               <div>
-                <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest font-mono">Defense Absorption</div>
+                <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest font-mono">Total Defence HP / Shields</div>
                 <div className="text-base font-black text-slate-100 font-mono mt-0.5">
                   {globalStats.totalDefence.toLocaleString()} <span className="text-[9px] font-bold text-blue-500">HP</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-[#0A0F1D]/65 border border-[#1E293B] rounded-xl flex items-center gap-3.5" title="Strike Firepower: Cumulative offensive combat capability total scoring planet raids.">
+              <div className="p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/15 text-orange-400">
+                <Sword size={16} title="Sword weapon action icon" />
+              </div>
+              <div>
+                <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest font-mono">Total Attack HP / Firepower</div>
+                <div className="text-base font-black text-slate-100 font-mono mt-0.5">
+                  {globalStats.totalAttack.toLocaleString()} <span className="text-[9px] font-bold text-orange-500">HP</span>
                 </div>
               </div>
             </div>
@@ -327,91 +442,124 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
           {/* Division list for Troops tab */}
           <div className="space-y-3.5">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 font-mono tracking-widest">Active Space Force Breakdown</h3>
+            <button
+              onClick={() => setShowBreakdown(!showBreakdown)}
+              className="w-full flex items-center justify-between gap-3 mb-2 border-b border-[#1E293B]/60 pb-2 text-left hover:text-white transition duration-150 cursor-pointer"
+              type="button"
+            >
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#5bc0be] font-mono flex items-center gap-2">
+                Active Space Force Breakdown
+                {showBreakdown ? (
+                  <ChevronUp size={12} className="text-red-500 inline" />
+                ) : (
+                  <ChevronDown size={12} className="text-emerald-500 inline" />
+                )}
+              </h3>
+              <span className="text-[10.5px] text-slate-500 font-mono font-bold">({totalTroopsCount.toLocaleString()} Combatants)</span>
+            </button>
             
-            {totalTroopsCount === 0 ? (
-              <div className="p-8 border border-cyan-500/15 bg-cyan-950/5 rounded-2xl text-center space-y-4 max-w-md mx-auto">
-                <Users size={32} className="text-cyan-400 mx-auto animate-pulse" title="Space Force: Zero active troops stationed on world sectors" />
-                <div className="space-y-1.5">
-                  <h4 className="font-bold text-xs text-slate-200 font-mono uppercase">No Regular Units Stationed</h4>
-                  <p className="text-[11px] text-slate-400 leading-normal">
-                    Operations screen shows zero active troop clusters on current planet sectors. Stand-by static armor fields active.
-                  </p>
+            {showBreakdown && (
+              totalTroopsCount === 0 ? (
+                <div className="p-8 border border-cyan-500/15 bg-cyan-950/5 rounded-2xl text-center space-y-4 max-w-md mx-auto">
+                  <Users size={32} className="text-cyan-400 mx-auto animate-pulse" title="Space Force: Zero active troops stationed on world sectors" />
+                  <div className="space-y-1.5">
+                    <h4 className="font-bold text-xs text-slate-200 font-mono uppercase">No Regular Units Stationed</h4>
+                    <p className="text-[11px] text-slate-400 leading-normal">
+                      Operations screen shows zero active troop clusters on current planet sectors. Stand-by static armor fields active.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSubTab('fabricate')}
+                    className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-mono font-bold uppercase tracking-widest rounded-xl transition duration-150 inline-flex items-center gap-2 cursor-pointer shadow-lg hover:shadow-cyan-500/15"
+                    title="Undergo construction yards sequence"
+                  >
+                    <Wrench size={11} title="Wrench build icon" /> Open Build Wing
+                  </button>
                 </div>
-                <button
-                  onClick={() => setSubTab('fabricate')}
-                  className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-mono font-bold uppercase tracking-widest rounded-xl transition duration-150 inline-flex items-center gap-2 cursor-pointer shadow-lg hover:shadow-cyan-500/15"
-                  title="Undergo construction yards sequence"
-                >
-                  <Wrench size={11} title="Wrench build icon" /> Open Build Wing
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4">
-                {(Object.entries(TROOP_DETAILS) as [string, any][]).map(([tId, details]) => {
-                  const count = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
-                  const Icon = details.icon;
-                  const percentageOfOverall = totalTroopsCount > 0 ? (count / totalTroopsCount) * 100 : 0;
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {(Object.entries(TROOP_DETAILS) as [string, any][]).map(([tId, details]) => {
+                    const count = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
+                    const Icon = details.icon;
+                    const percentageOfOverall = totalTroopsCount > 0 ? (count / totalTroopsCount) * 100 : 0;
 
-                  return (
-                    <div 
-                      key={tId}
-                      className="p-4 border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-white/10 transition"
-                    >
-                      <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                        <div className={`p-3 rounded-xl border border-[#1E293B] shrink-0 ${details.color}`} title={`${details.name}: ${details.desc}. Hover/long press for stats.`}>
-                          <Icon size={18} title={`${details.name}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-sm text-white font-mono">{details.name}</span>
-                            <span className="text-[10px] text-slate-500 font-mono">({percentageOfOverall.toFixed(1)}%)</span>
-                          </div>
-                          <div className="text-[11px] text-slate-450 mt-1 flex items-center gap-3 font-mono flex-wrap">
-                            <span className="text-red-400 font-bold">{details.attackHp * count} <span className="text-[9px] text-slate-600">ATK</span></span>
-                            <span className="text-slate-600">&bull;</span>
-                            <span className="text-blue-400 font-bold">{details.defenceHp * count} <span className="text-[9px] text-slate-600">SHLD</span></span>
-                            <span className="text-slate-600">&bull;</span>
-                            <span className="text-emerald-400 font-bold">{(details.carry * count).toLocaleString()} <span className="text-[9px] text-slate-600">CAP</span></span>
-                            <span className="text-slate-600">&bull;</span>
-                            <span className="text-amber-400 font-bold">{details.speed} <span className="text-[9px] text-slate-600">SPD</span></span>
-                          </div>
-                          
-                          {/* Visual progress distribution metric */}
-                          <div className="w-full bg-slate-950 h-1 rounded-full mt-2.5 overflow-hidden border border-white/5">
+                    return (
+                      <div 
+                        key={tId}
+                        className="p-4 border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-white/10 transition"
+                      >
+                        <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                          {details.image ? (
                             <div 
-                              className={`h-full rounded-full transition-all duration-1000 ${
-                                tId === 'defender' ? 'bg-blue-500' :
-                                tId === 'attacker' ? 'bg-red-500' :
-                                tId === 'tank' ? 'bg-amber-500' :
-                                tId === 'looter' ? 'bg-emerald-500' :
-                                tId === 'drone' ? 'bg-purple-500' : 'bg-teal-500'
-                              }`}
-                              style={{ width: `${percentageOfOverall}%` }}
-                            />
+                              onClick={() => {
+                                setActiveImageZoom(details.image);
+                                setActiveImageZoomTitle(details.name);
+                              }}
+                              className="relative w-12 h-12 rounded-xl border border-[#1E293B] overflow-hidden shrink-0 bg-[#05070a]/90 cursor-pointer hover:border-cyan-500/40" 
+                              title={`Click to expand full resolution ${details.name}`}
+                            >
+                              <img 
+                                src={details.image} 
+                                alt={details.name} 
+                                className="w-full h-full object-cover opacity-90 hover:scale-105 transition duration-350"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          ) : (
+                            <div className={`p-3 rounded-xl border border-[#1E293B] shrink-0 ${details.color}`} title={`${details.name}: ${details.desc}. Hover/long press for stats.`}>
+                              <Icon size={18} title={`${details.name}`} />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-white font-mono">{details.name}</span>
+                              <span className="text-[10px] text-slate-500 font-mono">({percentageOfOverall.toFixed(1)}%)</span>
+                            </div>
+                             <div className="text-[11px] text-slate-450 mt-1 flex items-center gap-3 font-mono flex-wrap">
+                               <span className="text-orange-400 font-bold" title="Total Firepower Attack HP">⚔️ {(details.attackHp * count).toLocaleString()} <span className="text-[9px] text-slate-600">ATK</span></span>
+                               <span className="text-slate-600">&bull;</span>
+                               <span className="text-blue-400 font-bold" title="Total Defensive HP / Shields">🛡️ {(details.defenceHp * count).toLocaleString()} <span className="text-[9px] text-slate-600">DEF</span></span>
+                               <span className="text-slate-600">&bull;</span>
+                               <span className="text-emerald-400 font-bold" title="Total Cargo capacity">📦 {(details.carry * count).toLocaleString()} <span className="text-[9px] text-slate-600">CAP</span></span>
+                             </div>
+                            
+                            {/* Visual progress distribution metric */}
+                            <div className="w-full bg-slate-950 h-1 rounded-full mt-2.5 overflow-hidden border border-white/5">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-1000 ${
+                                  tId === 'defender' ? 'bg-blue-500' :
+                                  tId === 'attacker' ? 'bg-red-500' :
+                                  tId === 'tank' ? 'bg-amber-500' :
+                                  tId === 'looter' ? 'bg-emerald-500' :
+                                  tId === 'drone' ? 'bg-purple-500' : 'bg-teal-500'
+                                }`}
+                                style={{ width: `${percentageOfOverall}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-4 justify-between sm:justify-end shrink-0">
-                        <div className="text-right font-mono">
-                          <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-bold">In Space Force</div>
-                          <div className="text-base font-bold text-cyan-400 mt-0.5">{count.toLocaleString()}</div>
+                        <div className="flex items-center gap-4 justify-between sm:justify-end shrink-0">
+                          <div className="text-right font-mono">
+                            <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-bold">In Space Force</div>
+                            <div className="text-base font-bold text-cyan-400 mt-0.5">{count.toLocaleString()}</div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSubTab('fabricate');
+                              setQuantities(p => ({ ...p, [tId]: Math.max(1, p[tId] || 1) }));
+                            }}
+                            className="px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/25 hover:border-cyan-500/40 text-cyan-400 text-[10px] font-bold uppercase tracking-wider font-mono rounded-lg transition"
+                          >
+                            Build
+                          </button>
                         </div>
-                        <button
-                          onClick={() => {
-                            setSubTab('fabricate');
-                            setQuantities(p => ({ ...p, [tId]: Math.max(1, p[tId] || 1) }));
-                          }}
-                          className="px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/25 hover:border-cyan-500/40 text-cyan-400 text-[10px] font-bold uppercase tracking-wider font-mono rounded-lg transition"
-                        >
-                          Build
-                        </button>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )
             )}
           </div>
         </div>
@@ -428,12 +576,12 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
               className="w-full p-4 flex items-center justify-between text-left transition hover:bg-white/[0.02] cursor-pointer"
             >
               <div className="flex items-center gap-3.5">
-                <div className="p-2.5 rounded-xl border border-cyan-500/25 bg-cyan-950/40 text-cyan-400 shadow-inner" title="Orbital Build Queue status indicator">
+                <div className="p-2.5 rounded-xl border border-cyan-500/25 bg-cyan-950/40 text-cyan-400 shadow-inner" title="Station Build Queue status indicator">
                   <Clock size={18} className={activePlanet.trainingQueue.length > 0 ? "animate-pulse" : ""} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-white text-base font-mono">Orbital Build Queue</span>
+                    <span className="font-bold text-white text-base font-mono">Station Build Queue</span>
                     <span className="text-[10px] text-slate-500 font-mono uppercase bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
                       ({activePlanet.trainingQueue.length} Batches)
                     </span>
@@ -525,21 +673,59 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
             )}
           </div>
 
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 font-mono">Build Tactical Forces</h3>
+          <button
+            onClick={() => setShowBuildForces(!showBuildForces)}
+            className="w-full flex items-center justify-between gap-3 mb-2 border-b border-[#1E293B]/60 pb-2 text-left hover:text-white transition duration-150 cursor-pointer"
+            type="button"
+          >
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#5bc0be] font-mono flex items-center gap-2">
+              Build Tactical Forces
+              {showBuildForces ? (
+                <ChevronUp size={12} className="text-red-500 inline" />
+              ) : (
+                <ChevronDown size={12} className="text-emerald-500 inline" />
+              )}
+            </h3>
+          </button>
 
-          <div className="grid grid-cols-1 gap-5">
-            {(Object.entries(TROOP_DETAILS) as [string, any][]).map(([tId, details]) => {
-              const Icon = details.icon;
-              const currentCount = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
-              const isInfoActive = activeTroopInfo === tId;
-              const qty = quantities[tId] || 1;
+          {showBuildForces && (
+            <div className="grid grid-cols-1 gap-5">
+              {(Object.entries(TROOP_DETAILS) as [string, any][]).map(([tId, details]) => {
+                const Icon = details.icon;
+                const currentCount = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
+                const isInfoActive = activeTroopInfo === tId;
+                const qty = quantities[tId] || 1;
 
-              return (
-                <div 
-                  key={tId}
-                  className="p-5 border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md flex flex-col gap-4.5 hover:border-white/10 transition duration-150"
-                  id={`troop_card_${tId}`}
-                >
+                return (
+                  <div 
+                    key={tId}
+                    className="p-5 border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md flex flex-col gap-4.5 hover:border-white/10 transition duration-150 overflow-hidden"
+                    id={`troop_card_${tId}`}
+                  >
+                  {/* Aspect-Ratio Rich Troop Image Banner */}
+                  {details.image && (
+                    <div 
+                      onClick={() => {
+                        setActiveImageZoom(details.image);
+                        setActiveImageZoomTitle(details.name);
+                      }}
+                      className="relative h-32 w-full rounded-lg overflow-hidden border border-white/5 bg-[#05070a] -mt-1 -mx-1 mb-2 cursor-pointer group/img"
+                      title="Click to view full-sized spacecraft blueprint"
+                    >
+                      <img 
+                        src={details.image} 
+                        alt={details.name} 
+                        className="w-full h-full object-cover opacity-80 group-hover/img:opacity-100 group-hover/img:scale-102 transition duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0A0F1D] via-transparent to-[#0A0F1D]/30" />
+                      
+                      {/* Interactive scanner lines/scitech corner guides */}
+                      <div className="absolute inset-0 border border-cyan-500/0 group-hover/img:border-cyan-500/20 transition-all duration-300 rounded-lg pointer-events-none" />
+                      <div className="absolute inset-0 bg-cyan-950/5 opacity-0 group-hover/img:opacity-30 transition-all duration-300 pointer-events-none" />
+                    </div>
+                  )}
+
                   {/* Header info */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5">
@@ -553,9 +739,6 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                             SPACE FORCE: {currentCount}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 font-mono mt-1">
-                          Operational Speed: <span className="text-amber-400 font-bold">{details.speed}</span>
-                        </p>
                         <button 
                           onClick={() => setActiveTroopInfo(isInfoActive ? null : tId)}
                           className="text-xs text-cyan-400 underline text-left cursor-pointer hover:text-cyan-300 block mt-1"
@@ -576,32 +759,70 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                   {/* Optional expanded spec panel */}
                   {isInfoActive && (() => {
                     const waterVal = 
-                      tId === 'defender' ? 0.5 :
-                      tId === 'attacker' ? 1.0 :
-                      tId === 'tank' ? 2.0 :
-                      tId === 'looter' ? 1.5 :
-                      tId === 'drone' ? 0.2 :
-                      2.5; // settlementShip is 2.5
+                      tId === 'defender' ? 0.05 :
+                      tId === 'attacker' ? 0.1 :
+                      tId === 'tank' ? 0.2 :
+                      tId === 'looter' ? 0.15 :
+                      tId === 'drone' ? 0.02 :
+                      0.25; // settlementShip is 0.25
 
                     return (
                       <div className="p-4 rounded-xl border border-[#1E293B] bg-[#05070A] text-xs space-y-2.5 font-mono">
                         <p className="text-slate-400 font-sans leading-relaxed text-[11px] mb-3">{details.desc}</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
-                          <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
-                            <span className="text-slate-500">Attack Rating:</span>
-                            <span className="text-red-400 font-bold">{details.attackHp} HP</span>
-                          </div>
-                          <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
-                            <span className="text-slate-500">Shield Defense:</span>
+                          <div className="flex items-center justify-between border-b border-white/5 pb-1.5 col-span-1 sm:col-span-2">
+                            <span className="text-slate-500">Structural HP / Shields:</span>
                             <span className="text-blue-400 font-bold">{details.defenceHp} HP</span>
                           </div>
-                          <div className="flex items-center justify-between border-b border-white/5 pb-1.5 font-sans sm:font-mono font-bold">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-1.5 col-span-1 sm:col-span-2">
+                            <span className="text-slate-500">Strike Firepower / Attack HP:</span>
+                            <span className="text-orange-400 font-bold">{details.attackHp} HP</span>
+                          </div>
+                          <div className="flex items-center justify-between border-b border-white/5 pb-1.5 font-sans sm:font-mono font-bold col-span-1 sm:col-span-2">
                             <span className="text-slate-500">Loot Capacity:</span>
                             <span className="text-emerald-400 font-bold">{details.carry.toLocaleString()} cargo</span>
                           </div>
-                          <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
-                            <span className="text-slate-500">Speed Rating:</span>
-                            <span className="text-yellow-400">{details.speed}</span>
+                          <div className="flex items-center justify-between border-b border-white/5 pb-1.5 font-sans sm:font-mono font-bold col-span-1 sm:col-span-2">
+                            <span className="text-slate-500">Assembly Duration:</span>
+                            {(() => {
+                              const baseTimes: Record<string, number> = { defender: 30, attacker: 20, tank: 60, looter: 40, drone: 15, settlementShip: 120 };
+                              const baseSecs = baseTimes[tId] || 30;
+                              const rcLevel = activePlanet.buildings.researchCenter.level;
+                              const reductionFrac = Math.min(0.7, 0.7 * (rcLevel / 20));
+                              const buildSecs = Math.max(1, Math.round(baseSecs * (1 - reductionFrac)));
+                              return (
+                                <span className="text-cyan-400 font-bold">
+                                  {buildSecs}s <span className="text-slate-500 text-[10px] font-normal font-sans">(Base: {baseSecs}s)</span>
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* Unit construction cost per ship */}
+                        <div className="border-t border-white/5 pt-2.5 mt-2">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block text-left">Unit Construction Cost:</span>
+                          <div className="grid grid-cols-5 gap-1.5 text-center text-[10px]">
+                            <div className={`py-1.5 px-1 rounded flex flex-col items-center justify-center border font-bold ${details.costs.water > 0 ? 'text-cyan-400 border-cyan-500/15 bg-cyan-500/5' : 'text-slate-600 border-white/5 opacity-50'}`}>
+                              <Droplet size={10} className="mb-0.5" />
+                              <span>{details.costs.water}</span>
+                            </div>
+                            <div className={`py-1.5 px-1 rounded flex flex-col items-center justify-center border font-bold ${details.costs.plasma > 0 ? 'text-purple-400 border-purple-500/15 bg-purple-500/5' : 'text-slate-600 border-white/5 opacity-50'}`}>
+                              <Zap size={10} className="mb-0.5" />
+                              <span>{details.costs.plasma}</span>
+                            </div>
+                            <div className={`py-1.5 px-1 rounded flex flex-col items-center justify-center border font-bold ${details.costs.fuel > 0 ? 'text-amber-500 border-amber-500/15 bg-amber-500/5' : 'text-slate-600 border-white/5 opacity-50'}`}>
+                              <Flame size={10} className="mb-0.5" />
+                              <span>{details.costs.fuel}</span>
+                            </div>
+                            <div className={`py-1.5 px-1 rounded flex flex-col items-center justify-center border font-bold ${details.costs.food > 0 ? 'text-emerald-400 border-emerald-500/15 bg-emerald-500/5' : 'text-slate-600 border-white/5 opacity-50'}`}>
+                              <Apple size={10} className="mb-0.5" />
+                              <span>{details.costs.food}</span>
+                            </div>
+                            <div className={`py-1.5 px-1 rounded flex flex-col items-center justify-center border font-bold ${details.costs.respirant > 0 ? 'text-blue-400 border-blue-500/15 bg-blue-500/5' : 'text-slate-600 border-white/5 opacity-50'}`}>
+                              <Wind size={10} className="mb-0.5" />
+                              <span>{details.costs.respirant}</span>
+                            </div>
                           </div>
                         </div>
 
@@ -671,33 +892,6 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                       </div>
                     );
                   })()}
-
-                  {/* Costs grid */}
-                  <div className="p-3 bg-[#05070A] rounded-xl border border-[#1E293B]">
-                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2 font-mono">Cost per Unit:</div>
-                    <div className="grid grid-cols-5 gap-1.5 text-xs text-center font-mono">
-                      <div className={`p-2 flex flex-col items-center justify-center rounded-xl border ${details.costs.water > 0 ? 'text-cyan-400 border-cyan-500/20 bg-cyan-500/5' : 'text-slate-600 border-white/5'}`} title={`Water input cost: ${details.costs.water} units`}>
-                        <Droplet size={11} className="mb-1" title="Water icon indicator" />
-                        <span className="text-[10px]">{details.costs.water}</span>
-                      </div>
-                      <div className={`p-2 flex flex-col items-center justify-center rounded-xl border ${details.costs.plasma > 0 ? 'text-purple-400 border-purple-500/20 bg-purple-500/5' : 'text-slate-600 border-white/5'}`} title={`Plasma input cost: ${details.costs.plasma} units`}>
-                        <Zap size={11} className="mb-1" title="Plasma energy icon indicator" />
-                        <span className="text-[10px]">{details.costs.plasma}</span>
-                      </div>
-                      <div className={`p-2 flex flex-col items-center justify-center rounded-xl border ${details.costs.fuel > 0 ? 'text-amber-400 border-amber-500/20 bg-amber-500/5' : 'text-slate-600 border-white/5'}`} title={`Fuel input cost: ${details.costs.fuel} units`}>
-                        <Flame size={11} className="mb-1" title="Thermonuclear fuel icon indicator" />
-                        <span className="text-[10px]">{details.costs.fuel}</span>
-                      </div>
-                      <div className={`p-2 flex flex-col items-center justify-center rounded-xl border ${details.costs.food > 0 ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5' : 'text-slate-600 border-white/5'}`} title={`Food input cost: ${details.costs.food} units`}>
-                        <Apple size={11} className="mb-1" title="Synthesized food proteins icon indicator" />
-                        <span className="text-[10px]">{details.costs.food}</span>
-                      </div>
-                      <div className={`p-2 flex flex-col items-center justify-center rounded-xl border ${details.costs.respirant > 0 ? 'text-blue-400 border-blue-500/20 bg-blue-500/5' : 'text-slate-600 border-white/5'}`} title={`Respirant input cost: ${details.costs.respirant} units`}>
-                        <Wind size={11} className="mb-1" title="O2 Atmosphere atmospheric respirant icon indicator" />
-                        <span className="text-[10px]">{details.costs.respirant}</span>
-                      </div>
-                    </div>
-                  </div>
 
                   {/* ACTIVE TRAINING QUEUE PROGRESS WITH EXACT REMAINING SECONDS REMOVED TO CONCENTRATE IN UPPER COMPONENT */}
 
@@ -774,6 +968,266 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
               );
             })}
           </div>
+          )}
+        </div>
+      )}
+
+      {/* SUB-VIEW 3: FLEET COMMAND VIEW */}
+      {subTab === 'fleet' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Main Title Banner */}
+          <div className="p-5 bg-gradient-to-r from-emerald-950/20 to-teal-950/20 border border-emerald-500/20 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="space-y-1 text-left">
+              <span className="text-[10px] font-black tracking-widest text-emerald-400 uppercase font-mono">DOCK BAY DISPATCH TERMINAL</span>
+              <h2 className="text-lg font-bold text-white tracking-tight">Active Duty Space Fleet Deployments</h2>
+              <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
+                Coordinate galactic missions directly from the safety of the War Room. Launch fast reconnaissance, territorial attacks, or settle new habitable worlds scan grids.
+              </p>
+            </div>
+            {/* Quick status counters */}
+            <div className="flex gap-4 font-mono shrink-0">
+              <div className="p-3 bg-slate-950/60 border border-slate-900 rounded-xl text-center">
+                <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">Active Fleets</span>
+                <span className="text-xl font-black text-emerald-400">
+                  {fleets.filter(f => f.senderId === player.id).length}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-950/60 border border-slate-900 rounded-xl text-center">
+                <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">Incoming Threats</span>
+                <span className="text-xl font-black text-red-400 animate-pulse">
+                  {fleets.filter(f => f.targetId === player.id && f.missionType === "attack" && !f.isReturning && f.arrivesAt > serverTime).length}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Deploy New Fleet Form Box */}
+            <div className="lg:col-span-12 xl:col-span-5 p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-2xl space-y-4 text-left">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] border-b border-[#1E293B]/60 pb-2 flex items-center justify-between">
+                <span>⚡ DEPLOY NEW EXPEDITION FLEET</span>
+                <span className="text-[9px] font-mono text-slate-500">Grid origin [{activePlanet.sectorX}, {activePlanet.sectorY}]</span>
+              </h3>
+
+              {/* Form implementation */}
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleLaunchFleet();
+              }} className="space-y-4">
+                
+                {/* Coordinates inputs */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Target Sectors Coordinates</label>
+                  <div className="grid grid-cols-2 gap-3 font-mono">
+                    <div>
+                      <span className="text-[9px] text-slate-500 block mb-1">GRID ALPHA (X Axis)</span>
+                      <input 
+                        type="number"
+                        min={0}
+                        max={100}
+                        required
+                        value={targetX}
+                        onChange={(e) => setTargetX(parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] focus:border-emerald-500 text-xs text-white font-extrabold focus:outline-none rounded-xl"
+                        placeholder="X: e.g. 15"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-slate-500 block mb-1">GRID BETA (Y Axis)</span>
+                      <input 
+                        type="number"
+                        min={0}
+                        max={100}
+                        required
+                        value={targetY}
+                        onChange={(e) => setTargetY(parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] focus:border-emerald-500 text-xs text-white font-extrabold focus:outline-none rounded-xl"
+                        placeholder="Y: e.g. 42"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mission Type selector */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Fleet Flight Directive Mission</label>
+                  <select
+                    value={missionType}
+                    onChange={(e) => setMissionType(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] focus:border-emerald-500 text-xs text-slate-200 font-mono rounded-xl focus:outline-none cursor-pointer"
+                  >
+                    <option value="move">🛸 MOVE (Deploy Squadrons permanently to your own outpost coordinates)</option>
+                    <option value="attack">⚔️ ATTACK (Interplanetary Siege Strike Sweep)</option>
+                    <option value="colonize">🚀 COLONIZE (Establish Settlement Colony Core)</option>
+                  </select>
+                </div>
+
+                {/* Target Building (if Attack) */}
+                {missionType === 'attack' && (
+                  <div className="space-y-1.5 font-mono">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Tactical Target Demolition Focus</label>
+                    <select
+                      value={targetBuilding}
+                      onChange={(e) => setTargetBuilding(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] focus:border-red-500 text-xs text-slate-200 rounded-xl focus:outline-none cursor-pointer"
+                    >
+                      <option value="random">⚡ RANDOM SECTOR COMPLEX (Collateral Overload)</option>
+                      <option value="commsHub">📡 COMMUNICATIONS HUB (Disable External Comms)</option>
+                      <option value="researchCenter">🧪 RESEARCH CENTER (Eradicate Lab Progression)</option>
+                      <option value="armyBase">🛡️ WAR ROOM (Reduce Troop Garrisons Building Capacity)</option>
+                      <option value="repository">🗄️ REPOSITORY (Rupture Resource Chest Vaults)</option>
+                      <option value="radar">🛰️ RADAR ARRAY (Blind Command Sensor Scans)</option>
+                      <option value="supplyNexus">🌌 SUPPLY NEXUS (Clog Resource Dispenser Portals)</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Allocated Troops layout list */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Allocate Ships inside Fleet Cargo</label>
+                  <div className="space-y-2 max-h-52 overflow-y-auto pr-1 bg-slate-950/20 p-2.5 border border-[#1E293B]/40 rounded-xl font-mono text-[10px]">
+                    {Object.keys(TROOP_NAME_MAPPING).map((tId) => {
+                      const avail = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
+                      return (
+                        <div key={tId} className="flex items-center justify-between border-b border-slate-900/40 pb-1.5 last:border-0 last:pb-0">
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-205 text-slate-200 block">{TROOP_NAME_MAPPING[tId]}</span>
+                            <span className="text-[8.5px] text-slate-500 font-bold">Available count: <strong className="text-cyan-400 font-extrabold">{avail}</strong></span>
+                          </div>
+                          
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: 0 }))}
+                              className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700/80 text-[8px] rounded font-bold"
+                            >
+                              Min
+                            </button>
+                            <input 
+                              type="number"
+                              min={0}
+                              max={avail}
+                              value={fleetTroops[tId] || 0}
+                              onChange={(e) => {
+                                const val = Math.min(avail, Math.max(0, parseInt(e.target.value) || 0));
+                                setFleetTroops(prev => ({ ...prev, [tId]: val }));
+                              }}
+                              className="w-12 text-center bg-slate-950 border border-slate-800 text-[10px] text-white focus:outline-none focus:border-cyan-500 font-bold p-0.5 rounded"
+                            />
+                            <button
+                              type="button"
+                              disabled={avail === 0}
+                              onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: avail }))}
+                              className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700/80 text-[8px] rounded deactivated:opacity-20 font-bold"
+                            >
+                              Max
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Dispatch Button */}
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono text-xs font-bold uppercase tracking-widest rounded-xl transition duration-150 cursor-pointer shadow-md leading-none flex items-center justify-center gap-2"
+                >
+                  <Rocket size={13} className="animate-pulse" />
+                  <span>DISPATCH EXPEDITIONARY FLEET</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Tracking Active Missions Sidebar Panel */}
+            <div className="lg:col-span-12 xl:col-span-7 p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-2xl flex flex-col justify-start">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] border-b border-[#1E293B]/60 pb-2 mb-4 flex items-center gap-2">
+                <Rocket size={14} className="text-emerald-500" /> Real-Time Fleets Under Traveling Mission orders
+              </h3>
+
+              {/* Active list */}
+              {fleets && fleets.filter(f => f.senderId === player.id || f.targetId === player.id).length > 0 ? (
+                <div className="space-y-3.5 max-h-[450px] overflow-y-auto pr-1">
+                  {fleets.filter(f => f.senderId === player.id || f.targetId === player.id).map((fleet) => {
+                    const isOutgoing = fleet.senderId === player.id;
+                    const isThreat = !isOutgoing && fleet.missionType === 'attack';
+                    const diffTime = Math.max(0, fleet.arrivesAt - serverTime);
+                    const arrivesString = diffTime > 0 
+                      ? `Arrives in ${Math.round(diffTime / 1000)}s` 
+                      : (fleet.isWaitingToSettle ? "WAITING FOR SETTLE" : "Arrived / Resolving");
+
+                    return (
+                      <div 
+                        key={fleet.id} 
+                        className={`p-3.5 border rounded-xl font-mono text-[11px] leading-relaxed relative ${
+                          isThreat 
+                            ? "bg-red-950/20 border-red-500/30 text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.08)]" 
+                            : isOutgoing 
+                              ? "bg-cyan-950/20 border-cyan-500/25 text-cyan-300" 
+                              : "bg-slate-900/50 border-slate-800 text-slate-400"
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center font-bold uppercase text-[10px] tracking-wide mb-1.5 pb-1 border-b border-white/5 gap-2">
+                          <span className="flex items-center flex-wrap gap-1.5">
+                            <span>{isOutgoing ? "🛰️ OUTGOING FLEET" : "🚨 HOSTILE DETECTED"}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${
+                              fleet.missionType === 'attack' ? 'bg-red-500 text-slate-950' :
+                              fleet.missionType === 'colonize' ? 'bg-teal-500 text-slate-950' :
+                              'bg-amber-500 text-slate-950'
+                            }`}>
+                              {fleet.missionType.toUpperCase()}
+                            </span>
+                          </span>
+                          <span className={`${isThreat ? "text-red-400 animate-pulse font-extrabold" : "text-emerald-400"} shrink-0`}>
+                            {arrivesString}
+                          </span>
+                        </div>
+
+                        <p className="mb-1 text-slate-300 break-words leading-normal select-text">
+                          <strong>Comdr:</strong> {fleet.senderName} ({fleet.senderCoords.x}, {fleet.senderCoords.y}) &rarr; <strong>Target:</strong> {fleet.targetName} ({fleet.targetCoords.x}, {fleet.targetCoords.y})
+                        </p>
+
+                        <div className="mt-2 text-[9px] text-slate-400 bg-black/30 p-2 rounded-lg border border-slate-900/60 leading-normal">
+                          <strong className="block mb-1 text-[8.5px] uppercase tracking-wider text-slate-500">Payload Crew Complement</strong>
+                          <span>{Object.entries(fleet.troops).filter(([_, qty]) => Number(qty) > 0).map(([k, v]) => `${v} ${TROOP_NAME_MAPPING[k] || k}`).join(', ')}</span>
+                          {fleet.lootCarried && Object.values(fleet.lootCarried).some(v => Number(v) > 0) && (
+                            <span className="block mt-1 text-emerald-400">
+                              Loot: {Object.entries(fleet.lootCarried).map(([k, v]) => `${(v || 0).toLocaleString()} ${k}`).join(', ')}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* If Settle button is authorized */}
+                        {isOutgoing && fleet.isWaitingToSettle && (
+                          <div className="mt-2.5">
+                            <span className="text-[10px] text-teal-400 font-extrabold animate-pulse block mb-1.5">★ HABITABLE COORDINATES CAPTURED & READY CORING!</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (onSettle) {
+                                  onSettle(fleet.id);
+                                }
+                              }}
+                              className="px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-mono font-bold text-[9px] rounded-lg tracking-widest cursor-pointer leading-none"
+                            >
+                              🚀 INITIATE HABITATION COLONIAL CORING
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-slate-900 rounded-xl text-slate-500 min-h-[220px]">
+                  <Rocket size={24} className="text-slate-600 mb-2" />
+                  <p className="text-xs uppercase tracking-wider font-bold text-slate-400">Launch Control Secure</p>
+                  <p className="text-[10px] text-slate-600 font-sans mt-1 leading-normal max-w-sm">No fleets are traveling. Initiate coordinate trajectories in the Dock Bay form.</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -794,164 +1248,313 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
               </button>
             </div>
 
+            {/* Save/All custom bookmark filter category bar */}
+            <div className="flex gap-2 pb-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setSavedCombatLogsFilter(false)}
+                className={`flex-1 py-1.5 px-3 font-bold rounded-lg transition-colors border cursor-pointer ${!savedCombatLogsFilter ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/45 shadow-[0_0_10px_rgba(34,211,238,0.15)]' : 'bg-[#05070A] text-slate-400 border-[#1E293B] hover:text-slate-200'}`}
+              >
+                📝 ALL SHIFT REPORTS ({battleReports.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSavedCombatLogsFilter(true)}
+                className={`flex-1 py-1.5 px-3 font-bold rounded-lg transition-colors border cursor-pointer ${savedCombatLogsFilter ? 'bg-amber-500/20 text-amber-300 border-amber-500/45 shadow-[0_0_10px_rgba(245,158,11,0.15)]' : 'bg-[#05070A] text-slate-400 border-[#1E293B] hover:text-slate-200'}`}
+              >
+                ⭐ SAVED TARGETS ({battleReports.filter(r => savedReports[r.id]).length})
+              </button>
+            </div>
+
             <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-              {battleReports.length === 0 ? (
-                <div className="py-12 text-center rounded-xl border border-dashed border-[#1E293B]">
-                  <p className="text-xs text-slate-500">No military engagements logged in this session.</p>
-                </div>
-              ) : (
-                battleReports.map((report) => {
+              {(() => {
+                const filteredReports = savedCombatLogsFilter 
+                  ? battleReports.filter(r => savedReports[r.id]) 
+                  : battleReports;
+
+                if (filteredReports.length === 0) {
+                  return (
+                    <div className="py-12 text-center rounded-xl border border-dashed border-[#1E293B]">
+                      <p className="text-xs text-slate-500">
+                        {savedCombatLogsFilter ? "No saved reports match your parameters." : "No military engagements logged in this session."}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return filteredReports.map((report) => {
                   const isPlayerAttacker = report.attackerId === player.id;
                   const isPlayerDefender = report.defenderId === player.id;
                   const outcomeText = report.winner === 'attacker' 
                     ? (isPlayerAttacker ? 'VICTORY' : 'DEFEAT') 
                     : (isPlayerDefender ? 'VICTORY' : 'DEFEAT');
 
+                  const isExpanded = expandedReports[report.id] || false;
+                  const isSaved = savedReports[report.id] || false;
+                  const isRead = readReports[report.id] || false;
+
+                  const isSeen = seenReports[report.id] || false;
+                  let cardStyle = "border-[#1E293B] bg-[#05070A]";
+                  if (!isSeen) {
+                    cardStyle = "border-red-500/40 bg-[#1A0909]/80 shadow-[0_0_15px_rgba(239,68,68,0.1)]";
+                  } else if (!isRead) {
+                    cardStyle = "border-cyan-500/30 bg-[#061021]/60";
+                  }
+
+                  const calculateInitialStats = (troops: Record<string, number> | undefined) => {
+                    if (!troops) return { hp: 0, atk: 0 };
+                    const mDef: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
+                    const mAtk: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
+                    const hp = Object.entries(troops).reduce((sum, [k, v]) => sum + (v || 0) * (mDef[k] || 10), 0);
+                    const atk = Object.entries(troops).reduce((sum, [k, v]) => sum + (v || 0) * (mAtk[k] || 10), 0);
+                    return { hp, atk };
+                  };
+
+                  const attStats = calculateInitialStats(report.attackerInitialTroops);
+                  const defStats = calculateInitialStats(report.defenderInitialTroops);
+
                   return (
-                    <div key={report.id} className="p-4 border border-[#1E293B] bg-[#05070A] rounded-xl space-y-3">
-                      <div className="flex justify-between items-center text-[10px] pb-2 border-b border-white/5">
-                        <span className="text-slate-500">{new Date(report.timestamp).toLocaleString()}</span>
-                        <span className={`font-black tracking-widest px-2 py-0.5 rounded ${
-                          outcomeText === 'VICTORY' 
-                            ? 'text-cyan-400 bg-cyan-950/20' 
-                            : 'text-red-400 bg-red-950/20'
-                        }`}>
-                          {outcomeText}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 text-[11px] leading-relaxed">
-                        <div>
-                          <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide">ATTACKER FLT: {report.attackerName}</p>
-                          <p className="text-slate-500 text-[10px] mt-0.5">Origin: [{report.attackerCoords.x}, {report.attackerCoords.y}]</p>
-                          <div className="mt-2 space-y-0.5">
-                            <p className="text-[10px] text-slate-400 font-bold uppercase">Attacker Force:</p>
-                            <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1">
-                              {Object.entries(report.attackerInitialTroops).map(([type, qty]) => {
-                                if (!qty) return null;
-                                return (
-                                  <span key={type} className="bg-red-950/20 px-1 py-0.2 rounded border border-red-900/20 text-red-300">
-                                    {(TROOP_NAME_MAPPING[type] || type)}: {qty} (loss: {report.attackerLosses[type] || 0})
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          </div>
+                    <div key={report.id} className={`p-4 border rounded-xl space-y-3 transition-colors ${cardStyle}`}>
+                      <div 
+                        onClick={() => {
+                          const nextExpanded = !isExpanded;
+                          setExpandedReports(prev => ({ ...prev, [report.id]: nextExpanded }));
+                          if (nextExpanded) {
+                            markReportSeen(report.id);
+                            if (onMarkRead) {
+                              onMarkRead(report.id);
+                            }
+                          }
+                        }}
+                        className="flex justify-between items-center text-[10px] pb-2 border-b border-white/5 cursor-pointer hover:bg-[#1E293B]/20 p-1 rounded-lg transition"
+                      >
+                        <div className="flex flex-col gap-0.5 text-left flex-1 min-w-0 pr-2">
+                          <span className="text-slate-200 font-bold font-mono text-[11px] flex items-center gap-1.5 flex-wrap">
+                            {/* Visual unread bullet indicators */}
+                            {!isSeen ? (
+                              <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-505 bg-red-500 animate-pulse shrink-0 shadow-[0_0_8px_#ef4444]" title="New Unseen Report" />
+                            ) : !isRead ? (
+                              <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0 shadow-[0_0_6px_#22d3ee]" title="Unread Report" />
+                            ) : null}
+                            ⚔️ {isPlayerAttacker ? 'Attacked' : 'Defended against'} {isPlayerAttacker ? report.defenderName : report.attackerName}
+                          </span>
+                          <span className="text-slate-500 font-mono text-[9px]">{new Date(report.timestamp).toLocaleString()} {isSaved && <span className="text-amber-400 font-bold ml-1">★ SAVED</span>}</span>
                         </div>
-                        <div>
-                          <p className="font-bold text-cyan-00 text-cyan-400 uppercase tracking-wide">STATION FORCE: {report.defenderName}</p>
-                          <p className="text-slate-500 text-[10px] mt-0.5">Target: [{report.defenderCoords.x}, {report.defenderCoords.y}]</p>
-                          <div className="mt-2 space-y-0.5">
-                            <p className="text-[10px] text-slate-400 font-bold uppercase">Defender Garrison:</p>
-                            <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1">
-                              {Object.entries(report.defenderInitialTroops).map(([type, qty]) => {
-                                if (!qty) return null;
-                                return (
-                                  <span key={type} className="bg-cyan-950/15 px-1 py-0.2 rounded border border-cyan-900/20 text-cyan-300">
-                                    {(TROOP_NAME_MAPPING[type] || type)}: {qty} (loss: {report.defenderLosses[type] || 0})
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`font-black tracking-widest px-2 py-0.5 rounded text-[9px] ${
+                            outcomeText === 'VICTORY' 
+                              ? 'text-cyan-400 bg-cyan-950/20' 
+                              : 'text-red-400 bg-red-950/20'
+                          }`}>
+                            {outcomeText}
+                          </span>
+                          <span className="text-[9px] text-[#22D3EE] font-extrabold uppercase border border-cyan-500/25 px-1.5 py-0.5 rounded">
+                            {isExpanded ? 'Collapse' : 'Expand'}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Points & Raid Score block */}
-                      {(() => {
-                        const raidScore = Object.values(report.resourcesStolen || {}).reduce((s: number, v: any) => s + (v || 0), 0);
-                        return (
-                          <div className="p-3 bg-amber-950/10 border border-amber-500/20 rounded-xl space-y-1.5 font-mono text-[10.5px]">
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">Raid Score (Resources Stolen):</span>
-                              <span className="font-bold text-emerald-400 font-mono">+{raidScore.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between border-t border-[#1E293B]/60 pt-1.5">
-                              <span className="text-slate-400">Attack Points earned (defense force destroyed):</span>
-                              <span className="font-bold font-mono text-red-400">+{report.winner === 'attacker' ? (report.defenceHpKilled || 0).toLocaleString() : 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">Defense Points earned (attacker fleet destroyed):</span>
-                              <span className="font-bold font-mono text-cyan-400">+{report.winner === 'defender' ? (report.attackHpKilled || 0).toLocaleString() : 0}</span>
-                            </div>
-                          </div>
-                        );
-                      })()}
+                      {/* Interactive bookmark and forwarding control panel */}
+                      <div className="flex flex-wrap items-center justify-between text-[10.5px] border-b border-white/5 pb-2 text-slate-400 gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onToggleSave) onToggleSave(report.id);
+                            }}
+                            className={`flex items-center gap-1 px-2 py-1 rounded transition border cursor-pointer text-[10px] ${isSaved ? 'text-amber-300 bg-amber-500/10 border-amber-500/30' : 'text-slate-400 border-white/5 hover:bg-white/5 hover:text-slate-200'}`}
+                          >
+                            <span>{isSaved ? '★ Saved' : '☆ Save Report'}</span>
+                          </button>
 
-                      {/* Resources stolen details */}
-                      {report.winner === 'attacker' && (
-                        <div className="p-3 bg-emerald-950/5 border border-emerald-900/20 text-emerald-305 text-emerald-400 rounded-lg">
-                          <p className="font-bold text-[10px] text-emerald-400 uppercase tracking-wider mb-2">LOOT SALVAGED (CARGO CORES):</p>
-                          <div className="grid grid-cols-5 gap-1.5 text-center font-bold text-[9px] text-emerald-450">
-                            <div className="bg-[#05070A] p-1 rounded border border-white/5">W: {report.resourcesStolen.water.toLocaleString()}</div>
-                            <div className="bg-[#05070A] p-1 rounded border border-white/5">P: {report.resourcesStolen.plasma.toLocaleString()}</div>
-                            <div className="bg-[#05070A] p-1 rounded border border-white/5">F: {report.resourcesStolen.fuel.toLocaleString()}</div>
-                            <div className="bg-[#05070A] p-1 rounded border border-white/5">Fd: {report.resourcesStolen.food.toLocaleString()}</div>
-                            <div className="bg-[#05070A] p-1 rounded border border-white/5">R: {report.resourcesStolen.respirant.toLocaleString()}</div>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isRead) {
+                                if (onMarkUnread) onMarkUnread(report.id);
+                              } else {
+                                markReportSeen(report.id);
+                                if (onMarkRead) onMarkRead(report.id);
+                              }
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 rounded border border-white/5 bg-slate-900/60 hover:text-white transition cursor-pointer text-[10px] text-slate-400"
+                          >
+                            <span>{isRead ? '✉ Mark Unread' : '✉ Mark Read'}</span>
+                          </button>
                         </div>
-                      )}
 
-                      {/* Collateral damage report */}
-                      {report.buildingDamage && report.buildingDamage.length > 0 && (
-                        <div className="p-3 bg-red-950/10 border border-red-900/20 text-red-300 rounded-lg">
-                          <p className="font-bold text-[10px] uppercase tracking-wider mb-1.5">BOMBER TANK COLLATERAL DEVASTATION:</p>
-                          <ul className="list-disc pl-4 space-y-1 text-red-300/80 text-[10px]">
-                            {report.buildingDamage.map((dmg, di) => (
-                              <li key={di}>
-                                {dmg.buildingName.toUpperCase()} damaged: Level {dmg.previousLevel} &rarr; {dmg.newLevel}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Interactive Round-by-Round Log Simulation Detail */}
-                      {report.battleRounds && report.battleRounds.length > 0 && (
-                        <div className="mt-3 p-3 bg-slate-950/40 border border-[#1E293B] rounded-lg">
-                          <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-2">
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-[#94A3B8] font-mono">TACTICAL COMBAT LOGS ({report.battleRounds.length} Rounds)</span>
+                        {/* Forward buttons */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-500 text-[9.5px]">Forward:</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onForwardReport) onForwardReport(report, 'global');
+                            }}
+                            className="px-2 py-0.5 rounded bg-slate-900 border border-white/10 hover:bg-slate-800 text-[9.5px] font-bold text-slate-300 transition cursor-pointer"
+                          >
+                            Global
+                          </button>
+                          {player.allianceId && (
                             <button
-                              onClick={() => {
-                                setExpandedReportRounds(prev => ({
-                                  ...prev,
-                                  [report.id]: prev[report.id] !== undefined ? undefined : 0
-                                }));
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onForwardReport) onForwardReport(report, 'alliance');
                               }}
-                              className="text-[9px] text-[#22D3EE] font-extrabold hover:text-white uppercase transition duration-150 border border-cyan-500/25 px-2 py-0.5 rounded cursor-pointer"
+                              className="px-2 py-0.5 rounded bg-cyan-950/40 border border-cyan-800/30 hover:bg-cyan-900/40 text-[9.5px] font-bold text-cyan-300 transition cursor-pointer"
                             >
-                              {expandedReportRounds[report.id] !== undefined ? 'Hide Rounds' : 'View Rounds'}
+                              Alliance
                             </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="space-y-3 animate-fade-in text-left">
+                          <div className="grid grid-cols-2 gap-4 text-[11px] leading-relaxed">
+                            <div>
+                              <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide">ATTACKER: {report.attackerName}</p>
+                              <p className="text-slate-500 text-[10px] mt-0.5">Origin: [{report.attackerCoords.x}, {report.attackerCoords.y}]</p>
+                              <div className="mt-2 space-y-1">
+                                <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
+                                  <div>Attacker HP (Defense Shields): <span className="text-red-400 font-mono font-extrabold">{attStats.hp.toLocaleString()}</span></div>
+                                  <div>Attacker Attack HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{attStats.atk.toLocaleString()}</span></div>
+                                </div>
+                                <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
+                                  {Object.entries(report.attackerInitialTroops).map(([type, qty]) => {
+                                    if (!qty) return null;
+                                    return (
+                                      <span key={type} className="bg-red-950/20 px-1 py-0.2 rounded border border-red-900/20 text-red-300">
+                                        {(TROOP_NAME_MAPPING[type] || type)}: {qty} (loss: {report.attackerLosses[type] || 0})
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                            <div>
+                              <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide">STATION: {report.defenderName}</p>
+                              <p className="text-slate-500 text-[10px] mt-0.5">Target: [{report.defenderCoords.x}, {report.defenderCoords.y}]</p>
+                              <div className="mt-2 space-y-1">
+                                <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
+                                  <div>Defender HP (Defense Shields): <span className="text-cyan-400 font-mono font-extrabold">{defStats.hp.toLocaleString()}</span></div>
+                                  <div>Defender Attack HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{defStats.atk.toLocaleString()}</span></div>
+                                </div>
+                                <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
+                                  {Object.entries(report.defenderInitialTroops).map(([type, qty]) => {
+                                    if (!qty) return null;
+                                    return (
+                                      <span key={type} className="bg-cyan-950/15 px-1 py-0.2 rounded border border-cyan-900/20 text-cyan-300">
+                                        {(TROOP_NAME_MAPPING[type] || type)}: {qty} (loss: {report.defenderLosses[type] || 0})
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
                           </div>
 
-                          {expandedReportRounds[report.id] !== undefined && (
-                            <div className="space-y-3 font-mono text-[10px]">
-                              {/* Round selector Tabs */}
-                              <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
-                                {report.battleRounds.map((r, rIdx) => (
-                                  <button
-                                    key={r.round}
-                                    onClick={() => setExpandedReportRounds(prev => ({ ...prev, [report.id]: rIdx }))}
-                                    className={`px-2.5 py-1 rounded text-[9px] font-black uppercase transition duration-150 cursor-pointer ${
-                                      expandedReportRounds[report.id] === rIdx
-                                        ? 'bg-cyan-500 text-slate-950 shadow-[0_0_8px_rgba(34,211,238,0.4)]'
-                                        : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
-                                    }`}
-                                  >
-                                    Rnd {r.round}
-                                  </button>
+                          {/* Points & Raid Score block */}
+                          {(() => {
+                            const raidScore = Object.values(report.resourcesStolen || {}).reduce((s: number, v: any) => s + (v || 0), 0);
+                            return (
+                              <div className="p-3 bg-amber-950/10 border border-amber-500/20 rounded-xl space-y-1.5 font-mono text-[10.5px]">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Raid Score (Resources Stolen):</span>
+                                  <span className="font-bold text-emerald-400 font-mono font-extrabold">+{raidScore.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between border-t border-[#1E293B]/60 pt-1.5">
+                                  <span className="text-slate-400">Attack Points earned (defense force destroyed):</span>
+                                  <span className="font-bold font-mono text-red-400 font-extrabold">+{(report.defenceHpKilled || 0).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Defense Points earned (attacker fleet destroyed):</span>
+                                  <span className="font-bold font-mono text-cyan-400 font-extrabold">+{(report.attackHpKilled || 0).toLocaleString()}</span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Resources stolen details */}
+                          {report.winner === 'attacker' && (
+                            <div className="p-3 bg-emerald-950/5 border border-emerald-900/20 text-emerald-305 text-emerald-400 rounded-lg">
+                              <p className="font-bold text-[10px] text-emerald-400 uppercase tracking-wider mb-2">LOOT SALVAGED (CARGO CORES):</p>
+                              <div className="grid grid-cols-5 gap-1.5 text-center font-bold text-[9px] text-emerald-450">
+                                <div className="bg-[#05070A] p-1 rounded border border-white/5">W: {report.resourcesStolen.water.toLocaleString()}</div>
+                                <div className="bg-[#05070A] p-1 rounded border border-white/5">P: {report.resourcesStolen.plasma.toLocaleString()}</div>
+                                <div className="bg-[#05070A] p-1 rounded border border-white/5">F: {report.resourcesStolen.fuel.toLocaleString()}</div>
+                                <div className="bg-[#05070A] p-1 rounded border border-white/5">Fd: {report.resourcesStolen.food.toLocaleString()}</div>
+                                <div className="bg-[#05070A] p-1 rounded border border-white/5">R: {report.resourcesStolen.respirant.toLocaleString()}</div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Collateral damage report */}
+                          {report.buildingDamage && report.buildingDamage.length > 0 && (
+                            <div className="p-3 bg-red-950/10 border border-red-900/20 text-red-300 rounded-lg">
+                              <p className="font-bold text-[10px] uppercase tracking-wider mb-1.5">DISRUPTER COLLATERAL DEVASTATION:</p>
+                              <ul className="list-disc pl-4 space-y-1 text-red-300/80 text-[10px]">
+                                {report.buildingDamage.map((dmg, di) => (
+                                  <li key={di}>
+                                    {dmg.buildingName.toUpperCase()} damaged: Level {dmg.previousLevel} &rarr; {dmg.newLevel}
+                                  </li>
                                 ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Interactive Round-by-Round Log Simulation Detail */}
+                          {report.battleRounds && report.battleRounds.length > 0 && (
+                            <div className="mt-3 p-3 bg-slate-950/40 border border-[#1E293B] rounded-lg">
+                              <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-[#94A3B8] font-mono">TACTICAL COMBAT LOGS ({report.battleRounds.length} Rounds)</span>
+                                <button
+                                  onClick={() => {
+                                    setExpandedReportRounds(prev => ({
+                                      ...prev,
+                                      [report.id]: prev[report.id] !== undefined ? undefined : 0
+                                    }));
+                                  }}
+                                  className="text-[9px] text-[#22D3EE] font-extrabold hover:text-white uppercase transition duration-150 border border-cyan-500/25 px-2 py-0.5 rounded cursor-pointer"
+                                >
+                                  {expandedReportRounds[report.id] !== undefined ? 'Hide Rounds' : 'View Rounds'}
+                                </button>
                               </div>
 
-                              {/* Round event logs listing */}
-                              {report.battleRounds[expandedReportRounds[report.id]] && (
-                                <div className="space-y-1.5 text-slate-300 font-mono text-[10px] bg-black/40 p-2.5 rounded border border-white/5 leading-relaxed max-h-[160px] overflow-y-auto">
-                                  {report.battleRounds[expandedReportRounds[report.id]].logs.map((logLine, li) => (
-                                    <p key={li} className="flex gap-2">
-                                      <span className="text-cyan-500 text-[10px] font-bold select-none">&bull;</span>
-                                      <span>{logLine}</span>
-                                    </p>
-                                  ))}
+                              {expandedReportRounds[report.id] !== undefined && (
+                                <div className="space-y-3 font-mono text-[10px]">
+                                  {/* Round selector Tabs */}
+                                  <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
+                                    {report.battleRounds.map((r, rIdx) => (
+                                      <button
+                                        key={r.round}
+                                        onClick={() => setExpandedReportRounds(prev => ({ ...prev, [report.id]: rIdx }))}
+                                        className={`px-2.5 py-1 rounded text-[9px] font-black uppercase transition duration-150 cursor-pointer ${
+                                          expandedReportRounds[report.id] === rIdx
+                                            ? 'bg-cyan-500 text-slate-950 shadow-[0_0_8px_rgba(34,211,238,0.4)]'
+                                            : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
+                                        }`}
+                                      >
+                                        Rnd {r.round}
+                                      </button>
+                                    ))}
+                                  </div>
+
+                                  {/* Round event logs listing */}
+                                  {report.battleRounds[expandedReportRounds[report.id]] && (
+                                    <div className="space-y-1.5 text-slate-300 font-mono text-[10px] bg-black/40 p-2.5 rounded border border-white/5 leading-relaxed max-h-[160px] overflow-y-auto">
+                                      {report.battleRounds[expandedReportRounds[report.id]].logs.map((logLine, li) => (
+                                        <p key={li} className="flex gap-2">
+                                          <span className="text-cyan-500 text-[10px] font-bold select-none">&bull;</span>
+                                          <span>{logLine}</span>
+                                        </p>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -960,8 +1563,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                       )}
                     </div>
                   );
-                })
-              )}
+                });
+              })()}
             </div>
 
             <div className="border-t border-[#1E293B] pt-3 flex justify-end">
@@ -975,6 +1578,61 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Spacecraft HD Blueprint Viewer Modal Backdrop */}
+      {activeImageZoom && (
+        <div 
+          onClick={() => {
+            setActiveImageZoom(null);
+            setActiveImageZoomTitle(null);
+          }}
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-fade-in"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="relative w-full max-w-4xl bg-[#0A0F1D]/95 border border-[#1E293B] shadow-[0_0_50px_rgba(5,182,212,0.15)] rounded-2xl overflow-hidden p-3 md:p-6 text-center"
+          >
+            {/* Corner Hologram Hud elements */}
+            <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-500/40 rounded-tl-xl pointer-events-none" />
+            <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-cyan-500/40 rounded-tr-xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-cyan-500/40 rounded-bl-xl pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-500/40 rounded-br-xl pointer-events-none" />
+            
+            {/* Grid background layer */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(18,24,38,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(18,24,38,0.1)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
+
+            <div className="flex items-center justify-between border-b border-[#1E293B]/60 pb-3 mb-4.5 relative z-10">
+              <div className="text-left font-mono">
+                <span className="text-[9px] text-[#5bc0be] uppercase tracking-widest font-black block">HOLOGRAPHIC BLUEPRINT SCHEMATIC</span>
+                <h4 className="text-sm md:text-base font-black text-white uppercase">{activeImageZoomTitle || 'Spaceship Artwork'}</h4>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveImageZoom(null);
+                  setActiveImageZoomTitle(null);
+                }}
+                className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/40 font-mono text-xs font-bold text-slate-400 transition cursor-pointer"
+                aria-label="Close schematic"
+              >
+                CLOSE [ESC]
+              </button>
+            </div>
+
+            <div className="relative rounded-lg overflow-hidden border border-[#1E293B] bg-black/40 flex items-center justify-center min-h-[300px] md:min-h-[500px]">
+              <img 
+                src={activeImageZoom} 
+                alt={activeImageZoomTitle || 'Spacecraft Blueprint'} 
+                className="max-h-[70vh] max-w-full object-contain mx-auto select-none rounded animate-fade-in"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-black/60 border border-white/5 text-[9px] text-slate-500 font-mono tracking-wider rounded">
+                COGNITIVE VISUAL TELEMETRY ACTIVE
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

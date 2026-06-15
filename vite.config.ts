@@ -3,8 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-export default defineConfig(() => {
-  return {
+export default defineConfig({
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
@@ -19,7 +18,6 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {
         ignored: ['**/galaxy_state.json'],
       },
-      allowedHosts: true as const,
+      allowedHosts: true,
     },
-  };
 });
