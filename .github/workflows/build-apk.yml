@@ -27,12 +27,12 @@ jobs:
         with:
           gradle-version: wrapper
           build-root-directory: android
+          cache-disabled: true
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install Packages
         run: |
