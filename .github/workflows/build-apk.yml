@@ -40,6 +40,16 @@ jobs:
         run: |
           npx cap sync android
 
+      - name: Ensure Gradle Wrapper JAR exists
+        run: |
+          mkdir -p android/gradle/wrapper
+          if [ ! -f android/gradle/wrapper/gradle-wrapper.jar ] || [ ! -s android/gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Gradle Wrapper JAR missing or empty, downloading..."
+            curl -L https://raw.githubusercontent.com/gradle/gradle/v8.2.1/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+          else
+            echo "Gradle Wrapper JAR exists and is not empty."
+          fi
+
       - name: Build Android APK with Gradle
         run: |
           cd android
