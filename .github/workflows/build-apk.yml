@@ -43,11 +43,13 @@ jobs:
       - name: Ensure Gradle Wrapper JAR exists
         run: |
           mkdir -p android/gradle/wrapper
-          if [ ! -f android/gradle/wrapper/gradle-wrapper.jar ] || [ ! -s android/gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "Gradle Wrapper JAR missing or empty, downloading..."
-            curl -L https://raw.githubusercontent.com/gradle/gradle/v8.2.1/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+          echo "Force-checking and downloading a clean Gradle Wrapper JAR from Maven Central..."
+          curl -SsfL https://repo1.maven.org/maven2/org/gradle/gradle-wrapper/8.2.1/gradle-wrapper-8.2.1.jar -o android/gradle/wrapper/gradle-wrapper.jar
+          if [ -f android/gradle/wrapper/gradle-wrapper.jar ] && [ -s android/gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Successfully downloaded valid non-empty Gradle Wrapper JAR."
           else
-            echo "Gradle Wrapper JAR exists and is not empty."
+            echo "Failed to download Gradle Wrapper JAR from Maven Central, trying backup public repository..."
+            curl -SsfL https://raw.githubusercontent.com/gradle/gradle/master/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
           fi
 
       - name: Build Android APK with Gradle
