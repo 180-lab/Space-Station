@@ -188,30 +188,31 @@ export async function saveStateToDB(state: GameState): Promise<void> {
   try {
     // 1. Save Alliances
     for (const a of Object.values(state.alliances)) {
+      if (!a.id) continue;
       await db.insert(schema.alliances)
         .values({
           id: a.id,
-          name: a.name,
-          tag: a.tag,
-          leaderId: a.leaderId,
-          leaderName: a.leaderName,
-          members: a.members,
-          wars: a.wars,
-          bannerColor: a.bannerColor,
-          bannerSymbol: a.bannerSymbol,
+          name: a.name || "UNKNOWN ALLIANCE",
+          tag: a.tag || "UNK",
+          leaderId: a.leaderId || "",
+          leaderName: a.leaderName || "Unknown",
+          members: a.members || [],
+          wars: a.wars || [],
+          bannerColor: a.bannerColor || "#FF007A",
+          bannerSymbol: a.bannerSymbol || "▲",
           highlights: a.highlights || null
         })
         .onConflictDoUpdate({
           target: schema.alliances.id,
           set: {
-            name: a.name,
-            tag: a.tag,
-            leaderId: a.leaderId,
-            leaderName: a.leaderName,
-            members: a.members,
-            wars: a.wars,
-            bannerColor: a.bannerColor,
-            bannerSymbol: a.bannerSymbol,
+            name: a.name || "UNKNOWN ALLIANCE",
+            tag: a.tag || "UNK",
+            leaderId: a.leaderId || "",
+            leaderName: a.leaderName || "Unknown",
+            members: a.members || [],
+            wars: a.wars || [],
+            bannerColor: a.bannerColor || "#FF007A",
+            bannerSymbol: a.bannerSymbol || "▲",
             highlights: a.highlights || null
           }
         });
@@ -317,6 +318,7 @@ export async function saveStateToDB(state: GameState): Promise<void> {
     // 4. Save Fleets
     await db.delete(schema.fleets);
     for (const f of state.fleets) {
+      if (!f.id) continue;
       await db.insert(schema.fleets)
         .values({
           id: f.id,
@@ -336,6 +338,27 @@ export async function saveStateToDB(state: GameState): Promise<void> {
           lootCarried: f.lootCarried || null,
           troopSpeedLevel: f.troopSpeedLevel || null,
           defenseShieldsLevel: f.defenseShieldsLevel || null
+        })
+        .onConflictDoUpdate({
+          target: schema.fleets.id,
+          set: {
+            senderId: f.senderId,
+            senderName: f.senderName,
+            senderCoords: f.senderCoords,
+            targetId: f.targetId || null,
+            targetName: f.targetName,
+            targetCoords: f.targetCoords,
+            missionType: f.missionType,
+            troops: f.troops,
+            startedAt: f.startedAt,
+            arrivesAt: f.arrivesAt,
+            isReturning: f.isReturning,
+            isWaitingToSettle: f.isWaitingToSettle || false,
+            targetBuilding: f.targetBuilding || null,
+            lootCarried: f.lootCarried || null,
+            troopSpeedLevel: f.troopSpeedLevel || null,
+            defenseShieldsLevel: f.defenseShieldsLevel || null
+          }
         });
     }
 
@@ -343,26 +366,26 @@ export async function saveStateToDB(state: GameState): Promise<void> {
     for (const r of state.battleReports) {
       await db.insert(schema.battleReports)
         .values({
-          id: r.id,
-          timestamp: r.timestamp,
-          attackerId: r.attackerId,
-          attackerName: r.attackerName,
+          id: r.id || `battle_fallback_${Math.random()}`,
+          timestamp: Number(r.timestamp) || Date.now(),
+          attackerId: r.attackerId || 'unknown',
+          attackerName: r.attackerName || 'Unknown Attacker',
           attackerAlliance: r.attackerAlliance || null,
-          defenderId: r.defenderId,
-          defenderName: r.defenderName,
+          defenderId: r.defenderId || 'unknown',
+          defenderName: r.defenderName || 'Unknown Defender',
           defenderAlliance: r.defenderAlliance || null,
           isRecon: r.isRecon || false,
-          attackerCoords: r.attackerCoords,
-          defenderCoords: r.defenderCoords,
-          attackerInitialTroops: r.attackerInitialTroops,
-          attackerLosses: r.attackerLosses,
-          defenderInitialTroops: r.defenderInitialTroops,
-          defenderLosses: r.defenderLosses,
-          winner: r.winner,
-          resourcesStolen: r.resourcesStolen,
+          attackerCoords: r.attackerCoords || { x: 0, y: 0 },
+          defenderCoords: r.defenderCoords || { x: 0, y: 0 },
+          attackerInitialTroops: r.attackerInitialTroops || { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+          attackerLosses: r.attackerLosses || { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+          defenderInitialTroops: r.defenderInitialTroops || { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+          defenderLosses: r.defenderLosses || { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+          winner: r.winner || 'defender',
+          resourcesStolen: r.resourcesStolen || { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 },
           buildingDamage: r.buildingDamage || null,
-          attackHpKilled: r.attackHpKilled,
-          defenceHpKilled: r.defenceHpKilled,
+          attackHpKilled: r.attackHpKilled !== undefined ? r.attackHpKilled : 0,
+          defenceHpKilled: r.defenceHpKilled !== undefined ? r.defenceHpKilled : 0,
           battleRounds: r.battleRounds || null,
           buildings: r.buildings || null,
           mines: r.mines || null,

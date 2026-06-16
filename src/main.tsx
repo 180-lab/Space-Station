@@ -59,61 +59,6 @@ try {
         }
       };
 
-      const customUrl = localStorage.getItem('space_station_backend_url');
-      if (customUrl) {
-        const cleanApiBase = customUrl.endsWith('/') ? customUrl.slice(0, -1) : customUrl;
-        const finalUrl = cleanApiBase + (urlStr.startsWith('/') ? urlStr : '/' + urlStr);
-        console.log(`[Global Fetch Interceptor] Custom URL Rewrite: ${urlStr} -> ${finalUrl}`);
-        
-        let targetRequest: RequestInfo | URL = finalUrl;
-        if (input instanceof Request) {
-          targetRequest = new Request(finalUrl, input);
-        }
-        
-        // Setup short timeout (e.g. 3.5s) using AbortController so dead or slow tunnels do not freeze the UI/app
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          console.warn(`[Fetch Interceptor] Request to custom local URL timed out after 3500ms: ${finalUrl}`);
-          controller.abort();
-        }, 3500);
-
-        let updatedInit = init || {};
-        const headers = new Headers(updatedInit.headers || {});
-        applyTunnelBypasses(headers, finalUrl);
-        updatedInit = { ...updatedInit, headers, signal: controller.signal };
-        
-        // Dynamic handler for active connection failures/errors to restore functionality on device
-        const runFallback = () => {
-          if (isNativeMobile) {
-            const fallbackUrl = cleanCloudBase + (urlStr.startsWith('/') ? urlStr : '/' + urlStr);
-            console.log(`[Fetch Interceptor Native Fallback] Routing failed custom endpoint to hosted cloud server: ${fallbackUrl}`);
-            let fallbackReq: RequestInfo | URL = fallbackUrl;
-            if (input instanceof Request) {
-              fallbackReq = new Request(fallbackUrl, input);
-            }
-            const fallbackHeaders = new Headers(init?.headers || {});
-            applyTunnelBypasses(fallbackHeaders, fallbackUrl);
-            const fallbackInit = { ...(init || {}), headers: fallbackHeaders };
-            return originalFetch(fallbackReq, fallbackInit);
-          } else {
-            return originalFetch(input, init);
-          }
-        };
-
-        return originalFetch(targetRequest, updatedInit).then(response => {
-          clearTimeout(timeoutId);
-          if (response.status === 502 || response.status === 503 || response.status === 504) {
-            console.warn(`[Fetch Interceptor] Custom gateway error (${response.status}) on ${finalUrl}. Invoking fallback.`);
-            return runFallback();
-          }
-          return response;
-        }).catch(err => {
-          clearTimeout(timeoutId);
-          console.warn(`[Fetch Interceptor] Connection failed or timed out to custom URL ${finalUrl}:`, err);
-          return runFallback();
-        });
-      }
-
       // Only prepend the hosted backend URL if we are running on a native device/emulator
       if (isNativeMobile) {
         const finalUrl = cleanCloudBase + (urlStr.startsWith('/') ? urlStr : '/' + urlStr);

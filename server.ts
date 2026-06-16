@@ -2865,6 +2865,38 @@ app.post("/api/fleet/send", (req, res) => {
   res.json({ player: p, success: true, fleets: state.fleets });
 });
 
+// Adjust troops for local/reserve fleets creation/disbanding
+app.post("/api/troops/adjust", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId, troopChanges } = req.body;
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  if (!troopChanges || typeof troopChanges !== "object") {
+    return res.status(400).json({ error: "Invalid troop changes payload" });
+  }
+
+  // Validate that the changes do not result in negative troops
+  for (const [tId, change] of Object.entries(troopChanges)) {
+    const changeVal = parseInt(String(change), 10) || 0;
+    const current = planet.troops[tId as keyof typeof planet.troops] || 0;
+    if (current + changeVal < 0) {
+      return res.status(400).json({ error: `Not enough ${tId} on the station to fulfill this adjustment!` });
+    }
+  }
+
+  // Apply changes
+  for (const [tId, change] of Object.entries(troopChanges)) {
+    const changeVal = parseInt(String(change), 10) || 0;
+    planet.troops[tId as keyof typeof planet.troops] = (planet.troops[tId as keyof typeof planet.troops] || 0) + changeVal;
+  }
+
+  saveState();
+  res.json({ player: p, success: true });
+});
+
 // Settle coordinates once fleet arrives
 app.post("/api/fleet/settle", (req, res) => {
   const p = getLoggedPlayer(req);

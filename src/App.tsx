@@ -9,7 +9,8 @@ import {
   NewsEvent, 
   PlayerProfile, 
   ResourceType,
-  LeaderboardPlayer
+  LeaderboardPlayer,
+  CreatedFleet
 } from './types';
 import { ExploreTab } from './components/ExploreTab';
 import { ArmyBaseTab } from './components/ArmyBaseTab';
@@ -95,10 +96,6 @@ export default function App() {
   // Connection error handling
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  // Advanced Server Connection Settings
-  const [backendUrl, setBackendUrl] = useState(() => localStorage.getItem('space_station_backend_url') || '');
-  const [showServerSettings, setShowServerSettings] = useState(false);
-
   // Google Sign-In & Payments Dialog states
   const [showGoogleDialog, setShowGoogleDialog] = useState(false);
   const [deviceGoogleAccounts, setDeviceGoogleAccounts] = useState<{ email: string; name: string }[]>(() => {
@@ -152,6 +149,20 @@ export default function App() {
 
   // Active Screen / Navigation Tab selector: 'explore' | 'army' | 'galaxy' | 'research' | 'settings'
   const [activeTab, setActiveTab] = useState<'explore' | 'army' | 'galaxy' | 'research' | 'settings'>('explore');
+
+  // Local reserve / created fleets state
+  const [createdFleets, setCreatedFleets] = useState<CreatedFleet[]>(() => {
+    try {
+      const saved = localStorage.getItem('space_station_created_fleets_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('space_station_created_fleets_v1', JSON.stringify(createdFleets));
+  }, [createdFleets]);
 
   const activeTabRef = useRef(activeTab);
   useEffect(() => {
@@ -1299,9 +1310,6 @@ export default function App() {
 
   // Login signup routing
   if (!userId || !player) {
-    const hasCustomBackend = typeof window !== 'undefined' && !!localStorage.getItem('space_station_backend_url');
-    const activeCustomUrl = typeof window !== 'undefined' ? localStorage.getItem('space_station_backend_url') : '';
-
     return (
       <div className={`min-h-screen bg-[#05070A] text-slate-300 flex flex-col items-center justify-center p-4 font-mono select-none theme-${theme}`}>
         <div className="w-full max-w-lg p-8 bg-[#0A0F1D] border border-[#1E293B] rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.05)] backdrop-blur-md relative overflow-hidden">
@@ -1309,40 +1317,7 @@ export default function App() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
           <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-pink-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
-          {/* Connection diagnostics alert */}
-          {hasCustomBackend && (
-            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-2.5 relative z-10">
-              <div className="flex items-center gap-2">
-                <span className="text-amber-400 animate-pulse text-sm">⚠️</span>
-                <span className="font-bold uppercase tracking-wider text-[10px] text-amber-300 font-sans">Custom Server Redirect Active</span>
-              </div>
-              <p className="leading-relaxed font-sans text-slate-300">
-                Your game client has been redirected to link with your custom private server endpoint:
-              </p>
-              <div className="bg-[#05070A] p-2.5 rounded font-mono text-[11px] text-cyan-400 select-all border border-slate-900 break-all">
-                {activeCustomUrl}
-              </div>
-              <p className="text-slate-400 text-[10px] font-sans leading-normal">
-                If your local tunnel client (localtunnel, ngrok, portwarden) is offline or currently throwing a <span className="text-rose-400 font-bold">"Bad Gateway"</span>, the game cannot load.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  localStorage.removeItem('space_station_backend_url');
-                  setBackendUrl('');
-                  showToast('Reverted Game Client to Default Gateway!', 'success');
-                  setTimeout(() => {
-                    window.location.reload();
-                  }, 800);
-                }}
-                className="w-full py-2.5 px-3 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:brightness-110 active:scale-[0.98] text-white font-bold text-[10px] tracking-wider uppercase rounded-lg transition duration-150 cursor-pointer shadow-md mt-1 flex items-center justify-center gap-1 font-sans"
-              >
-                🔄 Restore Default Gateway & Reconnect
-              </button>
-            </div>
-          )}
-
-          {connectionError && !hasCustomBackend && (
+          {connectionError && (
             <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 text-xs space-y-2.5 relative z-10">
               <div className="flex items-center gap-2">
                 <span className="text-rose-400 animate-pulse text-sm">⚠️</span>
@@ -1365,7 +1340,7 @@ export default function App() {
                     showToast('Initiating emergency system sync...', 'info');
                     window.location.reload();
                   }}
-                  className="flex-1 py-2 px-3 bg-rose-955/40 bg-rose-950/40 border border-rose-500/30 hover:border-rose-400 hover:text-white rounded text-[10px] font-semibold transition text-rose-350 cursor-pointer text-center"
+                  className="flex-1 py-2 px-3 bg-[#450A0A]/30 hover:bg-[#7F1D1D]/30 border border-rose-500/30 text-rose-300 rounded text-[10px] font-semibold transition text-rose-350 cursor-pointer text-center"
                 >
                   ⚡ Emergency Reload
                 </button>
@@ -1373,14 +1348,13 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     localStorage.removeItem('space_station_backend_url');
-                    setBackendUrl('');
                     setConnectionError(null);
-                    showToast('Repaired space-station terminal routing!', 'success');
+                    showToast('Terminal terminal modules aligned!', 'success');
                     setTimeout(() => window.location.reload(), 600);
                   }}
                   className="flex-1 py-2 px-3 bg-cyan-955/40 bg-cyan-950/40 border border-cyan-500/30 hover:border-cyan-400 hover:text-white rounded text-[10px] font-semibold transition text-cyan-400 cursor-pointer text-center"
                 >
-                  🛠️ Reset Gateway Config
+                  🛠️ Reset Terminal Config
                 </button>
               </div>
             </div>
@@ -1535,161 +1509,7 @@ export default function App() {
             <span>Continue with Google Account</span>
           </button>
 
-          {/* Advanced Server Vector settings */}
-          <div className="mt-8 pt-6 border-t border-[#1E293B]/60 text-center">
-            <button 
-              type="button"
-              onClick={() => setShowServerSettings(!showServerSettings)}
-              className="text-xs text-slate-500 hover:text-cyan-400 font-mono flex items-center justify-center gap-1.5 mx-auto transition duration-200 cursor-pointer"
-            >
-              <Settings size={12} className={showServerSettings ? "animate-spin text-cyan-400" : ""} />
-              <span>{showServerSettings ? "Hide Advanced Connection Ports" : "Configure Custom Game Server IP"}</span>
-            </button>
 
-            {showServerSettings && (
-              <div className="mt-4 p-4 rounded-xl bg-[#05070A] border border-[#1E293B] text-left space-y-3">
-                <p className="text-[10px] text-slate-400 leading-normal font-sans">
-                  By default, the emulator connects to the cloud workspace. If your server is running locally under <code className="bg-slate-900 px-1 py-0.5 rounded text-cyan-400 font-mono">PM2</code> or on a remote VPS, enter your server's endpoint vector below:
-                </p>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-sky-400 uppercase tracking-wider font-mono block">Custom Server URL</label>
-                  <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      value={backendUrl}
-                      onChange={(e) => setBackendUrl(e.target.value)}
-                      placeholder="E.g. http://10.0.2.2:3000"
-                      className="flex-1 px-3 py-2 bg-[#0A0F1D] border border-[#1E293B] text-slate-100 rounded-lg text-xs font-mono focus:outline-none focus:border-cyan-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const trimmed = backendUrl.trim();
-                        if (trimmed) {
-                          localStorage.setItem('space_station_backend_url', trimmed);
-                          showToast(`Linked backend to: ${trimmed}`, 'success');
-                          setTimeout(() => window.location.reload(), 1000);
-                        } else {
-                          localStorage.removeItem('space_station_backend_url');
-                          showToast(`Reset to Default Cloud Server gateway`, 'info');
-                          setTimeout(() => window.location.reload(), 1000);
-                        }
-                      }}
-                      className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:brightness-110 active:scale-95 text-white rounded-lg text-xs font-bold font-sans cursor-pointer transition select-none flex items-center justify-center shadow-lg shadow-cyan-500/20"
-                    >
-                      Apply
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 pt-1 font-sans">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBackendUrl('https://cold-areas-flow.loca.lt');
-                        localStorage.setItem('space_station_backend_url', 'https://cold-areas-flow.loca.lt');
-                        showToast(`Pointed to Live Localtunnel (https://cold-areas-flow.loca.lt)`, 'success');
-                        setTimeout(() => window.location.reload(), 1000);
-                      }}
-                      className="px-2.5 py-1.5 bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 hover:text-white rounded text-[10px] font-mono font-bold transition cursor-pointer select-none"
-                    >
-                      ⚓ Localtunnel (cold-areas-flow)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBackendUrl('https://eighty-towns-count.loca.lt');
-                        localStorage.setItem('space_station_backend_url', 'https://eighty-towns-count.loca.lt');
-                        showToast(`Pointed to Localtunnel (https://eighty-towns-count.loca.lt)`, 'success');
-                        setTimeout(() => window.location.reload(), 1000);
-                      }}
-                      className="px-2.5 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded text-[10px] font-mono transition cursor-pointer select-none"
-                    >
-                      ⚓ Localtunnel (eighty-towns)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBackendUrl('https://space-station-commander.onrender.com');
-                        localStorage.setItem('space_station_backend_url', 'https://space-station-commander.onrender.com');
-                        showToast(`Pointed to Render Production Server (https://space-station-commander.onrender.com)`, 'success');
-                        setTimeout(() => window.location.reload(), 1000);
-                      }}
-                      className="px-2.5 py-1.5 bg-cyan-950/40 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:text-white rounded text-[10px] font-mono transition cursor-pointer select-none font-bold"
-                    >
-                      🚀 Render Live Server
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBackendUrl('http://10.0.2.2:3000');
-                        localStorage.setItem('space_station_backend_url', 'http://10.0.2.2:3000');
-                        showToast(`Pointed to emulator Host computer (http://10.0.2.2:3000)`, 'success');
-                        setTimeout(() => window.location.reload(), 1000);
-                      }}
-                      className="px-2.5 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded text-[10px] font-mono transition cursor-pointer select-none"
-                    >
-                      Local Emulator (10.0.2.2:3000)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBackendUrl('http://10.0.2.2:3001');
-                        localStorage.setItem('space_station_backend_url', 'http://10.0.2.2:3001');
-                        showToast(`Pointed to emulator Host computer (http://10.0.2.2:3001)`, 'success');
-                        setTimeout(() => window.location.reload(), 1000);
-                      }}
-                      className="px-2.5 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded text-[10px] font-mono transition cursor-pointer select-none"
-                    >
-                      Local Emulator (10.0.2.2:3001)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBackendUrl('');
-                        localStorage.removeItem('space_station_backend_url');
-                        showToast(`Reverted game client to fallback cloud default.`, 'info');
-                        setTimeout(() => window.location.reload(), 1000);
-                      }}
-                      className="px-2.5 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded text-[10px] font-mono transition cursor-pointer select-none ml-auto"
-                    >
-                      Reset Gateway
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="mt-3 pt-3 border-t border-slate-800/60 space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-cyan-400 text-xs">⚡</span>
-                    <span className="text-[10px] font-bold tracking-wider uppercase text-slate-300 font-sans">Setup Backend Tunnels with PM2</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
-                    Prevent background connection crashes. Manage your Node.js application and localtunnel instance permanently using standard PM2 scripts:
-                  </p>
-                  <div className="bg-[#030508] border border-slate-800 p-2.5 rounded text-[10px] space-y-1.5 font-mono">
-                    <div>
-                      <span className="text-slate-500 select-none"># 1. Install PM2 daemon</span>
-                      <div className="text-cyan-300 select-all">npm install -g pm2</div>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 select-none"># 2. Stop any stale background setups</span>
-                      <div className="text-cyan-300 select-all">pm2 delete all</div>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 select-none"># 3. Run Space Server on free port 3001</span>
-                      <div className="text-cyan-300 select-all">PORT=3001 pm2 start "node dist/server.cjs" --name "space-station-server"</div>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 select-none"># 4. Keep localtunnel active & auto-restarted</span>
-                      <div className="text-cyan-300 select-all">pm2 start "npx localtunnel --port 3001" --name "space-station-tunnel"</div>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 select-none"># 5. Check real-time URL and status</span>
-                      <div className="text-cyan-300 select-all">pm2 status && pm2 log space-station-tunnel</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
 
         </div>
 
@@ -1845,14 +1665,13 @@ export default function App() {
             <button 
               onClick={() => {
                 localStorage.removeItem('space_station_backend_url');
-                setBackendUrl('');
                 setConnectionError(null);
-                showToast('Reverted Game Client to Default Gateway!', 'success');
+                showToast('Terminal terminal modules aligned!', 'success');
                 setTimeout(() => window.location.reload(), 1000);
               }} 
               className="flex-1 py-1.5 bg-cyan-950/30 hover:bg-[#0E2034] border border-cyan-500/30 text-cyan-400 rounded text-[10px] font-bold transition cursor-pointer"
             >
-              🛠️ Reset to Default
+              🛠️ Reset Terminal Config
             </button>
           </div>
         </div>
@@ -2285,6 +2104,9 @@ export default function App() {
             fleets={fleets}
             onSendFleet={handleSendFleet}
             onSettle={handleStartSettleFlow}
+            createdFleets={createdFleets}
+            setCreatedFleets={setCreatedFleets}
+            onUpdatePlayer={setPlayer}
           />
         )}
 

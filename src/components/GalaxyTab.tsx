@@ -7,7 +7,8 @@ import {
   FleetMission, 
   NewsEvent, 
   PlayerProfile,
-  LeaderboardPlayer
+  LeaderboardPlayer,
+  CreatedFleet
 } from '../types';
 import { 
   Radar, 
@@ -63,6 +64,9 @@ interface GalaxyTabProps {
   onToggleSave?: (reportId: string) => void;
   onForwardReport?: (report: BattleReport, channel: 'global' | 'alliance') => void;
   onViewPlayerProfile?: (playerId: string) => void;
+  createdFleets: CreatedFleet[];
+  setCreatedFleets: React.Dispatch<React.SetStateAction<CreatedFleet[]>>;
+  onUpdatePlayer?: (player: PlayerProfile) => void;
 }
 
 async function safeParseJson(res: Response): Promise<any> {
@@ -136,7 +140,10 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   onMarkUnread,
   onToggleSave,
   onForwardReport,
-  onViewPlayerProfile
+  onViewPlayerProfile,
+  createdFleets,
+  setCreatedFleets,
+  onUpdatePlayer
 }) => {
   // Sub-tabs
   const [subTab, setSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>('scanner');
@@ -159,6 +166,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   // Single vs Multiple Fleets configuration in primary dispatch drawer modal
   const [dispatchMode, setDispatchMode] = useState<'single' | 'multiple'>('single');
   const [dispatchNumFleets, setDispatchNumFleets] = useState<number>(2);
+  const [selectedReserveFleetId, setSelectedReserveFleetId] = useState<string>('manual');
 
   // Leaderboard States
   const [rankingMetric, setRankingMetric] = useState<'population' | 'attack' | 'defence' | 'raiders'>('population');
@@ -381,22 +389,88 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
     setFleetTroops(initial);
   };
 
+  const [isLaunchingReserve, setIsLaunchingReserve] = useState(false);
+
   // Dispatch launch
-  const handleLaunchFleet = () => {
+  const handleLaunchFleet = async () => {
     if (!selectedTarget) return;
-    onSendFleet({
-      targetX: selectedTarget.coords.x,
-      targetY: selectedTarget.coords.y,
-      missionType: fleetType,
-      troops: fleetTroops,
-      targetId: selectedTarget.id || undefined,
-      targetName: selectedTarget.planetName || `Sector [${selectedTarget.coords.x}, ${selectedTarget.coords.y}]`,
-      targetBuilding: (fleetTroops.tank || 0) > 0 ? targetBuilding : undefined,
-      numFleets: dispatchMode === 'multiple' ? dispatchNumFleets : 1
-    });
-    setSelectedTarget(null);
-    setDispatchMode('single');
-    setDispatchNumFleets(2);
+
+    if (selectedReserveFleetId !== 'manual') {
+      const fleet = createdFleets.find(f => f.id === selectedReserveFleetId);
+      if (!fleet) {
+        alert("Reserve fleet not found!");
+        return;
+      }
+
+      setIsLaunchingReserve(true);
+      try {
+        // Step 1: Temporarily adjust station troops back to positive so they are in the garrison 
+        // to be dispatched by onSendFleet!
+        const changes: Record<string, number> = {};
+        for (const [tId, val] of Object.entries(fleet.troops)) {
+          const qty = Number(val) || 0;
+          if (qty > 0) {
+            changes[tId] = qty;
+          }
+        }
+
+        const res = await fetch('/api/troops/adjust', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': player.id
+          },
+          body: JSON.stringify({
+            planetId: activePlanet.id,
+            troopChanges: changes
+          })
+        });
+        const data = await safeParseJson(res);
+        if (res.ok && data.player) {
+          if (onUpdatePlayer) {
+            onUpdatePlayer(data.player);
+          }
+
+          // Step 2: Dispatch the fleet mission!
+          onSendFleet({
+            targetX: selectedTarget.coords.x,
+            targetY: selectedTarget.coords.y,
+            missionType: fleetType,
+            troops: fleet.troops as any,
+            targetId: selectedTarget.id || undefined,
+            targetName: selectedTarget.planetName || `Sector [${selectedTarget.coords.x}, ${selectedTarget.coords.y}]`,
+            targetBuilding: (fleet.troops.tank || 0) > 0 ? targetBuilding : undefined,
+            numFleets: 1
+          });
+
+          // Step 3: Remove the reserve fleet since it's now an active traveler!
+          setCreatedFleets(prev => prev.filter(item => item.id !== fleet.id));
+          if (showToast) showToast(`Dispatched reserve fleet ${fleet.name} into space flight!`, 'success');
+        } else {
+          alert(data.error || 'Failed to assemble reserve fleet for launch');
+        }
+      } catch (err) {
+        alert('Network failure launching reserve fleet');
+      } finally {
+        setIsLaunchingReserve(false);
+        setSelectedTarget(null);
+        setSelectedReserveFleetId('manual');
+      }
+    } else {
+      onSendFleet({
+        targetX: selectedTarget.coords.x,
+        targetY: selectedTarget.coords.y,
+        missionType: fleetType,
+        troops: fleetTroops,
+        targetId: selectedTarget.id || undefined,
+        targetName: selectedTarget.planetName || `Sector [${selectedTarget.coords.x}, ${selectedTarget.coords.y}]`,
+        targetBuilding: (fleetTroops.tank || 0) > 0 ? targetBuilding : undefined,
+        numFleets: dispatchMode === 'multiple' ? dispatchNumFleets : 1
+      });
+      setSelectedTarget(null);
+      setDispatchMode('single');
+      setDispatchNumFleets(2);
+    }
   };
 
   // Direct Quick Scan Coordinate Deployment
@@ -2676,16 +2750,30 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         const hasCombat = (fleetTroops.attacker || 0) >= 1 || (fleetTroops.tank || 0) >= 1 || (fleetTroops.looter || 0) >= 1 || (fleetTroops.defender || 0) >= 1;
         const hasSettlement = (fleetTroops.settlementShip || 0) >= 1;
 
-        const isMissionReady = hasDrone || hasCombat || hasSettlement;
+        const isMissionReady = selectedReserveFleetId !== 'manual' ? true : (hasDrone || hasCombat || hasSettlement);
 
         let inferredType: 'attack' | 'colonize' | 'recon' | 'move' = 'move';
-        if (hasSettlement) {
-          inferredType = 'colonize';
-        } else if (hasCombat) {
-          inferredType = 'attack';
-        } else if (hasDrone) {
-          inferredType = 'move';
+        if (selectedReserveFleetId !== 'manual') {
+          const rf = createdFleets.find(f => f.id === selectedReserveFleetId);
+          if (rf) {
+            const rfHasSettlement = (rf.troops.settlementShip || 0) >= 1;
+            const rfHasCombat = (rf.troops.attacker || 0) >= 1 || (rf.troops.tank || 0) >= 1 || (rf.troops.looter || 0) >= 1 || (rf.troops.defender || 0) >= 1;
+            if (rfHasSettlement) inferredType = 'colonize';
+            else if (rfHasCombat) inferredType = 'attack';
+          }
+        } else {
+          if (hasSettlement) {
+            inferredType = 'colonize';
+          } else if (hasCombat) {
+            inferredType = 'attack';
+          } else if (hasDrone) {
+            inferredType = 'move';
+          }
         }
+
+        const activeTanks = selectedReserveFleetId !== 'manual'
+          ? (createdFleets.find(f => f.id === selectedReserveFleetId)?.troops.tank || 0)
+          : (fleetTroops.tank || 0);
 
         return (
           <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -2697,7 +2785,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   <p className="text-[11px] text-slate-400 mt-0.5">Sector Coordinates: [{selectedTarget.coords.x}, {selectedTarget.coords.y}] &bull; Commander {selectedTarget.username}</p>
                   
                   {/* Small Fast Attack Auto-Allocation Option under sector coordinates */}
-                  {selectedTarget.id !== player.id && !selectedTarget.isHabitable && (
+                  {selectedTarget.id !== player.id && !selectedTarget.isHabitable && selectedReserveFleetId === 'manual' && (
                     <div className="mt-2 flex items-center gap-1.5 text-[9.5px] border border-cyan-500/20 bg-cyan-950/20 px-2 py-1 rounded">
                       <span className="text-red-400 animate-pulse font-bold">⚡ QUICK ACTION:</span>
                       <button
@@ -2732,155 +2820,227 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
               {/* Scrollable Content Container */}
               <div className="flex-1 overflow-y-auto pr-1.5 space-y-4">
-                {/* Troop counts allocation panel - 2 COLUMNS */}
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Allocate Base Fleets & Crew:</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
-                  {['defender', 'attacker', 'tank', 'looter', 'drone', 'settlementShip'].map((tId) => {
-                    const count = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
-                    
-                    const dispatchLabel = 
-                      tId === 'drone' ? 'Missile Launcher' : 
-                      tId === 'defender' ? 'Interceptor' : 
-                      tId === 'looter' ? 'Matter Extractor' : 
-                      tId === 'tank' ? 'Disrupter' : 
-                      tId === 'settlementShip' ? 'Settlement Ship' :
-                      'Assault Drone';
-                      
-                    const icon = 
-                      tId === 'drone' ? '🛰️' :
-                      tId === 'defender' ? '🛡️' :
-                      tId === 'looter' ? '🛸' :
-                      tId === 'tank' ? '🤖' :
-                      tId === 'settlementShip' ? '🚀' :
-                      '⚔️';
-                    
-                    return (
-                      <div key={tId} className="p-1.5 border border-[#1E293B] bg-[#05070A]/85 rounded-xl flex items-center justify-between gap-1.5 text-[11px] font-mono">
-                        <div className="min-w-0">
-                          <span className="font-bold text-slate-200 flex items-center gap-1">
-                            <span>{icon}</span>
-                            <span className="truncate text-[10.5px]">{dispatchLabel}</span>
-                          </span>
-                          <p className="text-[9px] text-slate-500 mt-0.5">Aval: <strong className="text-cyan-400">{count}</strong></p>
-                        </div>
-                        <div className="flex items-center gap-0.5 shrink-0 bg-slate-950/40 p-0.5 rounded-lg border border-[#1E293B]/40">
-                          <button 
-                            type="button"
-                            onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: 0 }))}
-                            className="px-1 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-slate-300 font-mono rounded"
-                          >
-                            Min
-                          </button>
-                          <input 
-                            type="number"
-                            min={0}
-                            max={count}
-                            value={fleetTroops[tId] || 0}
-                            onChange={(e) => {
-                              const val = Math.min(count, Math.max(0, parseInt(e.target.value, 10) || 0));
-                              setFleetTroops(prev => ({ ...prev, [tId]: val }));
-                            }}
-                            className="w-8 text-center bg-[#05070A] border border-[#1E293B]/30 rounded font-mono text-[10px] text-white py-0.5 focus:outline-none focus:border-cyan-500 font-extrabold"
-                          />
-                          <button 
-                            type="button"
-                            disabled={count === 0}
-                            onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: count }))}
-                            className="px-1 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-cyan-400 font-mono rounded disabled:opacity-30"
-                          >
-                            Max
-                          </button>
-                        </div>
+                
+                {/* RESERVE FLEET DEPLOYMENT OPTION */}
+                {(() => {
+                  const planetReserves = createdFleets.filter(f => f.planetId === activePlanet.id);
+                  return (
+                    <div className="p-3.5 bg-cyan-950/20 border border-cyan-500/30 rounded-xl space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider block">Reserve Fleet Selection</span>
+                        <span className="text-[8.5px] text-slate-500 font-mono">Reserves Available: {planetReserves.length}</span>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                      
+                      {planetReserves.length === 0 ? (
+                        <p className="text-[9.5px] text-slate-400 leading-relaxed font-sans">
+                          No pre-constructed reserve fleets docked on this station. To prepare reserve fleets, visit the <span className="text-cyan-400 font-bold">War Room (Army Base)</span> where you can build, name, and manage subsidiaries of duplicate fleets.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          <select
+                            value={selectedReserveFleetId}
+                            onChange={(e) => {
+                              setSelectedReserveFleetId(e.target.value);
+                              if (e.target.value !== 'manual') {
+                                setDispatchMode('single'); // Locked to single for pre-constructed squads
+                              }
+                            }}
+                            className="w-full bg-[#05070A] text-xs font-mono font-bold py-2 px-3 rounded-xl border border-cyan-500/30 hover:border-cyan-400 text-white cursor-pointer focus:outline-none"
+                          >
+                            <option value="manual">🛠️ Compose New Custom Fleet (Manual)</option>
+                            {planetReserves.map(rf => (
+                              <option key={rf.id} value={rf.id}>🚀 {rf.name} ({rf.subsidiary})</option>
+                            ))}
+                          </select>
 
-              {/* Disrupter Demolition Targeting configuration */}
-              {(fleetTroops.tank || 0) > 0 && (
-                <div className="p-3 border border-amber-600/35 bg-[#0C0F1A] rounded-xl space-y-2 mt-2 z-10 relative">
-                  <div className="flex items-center gap-1.5 text-[10px] text-amber-400 font-mono font-bold uppercase tracking-wider">
-                    <span className="text-xs">💣</span>
-                    <span>Disrupter Demolition Target</span>
+                          {selectedReserveFleetId !== 'manual' && (() => {
+                            const selectedFleet = planetReserves.find(f => f.id === selectedReserveFleetId);
+                            if (!selectedFleet) return null;
+                            return (
+                              <div className="p-2.5 bg-slate-950/60 border border-slate-900 rounded-lg text-left font-mono text-[9.5px] space-y-1.5">
+                                <p className="font-bold text-cyan-400 uppercase">Pre-Loaded Fleet Components:</p>
+                                <div className="grid grid-cols-2 gap-1.5 text-slate-300">
+                                  {Object.entries(selectedFleet.troops).map(([tId, count]) => {
+                                    const qty = Number(count) || 0;
+                                    if (qty <= 0) return null;
+                                    const label = 
+                                      tId === 'drone' ? 'Missile Launcher' : 
+                                      tId === 'defender' ? 'Interceptor' : 
+                                      tId === 'looter' ? 'Matter Extractor' : 
+                                      tId === 'tank' ? 'Disrupter' : 
+                                      tId === 'settlementShip' ? 'Settlement Ship' :
+                                      'Assault Drone';
+                                    return (
+                                      <div key={tId} className="flex justify-between">
+                                        <span>{label}:</span>
+                                        <span className="font-bold text-white">{qty}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {selectedReserveFleetId === 'manual' && (
+                  <div className="space-y-3">
+                    {/* Troop counts allocation panel - 2 COLUMNS */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Allocate Base Fleets & Crew:</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
+                        {['defender', 'attacker', 'tank', 'looter', 'drone', 'settlementShip'].map((tId) => {
+                          const count = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
+                          
+                          const dispatchLabel = 
+                            tId === 'drone' ? 'Missile Launcher' : 
+                            tId === 'defender' ? 'Interceptor' : 
+                            tId === 'looter' ? 'Matter Extractor' : 
+                            tId === 'tank' ? 'Disrupter' : 
+                            tId === 'settlementShip' ? 'Settlement Ship' :
+                            'Assault Drone';
+                            
+                          const icon = 
+                            tId === 'drone' ? '🛰️' :
+                            tId === 'defender' ? '🛡️' :
+                            tId === 'looter' ? '🛸' :
+                            tId === 'tank' ? '🤖' :
+                            tId === 'settlementShip' ? '🚀' :
+                            '⚔️';
+                          
+                          return (
+                            <div key={tId} className="p-1.5 border border-[#1E293B] bg-[#05070A]/85 rounded-xl flex items-center justify-between gap-1.5 text-[11px] font-mono">
+                              <div className="min-w-0">
+                                <span className="font-bold text-slate-200 flex items-center gap-1">
+                                  <span>{icon}</span>
+                                  <span className="truncate text-[10.5px]">{dispatchLabel}</span>
+                                </span>
+                                <p className="text-[9px] text-slate-500 mt-0.5">Aval: <strong className="text-cyan-400">{count}</strong></p>
+                              </div>
+                              <div className="flex items-center gap-0.5 shrink-0 bg-slate-950/40 p-0.5 rounded-lg border border-[#1E293B]/40">
+                                <button 
+                                  type="button"
+                                  onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: 0 }))}
+                                  className="px-1 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-slate-300 font-mono rounded"
+                                >
+                                  Min
+                                </button>
+                                <input 
+                                  type="number"
+                                  min={0}
+                                  max={count}
+                                  value={fleetTroops[tId] || 0}
+                                  onChange={(e) => {
+                                    const val = Math.min(count, Math.max(0, parseInt(e.target.value, 10) || 0));
+                                    setFleetTroops(prev => ({ ...prev, [tId]: val }));
+                                  }}
+                                  className="w-8 text-center bg-[#05070A] border border-[#1E293B]/30 rounded font-mono text-[10px] text-white py-0.5 focus:outline-none focus:border-cyan-500 font-extrabold"
+                                />
+                                <button 
+                                  type="button"
+                                  disabled={count === 0}
+                                  onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: count }))}
+                                  className="px-1 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-cyan-400 font-mono rounded disabled:opacity-30"
+                                >
+                                  Max
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Interactive Mission Options - SOLE CHOICE IS SINGLE FLEET OR MULTIPLE FLEETS */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fleet Creation Strategy:</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Create Single Fleet */}
+                        <button 
+                          type="button"
+                          onClick={() => setDispatchMode('single')}
+                          className={`p-2.5 rounded-xl border flex flex-col items-center justify-center text-center transition duration-150 cursor-pointer ${
+                            dispatchMode === 'single'
+                              ? 'border-cyan-500 bg-cyan-950/35 text-cyan-300 font-bold shadow-[0_0_12px_rgba(34,211,238,0.25)]'
+                              : 'border-[#1E293B] bg-[#05070A] text-slate-400 hover:border-cyan-500/30 hover:text-slate-250'
+                          }`}
+                        >
+                          <span className="text-base">🚀</span>
+                          <span className="text-[10px] font-bold uppercase mt-1">Create a Fleet</span>
+                          <span className="text-[8px] text-cyan-405 mt-0.5 font-mono">Single Squadron</span>
+                        </button>
+
+                        {/* Create Multiple Fleets */}
+                        <button 
+                          type="button"
+                          onClick={() => setDispatchMode('multiple')}
+                          className={`p-2.5 rounded-xl border flex flex-col items-center justify-center text-center transition duration-150 cursor-pointer ${
+                            dispatchMode === 'multiple'
+                              ? 'border-cyan-500 bg-cyan-950/35 text-cyan-300 font-bold shadow-[0_0_12px_rgba(34,211,238,0.25)]'
+                              : 'border-[#1E293B] bg-[#05070A] text-slate-400 hover:border-cyan-500/30 hover:text-slate-250'
+                          }`}
+                        >
+                          <span className="text-base">🛸🛸</span>
+                          <span className="text-[10px] font-bold uppercase mt-1">Multiple Fleets</span>
+                          <span className="text-[8px] text-cyan-405 mt-0.5 font-mono">Separate Divisions</span>
+                        </button>
+                      </div>
+
+                      {dispatchMode === 'multiple' && (
+                        <div className="p-2 border border-cyan-800/25 bg-[#050810] rounded-xl flex items-center justify-between mt-1 text-xs">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-widest font-mono">Division divisions count:</span>
+                          <select
+                            value={dispatchNumFleets}
+                            onChange={(e) => setDispatchNumFleets(parseInt(e.target.value, 10))}
+                            className="bg-slate-900 border border-slate-700 text-cyan-400 text-[11px] font-mono py-0.5 px-2 rounded cursor-pointer"
+                            id="drawer-multi-fleets-select"
+                          >
+                            {[2, 3, 4, 5].map(n => (
+                              <option key={n} value={n} className="bg-slate-950 text-slate-350">{n} Squads</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-[9px] text-slate-400 font-sans leading-relaxed">
-                    Choose which structural system or extraction mine this Disrupter should prioritize to sabotage and degrade in level upon successful deployment.
-                  </p>
-                  <select
-                    value={targetBuilding}
-                    onChange={(e) => setTargetBuilding(e.target.value)}
-                    className="w-full bg-[#05070A] text-xs text-amber-400 font-mono font-bold py-1.5 px-3 rounded-lg border border-amber-500/20 focus:border-amber-500 focus:outline-[#f59e0b] cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.05)] hover:border-amber-500/40 transition"
-                    id="bomber-tank-target-select"
-                  >
-                    <option value="random">Random Structure (Default)</option>
-                    <optgroup label="Colony Buildings" className="bg-[#05070A] text-slate-300">
-                      <option value="commsHub">Communications Hub</option>
-                      <option value="researchCenter">Research Center</option>
-                      <option value="armyBase">War Room</option>
-                      <option value="repository">Repository</option>
-                      <option value="radar">Radar Array</option>
-                      <option value="supplyNexus">Supply Nexus</option>
-                    </optgroup>
-                    <optgroup label="Extraction Mines" className="bg-[#05070A] text-slate-300">
-                      <option value="mines.water">Water Condenser Mine</option>
-                      <option value="mines.plasma">Plasma Synthesizer Mine</option>
-                      <option value="mines.fuel">Thermonuclear Fuel Mine</option>
-                      <option value="mines.food">Hydroponic Food Mine</option>
-                      <option value="mines.respirant">Aerosol Respirant Mine</option>
-                    </optgroup>
-                  </select>
-                </div>
-              )}
+                )}
 
-              {/* Interactive Mission Options - SOLE CHOICE IS SINGLE FLEET OR MULTIPLE FLEETS */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fleet Creation Strategy:</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {/* Create Single Fleet */}
-                  <button 
-                    type="button"
-                    onClick={() => setDispatchMode('single')}
-                    className={`p-2.5 rounded-xl border flex flex-col items-center justify-center text-center transition duration-150 cursor-pointer ${
-                      dispatchMode === 'single'
-                        ? 'border-cyan-500 bg-cyan-950/35 text-cyan-300 font-bold shadow-[0_0_12px_rgba(34,211,238,0.25)]'
-                        : 'border-[#1E293B] bg-[#05070A] text-slate-400 hover:border-cyan-500/30 hover:text-slate-250'
-                    }`}
-                  >
-                    <span className="text-base">🚀</span>
-                    <span className="text-[10px] font-bold uppercase mt-1">Create a Fleet</span>
-                    <span className="text-[8px] text-cyan-405 mt-0.5 font-mono">Single Squadron</span>
-                  </button>
-
-                  {/* Create Multiple Fleets */}
-                  <button 
-                    type="button"
-                    onClick={() => setDispatchMode('multiple')}
-                    className={`p-2.5 rounded-xl border flex flex-col items-center justify-center text-center transition duration-150 cursor-pointer ${
-                      dispatchMode === 'multiple'
-                        ? 'border-cyan-500 bg-cyan-950/35 text-cyan-300 font-bold shadow-[0_0_12px_rgba(34,211,238,0.25)]'
-                        : 'border-[#1E293B] bg-[#05070A] text-slate-400 hover:border-cyan-500/30 hover:text-slate-250'
-                    }`}
-                  >
-                    <span className="text-base">🛸🛸</span>
-                    <span className="text-[10px] font-bold uppercase mt-1">Multiple Fleets</span>
-                    <span className="text-[8px] text-cyan-405 mt-0.5 font-mono">Separate Divisions</span>
-                  </button>
-                </div>
-
-                {dispatchMode === 'multiple' && (
-                  <div className="p-2 border border-cyan-800/25 bg-[#050810] rounded-xl flex items-center justify-between mt-1 text-xs">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-widest font-mono">Division divisions count:</span>
+                {/* Disrupter Demolition Targeting configuration */}
+                {activeTanks > 0 && (
+                  <div className="p-3 border border-amber-600/35 bg-[#0C0F1A] rounded-xl space-y-2 mt-2 z-10 relative">
+                    <div className="flex items-center gap-1.5 text-[10px] text-amber-400 font-mono font-bold uppercase tracking-wider">
+                      <span className="text-xs">💣</span>
+                      <span>Disrupter Demolition Target</span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 font-sans leading-relaxed">
+                      Choose which structural system or extraction mine this Disrupter should prioritize to sabotage and degrade in level upon successful deployment.
+                    </p>
                     <select
-                      value={dispatchNumFleets}
-                      onChange={(e) => setDispatchNumFleets(parseInt(e.target.value, 10))}
-                      className="bg-slate-900 border border-slate-700 text-cyan-400 text-[11px] font-mono py-0.5 px-2 rounded cursor-pointer"
-                      id="drawer-multi-fleets-select"
+                      value={targetBuilding}
+                      onChange={(e) => setTargetBuilding(e.target.value)}
+                      className="w-full bg-[#05070A] text-xs text-amber-400 font-mono font-bold py-1.5 px-3 rounded-lg border border-amber-500/20 focus:border-amber-500 focus:outline-[#f59e0b] cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.05)] hover:border-amber-500/40 transition"
+                      id="bomber-tank-target-select"
                     >
-                      {[2, 3, 4, 5].map(n => (
-                        <option key={n} value={n} className="bg-slate-950 text-slate-350">{n} Squads</option>
-                      ))}
+                      <option value="random">Random Structure (Default)</option>
+                      <optgroup label="Colony Buildings" className="bg-[#05070A] text-slate-300">
+                        <option value="commsHub">Communications Hub</option>
+                        <option value="researchCenter">Research Center</option>
+                        <option value="armyBase">War Room</option>
+                        <option value="repository">Repository</option>
+                        <option value="radar">Radar Array</option>
+                        <option value="supplyNexus">Supply Nexus</option>
+                      </optgroup>
+                      <optgroup label="Extraction Mines" className="bg-[#05070A] text-slate-300">
+                        <option value="mines.water">Water Condenser Mine</option>
+                        <option value="mines.plasma">Plasma Synthesizer Mine</option>
+                        <option value="mines.fuel">Thermonuclear Fuel Mine</option>
+                        <option value="mines.food">Hydroponic Food Mine</option>
+                        <option value="mines.respirant">Aerosol Respirant Mine</option>
+                      </optgroup>
                     </select>
                   </div>
                 )}
@@ -2942,7 +3102,13 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     settlementShip: 4.662
                   };
 
-                  const selectedTroops = Object.entries(fleetTroops).filter(([_, qty]) => (Number(qty) || 0) > 0);
+                  const selectedTroops = selectedReserveFleetId !== 'manual'
+                    ? (() => {
+                        const rf = createdFleets.find(f => f.id === selectedReserveFleetId);
+                        return rf ? Object.entries(rf.troops).filter(([_, qty]) => (Number(qty) || 0) > 0) : [];
+                      })()
+                    : Object.entries(fleetTroops).filter(([_, qty]) => (Number(qty) || 0) > 0);
+
                   const slowestTroopSpeed = selectedTroops.length > 0
                     ? (selectedTroops.reduce((slowest, [tId, _]) => {
                         const sp = speedMap[tId] || 5;
@@ -2979,7 +3145,10 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   );
                 })()}
                 {(() => {
-                  const stats = calculateEnemyHp(fleetTroops);
+                  const stats = selectedReserveFleetId !== 'manual'
+                    ? calculateEnemyHp(createdFleets.find(f => f.id === selectedReserveFleetId)?.troops || {})
+                    : calculateEnemyHp(fleetTroops);
+
                   return (
                     <div className="space-y-1.5 mt-1 border-t border-[#1E293B]/60 pt-2 text-[10px]">
                       <div className="flex justify-between items-center">
@@ -2997,7 +3166,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     </div>
                   );
                 })()}
-                {dispatchMode === 'multiple' && (
+                {dispatchMode === 'multiple' && selectedReserveFleetId === 'manual' && (
                   <div className="text-[9px] text-amber-400 font-mono italic">
                     Allocated forces will be divided evenly across {dispatchNumFleets} separate tactical squadrons to execute simultaneous tasks.
                   </div>
@@ -3006,21 +3175,20 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
               <button 
                 onClick={handleLaunchFleet}
-                disabled={!isMissionReady}
+                disabled={!isMissionReady || isLaunchingReserve}
                 className={`w-full px-5 py-3 text-[10px] uppercase font-black tracking-widest text-[#05070A] rounded-xl flex items-center justify-center gap-2 transition-all duration-155 ${
-                  isMissionReady
+                  isMissionReady && !isLaunchingReserve
                     ? 'bg-gradient-to-r from-cyan-400 to-indigo-500 hover:brightness-110 active:scale-[0.98] cursor-pointer shadow-[0_0_20px_rgba(34,211,238,0.3)] font-bold'
                     : 'bg-slate-800 border border-slate-900 text-slate-500 cursor-not-allowed opacity-60'
                 }`}
               >
                 <Zap size={11} fill="currentColor" /> 
-                {isMissionReady 
-                  ? `LAUNCH ${dispatchMode === 'multiple' ? `${dispatchNumFleets} SEPARATE FLEET` : 'SINGLE FLEET'} MISSIONS` 
-                  : 'ALLOCATE TROOPS FROM DOCKING BAY ABOVE'}
+                {isLaunchingReserve ? 'LAUNCHING RESERVE FLEET...' : (isMissionReady 
+                  ? `LAUNCH ${selectedReserveFleetId !== 'manual' ? 'RESERVE FLEET' : (dispatchMode === 'multiple' ? `${dispatchNumFleets} SEPARATE FLEET` : 'SINGLE FLEET')} MISSIONS` 
+                  : 'ALLOCATE TROOPS FROM DOCKING BAY ABOVE')}
               </button>
             </div>
           </div>
-        </div>
         );
       })()}
 

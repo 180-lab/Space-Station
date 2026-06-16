@@ -277,4 +277,19 @@ export interface LeaderboardPlayer {
   lastActive?: number;
 }
 
+export interface CreatedFleet {
+  id: string;
+  name: string;
+  subsidiary: string;
+  troops: {
+    defender: number;
+    attacker: number;
+    tank: number;
+    looter: number;
+    drone: number;
+    settlementShip: number;
+  };
+  planetId: string;
+}
+
 export { getUpgradeWeights, getUpgradeResourceCost } from './gameUtils';
