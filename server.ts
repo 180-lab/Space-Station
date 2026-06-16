@@ -1709,6 +1709,8 @@ function runAISimulatedActivity(now: number) {
 // Global loop logic
 loadState().then(() => {
   console.log("Game Engine database/file systems synced and initialized!");
+}).catch(err => {
+  console.error("Game Engine CRITICAL sync error on startup:", err);
 });
 setInterval(() => {
   const now = Date.now();
@@ -2761,6 +2763,11 @@ app.post("/api/fleet/send", (req, res) => {
   const { planetId, missionType, troops, targetId, targetName, targetBuilding } = req.body;
   const targetX = parseInt(String(req.body.targetX), 10);
   const targetY = parseInt(String(req.body.targetY), 10);
+  
+  if (isNaN(targetX) || isNaN(targetY)) {
+    return res.status(400).json({ error: "Invalid target coordinates. Directives must specify a numeric zone on the coordinate grid." });
+  }
+
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
 
@@ -3735,4 +3742,6 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error("CRITICAL: Failed to start server:", err);
+});

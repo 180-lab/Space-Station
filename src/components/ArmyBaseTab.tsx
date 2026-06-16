@@ -398,7 +398,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
             targetY: directLaunchY,
             missionType: directMissionType,
             troops: fleet.troops as any,
-            targetBuilding: (fleet.troops.tank || 0) > 0 ? directTargetBuilding : undefined
+            targetBuilding: (fleet.troops.tank || 0) > 0 ? directTargetBuilding : undefined,
+            planetId: activePlanet.id
           });
         }
 

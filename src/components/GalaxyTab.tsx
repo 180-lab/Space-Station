@@ -440,7 +440,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             targetId: selectedTarget.id || undefined,
             targetName: selectedTarget.planetName || `Sector [${selectedTarget.coords.x}, ${selectedTarget.coords.y}]`,
             targetBuilding: (fleet.troops.tank || 0) > 0 ? targetBuilding : undefined,
-            numFleets: 1
+            numFleets: 1,
+            planetId: activePlanet.id
           });
 
           // Step 3: Remove the reserve fleet since it's now an active traveler!
@@ -465,7 +466,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         targetId: selectedTarget.id || undefined,
         targetName: selectedTarget.planetName || `Sector [${selectedTarget.coords.x}, ${selectedTarget.coords.y}]`,
         targetBuilding: (fleetTroops.tank || 0) > 0 ? targetBuilding : undefined,
-        numFleets: dispatchMode === 'multiple' ? dispatchNumFleets : 1
+        numFleets: dispatchMode === 'multiple' ? dispatchNumFleets : 1,
+        planetId: activePlanet.id
       });
       setSelectedTarget(null);
       setDispatchMode('single');
@@ -2327,8 +2329,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                             setActionPlanetId(isSelected && actionType === 'attack' ? null : planet.id);
                             setActionType('attack');
                             setCustomTroops({ ...planet.troops });
-                            setCustomX(player.planets[0].sectorX.toString());
-                            setCustomY(player.planets[0].sectorY.toString());
+                            setCustomX('');
+                            setCustomY('');
                             setCustomNumFleets(1);
                           }}
                           className={`px-3 py-1.5 rounded-lg border text-[10px] uppercase font-bold tracking-wider transition cursor-pointer ${
@@ -2541,7 +2543,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 missionType: mType,
                                 troops: customTroops,
                                 targetName: `Sector [${xVal}, ${yVal}]`,
-                                numFleets: customNumFleets
+                                numFleets: customNumFleets,
+                                planetId: planet.id
                               });
 
                               setActionPlanetId(null);

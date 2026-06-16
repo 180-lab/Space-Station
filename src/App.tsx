@@ -164,86 +164,6 @@ export default function App() {
     localStorage.setItem('space_station_created_fleets_v1', JSON.stringify(createdFleets));
   }, [createdFleets]);
 
-  const activeTabRef = useRef(activeTab);
-  useEffect(() => {
-    activeTabRef.current = activeTab;
-  }, [activeTab]);
-
-  // Mobile swipe gestures handler for seamless tab switching
-  useEffect(() => {
-    const touchStartCoords = { x: 0, y: 0 };
-
-    const handleWindowTouchStart = (e: TouchEvent) => {
-      const touch = e.touches[0];
-      touchStartCoords.x = touch.clientX;
-      touchStartCoords.y = touch.clientY;
-    };
-
-    const handleWindowTouchEnd = (e: TouchEvent) => {
-      const touch = e.changedTouches[0];
-      const diffX = touch.clientX - touchStartCoords.x;
-      const diffY = touch.clientY - touchStartCoords.y;
-
-      // Ensure it is primarily a horizontal gesture
-      if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 80) {
-        return;
-      }
-
-      const minSwipeDistance = 75; // px horizontal threshold
-      if (Math.abs(diffX) < minSwipeDistance) return;
-
-      // Exclude form controls/buttons so we don't interfere with slider interactions
-      const target = e.target as HTMLElement;
-      if (
-        !target ||
-        target.tagName === 'INPUT' ||
-        target.tagName === 'SELECT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'BUTTON' ||
-        target.closest('input') ||
-        target.closest('select') ||
-        target.closest('textarea') ||
-        target.closest('button') ||
-        target.closest('.no-swipe')
-      ) {
-        return;
-      }
-
-      const tabsOrder: ('explore' | 'army' | 'galaxy' | 'research' | 'settings')[] = [
-        'explore',
-        'army',
-        'galaxy',
-        'research',
-        'settings'
-      ];
-
-      const currentIndex = tabsOrder.indexOf(activeTabRef.current);
-      if (currentIndex === -1) return;
-
-      if (diffX > 0) {
-        // Swiped right -> go to previous tab
-        const prevIndex = currentIndex - 1;
-        if (prevIndex >= 0) {
-          setActiveTab(tabsOrder[prevIndex]);
-        }
-      } else {
-        // Swiped left -> go to next tab
-        const nextIndex = currentIndex + 1;
-        if (nextIndex < tabsOrder.length) {
-          setActiveTab(tabsOrder[nextIndex]);
-        }
-      }
-    };
-
-    window.addEventListener('touchstart', handleWindowTouchStart, { passive: true });
-    window.addEventListener('touchend', handleWindowTouchEnd, { passive: true });
-
-    return () => {
-      window.removeEventListener('touchstart', handleWindowTouchStart);
-      window.removeEventListener('touchend', handleWindowTouchEnd);
-    };
-  }, []);
-
   // Selected active colony planet ID
   const [selectedPlanetId, setSelectedPlanetId] = useState<string | null>(null);
   const [showInitialStationNaming, setShowInitialStationNaming] = useState(false);
@@ -959,9 +879,10 @@ export default function App() {
     targetName?: string;
     targetBuilding?: string;
     numFleets?: number;
+    planetId?: string;
   }) => {
     if (!player) return;
-    const currentPlanet = player.planets.find(pl => pl.id === selectedPlanetId) || player.planets[0];
+    const currentPlanet = player.planets.find(pl => pl.id === (mission.planetId || selectedPlanetId)) || player.planets[0];
     
     let troopSpeedLevel = 1;
     let defenseShieldsLevel = 1;
