@@ -46,7 +46,7 @@ try {
       );
 
       const envVars = (import.meta as any).env || {};
-      const fallbackCloudUrl = envVars.VITE_API_BASE_URL || 'https://ais-pre-b3fusvtmpzbes4i5sek2jk-304053633303.europe-west2.run.app';
+      const fallbackCloudUrl = envVars.VITE_API_BASE_URL || 'https://space-station-commander.onrender.com';
       const cleanCloudBase = fallbackCloudUrl.endsWith('/') ? fallbackCloudUrl.slice(0, -1) : fallbackCloudUrl;
 
       // Helper function to dynamically add skip-warning headers for tunnels

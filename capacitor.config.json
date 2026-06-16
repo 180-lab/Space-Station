@@ -9,7 +9,8 @@
       "*.ngrok-free.dev",
       "34.35.146.110",
       "*-run.app",
-      "*.run.app"
+      "*.run.app",
+      "*.onrender.com"
     ]
   }
 }

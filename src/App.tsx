@@ -1608,14 +1608,14 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setBackendUrl('https://ais-dev-b3fusvtmpzbes4i5sek2jk-304053633303.europe-west2.run.app');
-                        localStorage.setItem('space_station_backend_url', 'https://ais-dev-b3fusvtmpzbes4i5sek2jk-304053633303.europe-west2.run.app');
-                        showToast(`Pointed to Cloud Run Dev Server (https://ais-dev-b3fusvtmpzbes4i5sek2jk-304053633303.europe-west2.run.app)`, 'success');
+                        setBackendUrl('https://space-station-commander.onrender.com');
+                        localStorage.setItem('space_station_backend_url', 'https://space-station-commander.onrender.com');
+                        showToast(`Pointed to Render Production Server (https://space-station-commander.onrender.com)`, 'success');
                         setTimeout(() => window.location.reload(), 1000);
                       }}
                       className="px-2.5 py-1.5 bg-cyan-950/40 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:text-white rounded text-[10px] font-mono transition cursor-pointer select-none font-bold"
                     >
-                      🚀 Dev Server (Cloud Run)
+                      🚀 Render Live Server
                     </button>
                     <button
                       type="button"
