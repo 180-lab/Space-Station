@@ -507,9 +507,10 @@ export default function App() {
             commsHub: 'Communications Hub',
             researchCenter: 'Research Center',
             armyBase: 'War Room',
-            repository: 'Repository',
+            repository: 'Silo',
             radar: 'Radar Array',
-            supplyNexus: 'Supply Nexus'
+            supplyNexus: 'Supply Nexus',
+            fabricator: 'Fabricator'
           };
           const bName = bNames[key] || key;
           showToast(`🚀 CONSTRUCTION RESOLVED: ${bName} construction finished! Upgraded to Level ${lvl}.`, 'success');
@@ -2058,6 +2059,9 @@ export default function App() {
             onToggleSave={toggleSaveReport}
             onForwardReport={handleForwardReport}
             onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
+            createdFleets={createdFleets}
+            setCreatedFleets={setCreatedFleets}
+            onUpdatePlayer={setPlayer}
           />
         )}
 

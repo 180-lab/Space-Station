@@ -105,10 +105,11 @@ const RESOURCE_INFO: Record<ResourceType, { name: string; color: string; icon: a
 };
 
 const BUILDING_INFO: Record<string, { name: string; desc: string; icon: string }> = {
+  fabricator: { name: 'Fabricator', desc: 'Core orbital printer. Crucial for manufacturing, constructing, and restoring modular structures on this station.', icon: '🏗️' },
   commsHub: { name: 'Communications Hub', desc: 'Secure interline network frequency to join alliances, manage roles, negotiate covenants, and deploy galaxy chat.', icon: '📡' },
   researchCenter: { name: 'Research Center', desc: 'Purity laboratory. Decreases travel or production speed of your troops by up to 70% at Lv.20. Crucial for colonization.', icon: '🧪' },
   armyBase: { name: 'War Room', desc: 'Troop command space force. Recruit interceptors, assault drones, matter extractors, disrupters, missile tanks, and settlement ships.', icon: '🎖️' },
-  repository: { name: 'Repository', desc: 'Secure vaults storing your resource mines. Max level 45, holds up to 5,000,000 of each fluid.', icon: '🗄️' },
+  repository: { name: 'Silo', desc: 'Secure vaults storing your resource mines. Max level 45, holds up to 5,000,000 of each fluid.', icon: '🗄️' },
   radar: { name: 'Radar Array', desc: 'Long-range sector radar scanners. Expands tactical awareness across coordinates.', icon: '🛰️' },
   supplyNexus: { name: 'Supply Nexus', desc: 'A quantum portal linking coordinates to core supplies. Max level 50, dispatches a total of 5,000,000 resources (1,000,000 of each type) directly to base storage when maxed.', icon: '🌌' }
 };
@@ -1045,6 +1046,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
               const cost = targetLvl * 150;
               const upgradeTimeMins = targetLvl * 2;
               const isExpanded = expandedBuilding === bKey;
+              const isFabricatorRequiredMissing = bKey !== 'fabricator' && bKey !== 'commsHub' && bKey !== 'repository' && (!activePlanet.buildings.fabricator || activePlanet.buildings.fabricator.level < 1);
 
               return (
                 <div 
@@ -1065,8 +1067,12 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                       <div className="space-y-1">
                         <div className="flex items-center gap-2.5 flex-wrap">
                           <span className="font-bold text-white text-base font-mono">{info.name}</span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 text-pink-400 border border-[#1E293B]">
-                            Lv. {bState.level} / {bState.maxLevel}
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                            bState.level === 0 
+                              ? 'bg-slate-950 text-slate-500 border-slate-800' 
+                              : 'bg-slate-900 text-pink-400 border-[#1E293B]'
+                          }`}>
+                            Lv. {bState.level} / {bState.maxLevel} {bState.level === 0 && '(Unconstructed)'}
                           </span>
                           {bState.health !== undefined && bState.health < 100 && (
                             <span className="px-2 py-0.5 rounded bg-red-950/40 text-red-400 border border-red-900/30 text-[10px] font-mono font-bold animate-pulse">
@@ -1079,7 +1085,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                     </div>
                     <div className="flex items-center gap-4 ml-4 shrink-0">
                       {bState.isUpgrading && (
-                        <span className="text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-mono font-bold animate-pulse">Upgrading {getTimerString(bState.upgradeEnd)}</span>
+                        <span className="text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-mono font-bold animate-pulse">
+                          {bState.level === 0 ? 'Constructing' : 'Upgrading'} {getTimerString(bState.upgradeEnd)}
+                        </span>
                       )}
                       {isExpanded ? (
                         <ChevronUp size={18} className="text-red-500 cursor-pointer" />
@@ -1092,6 +1100,12 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                   {/* Expanded Building Detail Panel */}
                   {isExpanded && (
                     <div className="border-t border-[#1E293B]/60 p-4 bg-slate-950/20 space-y-4 animate-fade-in">
+                      {isFabricatorRequiredMissing && (
+                        <div className="p-3 border border-red-500/20 bg-red-950/40 rounded-xl text-red-400 text-xs font-mono text-left">
+                          ⚠️ REQUIREMENT: A Fabricator at level 1 or higher is required to construct or upgrade this structure. Please construct/upgrade the Fabricator modular structure first!
+                        </div>
+                      )}
+
                       {bState.level < bState.maxLevel && (
                         <div className="pt-0.5 select-none text-left">
                           <span className="text-emerald-400 font-bold bg-emerald-950/30 border border-emerald-900/20 px-1.5 py-0.5 rounded text-[10px] font-mono inline-flex items-center gap-1.5" title="Every building upgrade increases your account population score by 30 points">
@@ -1172,11 +1186,15 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         <span className="text-[10px] text-slate-500 font-mono uppercase font-bold">Actions & Progress Control:</span>
                         {bState.isUpgrading ? (
                           <div className="flex flex-col items-end gap-1.5 font-mono">
-                            <div className="flex items-center gap-1.5 text-xs text-amber-400" title="Building upgrade in progress. Countdown until build completion.">
+                            <div className="flex items-center gap-1.5 text-xs text-amber-400" title="Building progress in progress. Countdown until build completion.">
                               <Clock size={12} className="animate-spin" title="Spinning build progress timer" />
-                              <span>Upgrading {getTimerString(bState.upgradeEnd)}</span>
+                              <span>{bState.level === 0 ? 'Constructing' : 'Upgrading'} {getTimerString(bState.upgradeEnd)}</span>
                             </div>
                           </div>
+                        ) : isFabricatorRequiredMissing ? (
+                          <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-3 py-1.5 rounded" title="Fabricator modular structure at level 1 or higher is required.">
+                            🔒 FABRICATOR REQUIRED
+                          </span>
                         ) : bState.level >= bState.maxLevel && !(bState.health !== undefined && bState.health < 100) ? (
                           <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase font-mono bg-slate-900 border border-slate-850 px-2 py-1 rounded">MAX CAP</span>
                         ) : bState.health !== undefined && bState.health < 100 ? (
@@ -1194,7 +1212,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                             className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer"
                             type="button"
                           >
-                            <span className="text-emerald-400">Queue Upgrade</span>
+                            <span className="text-emerald-400">{bState.level === 0 ? 'Queue Construction' : 'Queue Upgrade'}</span>
                             <span className="text-amber-400 font-extrabold">(15 SG)</span>
                           </button>
                         ) : (
@@ -1203,7 +1221,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                             className="px-4 py-2 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 hover:shadow-[0_0_12px_rgba(236,72,153,0.25)] border border-pink-500/35 rounded-xl transition duration-150 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 cursor-pointer"
                             type="button"
                           >
-                            <span>Upgrade</span>
+                            <span>{bState.level === 0 ? 'Construct' : 'Upgrade'}</span>
                             <span className="text-slate-500">({upgradeTimeMins}m)</span>
                           </button>
                         )}

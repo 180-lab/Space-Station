@@ -2141,23 +2141,25 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
                               {/* Buildings Dropdown collapsible (works like explore tab) */}
                               {(() => {
-                                const reportBuildings = report.buildings || { commsHub: 1, radar: 1, repository: 1, researchCenter: 1, armyBase: 1, supplyNexus: 1 };
+                                const reportBuildings = report.buildings || { fabricator: 1, commsHub: 1, radar: 1, repository: 1, researchCenter: 1, armyBase: 1, supplyNexus: 1 };
                                 return (
                                   <div className="space-y-1.5 border-t border-white/5 pt-3">
                                     <h5 className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-2 font-mono">🏢 Detected Buildings (Click to toggle details)</h5>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
                                       {Object.entries({
+                                        fabricator: 'Fabricator',
                                         commsHub: 'Communications Hub',
                                         radar: 'Radar Array',
                                         researchCenter: 'Research Center',
                                         armyBase: 'War Room',
-                                        repository: 'Repository',
+                                        repository: 'Silo',
                                         supplyNexus: 'Supply Nexus'
                                       }).map(([bKey, bName]) => {
                                         const uniqueKey = `${report.id}-${bKey}`;
                                         const isBExpanded = expandedReportBuildings[uniqueKey] ?? false;
                                         const lvl = reportBuildings[bKey] || 1;
                                         const detailsText = {
+                                          fabricator: 'Core modular orbital structural manufacturer and printer.',
                                           commsHub: 'Relay link coordinates encryption. Enables alliance parameters system logs.',
                                           radar: 'Thermal scan coordinates grid. Detects nearby hostile outpost targets.',
                                           researchCenter: 'Particle laboratories. Speeds up tactical tech upgrades and build velocities.',
@@ -3030,10 +3032,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     >
                       <option value="random">Random Structure (Default)</option>
                       <optgroup label="Colony Buildings" className="bg-[#05070A] text-slate-300">
+                        <option value="fabricator">Fabricator</option>
                         <option value="commsHub">Communications Hub</option>
                         <option value="researchCenter">Research Center</option>
                         <option value="armyBase">War Room</option>
-                        <option value="repository">Repository</option>
+                        <option value="repository">Silo</option>
                         <option value="radar">Radar Array</option>
                         <option value="supplyNexus">Supply Nexus</option>
                       </optgroup>
@@ -3402,7 +3405,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
                     {/* Integrated Interactive Buildings List (Works like Explore Tab dropdowns) */}
                     {(() => {
-                      const reportBuildings = intelReport.buildings || { commsHub: 1, radar: 1, repository: 1, researchCenter: 1, armyBase: 1, supplyNexus: 1 };
+                      const reportBuildings = intelReport.buildings || { fabricator: 1, commsHub: 1, radar: 1, repository: 1, researchCenter: 1, armyBase: 1, supplyNexus: 1 };
                       
                       return (
                         <div className="space-y-2 border-t border-[#1E293B]/60 pt-4">
@@ -3411,16 +3414,18 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           </h4>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                             {Object.entries({
+                              fabricator: 'Fabricator',
                               commsHub: 'Communications Hub',
                               radar: 'Radar Array',
                               researchCenter: 'Research Center',
                               armyBase: 'War Room',
-                              repository: 'Repository',
+                              repository: 'Silo',
                               supplyNexus: 'Supply Nexus'
                             }).map(([bKey, bName]) => {
                               const isExpanded = intelPopupExpandedBuildings[bKey] ?? false;
                               const level = reportBuildings[bKey] || 1;
                               const details = {
+                                fabricator: 'Core modular orbital structural manufacturer and printer.',
                                 commsHub: 'Tactical systems communications node. Dictates system message updates, coordinate signals, and war alliance parameters.',
                                 radar: 'High-frequency telemetry radar system. Dictates scan width of space lords and reveals unchartered planetary stars.',
                                 researchCenter: 'Scientific particle physics laboratory. Dictates upgrades of fleet technologies and research build times.',

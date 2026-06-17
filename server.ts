@@ -1,6 +1,8 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import http from "http";
+import https from "https";
 import { 
   GameState, 
   PlayerProfile, 
@@ -112,6 +114,97 @@ function saveState() {
   });
 }
 
+// Normalize GameState to ensure all newly-added properties exist across legacy states
+function normalizeState(s: GameState) {
+  if (!s) return;
+  if (!s.players) s.players = {};
+  if (!s.alliances) s.alliances = {};
+  if (!s.chatMessages) s.chatMessages = [];
+  if (!s.fleets) s.fleets = [];
+  if (!s.battleReports) s.battleReports = [];
+  if (!s.newsEvents) s.newsEvents = [];
+  if (!s.feedbacks) s.feedbacks = [];
+
+  Object.values(s.players).forEach((p) => {
+    if (!p) return;
+    if (!p.scores) {
+      p.scores = { population: 100, attack: 0, defence: 0, raiders: 0 };
+    }
+    if (!p.achievements) {
+      p.achievements = [];
+    }
+    if (!p.credits || p.credits < 10000) {
+      p.credits = 10000;
+    }
+    if (!Array.isArray(p.planets)) {
+      p.planets = [];
+    }
+
+    p.planets.forEach((pl: any) => {
+      if (!pl) return;
+      if (pl.name && typeof pl.name === "string" && pl.name.includes("Outpost")) {
+        pl.name = pl.name.replace(/Outpost/g, "Station");
+      }
+      
+      // Ensure all troops are present
+      if (!pl.troops) pl.troops = {};
+      const troopDefaults: Record<string, number> = {
+        defender: 12500,
+        attacker: 28600,
+        tank: 100,
+        looter: 1000,
+        drone: 100,
+        settlementShip: 0
+      };
+      Object.keys(troopDefaults).forEach(tKey => {
+        if (pl.troops[tKey] === undefined) {
+          pl.troops[tKey] = troopDefaults[tKey];
+        }
+      });
+
+      if (!pl.trainingQueue) {
+        pl.trainingQueue = [];
+      }
+      if (!pl.upgradeQueue) {
+        pl.upgradeQueue = [];
+      }
+
+      // Ensure all buildings are present and conform
+      if (!pl.buildings) pl.buildings = {};
+      
+      const buildingDefaults: Record<string, { level: number, maxLevel: number }> = {
+        fabricator: { level: 1, maxLevel: 30 },
+        commsHub: { level: 1, maxLevel: 50 },
+        researchCenter: { level: 1, maxLevel: 20 },
+        armyBase: { level: 1, maxLevel: 30 },
+        repository: { level: 1, maxLevel: 45 },
+        radar: { level: 1, maxLevel: 15 },
+        supplyNexus: { level: 1, maxLevel: 50 }
+      };
+
+      Object.entries(buildingDefaults).forEach(([bKey, bDef]) => {
+        if (!pl.buildings[bKey]) {
+          pl.buildings[bKey] = {
+            level: bKey === 'fabricator' || bKey === 'commsHub' || bKey === 'repository' ? 1 : 0,
+            maxLevel: bDef.maxLevel,
+            isUpgrading: false,
+            upgradeEnd: null,
+            health: 100
+          };
+        } else {
+          // Fill missing properties inside structure
+          const bObj = pl.buildings[bKey];
+          if (bObj.level === undefined) bObj.level = bKey === 'fabricator' || bKey === 'commsHub' || bKey === 'repository' ? 1 : 0;
+          if (bObj.maxLevel === undefined) bObj.maxLevel = bDef.maxLevel;
+          if (bObj.isUpgrading === undefined) bObj.isUpgrading = false;
+          if (bObj.upgradeEnd === undefined) bObj.upgradeEnd = null;
+          if (bObj.health === undefined) bObj.health = 100;
+        }
+      });
+    });
+  });
+}
+
 // Load state helper
 async function loadState() {
   try {
@@ -119,6 +212,7 @@ async function loadState() {
     const dbState = await loadStateFromDB();
     if (dbState && Object.keys(dbState.players).length > 0) {
       state = dbState;
+      normalizeState(state);
       console.log("Successfully restored active state from Cloud SQL! Players count:", Object.keys(state.players).length);
       return;
     }
@@ -162,6 +256,9 @@ async function loadState() {
                 if (!pl.buildings.supplyNexus) {
                   pl.buildings.supplyNexus = { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null };
                 }
+                if (!pl.buildings.fabricator) {
+                  pl.buildings.fabricator = { level: 1, maxLevel: 30, isUpgrading: false, upgradeEnd: null, health: 100 };
+                }
               }
             });
           }
@@ -185,6 +282,8 @@ async function loadState() {
         ];
       }
 
+      normalizeState(state);
+
       // Initial save to seed Cloud SQL
       saveState();
       
@@ -192,17 +291,19 @@ async function loadState() {
     } else {
       console.log("No existing state file found. Bootstrapping universe...");
       bootstrapUniverse();
+      normalizeState(state);
       saveState();
     }
   } catch (err) {
     console.error("Failed to load state", err);
     bootstrapUniverse();
+    normalizeState(state);
     saveState();
   }
 }
 
 // Create initial planet
-function createInitialPlanet(name: string, sectorX: number, sectorY: number): ColonyPlanet {
+function createInitialPlanet(name: string, sectorX: number, sectorY: number, isFirstStation: boolean = false): ColonyPlanet {
   const createMines = (count: number): MineState[] => {
     return Array.from({ length: count }, (_, i) => ({
       index: i,
@@ -227,12 +328,13 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number): Co
       respirant: createMines(3)
     },
     buildings: {
+      fabricator: { level: 1, maxLevel: 30, isUpgrading: false, upgradeEnd: null, health: 100 },
       commsHub: { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 },
-      researchCenter: { level: 1, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
-      armyBase: { level: 1, maxLevel: 30, isUpgrading: false, upgradeEnd: null, health: 100 },
+      researchCenter: { level: isFirstStation ? 1 : 0, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
+      armyBase: { level: isFirstStation ? 1 : 0, maxLevel: 30, isUpgrading: false, upgradeEnd: null, health: 100 },
       repository: { level: 1, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
-      radar: { level: 1, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
-      supplyNexus: { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 }
+      radar: { level: isFirstStation ? 1 : 0, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
+      supplyNexus: { level: isFirstStation ? 1 : 0, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 }
     },
     resources: {
       water: 5000,
@@ -305,7 +407,7 @@ function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarg
     if (computedHealth > 0) {
       targetState.health = computedHealth;
       buildingDamageReports.push({
-        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Repository" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName,
+        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName,
         levelsDestroyed: 0,
         previousLevel: prevLvl,
         newLevel: prevLvl
@@ -322,7 +424,7 @@ function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarg
       targetState.health = newHealth;
 
       buildingDamageReports.push({
-        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Repository" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName,
+        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName,
         levelsDestroyed: levelsLost,
         previousLevel: prevLvl,
         newLevel: newLvl
@@ -1767,9 +1869,10 @@ app.post("/api/register", (req, res) => {
   const startX = Math.floor(Math.random() * 90) + 5;
   const startY = Math.floor(Math.random() * 90) + 5;
 
-  const planet = createInitialPlanet(`${username}'s Station`, startX, startY);
+  const planet = createInitialPlanet(`${username}'s Station`, startX, startY, true);
   
   // Max out default user station buildings
+  if (planet.buildings.fabricator) planet.buildings.fabricator.level = planet.buildings.fabricator.maxLevel;
   planet.buildings.commsHub.level = planet.buildings.commsHub.maxLevel;
   planet.buildings.researchCenter.level = planet.buildings.researchCenter.maxLevel;
   planet.buildings.armyBase.level = planet.buildings.armyBase.maxLevel;
@@ -1899,8 +2002,9 @@ app.post("/api/auth/google", (req, res) => {
   const startY = Math.floor(Math.random() * 90) + 5;
 
   const defaultUsername = username || email.split("@")[0];
-  const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY);
+  const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY, true);
   
+  if (planet.buildings.fabricator) planet.buildings.fabricator.level = planet.buildings.fabricator.maxLevel;
   planet.buildings.commsHub.level = planet.buildings.commsHub.maxLevel;
   planet.buildings.researchCenter.level = planet.buildings.researchCenter.maxLevel;
   planet.buildings.armyBase.level = planet.buildings.armyBase.maxLevel;
@@ -2248,6 +2352,14 @@ app.post("/api/upgrade/building", (req, res) => {
 
   const building = planet.buildings[buildingKey as keyof typeof planet.buildings] as BuildingState;
   if (!building) return res.status(404).json({ error: "Building not found" });
+
+  // Pre-requisite check: Fabricator must be level >= 1 to construct/upgrade other structures (except Fabricator, Comms Hub, Silo/Repository itself)
+  if (buildingKey !== "fabricator" && buildingKey !== "commsHub" && buildingKey !== "repository") {
+    const fab = planet.buildings.fabricator;
+    if (!fab || fab.level < 1) {
+      return res.status(400).json({ error: "A Fabricator level 1 or higher is required to construct or upgrade other modular structures." });
+    }
+  }
 
   // Enforce 1 upgrade at a time (buildings or mines) limit per colony planet
   const isBuildingUpgrading = Object.values(planet.buildings).some((b: any) => b.isUpgrading);
@@ -2848,13 +2960,37 @@ app.post("/api/fleet/send", (req, res) => {
 
   const travelTimeMs = Math.round((dist / slowestTroopSpeed) * 60000);
 
+  let resolvedTargetId = targetId || null;
+  let resolvedTargetName = targetName || `Sector [${targetX}, ${targetY}]`;
+
+  // Dynamically resolve target coordinates if targetId is missing/omitted
+  if (!resolvedTargetId) {
+    for (const playerObj of Object.values(state.players)) {
+      const pl = playerObj.planets.find(p => p.sectorX === targetX && p.sectorY === targetY);
+      if (pl) {
+        resolvedTargetId = playerObj.id;
+        resolvedTargetName = pl.name || `${playerObj.username}'s Station`;
+        break;
+      }
+    }
+  }
+
+  // Also check if matches any habitable zone uncolonized
+  if (!resolvedTargetId && state.habitablePlanets) {
+    const hp = state.habitablePlanets.find(item => item.coords.x === targetX && item.coords.y === targetY);
+    if (hp) {
+      resolvedTargetId = "habitable";
+      resolvedTargetName = hp.name;
+    }
+  }
+
   const mission: FleetMission = {
     id: `fleet_${Math.random().toString(36).substr(2, 9)}`,
     senderId: p.id,
     senderName: p.username,
     senderCoords: { x: planet.sectorX, y: planet.sectorY },
-    targetId: targetId || null,
-    targetName: targetName || `Sector [${targetX}, ${targetY}]`,
+    targetId: resolvedTargetId,
+    targetName: resolvedTargetName,
     targetCoords: { x: targetX, y: targetY },
     missionType: missionType as "attack" | "recon" | "colonize" | "move",
     troops: troopSend,
@@ -3739,7 +3875,60 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Universe active. Server listening on http://0.0.0.0:${PORT}`);
+    setupKeepAlivePings();
   });
+}
+
+// Background Self-Ping Keep-Alive system to prevent Cloud Run sleep states
+function setupKeepAlivePings() {
+  const PING_INTERVAL_MS = 14 * 60 * 1000; // Exactly 14 minutes
+  const pingTargets = [
+    `http://127.0.0.1:${PORT}/api/health`,
+    "https://ais-dev-b3fusvtmpzbes4i5sek2jk-304053633303.europe-west2.run.app/api/health",
+    "https://ais-pre-b3fusvtmpzbes4i5sek2jk-304053633303.europe-west2.run.app/api/health"
+  ];
+
+  console.log(`[Keep-Alive] Initializing self-ping scheduler. Frequency: every 14 minutes.`);
+
+  // Execute first check after 30 seconds
+  setTimeout(() => {
+    executePings();
+  }, 30 * 1000);
+
+  // Set recurring interval
+  setInterval(() => {
+    executePings();
+  }, PING_INTERVAL_MS);
+
+  function executePings() {
+    console.log(`[Keep-Alive] Initiating self-ping transmission loop at ${new Date().toISOString()}`);
+    pingTargets.forEach((targetUrl) => {
+      try {
+        const isHttps = targetUrl.startsWith("https:");
+        const client = isHttps ? https : http;
+        
+        const req = client.get(targetUrl, {
+          headers: { "User-Agent": "AISTUDIO-BUILD-KEEPALIVE-COCKPIT/1.0" },
+          timeout: 10000
+        }, (res) => {
+          console.log(`[Keep-Alive] Ping to ${targetUrl} completed. Code: ${res.statusCode}`);
+          // Consume response body to release memory/socket
+          res.resume();
+        });
+
+        req.on("error", (err) => {
+          console.log(`[Keep-Alive] Ping to ${targetUrl} failed with networking message: ${err.message}`);
+        });
+
+        req.on("timeout", () => {
+          console.log(`[Keep-Alive] Ping to ${targetUrl} timed out after 10000ms`);
+          req.destroy();
+        });
+      } catch (err: any) {
+        console.log(`[Keep-Alive] Fatal exception attempting ping on ${targetUrl}: ${err.message}`);
+      }
+    });
+  }
 }
 
 startServer().catch(err => {

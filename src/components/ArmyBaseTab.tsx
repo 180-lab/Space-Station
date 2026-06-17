@@ -1470,10 +1470,11 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                     >
                                       <option value="random">Random Structure (Default)</option>
                                       <optgroup label="Colony Buildings" className="bg-[#05070A] text-slate-300">
+                                        <option value="fabricator">Fabricator</option>
                                         <option value="commsHub">Communications Hub</option>
                                         <option value="researchCenter">Research Center</option>
                                         <option value="armyBase">War Room</option>
-                                        <option value="repository">Repository</option>
+                                        <option value="repository">Silo</option>
                                         <option value="radar">Radar Array</option>
                                         <option value="supplyNexus">Supply Nexus</option>
                                       </optgroup>

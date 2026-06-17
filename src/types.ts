@@ -62,6 +62,7 @@ export interface ColonyPlanet {
     repository: BuildingState;    // Max 45
     radar: BuildingState;         // Max 15
     supplyNexus: BuildingState;   // Max 50
+    fabricator: BuildingState;    // Max 30
   };
   resources: {
     water: number;
