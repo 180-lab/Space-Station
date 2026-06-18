@@ -70,9 +70,14 @@ interface GalaxyTabProps {
 }
 
 async function safeParseJson(res: Response): Promise<any> {
-  const contentType = res.headers.get('content-type');
-  if (!contentType || !contentType.includes('application/json')) {
-    const text = await res.text();
+  const contentType = res.headers.get('content-type') || 'text/html';
+  if (!contentType.includes('application/json')) {
+    let text = '';
+    try {
+      text = await res.text();
+    } catch {
+      // Ignore text read error
+    }
     const hasCookieCheck = 
       text.includes('Cookie check') || 
       text.includes('blocking a required security cookie') ||
@@ -80,9 +85,13 @@ async function safeParseJson(res: Response): Promise<any> {
     if (hasCookieCheck) {
       throw new Error('Galactic Sandbox security check: Please grant iframe cookie permissions or refresh the page.');
     }
-    throw new Error(`Server gateway is currently stabilizing. Reconnecting... (Expected JSON, received ${contentType || 'text/html'})`);
+    throw new Error('Galaxy communications terminal is stabilizing. Reconnecting...');
   }
-  return res.json();
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
 }
 
 const TROOP_NAME_MAPPING: Record<string, string> = {
@@ -682,7 +691,19 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
       {/* SUB TAB 1: RADAR SCANNER */}
       {subTab === 'scanner' && (
-        <div className="space-y-5">
+        activePlanet.buildings.radar?.level === 0 ? (
+          <div className="p-8 border border-red-500/20 bg-[#0A0F1D]/80 backdrop-blur-md rounded-2xl text-center space-y-4 max-w-xl mx-auto shadow-xl font-mono mt-4">
+            <div className="text-4xl text-red-100">📡</div>
+            <h3 className="text-sm font-extrabold text-red-400 uppercase tracking-widest">
+              RADAR ARRAY OFFLINE
+            </h3>
+            <p className="text-xs text-slate-350 font-sans leading-relaxed">
+              This secondary colony station does not possess an active Radar system. 
+              Navigate to your <strong>Established Structures</strong> or <strong>Unlocked Blueprints</strong> in the station commands tab to construct a Radar Array first before scanning nearby star sectors.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-5">
           {/* Coordinates Search */}
           <form onSubmit={handleSearchSubmit} className="p-4 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="flex-1 grid grid-cols-2 gap-3 text-xs">
@@ -991,6 +1012,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             )}
           </div>
         </div>
+        )
       )}
 
       {/* SUB TAB 2: LEADERBOARD */}

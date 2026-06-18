@@ -15,12 +15,12 @@ import {
   NewsEvent, 
   Alliance,
   ResourceType,
+  CommandMessage,
 } from "./src/types";
 import { getUpgradeResourceCost } from "./src/gameUtils";
-import { loadStateFromDB, saveStateToDB } from "./src/db/state-sync.ts";
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+const PORT = process.env.NODE_ENV === "production" ? (process.env.PORT ? parseInt(process.env.PORT) : 3000) : 3000;
 
 // Set up permissive CORS headers for native Android Webviews and browser clients
 app.use((req, res, next) => {
@@ -108,10 +108,6 @@ function saveState() {
   } catch (err) {
     console.error("Failed to save state", err);
   }
-  // Safe Cloud SQL replication
-  saveStateToDB(state).catch(err => {
-    console.error("Failed async Cloud SQL save session:", err);
-  });
 }
 
 // Normalize GameState to ensure all newly-added properties exist across legacy states
@@ -133,6 +129,9 @@ function normalizeState(s: GameState) {
     if (!p.achievements) {
       p.achievements = [];
     }
+    if (!p.commandMessages) {
+      p.commandMessages = [];
+    }
     if (!p.credits || p.credits < 10000) {
       p.credits = 10000;
     }
@@ -140,7 +139,7 @@ function normalizeState(s: GameState) {
       p.planets = [];
     }
 
-    p.planets.forEach((pl: any) => {
+    p.planets.forEach((pl: any, plIdx: number) => {
       if (!pl) return;
       if (pl.name && typeof pl.name === "string" && pl.name.includes("Outpost")) {
         pl.name = pl.name.replace(/Outpost/g, "Station");
@@ -173,19 +172,22 @@ function normalizeState(s: GameState) {
       if (!pl.buildings) pl.buildings = {};
       
       const buildingDefaults: Record<string, { level: number, maxLevel: number }> = {
-        fabricator: { level: 1, maxLevel: 30 },
+        fabricator: { level: 1, maxLevel: 10 },
         commsHub: { level: 1, maxLevel: 50 },
         researchCenter: { level: 1, maxLevel: 20 },
-        armyBase: { level: 1, maxLevel: 30 },
+        armyBase: { level: 1, maxLevel: 22 },
         repository: { level: 1, maxLevel: 45 },
         radar: { level: 1, maxLevel: 15 },
         supplyNexus: { level: 1, maxLevel: 50 }
       };
 
+      const isFirst = plIdx === 0;
+
       Object.entries(buildingDefaults).forEach(([bKey, bDef]) => {
+        const defaultLvl = (bKey === 'fabricator' || bKey === 'commsHub' || bKey === 'repository' || isFirst) ? 1 : 0;
         if (!pl.buildings[bKey]) {
           pl.buildings[bKey] = {
-            level: bKey === 'fabricator' || bKey === 'commsHub' || bKey === 'repository' ? 1 : 0,
+            level: defaultLvl,
             maxLevel: bDef.maxLevel,
             isUpgrading: false,
             upgradeEnd: null,
@@ -194,8 +196,9 @@ function normalizeState(s: GameState) {
         } else {
           // Fill missing properties inside structure
           const bObj = pl.buildings[bKey];
-          if (bObj.level === undefined) bObj.level = bKey === 'fabricator' || bKey === 'commsHub' || bKey === 'repository' ? 1 : 0;
-          if (bObj.maxLevel === undefined) bObj.maxLevel = bDef.maxLevel;
+          if (bObj.level === undefined) bObj.level = defaultLvl;
+          bObj.maxLevel = bDef.maxLevel; // Enforce updated maxLevels like fabricator limit 10
+          if (bObj.level > bDef.maxLevel) bObj.level = bDef.maxLevel; // Clamp level if it exceeds new limit
           if (bObj.isUpgrading === undefined) bObj.isUpgrading = false;
           if (bObj.upgradeEnd === undefined) bObj.upgradeEnd = null;
           if (bObj.health === undefined) bObj.health = 100;
@@ -207,20 +210,6 @@ function normalizeState(s: GameState) {
 
 // Load state helper
 async function loadState() {
-  try {
-    console.log("Attempting to restore active state from Cloud SQL...");
-    const dbState = await loadStateFromDB();
-    if (dbState && Object.keys(dbState.players).length > 0) {
-      state = dbState;
-      normalizeState(state);
-      console.log("Successfully restored active state from Cloud SQL! Players count:", Object.keys(state.players).length);
-      return;
-    }
-    console.log("Cloud SQL database is empty. Fallback seeding...");
-  } catch (err) {
-    console.error("Cloud SQL load failed, preparing backup files restore...", err);
-  }
-
   try {
     if (fs.existsSync(STATE_FILE)) {
       const data = fs.readFileSync(STATE_FILE, "utf8");
@@ -257,7 +246,7 @@ async function loadState() {
                   pl.buildings.supplyNexus = { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null };
                 }
                 if (!pl.buildings.fabricator) {
-                  pl.buildings.fabricator = { level: 1, maxLevel: 30, isUpgrading: false, upgradeEnd: null, health: 100 };
+                  pl.buildings.fabricator = { level: 1, maxLevel: 10, isUpgrading: false, upgradeEnd: null, health: 100 };
                 }
               }
             });
@@ -328,10 +317,10 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number, isF
       respirant: createMines(3)
     },
     buildings: {
-      fabricator: { level: 1, maxLevel: 30, isUpgrading: false, upgradeEnd: null, health: 100 },
+      fabricator: { level: 1, maxLevel: 10, isUpgrading: false, upgradeEnd: null, health: 100 },
       commsHub: { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 },
       researchCenter: { level: isFirstStation ? 1 : 0, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
-      armyBase: { level: isFirstStation ? 1 : 0, maxLevel: 30, isUpgrading: false, upgradeEnd: null, health: 100 },
+      armyBase: { level: isFirstStation ? 1 : 0, maxLevel: 22, isUpgrading: false, upgradeEnd: null, health: 100 },
       repository: { level: 1, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
       radar: { level: isFirstStation ? 1 : 0, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
       supplyNexus: { level: isFirstStation ? 1 : 0, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 }
@@ -2138,6 +2127,7 @@ app.get("/api/state", (req, res) => {
     scores: pl.scores || { population: 0, attack: 0, defence: 0, raiders: 0 },
     achievements: pl.achievements || [],
     planetsCount: pl.planets?.length || 1,
+    planets: (pl.planets || []).map(plt => ({ id: plt.id, name: plt.name, sectorX: plt.sectorX, sectorY: plt.sectorY })),
     lastActive: pl.lastActive || now - 600000
   }));
 
@@ -2361,6 +2351,24 @@ app.post("/api/upgrade/building", (req, res) => {
     }
   }
 
+  // Check Fabricator level requirements for secondary bases when unlocking buildings
+  const isSecondaryBase = p.planets[0]?.id !== planet.id;
+  if (isSecondaryBase && building.level === 0) {
+    const fabLevel = planet.buildings.fabricator?.level || 0;
+    if (buildingKey === "radar" && fabLevel < 2) {
+      return res.status(400).json({ error: "A Fabricator level 2 or higher is required to construct your Radar Array on this secondary station!" });
+    }
+    if (buildingKey === "researchCenter" && fabLevel < 4) {
+      return res.status(400).json({ error: "A Fabricator level 4 or higher is required to construct your Research Center on this secondary station!" });
+    }
+    if (buildingKey === "armyBase" && fabLevel < 7) {
+      return res.status(400).json({ error: "A Fabricator level 7 or higher is required to construct your War Room on this secondary station!" });
+    }
+    if (buildingKey === "supplyNexus" && fabLevel < 10) {
+      return res.status(400).json({ error: "A Fabricator level 10 or higher is required to construct your Supply Nexus on this secondary station!" });
+    }
+  }
+
   // Enforce 1 upgrade at a time (buildings or mines) limit per colony planet
   const isBuildingUpgrading = Object.values(planet.buildings).some((b: any) => b.isUpgrading);
   let isMineUpgrading = false;
@@ -2555,6 +2563,21 @@ app.post("/api/train/troop", (req, res) => {
 
   const count = parseInt(quantity, 10);
   if (isNaN(count) || count <= 0) return res.status(400).json({ error: "Invalid quantity" });
+
+  // Enforce War Room level limits
+  const armyBaseLevel = planet.buildings.armyBase?.level || 0;
+  const troopLevelLocks: Record<string, number> = {
+    defender: 3,       // Interceptor
+    drone: 6,          // Missile Launcher
+    attacker: 10,      // Assault Drone
+    looter: 15,        // Matter Extractor
+    tank: 19,          // Disrupter
+    settlementShip: 22  // Settlement Ship
+  };
+  const requiredLevel = troopLevelLocks[troopId];
+  if (requiredLevel !== undefined && armyBaseLevel < requiredLevel) {
+    return res.status(400).json({ error: `Requires War Room Level ${requiredLevel} (Your Level: ${armyBaseLevel}) to produce ${specs.name}!` });
+  }
 
   // If training a Settlement Ship, enforce "you can only have one on each base"
   if (troopId === "settlementShip") {
@@ -3813,6 +3836,92 @@ app.post("/api/buy-credits", (req, res) => {
   res.json({ player: p, success: true });
 });
 
+// Send Private Command Message
+app.post("/api/messages/send", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { receiverId, content } = req.body;
+  if (!receiverId || !content || typeof content !== "string" || !content.trim()) {
+    return res.status(400).json({ error: "Invalid receiver or empty transmission content." });
+  }
+
+  const receiver = state.players[receiverId];
+  if (!receiver) {
+    return res.status(404).json({ error: "Target transmitter station not found." });
+  }
+
+  if (!receiver.commandMessages) {
+    receiver.commandMessages = [];
+  }
+
+  const newMessage: CommandMessage = {
+    id: `msg_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`,
+    senderId: p.id,
+    senderName: p.username,
+    senderFaction: p.faction,
+    senderFactionColor: p.factionColor,
+    receiverId: receiver.id,
+    receiverName: receiver.username,
+    content: content.trim(),
+    timestamp: Date.now(),
+    isRead: false,
+    isSaved: false
+  };
+
+  receiver.commandMessages.push(newMessage);
+  saveState();
+  res.json({ success: true, message: "Holographic command transmission dispatched!" });
+});
+
+// Toggle Command Message Read/Unread State
+app.post("/api/messages/mark-read", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { messageId, isRead } = req.body;
+  if (!messageId) return res.status(400).json({ error: "Transmission ID required" });
+
+  if (!p.commandMessages) p.commandMessages = [];
+  const msg = p.commandMessages.find(m => m.id === messageId);
+  if (msg) {
+    msg.isRead = isRead !== undefined ? isRead : true;
+    saveState();
+  }
+  res.json({ success: true, player: p });
+});
+
+// Saved Command Message Toggle
+app.post("/api/messages/save", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { messageId, isSaved } = req.body;
+  if (!messageId) return res.status(400).json({ error: "Transmission ID required" });
+
+  if (!p.commandMessages) p.commandMessages = [];
+  const msg = p.commandMessages.find(m => m.id === messageId);
+  if (msg) {
+    msg.isSaved = isSaved !== undefined ? isSaved : true;
+    saveState();
+  }
+  res.json({ success: true, player: p });
+});
+
+// Delete Received Command Message
+app.post("/api/messages/delete", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { messageId } = req.body;
+  if (!messageId) return res.status(400).json({ error: "Transmission ID required" });
+
+  if (!p.commandMessages) p.commandMessages = [];
+  p.commandMessages = p.commandMessages.filter(m => m.id !== messageId);
+  saveState();
+  res.json({ success: true, player: p });
+});
+
 // Submit Suggestion/Feedback
 app.post("/api/feedback/send", (req, res) => {
   const p = getLoggedPlayer(req);
@@ -3875,60 +3984,7 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Universe active. Server listening on http://0.0.0.0:${PORT}`);
-    setupKeepAlivePings();
   });
-}
-
-// Background Self-Ping Keep-Alive system to prevent Cloud Run sleep states
-function setupKeepAlivePings() {
-  const PING_INTERVAL_MS = 14 * 60 * 1000; // Exactly 14 minutes
-  const pingTargets = [
-    `http://127.0.0.1:${PORT}/api/health`,
-    "https://ais-dev-b3fusvtmpzbes4i5sek2jk-304053633303.europe-west2.run.app/api/health",
-    "https://ais-pre-b3fusvtmpzbes4i5sek2jk-304053633303.europe-west2.run.app/api/health"
-  ];
-
-  console.log(`[Keep-Alive] Initializing self-ping scheduler. Frequency: every 14 minutes.`);
-
-  // Execute first check after 30 seconds
-  setTimeout(() => {
-    executePings();
-  }, 30 * 1000);
-
-  // Set recurring interval
-  setInterval(() => {
-    executePings();
-  }, PING_INTERVAL_MS);
-
-  function executePings() {
-    console.log(`[Keep-Alive] Initiating self-ping transmission loop at ${new Date().toISOString()}`);
-    pingTargets.forEach((targetUrl) => {
-      try {
-        const isHttps = targetUrl.startsWith("https:");
-        const client = isHttps ? https : http;
-        
-        const req = client.get(targetUrl, {
-          headers: { "User-Agent": "AISTUDIO-BUILD-KEEPALIVE-COCKPIT/1.0" },
-          timeout: 10000
-        }, (res) => {
-          console.log(`[Keep-Alive] Ping to ${targetUrl} completed. Code: ${res.statusCode}`);
-          // Consume response body to release memory/socket
-          res.resume();
-        });
-
-        req.on("error", (err) => {
-          console.log(`[Keep-Alive] Ping to ${targetUrl} failed with networking message: ${err.message}`);
-        });
-
-        req.on("timeout", () => {
-          console.log(`[Keep-Alive] Ping to ${targetUrl} timed out after 10000ms`);
-          req.destroy();
-        });
-      } catch (err: any) {
-        console.log(`[Keep-Alive] Fatal exception attempting ping on ${targetUrl}: ${err.message}`);
-      }
-    });
-  }
 }
 
 startServer().catch(err => {

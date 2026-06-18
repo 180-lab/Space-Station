@@ -134,6 +134,15 @@ const TROOP_DETAILS = {
   }
 };
 
+const TROOP_REQUIRED_LEVELS: Record<string, number> = {
+  defender: 3,       // Interceptor
+  drone: 6,          // Missile Launcher
+  attacker: 10,      // Assault Drone
+  looter: 15,        // Matter Extractor
+  tank: 19,          // Disrupter
+  settlementShip: 22  // Settlement Ship
+};
+
 export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   player,
   activePlanet,
@@ -491,6 +500,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
     }
   });
 
+  const armyBaseLevel = activePlanet.buildings.armyBase?.level || 0;
+
   return (
     <div className="space-y-6 pb-24">
       {/* Overview stats centerpiece */}
@@ -532,7 +543,20 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
         </div>
       </div>
 
-      {/* Triple Sub-Tabs System */}
+      {armyBaseLevel === 0 ? (
+        <div className="p-8 border border-red-500/20 bg-[#0A0F1D]/80 backdrop-blur-md rounded-2xl text-center space-y-4 max-w-xl mx-auto shadow-xl font-mono">
+          <div className="text-4xl text-red-400">🛡️</div>
+          <h3 className="text-sm font-extrabold text-red-400 uppercase tracking-widest">
+            WAR ROOM OFFLINE
+          </h3>
+          <p className="text-xs text-slate-350 font-sans leading-relaxed">
+            This secondary colony station does not possess an active command defense center. 
+            Navigate to your <strong>Established Structures</strong> or <strong>Unlocked Blueprints</strong> in the station commands tab to construct a War Room first before allocating troop squadrons, training defense forces, or commanding starship fleet movements.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Triple Sub-Tabs System */}
       <div className="flex border border-[#1E293B] bg-[#0A0F1D]/80 p-1.5 rounded-2xl gap-2 shadow-inner">
         <button
           onClick={() => setSubTab('troops')}
@@ -885,11 +909,13 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                 const currentCount = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
                 const isInfoActive = activeTroopInfo === tId;
                 const qty = quantities[tId] || 1;
+                const requiredLevel = TROOP_REQUIRED_LEVELS[tId] || 0;
+                const isLocked = armyBaseLevel < requiredLevel;
 
                 return (
                   <div 
                     key={tId}
-                    className="p-5 border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md flex flex-col gap-4.5 hover:border-white/10 transition duration-150 overflow-hidden"
+                    className={`p-5 border rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md flex flex-col gap-4.5 hover:border-white/10 transition duration-150 overflow-hidden ${isLocked ? 'border-red-950/40 relative opacity-75' : 'border-[#1E293B]'}`}
                     id={`troop_card_${tId}`}
                   >
                   {/* Aspect-Ratio Rich Troop Image Banner */}
@@ -899,13 +925,13 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                         setActiveImageZoom(details.image);
                         setActiveImageZoomTitle(details.name);
                       }}
-                      className="relative h-32 w-full rounded-lg overflow-hidden border border-white/5 bg-[#05070a] -mt-1 -mx-1 mb-2 cursor-pointer group/img"
+                      className="relative h-28 w-full rounded-lg overflow-hidden border border-white/5 bg-[#05070a] -mt-1 -mx-1 mb-2 cursor-pointer group/img"
                       title="Click to view full-sized spacecraft blueprint"
                     >
                       <img 
                         src={details.image} 
                         alt={details.name} 
-                        className="w-full h-full object-cover opacity-80 group-hover/img:opacity-100 group-hover/img:scale-102 transition duration-500"
+                        className="w-full h-full object-cover opacity-60 group-hover/img:opacity-80 group-hover/img:scale-102 transition duration-500"
                         referrerPolicy="no-referrer"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0F1D] via-transparent to-[#0A0F1D]/30" />
@@ -925,9 +951,15 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                       <div>
                         <div className="flex items-center gap-2.5 flex-wrap">
                           <span className="font-bold text-white text-base font-mono">{details.name}</span>
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 text-cyan-400 border border-[#1E293B]">
-                            SPACE FORCE: {currentCount}
-                          </span>
+                          {isLocked ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-red-950/50 text-red-400 border border-red-500/30 flex items-center gap-1 animate-pulse shadow-sm">
+                              🔒 REQ WAR ROOM LV. {requiredLevel}
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 text-cyan-400 border border-[#1E293B]">
+                              SPACE FORCE: {currentCount}
+                            </span>
+                          )}
                         </div>
                         <button 
                           onClick={() => setActiveTroopInfo(isInfoActive ? null : tId)}
@@ -1087,6 +1119,19 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
                   {/* Control dispatch footer */}
                   {(() => {
+                    if (isLocked) {
+                      return (
+                        <div className="w-full p-4 rounded-xl border border-red-500/20 bg-red-950/15 text-center font-mono mt-2">
+                          <div className="flex items-center justify-center gap-2 text-red-400 font-bold text-xs uppercase tracking-wider">
+                            <span>🔒 Fabrication Status: Off-line</span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                            Upgrade your War Room to <strong className="text-white">Level {requiredLevel}</strong> to assemble {details.name}s on this base.
+                          </p>
+                        </div>
+                      );
+                    }
+
                     const maxAffordable = (() => {
                       let maxVal = Infinity;
                       Object.entries(details.costs).forEach(([res, amount]) => {
@@ -1599,6 +1644,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
 
       {/* SECURITY BATTLE ARCHIVES MODAL POPUP */}

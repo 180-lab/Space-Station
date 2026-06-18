@@ -142,6 +142,29 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   const [showStructures, setShowStructures] = useState(false);
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(null);
 
+  const getRequiredFabricatorLevel = (key: string): number => {
+    if (key === 'radar') return 2;
+    if (key === 'researchCenter') return 4;
+    if (key === 'armyBase') return 7;
+    if (key === 'supplyNexus') return 10;
+    return 1;
+  };
+
+  const fabLevel = activePlanet.buildings.fabricator?.level || 0;
+
+  const constructedBuildings = Object.entries(activePlanet.buildings).filter(([bKey, val]: [string, any]) => {
+    return val.level > 0 || val.isUpgrading;
+  });
+
+  const unconstructedBuildings = Object.entries(activePlanet.buildings).filter(([bKey, val]: [string, any]) => {
+    return val.level === 0 && !val.isUpgrading;
+  });
+
+  const visibleBlueprints = unconstructedBuildings.filter(([bKey]) => {
+    const reqLvl = getRequiredFabricatorLevel(bKey);
+    return fabLevel >= reqLvl;
+  });
+
   // Production Boost Modal State
   const [showBoostModal, setShowBoostModal] = useState(false);
   const [boostTargetType, setBoostTargetType] = useState<string>("all");
@@ -1026,18 +1049,18 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
           type="button"
         >
           <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#5bc0be] font-mono flex items-center gap-2">
-            Structures Commands
+            Established Structures ({constructedBuildings.length})
             {showStructures ? (
               <ChevronUp size={12} className="text-red-500 inline" />
             ) : (
               <ChevronDown size={12} className="text-emerald-500 inline" />
             )}
           </h3>
-          <span className="text-[10.5px] text-slate-500 font-mono font-bold">({Object.keys(activePlanet.buildings).length} Facilities)</span>
+          <span className="text-[10.5px] text-slate-500 font-mono font-bold">({constructedBuildings.length} Facilities)</span>
         </button>
         {showStructures && (
           <div className="space-y-4">
-            {Object.entries(activePlanet.buildings).map(([bKey, val]) => {
+            {constructedBuildings.map(([bKey, val]) => {
               const bState = val as any;
               const info = BUILDING_INFO[bKey];
               if (!info) return null;
@@ -1231,6 +1254,85 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Unlocked blueprints section for structures not yet constructed */}
+        {showStructures && visibleBlueprints.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-[#1E293B]/60 text-left">
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#5bc0be] font-mono flex items-center gap-2 mb-4">
+              🏗️ Unlocked Construction Blueprints ({visibleBlueprints.length})
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {visibleBlueprints.map(([bKey, val]) => {
+                const bState = val as any;
+                const info = BUILDING_INFO[bKey];
+                if (!info) return null;
+
+                const targetLvl = bState.level + 1;
+                const upgradeTimeMins = targetLvl * 2;
+                const isExpanded = expandedBuilding === bKey;
+
+                return (
+                  <div 
+                    key={bKey}
+                    className="border border-dashed border-[#5bc0be]/30 rounded-xl bg-[#090D1A]/50 backdrop-blur-md overflow-hidden hover:border-[#5bc0be]/60 transition duration-150"
+                    id={`blueprint_${bKey}`}
+                  >
+                    <div className="p-4 flex items-center justify-between text-left gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-lg bg-[#05070A] border border-[#5bc0be]/25 text-xl font-sans text-center shrink-0 shadow-lg select-none">
+                          {info.icon}
+                        </div>
+                        <div className="space-y-0.5">
+                          <span className="font-bold text-white text-sm font-mono block">{info.name}</span>
+                          <p className="text-[10.5px] text-slate-400 leading-normal line-clamp-1">{info.desc}</p>
+                        </div>
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={() => setExpandedBuilding(isExpanded ? null : bKey)}
+                        className="px-3 py-1.5 bg-[#5bc0be] hover:bg-[#5bc0be]/90 text-slate-950 font-bold font-mono text-[9px] uppercase tracking-wider rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                      >
+                        <span>Blueprint</span>
+                        {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                      </button>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="border-t border-[#5bc0be]/20 p-4 bg-slate-950/40 space-y-3.5 text-left text-xs animate-fade-in">
+                        <p className="text-slate-350 leading-relaxed font-sans">{info.desc}</p>
+                        <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={1} />
+                        
+                        <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-2">
+                          <span className="text-[9.5px] text-slate-500 font-mono font-bold tracking-wider">REQUISITE FABRICATOR: Lv. {getRequiredFabricatorLevel(bKey)}</span>
+                          {isAnyUpgradeInProgress ? (
+                            <button 
+                              onClick={() => onUpgradeBuilding(bKey, true)}
+                              className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/35 rounded-lg transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer"
+                              type="button"
+                            >
+                              <span className="text-emerald-400">Queue Construction</span>
+                              <span className="text-amber-400 font-extrabold">(15 SG)</span>
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => onUpgradeBuilding(bKey)}
+                              className="px-4 py-2 bg-pink-500/15 text-pink-400 hover:bg-pink-500/25 border border-pink-500/35 rounded-lg transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1 cursor-pointer"
+                              type="button"
+                            >
+                              <span>Construct</span>
+                              <span className="text-slate-450 text-[8px]">({upgradeTimeMins}m)</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

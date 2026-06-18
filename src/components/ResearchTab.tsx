@@ -244,90 +244,103 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
         </div>
       </div>
 
-      <div className="space-y-4 text-left">
-        <div className="flex items-center justify-between border-b border-[#1E293B]/60 pb-3">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2">
-            <Award size={14} /> Technology Research Projects
+      {rc.level === 0 ? (
+        <div className="p-8 border border-red-500/20 bg-[#0A0F1D]/80 backdrop-blur-md rounded-2xl text-center space-y-4 max-w-xl mx-auto shadow-xl">
+          <div className="text-4xl text-red-400">🧪</div>
+          <h3 className="text-sm font-extrabold text-red-400 uppercase tracking-widest font-mono">
+            RESEARCH CENTER OFFLINE
           </h3>
-          {activeResearch && (
-            <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded animate-pulse">
-              Active Research: {getTimerString(activeResearch.endAt)}
-            </span>
-          )}
+          <p className="text-xs text-slate-350 font-sans leading-relaxed">
+            This secondary colony station does not possess an active command laboratory. 
+            Navigate to your <strong>Established Structures</strong> or <strong>Unlocked Blueprints</strong> in the station commands tab to construct a Research Center first before authorizing advanced scientific research.
+          </p>
         </div>
+      ) : (
+        <div className="space-y-4 text-left">
+          <div className="flex items-center justify-between border-b border-[#1E293B]/60 pb-3">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2">
+              <Award size={14} /> Technology Research Projects
+            </h3>
+            {activeResearch && (
+              <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded animate-pulse">
+                Active Research: {getTimerString(activeResearch.endAt)}
+              </span>
+            )}
+          </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {TECHS.map(tech => {
-            const currentLvl = techLevels[tech.id] || 1;
-            const maxLvl = 20;
-            const isMax = currentLvl >= maxLvl;
-            const costs = getTechCost(tech, currentLvl);
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {TECHS.map(tech => {
+              const currentLvl = techLevels[tech.id] || 1;
+              const maxLvl = 20;
+              const isMax = currentLvl >= maxLvl;
+              const costs = getTechCost(tech, currentLvl);
 
-            return (
-              <div 
-                key={tech.id} 
-                className={`p-4 border rounded-xl flex flex-col justify-between space-y-3.5 ${activeResearch?.techId === tech.id ? 'border-amber-500 bg-amber-950/10' : 'border-[#1E293B] bg-[#0A0F1D]/80'}`}
-              >
-                <div className="space-y-1.5">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-2xl">{tech.icon}</span>
-                      <div>
-                        <h4 className="font-bold text-white text-sm">{tech.name}</h4>
-                        <span className="text-[10px] text-slate-500 font-mono font-bold block mt-0.5">Core Matrix Rank: {currentLvl}/{maxLvl}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-slate-400 font-sans">{tech.desc}</p>
-                  <div className="p-2 bg-indigo-950/15 border border-indigo-900/10 rounded-lg text-indigo-400 text-[10.5px]">
-                    {tech.effect}
-                  </div>
-                </div>
-
-                {!isMax && (
-                  <div className="space-y-2 border-t border-white/5 pt-2">
-                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Resource Cost Matrix:</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {Object.entries(costs).map(([res, val]) => {
-                            const { icon: Icon, color } = infoMap[res as keyof typeof infoMap];
-                            return (
-                              <div key={res} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-950/60 border border-slate-900 rounded font-mono text-[9px]">
-                                <Icon size={10} className={color} />
-                                <span className="text-slate-350 font-bold">{val.toLocaleString()}</span>
-                              </div>
-                            );
-                          })}
+              return (
+                <div 
+                  key={tech.id} 
+                  className={`p-4 border rounded-xl flex flex-col justify-between space-y-3.5 ${activeResearch?.techId === tech.id ? 'border-amber-500 bg-amber-950/10' : 'border-[#1E293B] bg-[#0A0F1D]/80'}`}
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">{tech.icon}</span>
+                        <div>
+                          <h4 className="font-bold text-white text-sm">{tech.name}</h4>
+                          <span className="text-[10px] text-slate-500 font-mono font-bold block mt-0.5">Core Matrix Rank: {currentLvl}/{maxLvl}</span>
                         </div>
                       </div>
-                    )}
-
-                    {activeResearch?.techId === tech.id ? (
-                      <div className="py-2 text-center bg-amber-950/30 border border-amber-900/20 rounded-xl text-amber-400 text-[10px] font-bold animate-pulse font-mono uppercase tracking-widest flex items-center justify-center gap-1.5">
-                        <Clock size={11} className="animate-spin" /> Telemetry Processing ({getTimerString(activeResearch.endAt)})
-                      </div>
-                    ) : isMax ? (
-                      <div className="py-2 text-center bg-emerald-950/20 border border-emerald-900/20 text-emerald-400 text-[10px] uppercase font-bold tracking-widest rounded-xl">
-                        🏆 MAX EXPERTISE
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => startResearch(tech.id)}
-                        disabled={!!activeResearch}
-                        className={`w-full py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono border transition ${
-                          activeResearch 
-                            ? 'border-slate-900 bg-slate-950 text-slate-650 opacity-40 cursor-not-allowed'
-                            : 'border-cyan-500/30 bg-cyan-950/20 text-cyan-400 hover:bg-cyan-950/40 hover:border-cyan-500 cursor-pointer'
-                        }`}
-                      >
-                        Initialize Research
-                      </button>
-                    )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 font-sans">{tech.desc}</p>
+                    <div className="p-2 bg-indigo-950/15 border border-indigo-900/10 rounded-lg text-indigo-400 text-[10.5px]">
+                      {tech.effect}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
+
+                  {!isMax && (
+                    <div className="space-y-2 border-t border-white/5 pt-2">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Resource Cost Matrix:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {Object.entries(costs).map(([res, val]) => {
+                          const { icon: Icon, color } = infoMap[res as keyof typeof infoMap];
+                          return (
+                            <div key={res} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-950/60 border border-slate-900 rounded font-mono text-[9px]">
+                              <Icon size={10} className={color} />
+                              <span className="text-slate-350 font-bold">{val.toLocaleString()}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeResearch?.techId === tech.id ? (
+                    <div className="py-2 text-center bg-amber-950/30 border border-amber-900/20 rounded-xl text-amber-400 text-[10px] font-bold animate-pulse font-mono uppercase tracking-widest flex items-center justify-center gap-1.5">
+                      <Clock size={11} className="animate-spin" /> Telemetry Processing ({getTimerString(activeResearch.endAt)})
+                    </div>
+                  ) : isMax ? (
+                    <div className="py-2 text-center bg-emerald-950/20 border border-emerald-900/20 text-emerald-400 text-[10px] uppercase font-bold tracking-widest rounded-xl">
+                      🏆 MAX EXPERTISE
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startResearch(tech.id)}
+                      disabled={!!activeResearch}
+                      className={`w-full py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono border transition ${
+                        activeResearch 
+                          ? 'border-slate-900 bg-slate-950 text-slate-650 opacity-40 cursor-not-allowed'
+                          : 'border-cyan-500/30 bg-cyan-950/20 text-cyan-400 hover:bg-cyan-950/40 hover:border-cyan-500 cursor-pointer'
+                      }`}
+                    >
+                      Initialize Research
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
+        </div>
+      )}
 
       {/* Polish Settings Footer with Logout */}
       <div className="p-4 bg-[#0A0F1D]/50 border border-[#1E293B]/60 rounded-xl flex items-center justify-between text-[11px] text-slate-500 max-w-lg mx-auto">

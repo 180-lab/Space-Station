@@ -12,6 +12,7 @@ import {
   LeaderboardPlayer,
   CreatedFleet
 } from './types';
+import { sendMobileNotification } from './lib/mobileNotifications';
 import { ExploreTab } from './components/ExploreTab';
 import { ArmyBaseTab } from './components/ArmyBaseTab';
 import { GalaxyTab } from './components/GalaxyTab';
@@ -38,7 +39,11 @@ import {
   ChevronDown,
   User,
   LogOut,
-  AlertTriangle
+  AlertTriangle,
+  Mail,
+  Trash2,
+  Star,
+  Forward
 } from 'lucide-react';
 
 const TROOP_NAME_MAPPING: Record<string, string> = {
@@ -51,37 +56,36 @@ const TROOP_NAME_MAPPING: Record<string, string> = {
 };
 
 async function safeParseJson(res: Response): Promise<any> {
-  let text = '';
-  try {
-    text = await res.text();
-  } catch (err) {
-    if (res.ok) return {};
-    throw new Error(`Failed to read response body: ${res.statusText || 'Unknown Connection'}`);
+  const text = await res.text().catch(() => '');
+  const trimmed = text.trim();
+  
+  // Guard against HTML fallbacks (e.g. index.html) during server adjustments or route misses
+  const isHtml = trimmed.startsWith('<!DOCTYPE html>') || 
+                 trimmed.startsWith('<!doctype html>') || 
+                 trimmed.startsWith('<html') || 
+                 trimmed.includes('blocking a required security cookie') || 
+                 trimmed.includes('Cookie check');
+  if (isHtml) {
+    throw new Error('Gateway connection is adjusting. Reconnecting...');
   }
 
-  // Check for the ngrok warning or cookie block
-  const hasCookieCheck = 
-    text.includes('Cookie check') || 
-    text.includes('blocking a required security cookie') ||
-    text.includes('Action required to load your app') ||
-    text.includes('ngrok-skip-browser-warning');
-    
-  if (hasCookieCheck) {
-    throw new Error('Galactic Sandbox security check: Please grant iframe cookie permissions or refresh the page.');
-  }
-  
-  if (!text.trim()) {
+  if (!trimmed) {
+    if (!res.ok) {
+      throw new Error(`Request failed with status ${res.status}`);
+    }
     return {};
   }
 
   try {
-    return JSON.parse(text);
-  } catch (jsonErr) {
-    if (res.ok) {
-      console.warn("Received non-JSON OK response", text.substring(0, 200));
+    return JSON.parse(trimmed);
+  } catch (err) {
+    if (!res.ok) {
+      if (trimmed.length < 200) {
+        throw new Error(trimmed);
+      }
+      throw new Error(`Request failed with status ${res.status}`);
     }
-    const contentType = res.headers.get('content-type') || 'text/html';
-    throw new Error(`Gateway response was not readable. Reconnecting... (Expected JSON, received ${contentType})`);
+    throw new Error('Gateway connection is adjusting. Reconnecting...');
   }
 }
 
@@ -95,6 +99,7 @@ export default function App() {
 
   // Connection error handling
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const consecutiveErrorsRef = useRef(0);
 
   // Google Sign-In & Payments Dialog states
   const [showGoogleDialog, setShowGoogleDialog] = useState(false);
@@ -146,6 +151,13 @@ export default function App() {
   const [serverTime, setServerTime] = useState<number>(Date.now());
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [viewingPlayerId, setViewingPlayerId] = useState<string | null>(null);
+
+  // Command message deck states
+  const [showCommDeck, setShowCommDeck] = useState(false);
+  const [profileMsgText, setProfileMsgText] = useState("");
+  const [isSendingMsg, setIsSendingMsg] = useState(false);
+  const [forwardingMsgId, setForwardingMsgId] = useState<string | null>(null);
+  const [forwardTargetId, setForwardTargetId] = useState("");
 
   // Active Screen / Navigation Tab selector: 'explore' | 'army' | 'galaxy' | 'research' | 'settings'
   const [activeTab, setActiveTab] = useState<'explore' | 'army' | 'galaxy' | 'research' | 'settings'>('explore');
@@ -345,12 +357,16 @@ export default function App() {
         const res = await fetch('/api/health');
         const data = await safeParseJson(res);
         if (active && data && data.status === "ok") {
+          consecutiveErrorsRef.current = 0;
           setConnectionError(null);
         }
       } catch (err: any) {
         if (active) {
-          // If connection is broken, set readable warning descriptor
-          setConnectionError(err?.message || 'Gateway connection timeout');
+          consecutiveErrorsRef.current += 1;
+          if (consecutiveErrorsRef.current >= 12) {
+            // If connection is broken, set readable warning descriptor
+            setConnectionError(err?.message || 'Gateway connection timeout');
+          }
         }
       }
     };
@@ -513,7 +529,9 @@ export default function App() {
             fabricator: 'Fabricator'
           };
           const bName = bNames[key] || key;
-          showToast(`🚀 CONSTRUCTION RESOLVED: ${bName} construction finished! Upgraded to Level ${lvl}.`, 'success');
+          const msg = `${bName} construction finished! Upgraded to Level ${lvl}.`;
+          showToast(`🚀 CONSTRUCTION RESOLVED: ${msg}`, 'success');
+          sendMobileNotification(`🚀 Construction Resolved!`, msg);
         }
       });
 
@@ -532,7 +550,9 @@ export default function App() {
                 respirant: 'Air Scrubber Oxygen Generator'
               };
               const mName = mineNames[key] || `${key.toUpperCase()} Extractor`;
-              showToast(`⛏️ EXTRACTION UPGRADE: ${mName} (Slot #${idx + 1}) upgraded to Level ${lvl}!`, 'success');
+              const msg = `${mName} (Slot #${idx + 1}) upgraded to Level ${lvl}!`;
+              showToast(`⛏️ EXTRACTION UPGRADE: ${msg}`, 'success');
+              sendMobileNotification(`⛏️ Extraction Upgrade Finished`, msg);
             }
           });
         }
@@ -573,7 +593,9 @@ export default function App() {
       if (!prevAttackIds.includes(f.id)) {
         const targetPlanet = player.planets.find(p => p.id === f.targetId);
         const pName = targetPlanet ? targetPlanet.name : "Station Core";
-        showToast(`⚠️ TACTICAL ALERT: Hostile space fleet from Commander ${f.senderName} detected on attack trajectory to ${pName}! Arriving in ${Math.round((f.arrivesAt - serverTime) / 1000)} seconds!`, 'error');
+        const message = `Hostile space fleet from Commander ${f.senderName} detected on attack trajectory to ${pName}! Arriving in ${Math.round((f.arrivesAt - serverTime) / 1000)} seconds!`;
+        showToast(`⚠️ TACTICAL ALERT: ${message}`, 'error');
+        sendMobileNotification(`⚠️ TACTICAL ALERT!`, message);
       }
     });
 
@@ -598,6 +620,7 @@ export default function App() {
         setBattleReports(data.battleReports);
         setNewsEvents(data.newsEvents);
         setServerTime(data.serverTime);
+        consecutiveErrorsRef.current = 0;
         setConnectionError(null);
       } else {
         // Only wipe the user ID if the server explicitly tells us the user profile doesn't exist or is unauthenticated (401/404)
@@ -610,7 +633,10 @@ export default function App() {
         }
       }
     } catch (err: any) {
-      setConnectionError(err?.message || 'Gateway connection error');
+      consecutiveErrorsRef.current += 1;
+      if (consecutiveErrorsRef.current >= 12) {
+        setConnectionError(err?.message || 'Gateway connection error');
+      }
       if (err?.message?.includes('security check') || err?.message?.includes('cookie') || err?.message?.includes('stabilizing')) {
         console.warn("Connection warning:", err.message);
       } else {
@@ -1682,6 +1708,26 @@ export default function App() {
 
           <button 
             type="button"
+            onClick={() => setShowCommDeck(true)}
+            className="w-10 h-10 border border-cyan-500/40 flex items-center justify-center rounded bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20 active:scale-101 transition-all duration-150 cursor-pointer relative z-50 mr-1"
+            title="Open Secure Command Comm-Messages"
+          >
+            <Mail size={18} className="text-cyan-400" />
+            {(() => {
+              const count = player.commandMessages?.filter(m => !m.isRead).length || 0;
+              if (count > 0) {
+                return (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 font-mono text-[9px] font-black text-white ring-1 ring-[#1E293B] animate-pulse shadow-[0_0_8px_#ef4444]">
+                    {count}
+                  </span>
+                );
+              }
+              return null;
+            })()}
+          </button>
+
+          <button 
+            type="button"
             onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
             className="w-10 h-10 border border-cyan-500/40 flex items-center justify-center rounded bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20 active:scale-95 transition-all duration-150 cursor-pointer relative z-50"
             title="Open Commander Stations & HP status"
@@ -2029,6 +2075,7 @@ export default function App() {
             createdFleets={createdFleets}
             setCreatedFleets={setCreatedFleets}
             onUpdatePlayer={setPlayer}
+            onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
           />
         )}
 

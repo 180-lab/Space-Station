@@ -62,7 +62,7 @@ export interface ColonyPlanet {
     repository: BuildingState;    // Max 45
     radar: BuildingState;         // Max 15
     supplyNexus: BuildingState;   // Max 50
-    fabricator: BuildingState;    // Max 30
+    fabricator: BuildingState;    // Max 10
   };
   resources: {
     water: number;
@@ -106,6 +106,21 @@ export interface PlayerProfile {
   googleEmail?: string;
   password?: string;
   lastActive?: number;
+  commandMessages?: CommandMessage[];
+}
+
+export interface CommandMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderFaction: string;
+  senderFactionColor: string;
+  receiverId: string;
+  receiverName: string;
+  content: string;
+  timestamp: number;
+  isRead: boolean;
+  isSaved?: boolean;
 }
 
 export interface Alliance {

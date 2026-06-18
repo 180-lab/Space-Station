@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PlayerProfile } from '../types';
+import { requestNotificationPermission, sendMobileNotification } from '../lib/mobileNotifications';
 import { 
   Settings, 
   Eye, 
@@ -490,6 +491,37 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   >
                     {notificationsEnabled ? 'ACTIVE' : 'BLOCKED'}
                   </button>
+                </div>
+
+                {/* Native Mobile Push Alerts */}
+                <div className="flex flex-col gap-2 pt-3 border-t border-[#1E293B]/40 mt-2">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-0.5 max-w-[70%]">
+                      <span className="text-xs font-bold text-slate-200 block uppercase flex items-center gap-1.5">
+                        <Bell size={13} className="text-cyan-400 animate-pulse" /> Native Device Notifications
+                      </span>
+                      <p className="text-[10.5px] text-slate-500 leading-relaxed font-sans">
+                        Enables native push vibration/sound chimes directly to your device (Android/Capacitor APK) during offline moments or critical incoming hostile orbital attacks.
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const isGranted = await requestNotificationPermission();
+                        if (isGranted) {
+                          showToast("📱 Mobile Notifications enabled! Chime test queued.", "success");
+                          sendMobileNotification(
+                            "📡 Command Link Active", 
+                            "System keys verified! Tactical system notices will propagate directly here."
+                          );
+                        } else {
+                          showToast("❌ Permission denied. Enable manually in App Settings.", "error");
+                        }
+                      }}
+                      className="py-1.5 px-3 bg-cyan-950/25 hover:bg-cyan-950/45 text-cyan-400 border border-cyan-500/30 rounded-lg text-[10px] font-bold uppercase tracking-wider shrink-0 transition"
+                    >
+                      Test Sync
+                    </button>
+                  </div>
                 </div>
               </div>
 
