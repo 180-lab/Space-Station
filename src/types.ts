@@ -144,6 +144,11 @@ export interface Alliance {
   bannerColor: string;
   bannerSymbol: string;
   highlights?: string;
+  applications?: {
+    playerId: string;
+    username: string;
+    timestamp: number;
+  }[];
 }
 
 export interface ChatMessage {

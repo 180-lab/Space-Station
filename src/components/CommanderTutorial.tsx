@@ -45,6 +45,9 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   // Completed tasks array retrieved from server (or defaults to empty)
   const completedList = player.completedTutorialTasks || [];
 
+  const repositoryLevel = activePlanet?.buildings?.repository?.level || 1;
+  const siloCapacity = Math.round(10000 * Math.pow(500, (repositoryLevel - 1) / 44));
+
   // Tutorial Quest definitions (total 22 progressive tasks with customized step-by-step instructions)
   const tasks: TutorialTask[] = [
     {
@@ -518,6 +521,13 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   // Find the user's current ACTIVE tutorial task (first incomplete task)
   const activeTask = tasks.find((t) => !completedList.includes(t.id));
 
+  const maxResourceReward = activeTask 
+    ? Math.max(...Object.values(activeTask.rewards.resources).map((v) => v || 0)) 
+    : 0;
+  const hasSiloStorageIssue = activeTask 
+    ? siloCapacity < maxResourceReward 
+    : false;
+
   // If all claims finished, proudly show completed state
   if (!activeTask) {
     return (
@@ -528,9 +538,22 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
           <h3 className="text-base font-black text-emerald-400 uppercase tracking-widest">
             STAR ADMIRAL ACADEMY - ALL 22 CAMPAIGN TASKS COMPLETED!
           </h3>
-          <p className="text-xs text-slate-300 max-w-2xl leading-relaxed mt-1">
+          <p className="text-xs text-slate-300 max-w-2xl leading-relaxed mt-1 font-sans font-normal">
             Absolute Sovereign Command established! You have mastered the star building, physics sciences, battle troop recruitment, messaging, alliances, public radio communications, and interstellar coordinate colonizations. The high command stands in total awe of your grand space empire!
           </p>
+          <div className="mt-4 p-4 border border-cyan-500/30 bg-[#060B14]/80 rounded-xl space-y-3 max-w-xl text-center">
+            <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-widest">📬 SHARE YOUR FEEDBACK & SUGGESTIONS!</h4>
+            <p className="text-[11px] text-slate-300 leading-relaxed font-sans font-normal">
+              As an elite Admiral who completed the Academy Roadmap, your feedback is crucial in shaping future outer-rim operations. Let us know how we can improve, what balance changes you want, or what new systems you would love to see!
+            </p>
+            <button 
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold uppercase text-[10px] tracking-widest rounded-lg cursor-pointer transition duration-150 block mx-auto hover:shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+            >
+              Open Settings & Send Suggestions ⚡
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -656,7 +679,12 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                     <h3 className="text-sm font-bold text-slate-200">
                       {activeTask.title}
                     </h3>
-                    <p className="text-xs text-slate-405 text-slate-400 leading-relaxed mt-1">
+                    {activeTask.id > 1 && activeTask.id < 22 && (
+                      <div className="my-1.5 px-2.5 py-1 text-[10px] bg-sky-500/15 text-sky-450 text-sky-300 border border-sky-500/20 rounded-lg inline-flex items-center gap-1.5 font-bold uppercase tracking-wider animate-pulse">
+                        <span>📡 SECTOR OUTPOST TARGET: SECOND STATION ({player.planets[1]?.name || 'Colony Station 2'})</span>
+                      </div>
+                    )}
+                    <p className="text-xs text-slate-400 leading-relaxed mt-1">
                       {activeTask.shortDesc}
                     </p>
                   </div>
@@ -752,6 +780,17 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                     </div>
                   </div>
                 </div>
+
+                 {/* Silo Capacity warning */}
+                {hasSiloStorageIssue && (
+                  <div className="mt-3 p-3 rounded-lg bg-red-950/20 border border-red-500/30 text-left text-[10px] leading-relaxed">
+                    <span className="font-extrabold text-red-400 block uppercase tracking-wide">⚠️ SILO STORAGE OVERFLOW</span>
+                    <p className="mt-1 text-slate-300 font-sans font-normal">
+                      Claiming now will overflow your storage! This task requires <span className="font-mono font-bold text-white">{maxResourceReward.toLocaleString()}</span> units of storage, but your active planet's Silo capacity is only <span className="font-mono font-bold text-white">{siloCapacity.toLocaleString()}</span> units. 
+                      Please upgrade your <span className="font-bold text-amber-300">Silo</span> to safely receive rewards!
+                    </p>
+                  </div>
+                )}
 
                 {/* Claim Button */}
                 <div className="mt-4 pt-3 border-t border-[#1E293B]/60">

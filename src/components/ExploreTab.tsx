@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ColonyPlanet, PlayerProfile, ResourceType, getUpgradeResourceCost, FleetMission, BuildingState } from '../types';
+import { ColonyPlanet, PlayerProfile, ResourceType, getUpgradeResourceCost, FleetMission, BuildingState, ChatMessage } from '../types';
 import { 
   Droplet, 
   Flame, 
@@ -14,7 +14,10 @@ import {
   RotateCw,
   ShieldAlert,
   Edit2,
-  Check
+  Check,
+  MessageSquare,
+  Send,
+  Radio
 } from 'lucide-react';
 
 const UpgradeCostBar: React.FC<{ type: 'mine' | 'building'; upgradeKey: string; targetLevel: number }> = ({ type, upgradeKey, targetLevel }) => {
@@ -96,6 +99,8 @@ interface ExploreTabProps {
   onViewPlayerProfile?: (playerId: string) => void;
   populationRank?: number;
   onNavigateToLeaderboard?: () => void;
+  chatMessages: ChatMessage[];
+  onSendChat: (channel: 'global' | 'alliance' | 'private', content: string, receiverId?: string) => void;
 }
 
 const RESOURCE_INFO: Record<ResourceType, { name: string; color: string; icon: any; desc: string }> = {
@@ -128,12 +133,16 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   onRefreshState,
   onViewPlayerProfile,
   populationRank = 1,
-  onNavigateToLeaderboard
+  onNavigateToLeaderboard,
+  chatMessages,
+  onSendChat
 }) => {
   const [expandedCategory, setExpandedCategory] = useState<ResourceType | null>(null);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [restoringKeys, setRestoringKeys] = useState<Record<string, boolean>>({});
   const [isQueueMinimized, setIsQueueMinimized] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
 
   // Check if any upgrade is active right now on this planet
   const isAnyUpgradeInProgress = 
@@ -1342,6 +1351,113 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
           </div>
         )}
       </div>
+
+      {/* TACTICAL NETWORK TRANSCEIVER */}
+      <div id="tactical-network-transceiver-box" className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl flex flex-col items-center justify-center text-center py-10 space-y-4 font-mono">
+        <div className="w-12 h-12 rounded-full border border-cyan-500/20 bg-cyan-500/5 flex items-center justify-center text-cyan-400">
+          <Radio size={20} className="animate-pulse" />
+        </div>
+        <div>
+          <h4 className="font-bold text-slate-200 text-sm uppercase tracking-wider">Tactical Network Transceiver</h4>
+          <p className="text-xs text-slate-500 max-w-sm mt-1 leading-relaxed font-sans font-normal">
+            Secure deep space transceiver wavelengths. Connect to the outer-rim sector communications grid to transmit or receive orbital signals.
+          </p>
+        </div>
+        <div className="pt-2">
+          <button 
+            type="button"
+            onClick={() => setIsChatOpen(true)}
+            className="px-6 py-3 bg-cyan-950/20 hover:bg-cyan-500/10 text-cyan-400 hover:text-cyan-300 border border-cyan-500/25 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 mx-auto"
+          >
+            <MessageSquare size={13} />
+            Open Global System Chat
+          </button>
+        </div>
+      </div>
+
+      {/* GLOBAL CHAT MODAL OVERLAY */}
+      {isChatOpen && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 font-mono">
+          <div className="w-full max-w-2xl bg-[#070B13] border border-cyan-500/30 rounded-2xl p-6 flex flex-col h-[550px] shadow-[0_0_50px_rgba(6,182,212,0.15)]">
+            {/* Header */}
+            <div className="flex justify-between items-center pb-3 border-b border-[#1E293B] mb-4">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg">
+                  SECURE NET TRANSCEIVER WINDOW — GLOBAL SYSTEM
+                </span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsChatOpen(false)}
+                className="text-slate-400 hover:text-white font-sans text-2xl cursor-pointer p-1"
+                title="Disconnect channel link"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Chat list */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 text-xs text-left">
+              {!chatMessages || chatMessages.filter(msg => msg.channel === 'global').length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-slate-600 py-10 space-y-2">
+                  <MessageSquare size={32} className="opacity-30" />
+                  <p className="text-xs">No active transmissions decoded on this wavelength.</p>
+                </div>
+              ) : (
+                chatMessages
+                  .filter(msg => msg.channel === 'global')
+                  .map((msg) => (
+                    <div key={msg.id} className="p-3 border border-slate-900 rounded-xl bg-[#05070A]/60 hover:bg-[#05070A]/95 transition duration-150 leading-snug">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-slate-600 text-[10px]">[{new Date(msg.timestamp).toLocaleTimeString()}]</span>
+                        {msg.allianceTag && (
+                          <span className="text-yellow-400 font-bold">[{msg.allianceTag}]</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => onViewPlayerProfile && onViewPlayerProfile(msg.senderId)}
+                          className="font-bold underline text-cyan-400 hover:text-cyan-300 cursor-pointer focus:outline-none"
+                        >
+                          {msg.senderName}
+                        </button>
+                        <span className="text-slate-500 text-[10px]">:</span>
+                      </div>
+                      <p className="text-slate-355 mt-1 pl-2 border-l border-cyan-500/40 text-slate-300">{msg.content}</p>
+                    </div>
+                  ))
+              )}
+            </div>
+
+            {/* Chat entry form */}
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!chatInput.trim()) return;
+                onSendChat('global', chatInput.trim());
+                setChatInput('');
+              }} 
+              className="mt-4 flex gap-2.5"
+            >
+              <input 
+                type="text" 
+                placeholder="Transmit across sector wavelengths..."
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                autoFocus
+                className="flex-1 px-4 py-3 bg-[#05070A] border border-[#1E293B] text-white rounded-xl text-xs focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]"
+              />
+              <button 
+                type="submit"
+                className="px-5 py-3 bg-cyan-500/10 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/20 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center transition cursor-pointer shrink-0"
+                title="Send secure communication transmission"
+              >
+                <Send size={13} />
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Tactical Alerts Modal Overlay */}
       {isAlertsOpen && (

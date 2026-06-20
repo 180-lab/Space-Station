@@ -2196,6 +2196,8 @@ export default function App() {
                 setGalaxyInitialSubTab('ranking');
                 setActiveTab('galaxy');
               }}
+              chatMessages={chatMessages}
+              onSendChat={handleSendChat}
             />
           );
         })()}
