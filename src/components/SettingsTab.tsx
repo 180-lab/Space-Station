@@ -76,6 +76,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [showSync, setShowSync] = useState(false);
   const [showRegistryNames, setShowRegistryNames] = useState(false);
   const [showFeedbackConsole, setShowFeedbackConsole] = useState(false);
+  const [gatewayUrl, setGatewayUrl] = useState(() => localStorage.getItem('space_station_backend_url') || 'https://space-station-commander.onrender.com');
 
   // Suggestions state
   const [feedbackText, setFeedbackText] = useState('');
@@ -638,6 +639,62 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Box 2: Terminal Gateway URL configuration */}
+          <div className="space-y-3.5 bg-slate-950/40 p-4 border border-[#1E293B] rounded-xl flex flex-col justify-between">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider">Terminal Server Connection</span>
+              <h4 className="text-xs font-bold text-white uppercase font-mono">Central Server Gateway Link</h4>
+              <p className="text-[10px] text-slate-400 leading-normal font-sans mt-0.5">
+                Configure the primary server API host address. Set to a custom domain (e.g. Render) to play 24/7, or leave blank/relative to fall back to the native local container.
+              </p>
+            </div>
+
+            <div className="pt-2 space-y-3">
+              <input
+                type="text"
+                value={gatewayUrl}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setGatewayUrl(val);
+                  const trimmed = val.trim();
+                  if (trimmed) {
+                    localStorage.setItem('space_station_backend_url', trimmed);
+                  } else {
+                    localStorage.removeItem('space_station_backend_url');
+                  }
+                }}
+                className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] hover:border-cyan-500/40 focus:border-cyan-500 focus:outline-none text-xs text-cyan-400 font-mono rounded-xl transition"
+                placeholder="E.g. https://space-station-commander.onrender.com"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('space_station_backend_url', 'https://space-station-commander.onrender.com');
+                    setGatewayUrl('https://space-station-commander.onrender.com');
+                    showToast('Terminal set to Render high-availability server!', 'success');
+                    setTimeout(() => window.location.reload(), 600);
+                  }}
+                  className="flex-grow py-1.5 px-3 bg-[#0E1E2F] hover:bg-[#122A42] border border-cyan-500/20 text-cyan-400 rounded-lg text-[9.5px] font-bold uppercase transition"
+                >
+                  🚀 Use Render host
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem('space_station_backend_url');
+                    setGatewayUrl('');
+                    showToast('Terminal set to local relative fallback!', 'info');
+                    setTimeout(() => window.location.reload(), 600);
+                  }}
+                  className="flex-grow py-1.5 px-3 bg-slate-900 hover:bg-slate-850 text-slate-350 border border-slate-800 rounded-lg text-[9.5px] font-bold uppercase transition"
+                >
+                  🛠️ Local Relative
+                </button>
+              </div>
             </div>
           </div>
         </div>

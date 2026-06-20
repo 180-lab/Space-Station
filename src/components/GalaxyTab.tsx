@@ -1630,7 +1630,15 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                       battleReports.filter(r => r.isRecon !== true).map((report) => {
                         const isExpanded = expandedCombatReports[report.id] || false;
                         const isAttacker = report.attackerId === player.id;
-                        const outcome = report.winner === 'attacker' ? (isAttacker ? 'WINNER' : 'DEFEATED') : (isAttacker ? 'DEFEATED' : 'WINNER');
+                        const isDefender = report.defenderId === player.id;
+                        let outcome = 'DEFEATED';
+                        if (isAttacker) {
+                          outcome = report.winner === 'attacker' ? 'WINNER' : 'DEFEATED';
+                        } else if (isDefender) {
+                          outcome = report.winner === 'defender' ? 'WINNER' : 'DEFEATED';
+                        } else {
+                          outcome = report.winner === 'attacker' ? 'ATT WINNER' : 'DEF WINNER';
+                        }
                         return (
                           <div key={report.id} className="p-3 border border-[#1E293B] bg-[#030508]/60 hover:bg-[#070b14]/70 transition rounded-xl font-mono">
                             <button
@@ -1641,7 +1649,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               <span className="truncate pr-2">
                                 ⚔️ <span className="text-red-400 font-mono underline hover:text-red-300">DEC-LINK_ENGAGE_SEC_{report.defenderCoords.x}_{report.defenderCoords.y}</span>
                               </span>
-                              <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded border shrink-0 font-bold ${outcome === 'WINNER' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-red-400 bg-red-500/10 border-red-500/20'}`}>
+                              <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded border shrink-0 font-bold ${outcome === 'WINNER' || outcome.includes('WINNER') ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-red-400 bg-red-500/10 border-red-500/20'}`}>
                                 {isExpanded ? 'CLOSE' : outcome}
                               </span>
                             </button>
@@ -1736,9 +1744,14 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                         const roleLabel = isPlayerAttacker ? 'Attacked' : 'Defended against';
                         const counterpartyName = isPlayerAttacker ? report.defenderName : report.attackerName;
                         const counterpartyId = isPlayerAttacker ? report.defenderId : report.attackerId;
-                        const outcomeText = report.winner === 'attacker' 
-                          ? (isPlayerAttacker ? 'VICTORY' : 'DEFEAT') 
-                          : (isPlayerDefender ? 'VICTORY' : 'DEFEAT');
+                        let outcomeText = 'DEFEAT';
+                        if (isPlayerAttacker) {
+                          outcomeText = report.winner === 'attacker' ? 'VICTORY' : 'DEFEAT';
+                        } else if (isPlayerDefender) {
+                          outcomeText = report.winner === 'defender' ? 'VICTORY' : 'DEFEAT';
+                        } else {
+                          outcomeText = report.winner === 'attacker' ? 'ATTACKER VICTORY' : 'DEFENDER VICTORY';
+                        }
 
                         const isSaved = savedReports[report.id] || false;
                         const isRead = readReports[report.id] || false;
@@ -1764,7 +1777,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   {!isRead && (
                                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0 shadow-[0_0_5px_#22d3ee]" />
                                   )}
-                                  ⚔️ <span className={outcomeText === 'VICTORY' ? 'text-cyan-400' : 'text-red-400'}>[{outcomeText}]</span> {roleLabel}{' '}
+                                  ⚔️ <span className={outcomeText.includes('VICTORY') ? 'text-cyan-400' : 'text-red-400'}>[{outcomeText}]</span> {roleLabel}{' '}
                                   <span 
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1850,7 +1863,13 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                             <div className="pt-3 border-t border-white/5 space-y-3.5">
                               <div className="flex items-center justify-between text-[10px] pb-1 border-b border-white/5">
                                 <span className="text-slate-500">{new Date(report.timestamp).toLocaleString()}</span>
-                                <span className={`font-bold tracking-wider uppercase px-2 py-0.5 rounded ${report.winner === 'attacker' && report.attackerId === player.id ? 'text-red-400 bg-red-950/15 animate-pulse' : report.winner === 'defender' && report.defenderId === player.id ? 'text-cyan-400 bg-cyan-950/15 animate-pulse' : 'text-slate-400 bg-white/5'}`}>
+                                <span className={`font-bold tracking-wider uppercase px-2 py-0.5 rounded ${
+                                  (report.winner === 'attacker' && isPlayerAttacker) || (report.winner === 'defender' && isPlayerDefender)
+                                    ? 'text-cyan-400 bg-cyan-950/15 animate-pulse'
+                                    : (report.winner === 'defender' && isPlayerAttacker) || (report.winner === 'attacker' && isPlayerDefender)
+                                    ? 'text-red-400 bg-red-950/15'
+                                    : 'text-slate-400 bg-white/5'
+                                }`}>
                                   {report.winner.toUpperCase()} VICTORIOUS
                                 </span>
                               </div>

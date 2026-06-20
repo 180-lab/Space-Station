@@ -1704,9 +1704,14 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                 return filteredReports.map((report) => {
                   const isPlayerAttacker = report.attackerId === player.id;
                   const isPlayerDefender = report.defenderId === player.id;
-                  const outcomeText = report.winner === 'attacker' 
-                    ? (isPlayerAttacker ? 'VICTORY' : 'DEFEAT') 
-                    : (isPlayerDefender ? 'VICTORY' : 'DEFEAT');
+                  let outcomeText = 'DEFEAT';
+                  if (isPlayerAttacker) {
+                    outcomeText = report.winner === 'attacker' ? 'VICTORY' : 'DEFEAT';
+                  } else if (isPlayerDefender) {
+                    outcomeText = report.winner === 'defender' ? 'VICTORY' : 'DEFEAT';
+                  } else {
+                    outcomeText = report.winner === 'attacker' ? 'ATTACKER VICTORY' : 'DEFENDER VICTORY';
+                  }
 
                   const isExpanded = expandedReports[report.id] || false;
                   const isSaved = savedReports[report.id] || false;
@@ -1771,7 +1776,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={`font-black tracking-widest px-2 py-0.5 rounded text-[9px] ${
-                            outcomeText === 'VICTORY' 
+                            outcomeText.includes('VICTORY') 
                               ? 'text-cyan-400 bg-cyan-950/20' 
                               : 'text-red-400 bg-red-950/20'
                           }`}>
