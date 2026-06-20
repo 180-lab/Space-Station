@@ -3896,28 +3896,28 @@ app.post("/api/tutorial/claim", (req, res) => {
   }
 
   const rewards: Record<number, { water: number; plasma: number; fuel: number; food: number; respirant: number; credits: number }> = {
-    1: { water: 150000, plasma: 100000, fuel: 100000, food: 100000, respirant: 100000, credits: 15000 },  // Colonize 2nd planet
-    2: { water: 20000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000, credits: 3000 },      // Rename Outpost
-    3: { water: 25000, plasma: 15000, fuel: 15000, food: 15000, respirant: 15000, credits: 5000 },      // Hydrothermal pump Lvl 2
-    4: { water: 15000, plasma: 15000, fuel: 15000, food: 15000, respirant: 25000, credits: 4000 },      // Air Scrubber Lvl 2
-    5: { water: 15000, plasma: 15000, fuel: 15000, food: 25000, respirant: 15000, credits: 4000 },      // Food bio-synth Lvl 2
-    6: { water: 15000, plasma: 25000, fuel: 15000, food: 15000, respirant: 15500, credits: 4000 },      // Plasma refinery Lvl 2
-    7: { water: 45000, plasma: 35000, fuel: 35000, food: 35000, respirant: 35000, credits: 7500 },      // Launch Scan Attack Mission
-    8: { water: 25000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000, credits: 5000 },      // Extractor Production boost
-    9: { water: 30000, plasma: 25000, fuel: 25000, food: 25000, respirant: 25000, credits: 6000 },      // Fabricator Lvl 2
-    10: { water: 25000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000, credits: 5000 },     // Radar Array Lvl 1
-    11: { water: 20000, plasma: 15000, fuel: 25000, food: 15000, respirant: 15000, credits: 4000 },     // Deep Space sweep
-    12: { water: 35000, plasma: 30000, fuel: 30000, food: 30000, respirant: 30000, credits: 8000 },     // Research Center Lvl 1
-    13: { water: 30000, plasma: 25000, fuel: 25000, food: 25000, respirant: 25000, credits: 5000 },     // Quantum Processor research
-    14: { water: 30000, plasma: 25050, fuel: 25000, food: 25000, respirant: 25000, credits: 6000 },     // War room Command level 1
-    15: { water: 25000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000, credits: 5000 },     // Train 15 troop fighters
-    16: { water: 15000, plasma: 15000, fuel: 15000, food: 15000, respirant: 15000, credits: 3000 },     // Sending a private text PM
-    17: { water: 30000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000, credits: 5000 },     // Nexus Cargo Claim
-    18: { water: 40000, plasma: 30000, fuel: 30000, food: 30000, respirant: 30000, credits: 7000 },     // Join / Create an Alliance Alliance
-    19: { water: 15000, plasma: 15000, fuel: 15000, food: 15000, respirant: 15000, credits: 3000 },     // Send general public Chat msg
-    20: { water: 35000, plasma: 30000, fuel: 35000, food: 30000, respirant: 30000, credits: 8000 },     // Engine Warp tech research
-    21: { water: 20000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000, credits: 4000 },     // Check local leader or payroll
-    22: { water: 200500, plasma: 150000, fuel: 150000, food: 150000, respirant: 150000, credits: 30000 }, // Settle 3rd Planet outpost!
+    1: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 15000 },  // Colonize 2nd planet
+    2: { water: 10280, plasma: 10180, fuel: 10180, food: 10180, respirant: 10180, credits: 3000 },      // Rename Outpost
+    3: { water: 10180, plasma: 10180, fuel: 10180, food: 10180, respirant: 10280, credits: 5000 },      // Hydrothermal pump Lvl 2
+    4: { water: 10180, plasma: 10180, fuel: 10180, food: 10280, respirant: 10180, credits: 4000 },      // Air Scrubber Lvl 2
+    5: { water: 10180, plasma: 10280, fuel: 10180, food: 10180, respirant: 10180, credits: 4000 },      // Food bio-synth Lvl 2
+    6: { water: 10150, plasma: 10000, fuel: 10000, food: 10200, respirant: 10100, credits: 4000 },      // Plasma refinery Lvl 2
+    7: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 7500 },      // Launch Scan Attack Mission
+    8: { water: 10291, plasma: 10302, fuel: 10302, food: 10302, respirant: 10302, credits: 5000 },      // Extractor Production boost
+    9: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 6000 },      // Fabricator Lvl 2
+    10: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5005 },     // Radar Array Lvl 1
+    11: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 4000 },     // Deep Space sweep
+    12: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000, credits: 8000 },     // Research Center Lvl 1
+    13: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 5000 },     // Quantum Processor research
+    14: { water: 12250, plasma: 10000, fuel: 10000, food: 13000, respirant: 11500, credits: 6000 },     // War room Command level 1
+    15: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },     // Train 15 troop fighters
+    16: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 3000 },     // Sending a private text PM
+    17: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },     // Nexus Cargo Claim
+    18: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 7000 },     // Join / Create an Alliance Alliance
+    19: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000, credits: 3000 },     // Send general public Chat msg
+    20: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 8000 },     // Engine Warp tech research
+    21: { water: 11500, plasma: 11000, fuel: 12000, food: 11500, respirant: 11000, credits: 4000 },     // Check local leader or payroll
+    22: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 30000 }, // Settle 3rd Planet outpost!
   };
 
   const idNum = parseInt(taskId);

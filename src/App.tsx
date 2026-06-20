@@ -1743,26 +1743,17 @@ export default function App() {
 
       {/* Main Top Header Navbar info */}
       <header className="sticky top-0 z-40 h-20 bg-[#0A0F1D] border-b border-[#1E293B] flex items-center justify-between px-6 shrink-0 backdrop-blur-md bg-opacity-95">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div 
-              className="w-2.5 h-2.5 rounded-full animate-pulse bg-cyan-400 shadow-[0_0_10px_#22d3ee]" 
-            />
-            <div>
-              <span className="text-[9px] font-mono font-bold uppercase text-slate-500 tracking-widest leading-none">Commander Profile</span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <h1 className="text-sm sm:text-base font-bold font-mono tracking-tight leading-none text-white">{player.username}</h1>
-              </div>
-            </div>
-          </div>
-
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-2.5 h-2.5 rounded-full animate-pulse bg-cyan-400 shadow-[0_0_10px_#22d3ee] shrink-0" 
+          />
           {/* Slick unified Custom Station Selector Dropdown */}
           <div className="relative font-mono leading-none flex items-center">
             <button
               id="active-station-selector-btn"
               type="button"
               onClick={() => setStationDropdownOpen(!stationDropdownOpen)}
-              className="bg-[#05070A]/90 hover:bg-[#1E293B]/40 text-cyan-404 text-cyan-400 hover:text-white text-xs font-bold py-2 px-3 rounded-xl border border-cyan-500/15 focus:border-cyan-500/50 hover:border-cyan-500/40 focus:outline-none cursor-pointer transition flex items-center gap-2 shadow-[0_0_15px_rgba(34,211,238,0.06)] active:scale-95"
+              className="bg-[#05070A]/90 hover:bg-[#1E293B]/40 text-cyan-400 hover:text-white text-xs font-bold py-2 px-3 rounded-xl border border-cyan-500/15 focus:border-cyan-500/50 hover:border-cyan-500/40 focus:outline-none cursor-pointer transition flex items-center gap-2 shadow-[0_0_15px_rgba(34,211,238,0.06)] active:scale-95"
             >
               <span className="text-[9px] text-slate-500 tracking-wider">STATION:</span>
               <span className="truncate max-w-[125px] text-slate-100 font-black tracking-tight">{activePlanet.name}</span>
@@ -2065,103 +2056,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Dynamic Resource Stats HUD Panels (Elegant Dark Telemetry Mockup style with mini Progress Bars) - Restrict to only show on the explore tab */}
-      {activeTab === 'explore' && (
-        <div className="bg-[#0A0F1D] border-b border-[#1E293B] grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-8 px-6 py-4 shrink-0 justify-between">
-          
-          {/* Water Stat */}
-          <div className="flex flex-col" title="Water (H2O): Essential life fluid. Consumed continuously by troops to maintain Space Force strength. Hover/long press for info.">
-            <div className="flex items-center gap-2 mb-1">
-              <Droplet size={12} className="text-cyan-400 animate-pulse" title="Water icon: Click or long-press to view details" />
-              <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Water (H2O)</span>
-            </div>
-            <span className="text-base font-mono font-bold text-cyan-400">
-              {Math.round(localResources.water).toLocaleString()}{" "}
-              <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-            </span>
-            <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-              <div 
-                className="h-full bg-cyan-400 rounded-full shadow-[0_0_6px_#22d3ee] transition-all duration-300"
-                style={{ width: `${Math.min(100, (localResources.water / repositoryLimit) * 100)}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Plasma Stat */}
-          <div className="flex flex-col" title="Plasma: High-energy matter. Essential for building complex spaceship hull grades and hyper-engines. Hover/long press for info.">
-            <div className="flex items-center gap-2 mb-1">
-              <Zap size={12} className="text-purple-400 animate-pulse" title="Plasma icon: Click or long-press to view details" />
-              <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Plasma</span>
-            </div>
-            <span className="text-base font-mono font-bold text-purple-400">
-              {Math.round(localResources.plasma).toLocaleString()}{" "}
-              <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-            </span>
-            <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-              <div 
-                className="h-full bg-purple-500 rounded-full shadow-[0_0_6px_#a855f7] transition-all duration-300"
-                style={{ width: `${Math.min(100, (localResources.plasma / repositoryLimit) * 100)}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Fuel Stat */}
-          <div className="flex flex-col" title="Fuel: Thermonuclear propulsion energy. Required for dispatching fleet traversals across global planetary sectors. Hover/long press for info.">
-            <div className="flex items-center gap-2 mb-1">
-              <Flame size={12} className="text-amber-400 animate-pulse" title="Fuel icon: Click or long-press to view details" />
-              <span className="text-[10px] uppercase tracking-widest font-bold text-slate-550">Fuel</span>
-            </div>
-            <span className="text-base font-mono font-bold text-amber-400">
-              {Math.round(localResources.fuel).toLocaleString()}{" "}
-              <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-            </span>
-            <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-              <div 
-                className="h-full bg-amber-500 rounded-full shadow-[0_0_6px_#fbbf24] transition-all duration-300"
-                style={{ width: `${Math.min(100, (localResources.fuel / repositoryLimit) * 100)}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Food Stat */}
-          <div className="flex flex-col" title="Food: Life support proteins. Vital to sustaining personnel during active colonist station operations. Hover/long press for info.">
-            <div className="flex items-center gap-2 mb-1">
-              <Apple size={12} className="text-emerald-400 animate-pulse" title="Food icon: Click or long-press to view details" />
-              <span className="text-[10px] uppercase tracking-widest font-bold text-slate-550">Food</span>
-            </div>
-            <span className="text-base font-mono font-bold text-emerald-400">
-              {Math.round(localResources.food).toLocaleString()}{" "}
-              <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-            </span>
-            <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-              <div 
-                className="h-full bg-emerald-500 rounded-full shadow-[0_0_6px_#10b981] transition-all duration-300"
-                style={{ width: `${Math.min(100, (localResources.food / repositoryLimit) * 100)}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Respirant Stat */}
-          <div className="flex flex-col col-span-2 md:col-span-1" title="Respirant (O2): Atmospheric gases. Powering life ventilation systems for astronauts and pilots. Hover/long press for info.">
-            <div className="flex items-center gap-2 mb-1">
-              <Wind size={12} className="text-blue-400 animate-pulse" title="Respirant icon: Click or long-press to view details" />
-              <span className="text-[10px] uppercase tracking-widest font-bold text-[#64748b]">Respirant (O2)</span>
-            </div>
-            <span className="text-base font-mono font-bold text-blue-400">
-              {Math.round(localResources.respirant).toLocaleString()}{" "}
-              <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-            </span>
-            <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-              <div 
-                className="h-full bg-blue-500 rounded-full shadow-[0_0_6px_#3b82f6] transition-all duration-300"
-                style={{ width: `${Math.min(100, (localResources.respirant / repositoryLimit) * 100)}%` }}
-              />
-            </div>
-          </div>
-
-        </div>
-      )}
-
       {/* Screen view router container */}
       <main className="max-w-5xl mx-auto px-4 pt-8 pb-24 animate-fade-in animate-duration-500">
         {player && activePlanet && (
@@ -2198,6 +2092,7 @@ export default function App() {
               }}
               chatMessages={chatMessages}
               onSendChat={handleSendChat}
+              localResources={localResources}
             />
           );
         })()}

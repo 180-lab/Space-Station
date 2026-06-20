@@ -101,6 +101,7 @@ interface ExploreTabProps {
   onNavigateToLeaderboard?: () => void;
   chatMessages: ChatMessage[];
   onSendChat: (channel: 'global' | 'alliance' | 'private', content: string, receiverId?: string) => void;
+  localResources?: Record<ResourceType, number>;
 }
 
 const RESOURCE_INFO: Record<ResourceType, { name: string; color: string; icon: any; desc: string }> = {
@@ -135,7 +136,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   populationRank = 1,
   onNavigateToLeaderboard,
   chatMessages,
-  onSendChat
+  onSendChat,
+  localResources = activePlanet.resources
 }) => {
   const [expandedCategory, setExpandedCategory] = useState<ResourceType | null>(null);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
@@ -416,6 +418,294 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
   return (
     <div className="space-y-8 pb-24">
+      {/* Action Centerpiece Header with Holographic Glow */}
+      <div className="relative p-6 bg-gradient-to-b from-[#0F172A] to-black border border-white/5 rounded-xl overflow-hidden flex flex-col">
+        {/* Holographic Overlay */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(34,211,238,0.05)_0%,_transparent_70%)] pointer-events-none"></div>
+        
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <span className="text-[10px] font-bold text-cyan-400 tracking-widest uppercase font-mono">SECTOR COMMAND SITE</span>
+            {isEditingName ? (
+              <div className="flex items-center gap-2 mt-1 max-w-md">
+                <input
+                  type="text"
+                  maxLength={30}
+                  value={newNameInput}
+                  onChange={(e) => setNewNameInput(e.target.value)}
+                  className="flex-1 px-3 py-1 bg-slate-955 bg-slate-950 border border-cyan-500/50 hover:border-cyan-500 focus:border-cyan-500 focus:outline-none text-sm text-white font-mono rounded-lg transition"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRenameActiveStation();
+                    if (e.key === 'Escape') {
+                      setIsEditingName(false);
+                      setNewNameInput(activePlanet.name);
+                    }
+                  }}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={handleRenameActiveStation}
+                  className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
+                  title="Save Name"
+                >
+                  <Check size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingName(false);
+                    setNewNameInput(activePlanet.name);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 rounded-lg transition cursor-pointer font-sans"
+                  title="Cancel"
+                >
+                  <span className="text-sm font-semibold select-none font-sans">✕</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 mt-1 group">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">{activePlanet.name}</h2>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingName(true)}
+                  className="p-1 px-2 text-[10px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/30 hover:bg-cyan-950/80 border border-cyan-500/20 hover:border-cyan-500/50 font-bold uppercase rounded-lg transition opacity-60 group-hover:opacity-100 flex items-center gap-1 cursor-pointer"
+                  title="Rename Station Base"
+                >
+                  <Edit2 size={10} /> Rename
+                </button>
+              </div>
+            )}
+            <div className="mt-2 text-xs text-slate-400 flex items-center gap-2 font-mono">
+              <span className={`inline-block w-2 h-2 rounded-full ${pulseDot} animate-pulse`} />
+              <span>Commander: <span className="text-slate-200 font-bold">{player.username}</span> &bull; {activePlanet.name} &bull; Sector Coord: [{activePlanet.sectorX}, {activePlanet.sectorY}]</span>
+            </div>
+          </div>
+
+          {/* Active Sector Alerts indicator block (Replaces Repository Limit) */}
+          <button
+            id="alerts-hud-trigger"
+            onClick={() => setIsAlertsOpen(true)}
+            className={`p-3 border rounded-lg text-left font-mono min-w-[170px] self-start md:self-auto cursor-pointer transition duration-150 hover:brightness-110 active:scale-95 flex flex-col justify-center ${alertsColor}`}
+          >
+            <span className="text-[9px] uppercase tracking-widest font-bold opacity-75">{alertsLabel}</span>
+            <span className="text-[11px] font-black uppercase mt-1 tracking-tight flex items-center gap-1.5 font-mono">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
+              {alertsValue}
+            </span>
+          </button>
+        </div>
+
+        {isDehydrated && (
+          <div className="relative z-10 mt-4 p-3 border border-red-900/50 bg-red-950/30 text-red-400 rounded-xl flex items-start gap-2.5 text-xs animate-pulse" title="Critical Alert: High severity base warning">
+            <ShieldAlert size={16} className="shrink-0 mt-0.5 animate-bounce text-red-500" title="Shield warning indicator: Critical dehydration is occurring" />
+            <div>
+              <p className="font-bold uppercase tracking-widest text-[10px]">CRITICAL NEGATIVE PRODUCTION (ATTRITION PASSIVE)</p>
+              <p className="text-red-300/80 leading-relaxed mt-0.5">Troops are suffering rapid attrition due to negative production! Upgrade resource extractors immediately built with deeper wells or dismiss excess troops.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Interactive Construction Queue Dashboard */}
+        {(() => {
+          const queueList = activePlanet.upgradeQueue || [];
+          const activeUpgrades: { type: 'mine' | 'building'; key: string; mineIndex?: number; upgradeEnd: number }[] = [];
+          
+          for (const rKey of Object.keys(activePlanet.mines)) {
+            activePlanet.mines[rKey as ResourceType].forEach((m, idx) => {
+              if (m.isUpgrading && m.upgradeEnd) {
+                activeUpgrades.push({ type: 'mine', key: rKey, mineIndex: idx, upgradeEnd: m.upgradeEnd });
+              }
+            });
+          }
+          
+          for (const bKey of Object.keys(activePlanet.buildings)) {
+            const b = activePlanet.buildings[bKey as keyof typeof activePlanet.buildings] as BuildingState;
+            if (b && b.isUpgrading && b.upgradeEnd) {
+              activeUpgrades.push({ type: 'building', key: bKey, upgradeEnd: b.upgradeEnd });
+            }
+          }
+
+          const totalActiveAndQueued = activeUpgrades.length + queueList.length;
+          if (totalActiveAndQueued === 0) return null;
+
+          return (
+            <div className="relative z-10 mt-4 p-4 border border-cyan-500/25 bg-cyan-950/10 rounded-2xl font-mono text-xs text-slate-350 shadow-inner">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-cyan-400 uppercase tracking-widest font-extrabold flex items-center gap-1.5 animate-pulse">
+                    <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full" />
+                    Station Construction Queue ({queueList.length}/25 queued)
+                  </span>
+                  {activeUpgrades.length > 0 && (
+                    <span className="text-[9px] bg-cyan-500/10 text-cyan-300 px-1.5 py-0.5 rounded font-bold uppercase">
+                      {activeUpgrades.length} Active
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] text-slate-500 uppercase hidden sm:inline">Sequential Processing</span>
+                  <button
+                    onClick={() => setIsQueueMinimized(!isQueueMinimized)}
+                    className="p-1 px-2.5 text-[9px] font-extrabold font-mono uppercase bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-400 border border-cyan-500/25 hover:border-cyan-400 rounded-lg transition duration-150 cursor-pointer flex items-center gap-1 select-none"
+                    title={isQueueMinimized ? "Maximize Queue" : "Minimize Queue"}
+                    type="button"
+                  >
+                    {isQueueMinimized ? (
+                      <>
+                        <ChevronDown size={10} />
+                        <span>Expand ({totalActiveAndQueued})</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronUp size={10} />
+                        <span>Minimize</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+              
+              {!isQueueMinimized && (
+                <div className="space-y-2 mt-3">
+                  {activeUpgrades.map((act, index) => {
+                    const bName = act.type === 'mine' 
+                      ? `${act.key.toUpperCase()} Extractor #${act.mineIndex! + 1}`
+                      : act.key.toUpperCase();
+                    return (
+                      <div key={`act-${index}`} className="flex items-center justify-between bg-cyan-500/5 hover:bg-cyan-500/10 border border-cyan-500/15 p-2 px-3 rounded-xl transition">
+                        <div className="flex items-center gap-2">
+                          <span className="text-cyan-400 font-bold select-none">[ACTIVE]</span>
+                          <span className="text-white font-extrabold font-sans">
+                            {act.type === 'mine' ? '⛏️' : '🏗️'} {bName}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-amber-400 font-bold">
+                          <Clock size={11} className="animate-spin" />
+                          <span>{getTimerString(act.upgradeEnd)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {queueList.map((q, index) => {
+                    const bName = q.type === 'mine'
+                      ? `${q.key.toUpperCase()} Extractor #${q.mineIndex! + 1}`
+                      : q.key.toUpperCase();
+                    return (
+                      <div key={`queued-${index}`} className="flex items-center justify-between bg-slate-900/30 hover:bg-slate-900/50 border border-slate-800 p-2 px-3 rounded-xl transition">
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-500 font-bold select-none">#{index + 1} QUEUED (SG)</span>
+                          <span className="text-slate-300 font-semibold font-sans">
+                            {q.type === 'mine' ? '⛏️' : '🏗️'} {bName} &rarr; <span className="text-cyan-400 font-extrabold font-mono">Lv. {q.targetLevel}</span>
+                          </span>
+                        </div>
+                        <span className="text-[9px] text-slate-500 border border-slate-800 px-1.5 py-0.5 rounded uppercase">Pending</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* Main Dynamic Resource Stats HUD Panels (Elegant Dark Telemetry Mockup style with mini Progress Bars) */}
+      <div className="bg-[#0A0F1D]/80 backdrop-blur-md border border-[#1E293B] rounded-2xl grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-7 p-5 justify-between">
+        
+        {/* Water Stat */}
+        <div className="flex flex-col animate-fade-in" title="Water (H2O): Essential life fluid. Consumed continuously by troops to maintain Space Force strength. Hover/long press for info.">
+          <div className="flex items-center gap-2 mb-1">
+            <Droplet size={12} className="text-cyan-400 animate-pulse" title="Water icon" />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Water (H2O)</span>
+          </div>
+          <span className="text-base font-mono font-bold text-cyan-400">
+            {Math.round(localResources.water).toLocaleString()}{" "}
+            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+          </span>
+          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+            <div 
+              className="h-full bg-cyan-400 rounded-full shadow-[0_0_6px_#22d3ee] transition-all duration-300"
+              style={{ width: `${Math.min(100, (localResources.water / repositoryLimit) * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Plasma Stat */}
+        <div className="flex flex-col animate-fade-in" title="Plasma: High-energy matter. Essential for building complex spaceship hull grades and hyper-engines. Hover/long press for info.">
+          <div className="flex items-center gap-2 mb-1">
+            <Zap size={12} className="text-purple-400 animate-pulse" title="Plasma icon" />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Plasma</span>
+          </div>
+          <span className="text-base font-mono font-bold text-purple-400">
+            {Math.round(localResources.plasma).toLocaleString()}{" "}
+            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+          </span>
+          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+            <div 
+              className="h-full bg-purple-500 rounded-full shadow-[0_0_6px_#a855f7] transition-all duration-300"
+              style={{ width: `${Math.min(100, (localResources.plasma / repositoryLimit) * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Fuel Stat */}
+        <div className="flex flex-col animate-fade-in" title="Fuel: Thermonuclear propulsion energy. Required for dispatching fleet traversals across global planetary sectors. Hover/long press for info.">
+          <div className="flex items-center gap-2 mb-1">
+            <Flame size={12} className="text-amber-400 animate-pulse" title="Fuel icon" />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Fuel</span>
+          </div>
+          <span className="text-base font-mono font-bold text-amber-400">
+            {Math.round(localResources.fuel).toLocaleString()}{" "}
+            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+          </span>
+          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+            <div 
+              className="h-full bg-amber-500 rounded-full shadow-[0_0_6px_#fbbf24] transition-all duration-300"
+              style={{ width: `${Math.min(100, (localResources.fuel / repositoryLimit) * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Food Stat */}
+        <div className="flex flex-col animate-fade-in" title="Food: Life support proteins. Vital to sustaining personnel during active colonist station operations. Hover/long press for info.">
+          <div className="flex items-center gap-2 mb-1">
+            <Apple size={12} className="text-emerald-400 animate-pulse" title="Food icon" />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Food</span>
+          </div>
+          <span className="text-base font-mono font-bold text-emerald-400">
+            {Math.round(localResources.food).toLocaleString()}{" "}
+            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+          </span>
+          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+            <div 
+              className="h-full bg-emerald-500 rounded-full shadow-[0_0_6px_#10b981] transition-all duration-300"
+              style={{ width: `${Math.min(100, (localResources.food / repositoryLimit) * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Respirant Stat */}
+        <div className="flex flex-col col-span-2 md:col-span-1 animate-fade-in" title="Respirant (O2): Atmospheric gases. Powering life ventilation systems for astronauts and pilots. Hover/long press for info.">
+          <div className="flex items-center gap-2 mb-1">
+            <Wind size={12} className="text-blue-400 animate-pulse" title="Respirant icon" />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-[#64748b] font-mono">Respirant (O2)</span>
+          </div>
+          <span className="text-base font-mono font-bold text-blue-400">
+            {Math.round(localResources.respirant).toLocaleString()}{" "}
+            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+          </span>
+          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+            <div 
+              className="h-full bg-blue-500 rounded-full shadow-[0_0_6px_#3b82f6] transition-all duration-300"
+              style={{ width: `${Math.min(100, (localResources.respirant / repositoryLimit) * 100)}%` }}
+            />
+          </div>
+        </div>
+
+      </div>
+
       {/* TACTICAL METRIC FLIGHT RADAR - INCOMING AND OUTGOING FLEET OBSERVATIONS */}
       {(() => {
         const outgoingFleets = fleets.filter((f) => f.senderId === player.id);
@@ -627,199 +917,6 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
           </div>
         );
       })()}
-
-      {/* Action Centerpiece Header with Holographic Glow */}
-      <div className="relative p-6 bg-gradient-to-b from-[#0F172A] to-black border border-white/5 rounded-xl overflow-hidden flex flex-col">
-        {/* Holographic Overlay */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(34,211,238,0.05)_0%,_transparent_70%)] pointer-events-none"></div>
-        
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <span className="text-[10px] font-bold text-cyan-400 tracking-widest uppercase font-mono">SECTOR COMMAND SITE</span>
-            {isEditingName ? (
-              <div className="flex items-center gap-2 mt-1 max-w-md">
-                <input
-                  type="text"
-                  maxLength={30}
-                  value={newNameInput}
-                  onChange={(e) => setNewNameInput(e.target.value)}
-                  className="flex-1 px-3 py-1 bg-slate-950 border border-cyan-500/50 hover:border-cyan-500 focus:border-cyan-500 focus:outline-none text-sm text-white font-mono rounded-lg transition"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleRenameActiveStation();
-                    if (e.key === 'Escape') {
-                      setIsEditingName(false);
-                      setNewNameInput(activePlanet.name);
-                    }
-                  }}
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={handleRenameActiveStation}
-                  className="p-1.5 text-emerald-405 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
-                  title="Save Name"
-                >
-                  <Check size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditingName(false);
-                    setNewNameInput(activePlanet.name);
-                  }}
-                  className="p-1.5 text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 rounded-lg transition cursor-pointer font-sans"
-                  title="Cancel"
-                >
-                  <span className="text-sm font-semibold select-none">✕</span>
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 mt-1 group">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">{activePlanet.name}</h2>
-                <button
-                  type="button"
-                  onClick={() => setIsEditingName(true)}
-                  className="p-1 px-2 text-[10px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/30 hover:bg-cyan-950/80 border border-cyan-500/20 hover:border-cyan-500/50 font-bold uppercase rounded-lg transition opacity-60 group-hover:opacity-100 flex items-center gap-1 cursor-pointer"
-                  title="Rename Station Base"
-                >
-                  <Edit2 size={10} /> Rename
-                </button>
-              </div>
-            )}
-            <div className="mt-2 text-xs text-slate-400 flex items-center gap-2 font-mono">
-              <span className={`inline-block w-2 h-2 rounded-full ${pulseDot} animate-pulse`} />
-              <span>Commander: <span className="text-slate-200 font-bold">{player.username}</span> &bull; {activePlanet.name} &bull; Sector Coord: [{activePlanet.sectorX}, {activePlanet.sectorY}]</span>
-            </div>
-          </div>
-
-          {/* Active Sector Alerts indicator block (Replaces Repository Limit) */}
-          <button
-            id="alerts-hud-trigger"
-            onClick={() => setIsAlertsOpen(true)}
-            className={`p-3 border rounded-lg text-left font-mono min-w-[170px] self-start md:self-auto cursor-pointer transition duration-150 hover:brightness-110 active:scale-95 flex flex-col justify-center ${alertsColor}`}
-          >
-            <span className="text-[9px] uppercase tracking-widest font-bold opacity-75">{alertsLabel}</span>
-            <span className="text-[11px] font-black uppercase mt-1 tracking-tight flex items-center gap-1.5 font-mono">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
-              {alertsValue}
-            </span>
-          </button>
-        </div>
-
-        {isDehydrated && (
-          <div className="relative z-10 mt-4 p-3 border border-red-900/50 bg-red-950/30 text-red-400 rounded-xl flex items-start gap-2.5 text-xs animate-pulse" title="Critical Alert: High severity base warning">
-            <ShieldAlert size={16} className="shrink-0 mt-0.5 animate-bounce text-red-500" title="Shield warning indicator: Critical dehydration is occurring" />
-            <div>
-              <p className="font-bold uppercase tracking-widest text-[10px]">CRITICAL NEGATIVE PRODUCTION (ATTRITION PASSIVE)</p>
-              <p className="text-red-300/80 leading-relaxed mt-0.5">Troops are suffering rapid attrition due to negative production! Upgrade resource extractors immediately built with deeper wells or dismiss excess troops.</p>
-            </div>
-          </div>
-        )}
-
-        {/* Interactive Construction Queue Dashboard */}
-        {(() => {
-          const queueList = activePlanet.upgradeQueue || [];
-          const activeUpgrades: { type: 'mine' | 'building'; key: string; mineIndex?: number; upgradeEnd: number }[] = [];
-          
-          for (const rKey of Object.keys(activePlanet.mines)) {
-            activePlanet.mines[rKey as ResourceType].forEach((m, idx) => {
-              if (m.isUpgrading && m.upgradeEnd) {
-                activeUpgrades.push({ type: 'mine', key: rKey, mineIndex: idx, upgradeEnd: m.upgradeEnd });
-              }
-            });
-          }
-          
-          for (const bKey of Object.keys(activePlanet.buildings)) {
-            const b = activePlanet.buildings[bKey as keyof typeof activePlanet.buildings] as BuildingState;
-            if (b && b.isUpgrading && b.upgradeEnd) {
-              activeUpgrades.push({ type: 'building', key: bKey, upgradeEnd: b.upgradeEnd });
-            }
-          }
-
-          const totalActiveAndQueued = activeUpgrades.length + queueList.length;
-          if (totalActiveAndQueued === 0) return null;
-
-          return (
-            <div className="relative z-10 mt-4 p-4 border border-cyan-500/25 bg-cyan-950/10 rounded-2xl font-mono text-xs text-slate-350 shadow-inner">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-cyan-405 uppercase tracking-widest font-extrabold flex items-center gap-1.5 animate-pulse">
-                    <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full" />
-                    Station Construction Queue ({queueList.length}/25 queued)
-                  </span>
-                  {activeUpgrades.length > 0 && (
-                    <span className="text-[9px] bg-cyan-500/10 text-cyan-300 px-1.5 py-0.5 rounded font-bold uppercase">
-                      {activeUpgrades.length} Active
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-slate-500 uppercase hidden sm:inline">Sequential Processing</span>
-                  <button
-                    onClick={() => setIsQueueMinimized(!isQueueMinimized)}
-                    className="p-1 px-2.5 text-[9px] font-extrabold font-mono uppercase bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-400 border border-cyan-500/25 hover:border-cyan-450 rounded-lg transition duration-150 cursor-pointer flex items-center gap-1 select-none"
-                    title={isQueueMinimized ? "Maximize Queue" : "Minimize Queue"}
-                    type="button"
-                  >
-                    {isQueueMinimized ? (
-                      <>
-                        <ChevronDown size={10} />
-                        <span>Expand ({totalActiveAndQueued})</span>
-                      </>
-                    ) : (
-                      <>
-                        <ChevronUp size={10} />
-                        <span>Minimize</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-              
-              {!isQueueMinimized && (
-                <div className="space-y-2 mt-3">
-                  {activeUpgrades.map((act, index) => {
-                    const bName = act.type === 'mine' 
-                      ? `${act.key.toUpperCase()} Extractor #${act.mineIndex! + 1}`
-                      : act.key.toUpperCase();
-                    return (
-                      <div key={`act-${index}`} className="flex items-center justify-between bg-cyan-500/5 hover:bg-cyan-500/10 border border-cyan-500/15 p-2 px-3 rounded-xl transition">
-                        <div className="flex items-center gap-2">
-                          <span className="text-cyan-400 font-bold select-none">[ACTIVE]</span>
-                          <span className="text-white font-extrabold">
-                            {act.type === 'mine' ? '⛏️' : '🏗️'} {bName}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-amber-400 font-bold">
-                          <Clock size={11} className="animate-spin" />
-                          <span>{getTimerString(act.upgradeEnd)}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {queueList.map((q, index) => {
-                    const bName = q.type === 'mine'
-                      ? `${q.key.toUpperCase()} Extractor #${q.mineIndex! + 1}`
-                      : q.key.toUpperCase();
-                    return (
-                      <div key={`queued-${index}`} className="flex items-center justify-between bg-slate-900/30 hover:bg-slate-900/50 border border-slate-850 p-2 px-3 rounded-xl transition">
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-500 font-bold select-none">#{index + 1} QUEUED (SG)</span>
-                          <span className="text-slate-300 font-semibold">
-                            {q.type === 'mine' ? '⛏️' : '🏗️'} {bName} &rarr; <span className="text-cyan-400 font-extrabold">Lv. {q.targetLevel}</span>
-                          </span>
-                        </div>
-                        <span className="text-[9px] text-slate-500 border border-slate-800 px-1.5 py-0.5 rounded uppercase">Pending</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-      </div>
 
       {/* resource mines category list */}
       <div>

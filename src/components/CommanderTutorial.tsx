@@ -62,7 +62,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Elite stride, Admiral! Having a dual-station outpost prepares your empire for massive economy scaling and fleet deployments!',
       targetTab: 'galaxy',
       rewards: {
-        resources: { water: 150000, plasma: 100000, fuel: 100000, food: 100000, respirant: 100000 },
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
         credits: 15000,
       },
     },
@@ -78,7 +78,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Brilliant! A space empire represents its leader - choose a label that sends shivers of glory down the spines of rogue pirate syndicates!',
       targetTab: 'explore',
       rewards: {
-        resources: { water: 20000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000 },
+        resources: { water: 10280, plasma: 10180, fuel: 10180, food: 10180, respirant: 10180 },
         credits: 3000,
       },
     },
@@ -94,7 +94,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Excellent design! Keeping your fluid water production on point is essential for colonist health and troop training assembly lines!',
       targetTab: 'explore',
       rewards: {
-        resources: { water: 25000, plasma: 15000, fuel: 15000, food: 15000, respirant: 15000 },
+        resources: { water: 10180, plasma: 10180, fuel: 10180, food: 10180, respirant: 10280 },
         credits: 5000,
       },
     },
@@ -110,7 +110,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Marvelous efficiency, Commander! Fresh atmosphere boosts engineering productivity tenfold across your entire planetary base!',
       targetTab: 'explore',
       rewards: {
-        resources: { water: 15000, plasma: 15000, fuel: 15000, food: 15000, respirant: 25000 },
+        resources: { water: 10180, plasma: 10180, fuel: 10180, food: 10280, respirant: 10180 },
         credits: 4000,
       },
     },
@@ -126,7 +126,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Astounding logic, Admiral! High-tier armies move on their stomachs - ensuring balanced organic rations is the mark of a master strategist!',
       targetTab: 'explore',
       rewards: {
-        resources: { water: 15000, plasma: 15000, fuel: 15000, food: 25000, respirant: 15000 },
+        resources: { water: 10180, plasma: 10280, fuel: 10180, food: 10180, respirant: 10180 },
         credits: 4000,
       },
     },
@@ -142,7 +142,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Stellar! Plasma fuel is highly critical for running science scanners, hyperdrive thruster upgrades, and high-tech energy shield nodes!',
       targetTab: 'explore',
       rewards: {
-        resources: { water: 15000, plasma: 25000, fuel: 15000, food: 15000, respirant: 15500 },
+        resources: { water: 10150, plasma: 10000, fuel: 10000, food: 10200, respirant: 10100 },
         credits: 4000,
       },
     },
@@ -158,7 +158,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Spectacular military initiative, General! Letting the rogue syndicates know who commands this sector is critical for border security!',
       targetTab: 'galaxy',
       rewards: {
-        resources: { water: 45000, plasma: 35000, fuel: 35000, food: 35000, respirant: 35000 },
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
         credits: 7500,
       },
     },
@@ -174,7 +174,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Outstanding productivity tactics! Speed credits booster allows you to fast-lane resource collection for heavy shipbuilding or complex physics researches!',
       targetTab: 'explore',
       rewards: {
-        resources: { water: 25000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000 },
+        resources: { water: 10291, plasma: 10302, fuel: 10302, food: 10302, respirant: 10302 },
         credits: 5000,
       },
     },
@@ -190,7 +190,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Fabulous! Physical construction efficiency is the bedrock of rapid base development - higher fabricator levels let you expand in a flash!',
       targetTab: 'explore',
       rewards: {
-        resources: { water: 30000, plasma: 25000, fuel: 25000, food: 25000, respirant: 25000 },
+        resources: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151 },
         credits: 6000,
       },
     },
@@ -207,8 +207,8 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Incredible early warning system! A sovereign admiral is never caught blind - keeping your radar level high maps out incoming pirate hostiles!',
       targetTab: 'explore',
       rewards: {
-        resources: { water: 25000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000 },
-        credits: 5000,
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
+        credits: 5005,
       },
     },
     {
@@ -223,7 +223,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Excellent reconnaissance! Sweeping coordinates lists let you find rogue pirate hubs, rich mineral asteroid deposits, and cargo supply drops!',
       targetTab: 'galaxy',
       rewards: {
-        resources: { water: 20000, plasma: 15000, fuel: 25000, food: 15000, respirant: 15000 },
+        resources: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151 },
         credits: 4000,
       },
     },
@@ -239,7 +239,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Glorious, Admiral! A civilization without scientific research remains stuck in the stone age. Let us research higher physics next!',
       targetTab: 'explore',
       rewards: {
-        resources: { water: 35000, plasma: 30000, fuel: 30000, food: 30000, respirant: 30000 },
+        resources: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000 },
         credits: 8000,
       },
     },
@@ -255,7 +255,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Truly magnificent! Science yields passive permanent boosts that affect all troop movement, defenses, and building production throughout your journey!',
       targetTab: 'research',
       rewards: {
-        resources: { water: 30000, plasma: 25000, fuel: 25000, food: 25000, respirant: 25000 },
+        resources: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151 },
         credits: 5000,
       },
     },
@@ -271,7 +271,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Magnificent tactical wisdom! Space is a hostile abyss - having a robust local defensive army base protects your logistics caches from raiders!',
       targetTab: 'explore',
       rewards: {
-        resources: { water: 30000, plasma: 25050, fuel: 25000, food: 25000, respirant: 25000 },
+        resources: { water: 12250, plasma: 10000, fuel: 10000, food: 13000, respirant: 11500 },
         credits: 6000,
       },
     },
@@ -287,7 +287,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Elite tactical defense, Commander! A robust standing army prevents other raiding emperors from stealing your plasma and water siphons!',
       targetTab: 'army',
       rewards: {
-        resources: { water: 25000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000 },
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
         credits: 5000,
       },
     },
@@ -303,7 +303,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Fabulous diplomatic skill, Commander! Space communication networks let you negotiate truce pacts, commerce transactions or alliances!',
       targetTab: 'settings',
       rewards: {
-        resources: { water: 15000, plasma: 15000, fuel: 15000, food: 15000, respirant: 15000 },
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
         credits: 3000,
       },
     },
@@ -319,7 +319,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Outstanding administrative management, Admiral! Consistently harvesting nexus drops boosts your economic upgrade rates exponentially!',
       targetTab: 'explore',
       rewards: {
-        resources: { water: 30000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000 },
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
         credits: 5000,
       },
     },
@@ -335,7 +335,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Brilliant strategic move! A single twig snaps easily, but a bundle of space oak remains unbreakable. Your alliances will secure your frontiers!',
       targetTab: 'settings',
       rewards: {
-        resources: { water: 40000, plasma: 30000, fuel: 30000, food: 30000, respirant: 30000 },
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
         credits: 7000,
       },
     },
@@ -351,7 +351,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Perfect sector social interaction! Networking with neighbors can establish peace agreements or reveal secret cooperative opportunities!',
       targetTab: 'explore',
       rewards: {
-        resources: { water: 15000, plasma: 15000, fuel: 15000, food: 15000, respirant: 15000 },
+        resources: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000 },
         credits: 3000,
       },
     },
@@ -367,7 +367,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Astonishing development, Admiral! Moving fleets at hyper-speeds ensures you catch rebels off guard and escape dangerous sector threats!',
       targetTab: 'research',
       rewards: {
-        resources: { water: 35000, plasma: 30000, fuel: 35000, food: 30000, respirant: 30000 },
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
         credits: 8000,
       },
     },
@@ -383,7 +383,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Terrific ledger discipline! A master commander must constantly calculate population sizes and credits reserves to stay ahead of the pack!',
       targetTab: 'settings',
       rewards: {
-        resources: { water: 20000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000 },
+        resources: { water: 11500, plasma: 11000, fuel: 12000, food: 11500, respirant: 11000 },
         credits: 4000,
       },
     },
@@ -399,7 +399,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       encouragementQuote: 'Outstanding galactic mastery, Supreme Admiral! You have successfully mastered space building, science, military troops recruitment, chat broadcasts, and alliances! Go on and rule the stars!',
       targetTab: 'galaxy',
       rewards: {
-        resources: { water: 200500, plasma: 150000, fuel: 150000, food: 150000, respirant: 150000 },
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
         credits: 30000,
       },
     },
@@ -640,9 +640,15 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
         </div>
 
         {/* Collapsible Trigger */}
-        <span className="text-xs text-slate-400 hover:text-cyan-400 transition ml-4">
-          {isCollapsed ? '[ EXPAND GUIDE ]' : '[ MINIMIZE ]'}
-        </span>
+        <div
+          className={`px-3 py-1 text-xs font-bold uppercase tracking-wider transition-all duration-200 rounded-lg cursor-pointer flex items-center ml-4 ${
+            isCollapsed
+              ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 font-extrabold hover:shadow-[0_0_12px_rgba(6,182,212,0.5)] hover:scale-105 active:scale-95'
+              : 'bg-gradient-to-r from-amber-500 to-rose-600 text-white font-extrabold hover:shadow-[0_0_12px_rgba(244,63,94,0.5)] hover:scale-105 active:scale-95'
+          }`}
+        >
+          {isCollapsed ? 'Expand Guide' : 'Minimize'}
+        </div>
       </div>
 
       <AnimatePresence initial={false}>
