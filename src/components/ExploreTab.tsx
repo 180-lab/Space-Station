@@ -94,6 +94,8 @@ interface ExploreTabProps {
   showToast?: (msg: string, type: 'success' | 'error' | 'info') => void;
   onRefreshState?: () => void;
   onViewPlayerProfile?: (playerId: string) => void;
+  populationRank?: number;
+  onNavigateToLeaderboard?: () => void;
 }
 
 const RESOURCE_INFO: Record<ResourceType, { name: string; color: string; icon: any; desc: string }> = {
@@ -124,7 +126,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   onSettle,
   showToast,
   onRefreshState,
-  onViewPlayerProfile
+  onViewPlayerProfile,
+  populationRank = 1,
+  onNavigateToLeaderboard
 }) => {
   const [expandedCategory, setExpandedCategory] = useState<ResourceType | null>(null);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
@@ -198,6 +202,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
       const data = await res.json();
       if (res.ok) {
+        localStorage.setItem(`moonbase_boosted_${player.id}`, 'true');
         showToast?.('Extractor Production Boost activated successfully!', 'success');
         setShowBoostModal(false);
         if (onRefreshState) onRefreshState();
@@ -674,7 +679,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
             )}
             <div className="mt-2 text-xs text-slate-400 flex items-center gap-2 font-mono">
               <span className={`inline-block w-2 h-2 rounded-full ${pulseDot} animate-pulse`} />
-              Commander: {player.username} &bull; {activePlanet.name} &bull; Sector Coord: [{activePlanet.sectorX}, {activePlanet.sectorY}]
+              <span>Commander: <span className="text-slate-200 font-bold">{player.username}</span> &bull; {activePlanet.name} &bull; Sector Coord: [{activePlanet.sectorX}, {activePlanet.sectorY}]</span>
             </div>
           </div>
 
@@ -1166,13 +1171,14 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                       body: JSON.stringify({ planetId: activePlanet.id })
                                     });
                                     const data = await response.json();
-                                    if (!response.ok) {
-                                      if (showToast) showToast(data.error || 'Failed to claim shipment', 'error');
-                                    } else {
+                                    if (response.ok) {
+                                      localStorage.setItem(`moonbase_nexus_claimed_${player.id}`, 'true');
                                       if (showToast) {
                                         showToast(`Quantum shipment received! +${data.qtyPerResource.toLocaleString()} of all 5 resource types loaded (+${data.totalVolume.toLocaleString()} total resources)!`, 'success');
                                       }
                                       if (onRefreshState) onRefreshState();
+                                    } else {
+                                      if (showToast) showToast(data.error || 'Failed to claim shipment', 'error');
                                     }
                                   } catch (err) {
                                     if (showToast) showToast('Network or quantum instability occurred.', 'error');

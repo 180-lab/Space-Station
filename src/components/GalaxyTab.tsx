@@ -67,6 +67,7 @@ interface GalaxyTabProps {
   createdFleets: CreatedFleet[];
   setCreatedFleets: React.Dispatch<React.SetStateAction<CreatedFleet[]>>;
   onUpdatePlayer?: (player: PlayerProfile) => void;
+  defaultSubTab?: 'scanner' | 'ranking' | 'comms' | 'news' | 'fleets';
 }
 
 async function safeParseJson(res: Response): Promise<any> {
@@ -152,10 +153,17 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   onViewPlayerProfile,
   createdFleets,
   setCreatedFleets,
-  onUpdatePlayer
+  onUpdatePlayer,
+  defaultSubTab
 }) => {
   // Sub-tabs
-  const [subTab, setSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>('scanner');
+  const [subTab, setSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>(defaultSubTab || 'scanner');
+
+  React.useEffect(() => {
+    if (defaultSubTab) {
+      setSubTab(defaultSubTab);
+    }
+  }, [defaultSubTab]);
 
   // Fleets Section States
   const [actionPlanetId, setActionPlanetId] = useState<string | null>(null);
@@ -357,6 +365,9 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         body: JSON.stringify({ centerX: cx, centerY: cy, planetId: activePlanet.id })
       });
       const data = await safeParseJson(res);
+      if (res.ok) {
+        localStorage.setItem(`moonbase_scan_${player.id}`, 'true');
+      }
       setScanResults(data.targets || []);
       setRadarRadius(data.scanRadius || 1);
     } catch (err: any) {
@@ -1370,27 +1381,6 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     </button>
                   </div>
 
-                  {/* Wars declared */}
-                  <div className="pt-4 border-t border-[#1E293B] space-y-3">
-                    <h4 className="text-[11px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5 font-mono">
-                      <ShieldAlert size={12} /> ACTIVE DECLARATIONS OF WAR
-                    </h4>
-                    {alliances[player.allianceId]?.wars.length === 0 ? (
-                      <p className="text-[11px] text-slate-500 leading-relaxed font-sans">Corporate neutrality protocol active. Peace agreements registered with other outer-rim sectors.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {alliances[player.allianceId]?.wars.map((war, idx) => (
-                          <div key={idx} className="p-3 border border-red-900/40 bg-red-950/20 text-red-300 rounded-xl flex items-center justify-between text-[11px]">
-                            <span>WAR DEC: TARGETING {war.targetAllianceName}</span>
-                            <span className="text-red-400 font-bold uppercase tracking-widest text-[9px] animate-pulse">WAR ACTIVE</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-
-                  </div>
-
                   {/* Alliance Members Management */}
                   <div className="pt-4 border-t border-[#1E293B] space-y-3">
                     <h4 className="text-[11px] font-bold text-sky-400 uppercase tracking-widest flex items-center gap-1.5 font-mono">
@@ -1523,61 +1513,38 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 <div className="p-5 bg-[#05070A]/90 rounded-xl border border-[#1E293B] space-y-4 font-mono">
                   <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-widest"><Users size={12} className="text-yellow-400" /> Join Existing</h4>
                   <div className="space-y-2.5 max-h-[160px] overflow-y-auto text-xs pr-1">
-                    {rankedState.map((alliance) => (
-                      <div key={alliance.id} className="p-2.5 border border-[#1E293B] bg-[#0A0F1D] rounded-xl flex items-center justify-between">
-                        <div>
-                          <span className="font-bold text-yellow-400">[{alliance.tag}]</span>
-                          <span className="text-slate-350 ml-2 font-bold uppercase">{alliance.name}</span>
+                    {rankedState.map((alliance) => {
+                      const alreadyApplied = alliance.applications?.some(a => a.playerId === player.id);
+                      return (
+                        <div key={alliance.id} className="p-2.5 border border-[#1E293B] bg-[#0A0F1D] rounded-xl flex items-center justify-between">
+                          <div>
+                            <span className="font-bold text-yellow-400">[{alliance.tag}]</span>
+                            <span className="text-slate-350 ml-2 font-bold uppercase">{alliance.name}</span>
+                          </div>
+                          {alreadyApplied ? (
+                            <span className="px-3 py-1.5 bg-slate-800 text-slate-400 text-[10px] font-bold font-mono tracking-widest uppercase border border-slate-700 rounded-lg">
+                              Pending Approval 🕒
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onJoinAlliance(alliance.id);
+                              }}
+                              className="px-3 py-1.5 bg-yellow-600/10 hover:bg-yellow-500/20 text-yellow-400 hover:text-yellow-300 text-[10px] font-bold font-mono tracking-widest uppercase border border-yellow-500/30 rounded-lg cursor-pointer transition duration-150"
+                            >
+                              Apply to Join
+                            </button>
+                          )}
                         </div>
-                        <button
-                          onClick={() => onJoinAlliance(alliance.id)}
-                          className="px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 text-[10px] font-bold font-mono tracking-widest uppercase border border-cyan-500/30 rounded-lg cursor-pointer transition duration-150"
-                        >
-                          Enlist
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
             )}
             </>
           )}
-          </div>
-
-          {/* Social Chat */}
-          <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl flex flex-col items-center justify-center text-center py-12 space-y-4">
-            <div className="w-12 h-12 rounded-full border border-cyan-500/20 bg-cyan-500/5 flex items-center justify-center text-cyan-400 animate-pulse">
-              <Radio size={20} className="animate-pulse" />
-            </div>
-            <div>
-              <h4 className="font-bold text-slate-200 text-sm font-mono uppercase tracking-wider">Tactical Network Transceiver</h4>
-              <p className="text-xs text-slate-500 max-w-sm mt-1 leading-relaxed">
-                Outer-rim data relays are active. Establish a secure high-frequency stream window to transmit or receive encrypted signals.
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md pt-2">
-              <button 
-                onClick={() => {
-                  setCurrentChatChannel('global');
-                  setActiveChatWindow('global');
-                }}
-                className="flex-1 px-4 py-3 bg-cyan-950/20 hover:bg-cyan-500/10 text-cyan-400 hover:text-cyan-300 border border-cyan-500/25 rounded-xl font-bold text-xs uppercase tracking-wider font-mono transition cursor-pointer"
-              >
-                Open Global System Chat
-              </button>
-              {player.allianceId && (
-                <button 
-                  onClick={() => {
-                    setCurrentChatChannel('alliance');
-                    setActiveChatWindow('alliance');
-                  }}
-                  className="flex-1 px-4 py-3 bg-yellow-950/20 hover:bg-yellow-500/10 text-yellow-500 hover:text-yellow-400 border border-yellow-500/25 rounded-xl font-bold text-xs uppercase tracking-wider font-mono transition cursor-pointer"
-                >
-                  Open Alliance Comms
-                </button>
-              )}
-            </div>
           </div>
 
           {/* Tactical Decrypted Feed (DEC links) */}
@@ -1768,6 +1735,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                         const isPlayerDefender = report.defenderId === player.id;
                         const roleLabel = isPlayerAttacker ? 'Attacked' : 'Defended against';
                         const counterpartyName = isPlayerAttacker ? report.defenderName : report.attackerName;
+                        const counterpartyId = isPlayerAttacker ? report.defenderId : report.attackerId;
                         const outcomeText = report.winner === 'attacker' 
                           ? (isPlayerAttacker ? 'VICTORY' : 'DEFEAT') 
                           : (isPlayerDefender ? 'VICTORY' : 'DEFEAT');
@@ -1790,13 +1758,22 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               }}
                               className="flex items-center justify-between cursor-pointer hover:bg-slate-900/40 p-1.5 rounded-lg transition"
                             >
-                              <div className="flex flex-col gap-1 pr-4">
+                              <div className="flex flex-col gap-1 pr-4 text-left">
                                 <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5 flex-wrap">
                                   {/* Pulsing state marker */}
                                   {!isRead && (
                                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0 shadow-[0_0_5px_#22d3ee]" />
                                   )}
-                                  ⚔️ <span className={outcomeText === 'VICTORY' ? 'text-cyan-400' : 'text-red-400'}>[{outcomeText}]</span> {roleLabel} {counterpartyName} 
+                                  ⚔️ <span className={outcomeText === 'VICTORY' ? 'text-cyan-400' : 'text-red-400'}>[{outcomeText}]</span> {roleLabel}{' '}
+                                  <span 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (onViewPlayerProfile) onViewPlayerProfile(counterpartyId);
+                                    }}
+                                    className="underline decoration-dotted cursor-pointer text-cyan-455 text-cyan-400 hover:text-cyan-300 font-bold"
+                                  >
+                                    {counterpartyName}
+                                  </span>
                                   <span className="text-slate-550 font-normal">({new Date(report.timestamp).toLocaleDateString()})</span>
                                 </span>
                                 <span className="text-[9.5px] text-slate-500">
@@ -1887,7 +1864,15 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     const attAtkValue = Object.entries(report.attackerInitialTroops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (mAtk[k] || 10), 0);
                                     return (
                                       <>
-                                        <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide">ATTACKER: {report.attackerName}</p>
+                                        <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide">
+                                          ATTACKER:{' '}
+                                          <span 
+                                            onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.attackerId)}
+                                            className="underline decoration-dotted cursor-pointer hover:text-red-300"
+                                          >
+                                            {report.attackerName}
+                                          </span>
+                                        </p>
                                         <p className="text-slate-500 text-[10px] mt-0.5">Origin: [{report.attackerCoords.x}, {report.attackerCoords.y}]</p>
                                         <div className="mt-2 space-y-1">
                                           <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
@@ -1917,7 +1902,15 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     const defAtkValue = Object.entries(report.defenderInitialTroops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (mAtk[k] || 10), 0);
                                     return (
                                       <>
-                                        <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide">STATION: {report.defenderName}</p>
+                                        <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide">
+                                          STATION:{' '}
+                                          <span 
+                                            onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
+                                            className="underline decoration-dotted cursor-pointer hover:text-cyan-300"
+                                          >
+                                            {report.defenderName}
+                                          </span>
+                                        </p>
                                         <p className="text-slate-500 text-[10px] mt-0.5">Target: [{report.defenderCoords.x}, {report.defenderCoords.y}]</p>
                                         <div className="mt-2 space-y-1">
                                           <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
@@ -2081,9 +2074,19 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                             onClick={() => setExpandedIntelReports(prev => ({ ...prev, [report.id]: !isExpanded }))}
                             className="flex items-center justify-between cursor-pointer hover:bg-slate-900/40 p-1.5 rounded-lg transition"
                           >
-                            <div className="flex flex-col gap-1 pr-4">
+                            <div className="flex flex-col gap-1 pr-4 text-left">
                               <span className="text-[11px] font-bold text-slate-200">
-                                🛰️ Scout Recon Scan of <span className="text-cyan-400">{report.defenderName}</span> [{report.defenderCoords.x}, {report.defenderCoords.y}]
+                                🛰️ Scout Recon Scan of{' '}
+                                <span 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onViewPlayerProfile) onViewPlayerProfile(report.defenderId);
+                                  }}
+                                  className="text-cyan-400 underline decoration-dotted cursor-pointer hover:text-cyan-300"
+                                >
+                                  {report.defenderName}
+                                </span>{' '}
+                                [{report.defenderCoords.x}, {report.defenderCoords.y}]
                                 <span className="text-slate-500 ml-1.5 font-normal">({parsedTime})</span>
                               </span>
                             </div>
@@ -2105,7 +2108,16 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               </div>
 
                               <div className="space-y-1">
-                                <h4 className="font-bold text-slate-200 text-xs uppercase">TARGET SIGNATURE: {report.defenderName} <span className="text-slate-400 font-bold font-mono">[{report.defenderCoords.x}, {report.defenderCoords.y}]</span></h4>
+                                <h4 className="font-bold text-slate-200 text-xs uppercase">
+                                  TARGET SIGNATURE:{' '}
+                                  <span 
+                                    onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
+                                    className="underline decoration-dotted cursor-pointer text-cyan-400 hover:text-cyan-300"
+                                  >
+                                    {report.defenderName}
+                                  </span>{' '}
+                                  <span className="text-slate-400 font-bold font-mono">[{report.defenderCoords.x}, {report.defenderCoords.y}]</span>
+                                </h4>
                                 <p className="text-[11px] text-slate-400">Drone troops dispatched from Base Coordinate origin [{report.attackerCoords.x}, {report.attackerCoords.y}].</p>
                               </div>
 
@@ -2809,7 +2821,23 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 <div>
                   <span className="text-[9px] font-black text-cyan-300 uppercase tracking-widest bg-cyan-950/25 border border-cyan-500/25 px-2.5 py-1 rounded-lg">FLEET DEPLOYMENT TRANSMISSION</span>
                   <h3 className="text-lg font-bold text-white mt-2 tracking-tight">{selectedTarget.planetName}</h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Sector Coordinates: [{selectedTarget.coords.x}, {selectedTarget.coords.y}] &bull; Commander {selectedTarget.username}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                    Sector Coordinates: [{selectedTarget.coords.x}, {selectedTarget.coords.y}] &bull; Commander:{' '}
+                    {selectedTarget.id !== 'habitable' && selectedTarget.id !== player.id ? (
+                      <span 
+                        onClick={() => {
+                          setSelectedTarget(null);
+                          if (onViewPlayerProfile) onViewPlayerProfile(selectedTarget.id);
+                        }}
+                        className="underline decoration-dotted font-bold text-cyan-400 hover:text-cyan-300 cursor-pointer"
+                        title="View Commander profile to send private message"
+                      >
+                        {selectedTarget.username} 💬
+                      </span>
+                    ) : (
+                      <span className="text-slate-350 font-bold">{selectedTarget.username}</span>
+                    )}
+                  </p>
                   
                   {/* Small Fast Attack Auto-Allocation Option under sector coordinates */}
                   {selectedTarget.id !== player.id && !selectedTarget.isHabitable && selectedReserveFleetId === 'manual' && (
@@ -3201,20 +3229,37 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 )}
               </div>
 
-              <button 
-                onClick={handleLaunchFleet}
-                disabled={!isMissionReady || isLaunchingReserve}
-                className={`w-full px-5 py-3 text-[10px] uppercase font-black tracking-widest text-[#05070A] rounded-xl flex items-center justify-center gap-2 transition-all duration-155 ${
-                  isMissionReady && !isLaunchingReserve
-                    ? 'bg-gradient-to-r from-cyan-400 to-indigo-500 hover:brightness-110 active:scale-[0.98] cursor-pointer shadow-[0_0_20px_rgba(34,211,238,0.3)] font-bold'
-                    : 'bg-slate-800 border border-slate-900 text-slate-500 cursor-not-allowed opacity-60'
-                }`}
-              >
-                <Zap size={11} fill="currentColor" /> 
-                {isLaunchingReserve ? 'LAUNCHING RESERVE FLEET...' : (isMissionReady 
-                  ? `LAUNCH ${selectedReserveFleetId !== 'manual' ? 'RESERVE FLEET' : (dispatchMode === 'multiple' ? `${dispatchNumFleets} SEPARATE FLEET` : 'SINGLE FLEET')} MISSIONS` 
-                  : 'ALLOCATE TROOPS FROM DOCKING BAY ABOVE')}
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button 
+                  onClick={handleLaunchFleet}
+                  disabled={!isMissionReady || isLaunchingReserve}
+                  className={`flex-1 px-5 py-3 text-[10px] uppercase font-black tracking-widest text-[#05070A] rounded-xl flex items-center justify-center gap-2 transition-all duration-155 ${
+                    isMissionReady && !isLaunchingReserve
+                      ? 'bg-gradient-to-r from-cyan-400 to-indigo-500 hover:brightness-110 active:scale-[0.98] cursor-pointer shadow-[0_0_20px_rgba(34,211,238,0.3)] font-bold'
+                      : 'bg-slate-800 border border-slate-900 text-slate-500 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  <Zap size={11} fill="currentColor" /> 
+                  {isLaunchingReserve ? 'LAUNCHING RESERVE FLEET...' : (isMissionReady 
+                    ? `LAUNCH ${selectedReserveFleetId !== 'manual' ? 'RESERVE FLEET' : (dispatchMode === 'multiple' ? `${dispatchNumFleets} SEPARATE FLEET` : 'SINGLE FLEET')} MISSIONS` 
+                    : 'ALLOCATE TROOPS FROM DOCKING BAY ABOVE')}
+                </button>
+
+                {selectedTarget.id !== player.id && selectedTarget.id !== 'habitable' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetId = selectedTarget.id;
+                      setSelectedTarget(null);
+                      if (onViewPlayerProfile) onViewPlayerProfile(targetId);
+                    }}
+                    className="px-4 py-3 bg-[#050D19]/40 border border-[#00F0FF]/40 text-[#00F0FF] hover:bg-[#00F0FF]/15 active:scale-[0.98] transition font-bold uppercase rounded-xl text-[10px] tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                    title="Transmit private encrypted message to this Commander"
+                  >
+                    💬 MESSAGE
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         );
@@ -3351,7 +3396,24 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   {intelReport.type === 'occupied' && (
                     <>
                       <p className="text-xs text-slate-300 font-sans"><span className="text-amber-400 font-mono font-bold">STATION NAME: &bull;</span> {intelReport.planetName}</p>
-                      <p className="text-xs text-slate-300 font-sans"><span className="text-amber-400 font-mono font-bold">STATION COMMANDER: &bull; </span> {intelReport.commander} <span className="text-slate-500 bg-white/5 px-1.5 py-0.2 rounded border border-white/5 uppercase ml-1.5 text-[9px]">{intelReport.faction || 'Neutral Space Alliance'}</span></p>
+                      <p className="text-xs text-slate-300 font-sans">
+                        <span className="text-amber-400 font-mono font-bold">STATION COMMANDER: &bull; </span>{' '}
+                        {intelReport.commanderId ? (
+                          <span 
+                            onClick={() => {
+                              if (onViewPlayerProfile) onViewPlayerProfile(intelReport.commanderId);
+                            }}
+                            className="underline decoration-dotted cursor-pointer text-cyan-400 hover:text-cyan-300 font-black"
+                          >
+                            {intelReport.commander}
+                          </span>
+                        ) : (
+                          intelReport.commander
+                        )}{' '}
+                        <span className="text-slate-500 bg-white/5 px-1.5 py-0.2 rounded border border-white/5 uppercase ml-1.5 text-[9px]">
+                          {intelReport.faction || 'Neutral Space Alliance'}
+                        </span>
+                      </p>
                     </>
                   )}
                   {intelReport.type === 'habitable' && (
@@ -4208,6 +4270,98 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           })}
                         </tbody>
                       </table>
+                    </div>
+                  )}
+
+                  {/* PENDING ALLIANCE APPLICATIONS SECTION */}
+                  {(player.allianceRole === 'leader' || player.allianceRole === 'officer') && (
+                    <div className="pt-4 mt-6 border-t border-[#1E293B] space-y-3">
+                      <h4 className="text-xs font-bold text-yellow-400 uppercase tracking-widest flex items-center gap-1.5 font-mono">
+                        📥 PENDING MEMBERSHIP APPLICATIONS ({activeAlliance?.applications?.length || 0})
+                      </h4>
+                      {!activeAlliance?.applications || activeAlliance.applications.length === 0 ? (
+                        <p className="text-[11px] text-slate-500 italic bg-sky-950/5 p-3 rounded-lg border border-[#1E293B]/40 font-sans">
+                          No pending sector recruitment applications submitted. Transceiver wavelengths are silent.
+                        </p>
+                      ) : (
+                        <div className="space-y-2.5">
+                          {activeAlliance.applications.map((app) => (
+                            <div key={app.playerId} className="p-3 border border-yellow-500/20 bg-yellow-500/5 hover:bg-yellow-500/10 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+                              <div className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                                <div>
+                                  <button
+                                    type="button"
+                                    onClick={() => onViewPlayerProfile && onViewPlayerProfile(app.playerId)}
+                                    className="font-bold text-white hover:text-cyan-400 underline cursor-pointer"
+                                  >
+                                    Commander {app.username}
+                                  </button>
+                                  <span className="text-slate-500 text-[10px] ml-2">
+                                    Submitted: {new Date(app.timestamp).toLocaleTimeString()}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch('/api/alliance/approve', {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'x-user-id': player.id
+                                        },
+                                        body: JSON.stringify({ targetPlayerId: app.playerId })
+                                      });
+                                      const data = await safeParseJson(res);
+                                      if (res.ok) {
+                                        if (showToast) showToast(`Approved Commander ${app.username} into our Alliance!`, 'success');
+                                        if (onRefreshState) onRefreshState();
+                                      } else {
+                                        if (showToast) showToast(data.error || 'Approval failed', 'error');
+                                      }
+                                    } catch (err) {
+                                      if (showToast) showToast('Communication link error', 'error');
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold rounded-lg uppercase text-[10px] cursor-pointer transition duration-150"
+                                >
+                                  Approve ✅
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch('/api/alliance/decline', {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'x-user-id': player.id
+                                        },
+                                        body: JSON.stringify({ targetPlayerId: app.playerId })
+                                      });
+                                      const data = await safeParseJson(res);
+                                      if (res.ok) {
+                                        if (showToast) showToast(`Declined application request from ${app.username}.`, 'info');
+                                        if (onRefreshState) onRefreshState();
+                                      } else {
+                                        if (showToast) showToast(data.error || 'Operation failed', 'error');
+                                      }
+                                    } catch (err) {
+                                      if (showToast) showToast('Net interface error', 'error');
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-bold rounded-lg uppercase text-[10px] cursor-pointer transition duration-150"
+                                >
+                                  Decline ❌
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

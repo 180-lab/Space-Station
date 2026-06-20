@@ -18,6 +18,7 @@ import { ArmyBaseTab } from './components/ArmyBaseTab';
 import { GalaxyTab } from './components/GalaxyTab';
 import { ResearchTab } from './components/ResearchTab';
 import { SettingsTab } from './components/SettingsTab';
+import { CommanderTutorial } from './components/CommanderTutorial';
 import { 
   Droplet, 
   Flame, 
@@ -154,13 +155,17 @@ export default function App() {
 
   // Command message deck states
   const [showCommDeck, setShowCommDeck] = useState(false);
+  const [commDeckTab, setCommDeckTab] = useState<'incoming' | 'saved' | 'sent' | 'compose'>('incoming');
   const [profileMsgText, setProfileMsgText] = useState("");
   const [isSendingMsg, setIsSendingMsg] = useState(false);
   const [forwardingMsgId, setForwardingMsgId] = useState<string | null>(null);
   const [forwardTargetId, setForwardTargetId] = useState("");
+  const [directMsgTargetId, setDirectMsgTargetId] = useState("");
+  const [directMsgContent, setDirectMsgContent] = useState("");
 
   // Active Screen / Navigation Tab selector: 'explore' | 'army' | 'galaxy' | 'research' | 'settings'
-  const [activeTab, setActiveTab] = useState<'explore' | 'army' | 'galaxy' | 'research' | 'settings'>('explore');
+  const [activeTab, setActiveTab ] = useState<'explore' | 'army' | 'galaxy' | 'research' | 'settings'>('explore');
+  const [galaxyInitialSubTab, setGalaxyInitialSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>('scanner');
 
   // Local reserve / created fleets state
   const [createdFleets, setCreatedFleets] = useState<CreatedFleet[]>(() => {
@@ -207,6 +212,12 @@ export default function App() {
   const [isMobileView, setIsMobileView] = useState(() => {
     return typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
   });
+
+  // Calculated dynamic leader board rank based on population score
+  const sortedByPopulation = [...playersList].sort((a, b) => b.scores.population - a.scores.population);
+  const myPopulationRankIndex = player && playersList.length > 0 
+    ? (sortedByPopulation.findIndex(p => p.id === player.id) + 1 || 1)
+    : (player ? (Math.abs(parseInt(player.id.substring(0, 4), 16) % 150) || 48) : 48);
 
   useEffect(() => {
     const handleResize = () => {
@@ -1101,7 +1112,7 @@ export default function App() {
   const handleSendChat = async (channel: 'global' | 'alliance' | 'private', content: string, receiverId?: string) => {
     if (!player) return;
     try {
-      await fetch('/api/chat/send', {
+      const res = await fetch('/api/chat/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1109,6 +1120,9 @@ export default function App() {
         },
         body: JSON.stringify({ channel, content, receiverId })
       });
+      if (res.ok) {
+        localStorage.setItem(`moonbase_chatted_${player.id}`, 'true');
+      }
       fetchState();
     } catch (err) {
       console.error(err);
@@ -1128,6 +1142,7 @@ export default function App() {
       });
       const data = await safeParseJson(res);
       if (res.ok) {
+        localStorage.setItem(`moonbase_alliance_joined_${player.id}`, 'true');
         setPlayer(data.player);
         showToast(`Alliance foundation project [${tag.toUpperCase()}] established!`, 'success');
       } else {
@@ -1151,6 +1166,7 @@ export default function App() {
       });
       const data = await safeParseJson(res);
       if (res.ok) {
+        localStorage.setItem(`moonbase_alliance_joined_${player.id}`, 'true');
         setPlayer(data.player);
         showToast(`Successfully registered and joined alliance!`, 'success');
       } else {
@@ -1217,6 +1233,7 @@ export default function App() {
       });
       const data = await safeParseJson(res);
       if (res.ok) {
+        localStorage.setItem(`moonbase_nexus_claimed_${player.id}`, 'true');
         setPlayer(data.player);
         showToast(`Cargo unlocked! Standard supply package received (+${data.s_amount.toLocaleString()} fluids)`, 'success');
       } else {
@@ -1248,6 +1265,105 @@ export default function App() {
       }
     } catch (err) {
       showToast('Quantum network unstable. Try again.', 'error');
+    }
+  };
+
+  // Dispatch secure holographic message
+  const handleSendMessage = async (receiverId: string, content: string) => {
+    if (!player) return;
+    try {
+      setIsSendingMsg(true);
+      const res = await fetch('/api/messages/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ receiverId, content })
+      });
+      const data = await safeParseJson(res);
+      if (res.ok) {
+        localStorage.setItem(`moonbase_msg_sent_${player.id}`, 'true');
+        showToast('Holographic transmission sent successfully!', 'success');
+        setProfileMsgText("");
+        setDirectMsgContent("");
+        setViewingPlayerId(null); // auto-close player profile
+        setShowCommDeck(true);    // show the message deck to view sent logs
+        setCommDeckTab('sent');   // focus on sent transmissions
+        // Instantly sync state to reflect the dispatch
+        fetchState();
+      } else {
+        showToast(data.error || 'Failed to send transmission.', 'error');
+      }
+    } catch (err) {
+      showToast('Quantum communication network unstable.', 'error');
+    } finally {
+      setIsSendingMsg(false);
+    }
+  };
+
+  // Toggle Read / Unread message status
+  const handleToggleMessageRead = async (messageId: string, isRead: boolean) => {
+    if (!player) return;
+    try {
+      const res = await fetch('/api/messages/mark-read', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ messageId, isRead })
+      });
+      const data = await safeParseJson(res);
+      if (res.ok && data.player) {
+         setPlayer(data.player);
+      }
+    } catch (err) {
+      console.error('Error toggling read state:', err);
+    }
+  };
+
+  // Toggle Save message status
+  const handleToggleSaveMessage = async (messageId: string, isSaved: boolean) => {
+    if (!player) return;
+    try {
+      const res = await fetch('/api/messages/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ messageId, isSaved })
+      });
+      const data = await safeParseJson(res);
+      if (res.ok && data.player) {
+         setPlayer(data.player);
+         showToast(isSaved ? 'Transmission secure saved to core memory.' : 'Transmission unsaved.', 'info');
+      }
+    } catch (err) {
+      console.error('Error toggling save status:', err);
+    }
+  };
+
+  // Delete message
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!player) return;
+    try {
+      const res = await fetch('/api/messages/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ messageId })
+      });
+      const data = await safeParseJson(res);
+      if (res.ok && data.player) {
+         setPlayer(data.player);
+         showToast('Secure transmission purged from local logs.', 'info');
+      }
+    } catch (err) {
+      console.error('Error deleting transmission:', err);
     }
   };
 
@@ -1697,12 +1813,19 @@ export default function App() {
           </div>
         </div>
 
-        {/* Profile Badge with User icon next to interactive Rank indicator */}
+        {/* Profile Badge with User icon next to interactive Rank/Score indicator */}
         <div className="flex items-center gap-2 relative">
-          <div className="flex flex-col items-end font-mono">
-            <span className="text-[8px] text-slate-500 uppercase tracking-widest font-bold">Commander Rank</span>
-            <span className="text-[11px] font-black text-cyan-400">
-              #{Math.abs(parseInt(player.id.substring(0, 4), 16) % 150) || 48}
+          <div 
+            onClick={() => {
+              setGalaxyInitialSubTab('ranking');
+              setActiveTab('galaxy');
+            }}
+            className="flex flex-col items-end font-mono cursor-pointer group hover:opacity-90 transition-all"
+            title="Click to view Sovereignty Leaderboard rankings"
+          >
+            <span className="text-[8px] text-slate-500 uppercase tracking-widest font-bold group-hover:text-cyan-400">Commander Rank</span>
+            <span className="text-[11px] font-black text-cyan-400 group-hover:underline decoration-dotted">
+              #{myPopulationRankIndex} 🏆
             </span>
           </div>
 
@@ -2040,21 +2163,42 @@ export default function App() {
       )}
 
       {/* Screen view router container */}
-      <main className="max-w-5xl mx-auto px-4 pt-8 pb-24 animate-fade-in">
-        {activeTab === 'explore' && (
-          <ExploreTab 
+      <main className="max-w-5xl mx-auto px-4 pt-8 pb-24 animate-fade-in animate-duration-500">
+        {player && activePlanet && (
+          <CommanderTutorial 
             player={player}
             activePlanet={activePlanet}
-            onUpgradeMine={handleUpgradeMine}
-            onUpgradeBuilding={handleUpgradeBuilding}
-            serverTime={serverTime}
             fleets={fleets}
-            onSettle={handleStartSettleFlow}
-            showToast={showToast}
             onRefreshState={fetchState}
-            onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
+            showToast={showToast}
+            setActiveTab={setActiveTab}
+            chatMessages={chatMessages}
           />
         )}
+
+        {activeTab === 'explore' && player && (() => {
+          const sortedByPopulation = [...playersList].sort((a, b) => b.scores.population - a.scores.population);
+          const populationRank = sortedByPopulation.findIndex(p => p.id === player.id) + 1 || 1;
+          return (
+            <ExploreTab 
+              player={player}
+              activePlanet={activePlanet}
+              onUpgradeMine={handleUpgradeMine}
+              onUpgradeBuilding={handleUpgradeBuilding}
+              serverTime={serverTime}
+              fleets={fleets}
+              onSettle={handleStartSettleFlow}
+              showToast={showToast}
+              onRefreshState={fetchState}
+              onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
+              populationRank={populationRank}
+              onNavigateToLeaderboard={() => {
+                setGalaxyInitialSubTab('ranking');
+                setActiveTab('galaxy');
+              }}
+            />
+          );
+        })()}
 
         {activeTab === 'army' && (
           <ArmyBaseTab 
@@ -2109,6 +2253,7 @@ export default function App() {
             createdFleets={createdFleets}
             setCreatedFleets={setCreatedFleets}
             onUpdatePlayer={setPlayer}
+            defaultSubTab={galaxyInitialSubTab}
           />
         )}
 
@@ -2143,6 +2288,11 @@ export default function App() {
               setPaymentState('idle');
               setShowPaymentModal(true);
             }}
+            onNavigateToLeaderboard={() => {
+              setGalaxyInitialSubTab('ranking');
+              setActiveTab('galaxy');
+            }}
+            populationRank={myPopulationRankIndex}
           />
         )}
       </main>
@@ -2173,7 +2323,10 @@ export default function App() {
 
           {/* Tab 3: Galaxy Scan Map */}
           <button 
-            onClick={() => setActiveTab('galaxy')}
+            onClick={() => {
+              setGalaxyInitialSubTab('scanner');
+              setActiveTab('galaxy');
+            }}
             className={`flex-1 h-full flex flex-col items-center justify-center gap-1 border-r border-[#1E293B] group relative transition-colors duration-150 cursor-pointer ${activeTab === 'galaxy' ? 'bg-cyan-500/10' : ''}`}
           >
             {activeTab === 'galaxy' && <div className="absolute top-0 inset-x-0 h-[3px] bg-cyan-400 shadow-[0_0_10px_#22d3ee]"></div>}
@@ -2669,6 +2822,36 @@ export default function App() {
                   )}
                 </div>
 
+                 {/* Secure Comms Dispatch Panel */}
+                <div className="pt-3 border-t border-[#1E293B]">
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#00F0FF] mb-2 font-mono">Send message to {targetPlayer.username}</h4>
+                  {targetPlayer.id === player?.id ? (
+                    <p className="text-[10px] text-slate-500 italic">This is your own commander terminal. Loopback diagnostics enabled.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <textarea
+                        value={profileMsgText}
+                        onChange={(e) => setProfileMsgText(e.target.value)}
+                        placeholder={`Transmit secure encrypted message to Commander ${targetPlayer.username}...`}
+                        className="w-full h-16 bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none focus:border-cyan-500 font-mono"
+                        maxLength={500}
+                      />
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          disabled={isSendingMsg || !profileMsgText.trim()}
+                          onClick={async () => {
+                            await handleSendMessage(targetPlayer.id, profileMsgText);
+                          }}
+                          className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-indigo-600 text-white rounded-lg text-[11px] font-bold tracking-wider hover:brightness-110 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed uppercase shadow-[0_0_10px_rgba(34,211,238,0.2)] cursor-pointer"
+                        >
+                          {isSendingMsg ? "TRANSMITTING..." : "send message"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Last Detected Activity */}
                 <div className="pt-3 border-t border-[#1E293B] text-[10px] text-slate-500 flex justify-between items-center text-right sm:text-left gap-2 flex-wrap">
                   <span>TELEMETRY STABILIZATION GRID</span>
@@ -2785,6 +2968,319 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      
+      {/* SECURE COMMANDER COMM-MESSAGES DECK */}
+      {showCommDeck && (
+        <div className="fixed inset-0 bg-[#05070A]/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl h-[560px] bg-[#0A0F1D] border border-cyan-500/30 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.15)] p-6 font-mono text-slate-100 flex flex-col relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-4 mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📻</span>
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-[#00F0FF]">COM-MS SECURE SITE</h3>
+                  <p className="text-[10px] uppercase text-slate-500">QUANTUM LINKED FIELD ENVELOPE TRANSMITTER</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowCommDeck(false);
+                  setForwardingMsgId(null);
+                  setForwardTargetId("");
+                }}
+                className="text-slate-400 hover:text-white bg-[#05070A] hover:bg-slate-900 border border-[#1E293B] w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition text-base"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Sub-Tabs Selector */}
+            <div className="flex border-b border-[#1E293B]/60 mb-4 bg-[#05070A]/50 rounded-lg p-1 text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => { setCommDeckTab('incoming'); setForwardingMsgId(null); }}
+                className={`flex-1 py-2 text-center rounded-md transition cursor-pointer ${commDeckTab === 'incoming' ? 'bg-[#1e293b]/60 text-cyan-400 border border-cyan-500/10' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                📥 INCOMING ({player.commandMessages?.filter(m => !m.isSent && !m.isRead).length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCommDeckTab('sent'); setForwardingMsgId(null); }}
+                className={`flex-1 py-2 text-center rounded-md transition cursor-pointer ${commDeckTab === 'sent' ? 'bg-[#1e293b]/60 text-emerald-400 border border-cyan-500/10' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                📤 SENT ({player.commandMessages?.filter(m => m.isSent).length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCommDeckTab('saved'); setForwardingMsgId(null); }}
+                className={`flex-1 py-2 text-center rounded-md transition cursor-pointer ${commDeckTab === 'saved' ? 'bg-[#1e293b]/60 text-[#00F0FF] border border-cyan-500/10' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                ⭐ SAVED ({player.commandMessages?.filter(m => !m.isSent && m.isSaved).length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCommDeckTab('compose'); setForwardingMsgId(null); }}
+                className={`flex-1 py-2 text-center rounded-md transition cursor-pointer ${commDeckTab === 'compose' ? 'bg-[#1e293b]/60 text-yellow-400 border border-yellow-500/10' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                🛰️ FIELD DISPATCHER
+              </button>
+            </div>
+
+            {/* Scrollable list/content dynamic rendering */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-3 min-h-0 text-left text-xs">
+              
+              {/* COMPOSE (FIELD DISPATCHER) TAB */}
+              {commDeckTab === 'compose' && (
+                <div className="space-y-4 p-2 bg-[#05070A]/30 border border-[#1E293B]/60 rounded-xl">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-bold text-cyan-400 tracking-wider">Select Destination Commander ID</label>
+                    <select
+                      value={directMsgTargetId}
+                      onChange={(e) => setDirectMsgTargetId(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-xl focus:outline-none focus:border-cyan-500 text-xs"
+                    >
+                      <option value="">-- Choose active Commander --</option>
+                      {playersList.filter(p => p.id !== player.id).map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.username} [{p.faction || 'Neutral'}]
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-bold text-cyan-400 tracking-wider font-mono">Transmission Content Description</label>
+                    <textarea
+                      value={directMsgContent}
+                      onChange={(e) => setDirectMsgContent(e.target.value)}
+                      placeholder="Type secure envelope message to dispatch..."
+                      className="w-full h-24 bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-xl p-3 focus:outline-none focus:border-cyan-500 text-xs font-mono"
+                      maxLength={500}
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="button"
+                      disabled={isSendingMsg || !directMsgTargetId || !directMsgContent.trim()}
+                      onClick={async () => {
+                        await handleSendMessage(directMsgTargetId, directMsgContent);
+                      }}
+                      className="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:brightness-110 text-white rounded-xl font-bold uppercase transition disabled:opacity-30 disabled:cursor-not-allowed text-xs cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                    >
+                      {isSendingMsg ? 'DISPATCHING RADIO TRANS...' : 'DISPATCH SECURE TRANS'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* INCOMING, SENT & SAVED TABS */}
+              {commDeckTab !== 'compose' && (() => {
+                const messagesListFiltered = (player.commandMessages || []).filter(m => {
+                  if (commDeckTab === 'saved') return !m.isSent && m.isSaved === true;
+                  if (commDeckTab === 'sent') return m.isSent === true;
+                  return !m.isSent; // incoming lists logs where isSent is falsy/undefined
+                });
+
+                if (messagesListFiltered.length === 0) {
+                  return (
+                    <div className="py-20 text-center border border-dashed border-[#1E293B] rounded-xl">
+                      <p className="text-slate-500 text-xs">No active cryptographic records found in this memory sector.</p>
+                    </div>
+                  );
+                }
+
+                return messagesListFiltered.slice().reverse().map(msg => {
+                  const isRead = msg.isRead;
+                  const isSaved = msg.isSaved;
+                  const itemGlow = !isRead && commDeckTab === 'incoming' 
+                    ? 'border-cyan-500/40 bg-[#061224]/30 shadow-[0_0_15px_rgba(34,211,238,0.05)]' 
+                    : 'border-[#1E293B]/80 bg-[#080d19]/40';
+
+                  const showRecipient = commDeckTab === 'sent';
+
+                  return (
+                    <div 
+                      key={msg.id} 
+                      className={`p-3.5 border rounded-xl space-y-2.5 transition-all duration-200 ${itemGlow}`}
+                      onClick={() => {
+                        if (!isRead && commDeckTab === 'incoming') {
+                          handleToggleMessageRead(msg.id, true);
+                        }
+                      }}
+                    >
+                      {/* Message Meta Info Header */}
+                      <div className="flex justify-between items-start gap-2 flex-wrap">
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {!isRead && !showRecipient && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_5px_#22d3ee]" title="Encrypt Alert Active" />
+                            )}
+                            <span className="font-bold text-slate-100 uppercase tracking-wide">
+                              🛰️ {showRecipient ? 'Recipient: ' : 'Sender: '}
+                              <span 
+                                className="text-cyan-400 hover:underline cursor-pointer decoration-dotted font-black" 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  setViewingPlayerId(showRecipient ? msg.receiverId : msg.senderId); 
+                                }}
+                              >
+                                {showRecipient ? msg.receiverName : msg.senderName}
+                              </span>
+                            </span>
+                            <span 
+                              className="px-1.5 py-0.1 border rounded text-[9px] uppercase font-bold"
+                              style={{ borderColor: msg.senderFactionColor || '#22d3ee', color: msg.senderFactionColor || '#22d3ee', backgroundColor: (msg.senderFactionColor || '#22d3ee') + '10' }}
+                            >
+                              {msg.senderFaction}
+                            </span>
+                          </div>
+                          <span className="text-[9.5px] text-slate-500 font-mono mt-0.5 block">
+                            Sector Coord Transit: {new Date(msg.timestamp).toLocaleString()}
+                          </span>
+                        </div>
+
+                        {/* Visual alerts badge */}
+                        <div className="flex gap-1.5">
+                          {isSaved && !showRecipient && (
+                            <span className="bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[8.5px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wide">
+                              CORE SAVED
+                            </span>
+                          )}
+                          {!isRead && !showRecipient && (
+                            <span className="bg-red-500/10 border border-red-500/30 text-red-400 text-[8.5px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wide animate-pulse">
+                              ALERT LIVE
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Content block */}
+                      <p className="text-[11.5px] text-slate-300 font-sans leading-relaxed bg-[#05070a]/60 border border-[#1e293b]/40 rounded-lg p-2.5 break-words">
+                        {msg.content}
+                      </p>
+
+                      {/* Action Tools Console */}
+                      <div className="flex flex-wrap gap-2 justify-between items-center pt-2 border-t border-[#1E293B]/40 text-[9.5px]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {!showRecipient && (
+                            <>
+                              {/* Toggle Read/Unread */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleMessageRead(msg.id, !isRead);
+                                }}
+                                className="px-2 py-1 rounded bg-[#05070A]/80 border border-[#1e293b] hover:bg-slate-900 text-slate-400 hover:text-slate-100 transition duration-150 font-bold uppercase cursor-pointer"
+                              >
+                                Mark {isRead ? 'Unread' : 'Read'}
+                              </button>
+
+                              {/* Save / Bookmark toggle */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleSaveMessage(msg.id, !isSaved);
+                                }}
+                                className={`px-2 py-1 rounded border transition duration-150 font-bold uppercase flex items-center gap-1 cursor-pointer ${
+                                  isSaved 
+                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20' 
+                                    : 'bg-[#05070A]/80 border-[#1e293b] text-slate-400 hover:text-amber-400 hover:border-amber-500/30'
+                                }`}
+                              >
+                                <Star size={9.5} className={isSaved ? 'fill-current' : ''} /> {isSaved ? 'Unsave' : 'Save'}
+                              </button>
+                            </>
+                          )}
+
+                          {/* Forward message content */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (forwardingMsgId === msg.id) {
+                                setForwardingMsgId(null);
+                                setForwardTargetId("");
+                              } else {
+                                setForwardingMsgId(msg.id);
+                                setForwardTargetId("");
+                              }
+                            }}
+                            className={`px-2 py-1 rounded border transition duration-150 font-bold uppercase flex items-center gap-1 cursor-pointer ${
+                              forwardingMsgId === msg.id 
+                                ? 'bg-[#00F0FF]/10 border-[#00F0FF]/30 text-cyan-400' 
+                                : 'bg-[#05070A]/80 border-[#1e293b] text-slate-400 hover:text-cyan-450 hover:text-cyan-400 hover:border-cyan-500/30'
+                            }`}
+                          >
+                            <Forward size={9.5} /> Forward
+                          </button>
+                        </div>
+
+                        {/* Purge delete item option */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAppConfirmModal({
+                              title: "PURGE SECURE TRANSMISSION RECORD",
+                              message: "Are you absolutely sure you want to permanently delete this cryptographic transmission log? This cannot be restored.",
+                              onConfirm: () => handleDeleteMessage(msg.id)
+                            });
+                          }}
+                          className="px-2 py-1 bg-red-950/20 border border-red-500/20 text-red-400 hover:bg-red-950/40 hover:text-red-300 rounded font-bold uppercase tracking-wider flex items-center gap-1 duration-150 cursor-pointer"
+                        >
+                          <Trash2 size={9.5} /> Purge log
+                        </button>
+                      </div>
+
+                      {/* Floating forward panel */}
+                      {forwardingMsgId === msg.id && (
+                        <div className="mt-3 p-3 bg-[#05070A] border border-cyan-500/20 rounded-xl space-y-2 text-left" onClick={(e) => e.stopPropagation()}>
+                          <div className="text-[9px] uppercase font-bold text-cyan-400 tracking-widest font-mono">Select Receiver Core Link:</div>
+                          <div className="flex gap-2">
+                            <select
+                              value={forwardTargetId}
+                              onChange={(e) => setForwardTargetId(e.target.value)}
+                              className="bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-lg p-1.5 flex-1 text-xs outline-none"
+                            >
+                              <option value="">-- Click to choose Commander --</option>
+                              {playersList.filter(p => p.id !== player.id).map(p => (
+                                <option key={p.id} value={p.id}>
+                                  {p.username} [{p.faction || 'Neutral'}]
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              disabled={!forwardTargetId || isSendingMsg}
+                              onClick={async () => {
+                                await handleSendMessage(forwardTargetId, `[FORWARDED FROM ${msg.senderName}]: ${msg.content}`);
+                                setForwardingMsgId(null);
+                                setForwardTargetId("");
+                              }}
+                              className="px-4 py-1.5 bg-gradient-to-r from-cyan-500 to-indigo-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg hover:brightness-110 active:scale-95 disabled:opacity-35 transition cursor-pointer"
+                            >
+                              Forward
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+                  );
+                });
+              })()}
+
+            </div>
+
           </div>
         </div>
       )}

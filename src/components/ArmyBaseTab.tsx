@@ -63,6 +63,7 @@ interface ArmyBaseTabProps {
   createdFleets: CreatedFleet[];
   setCreatedFleets: React.Dispatch<React.SetStateAction<CreatedFleet[]>>;
   onUpdatePlayer?: (player: PlayerProfile) => void;
+  onViewPlayerProfile?: (playerId: string) => void;
 }
 
 const TROOP_DETAILS = {
@@ -160,7 +161,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   onSettle,
   createdFleets,
   setCreatedFleets,
-  onUpdatePlayer
+  onUpdatePlayer,
+  onViewPlayerProfile
 }) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({
     defender: 1,
@@ -1753,7 +1755,17 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                             ) : !isRead ? (
                               <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0 shadow-[0_0_6px_#22d3ee]" title="Unread Report" />
                             ) : null}
-                            ⚔️ {isPlayerAttacker ? 'Attacked' : 'Defended against'} {isPlayerAttacker ? report.defenderName : report.attackerName}
+                            ⚔️ {isPlayerAttacker ? 'Attacked' : 'Defended against'}{' '}
+                            <span 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const profileId = isPlayerAttacker ? report.defenderId : report.attackerId;
+                                if (onViewPlayerProfile) onViewPlayerProfile(profileId);
+                              }}
+                              className="underline decoration-dotted cursor-pointer text-cyan-400 hover:text-cyan-300 font-bold"
+                            >
+                              {isPlayerAttacker ? report.defenderName : report.attackerName}
+                            </span>
                           </span>
                           <span className="text-slate-500 font-mono text-[9px]">{new Date(report.timestamp).toLocaleString()} {isSaved && <span className="text-amber-400 font-bold ml-1">★ SAVED</span>}</span>
                         </div>
@@ -1834,7 +1846,15 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                         <div className="space-y-3 animate-fade-in text-left">
                           <div className="grid grid-cols-2 gap-4 text-[11px] leading-relaxed">
                             <div>
-                              <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide">ATTACKER: {report.attackerName}</p>
+                              <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide">
+                                ATTACKER:{' '}
+                                <span 
+                                  onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.attackerId)}
+                                  className="underline decoration-dotted cursor-pointer hover:text-red-300 font-bold text-red-400"
+                                >
+                                  {report.attackerName}
+                                </span>
+                              </p>
                               <p className="text-slate-500 text-[10px] mt-0.5">Origin: [{report.attackerCoords.x}, {report.attackerCoords.y}]</p>
                               <div className="mt-2 space-y-1">
                                 <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
@@ -1854,7 +1874,15 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                               </div>
                             </div>
                             <div>
-                              <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide">STATION: {report.defenderName}</p>
+                              <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide">
+                                STATION:{' '}
+                                <span 
+                                  onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
+                                  className="underline decoration-dotted cursor-pointer hover:text-cyan-300 font-bold text-cyan-400"
+                                >
+                                  {report.defenderName}
+                                </span>
+                              </p>
                               <p className="text-slate-500 text-[10px] mt-0.5">Target: [{report.defenderCoords.x}, {report.defenderCoords.y}]</p>
                               <div className="mt-2 space-y-1">
                                 <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">

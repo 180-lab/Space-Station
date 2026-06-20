@@ -38,6 +38,8 @@ interface SettingsTabProps {
   onRefreshState?: () => void;
   onLinkGoogle?: (email: string) => void;
   onOpenPayments?: () => void;
+  onNavigateToLeaderboard?: () => void;
+  populationRank?: number;
 }
 
 const COSMETIC_SKINS = [
@@ -60,7 +62,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   showToast,
   onRefreshState,
   onLinkGoogle,
-  onOpenPayments
+  onOpenPayments,
+  onNavigateToLeaderboard,
+  populationRank
 }) => {
   // Rename commander name and base colony names state
   const [commanderName, setCommanderName] = useState(player.username);
@@ -665,13 +669,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         {/* Commander Profile Dashboard representing Global Rank and Space Gold */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-950/50 border border-[#1E293B]/60 rounded-xl font-mono">
           {/* Global standing rank */}
-          <div className="flex flex-col justify-between p-1">
+          <div 
+            onClick={() => onNavigateToLeaderboard && onNavigateToLeaderboard()}
+            className="flex flex-col justify-between p-1 cursor-pointer group text-left"
+            title="Click to view Sovereignty Leaderboard rankings"
+          >
             <div className="space-y-0.5">
-              <span className="text-[9px] text-slate-500 block uppercase font-bold tracking-wider">COMMANDER GLOBAL STANDING</span>
-              <span className="text-[11px] font-semibold text-slate-300 block">Galactic Leaderboard Standing</span>
+              <span className="text-[9px] text-slate-500 block uppercase font-bold tracking-wider group-hover:text-cyan-400">COMMANDER RANK</span>
+              <span className="text-[11px] font-semibold text-slate-350 block">Galactic Leaderboard Standing</span>
             </div>
-            <div className="text-2xl font-black italic text-cyan-400 font-mono mt-3">
-              #{Math.abs(parseInt(player.id.substring(0, 4), 16) % 150) || 48}
+            <div className="text-2xl font-black italic text-cyan-400 font-mono mt-3 group-hover:underline decoration-dotted">
+              #{populationRank || 48} 🏆
             </div>
           </div>
 

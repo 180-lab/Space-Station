@@ -2579,8 +2579,13 @@ app.post("/api/train/troop", (req, res) => {
     return res.status(400).json({ error: `Requires War Room Level ${requiredLevel} (Your Level: ${armyBaseLevel}) to produce ${specs.name}!` });
   }
 
-  // If training a Settlement Ship, enforce "you can only have one on each base"
+  // If training a Settlement Ship, enforce "you can only have one on each base" and "all bases must be at level 22 on their war room"
   if (troopId === "settlementShip") {
+    const hasAllBasesLevel22 = p.planets.every(pl => (pl.buildings.armyBase?.level || 0) >= 22);
+    if (!hasAllBasesLevel22) {
+      return res.status(400).json({ error: "To build a Settlement Ship, all of your colonized bases must have their War Room (Army Base) upgraded to Level 22!" });
+    }
+
     if (count > 1) {
       return res.status(400).json({ error: "You can only construct one Settlement Ship at a time!" });
     }
@@ -2788,6 +2793,7 @@ app.post("/api/galaxy/intelligence", (req, res) => {
       type: "occupied",
       planetName: targetPlanet.name,
       commander: targetUser.username,
+      commanderId: targetUser.id,
       faction: targetUser.faction,
       coords: { x: xVal, y: yVal },
       scores: targetUser.scores,
@@ -3392,6 +3398,126 @@ app.post("/api/alliance/join", (req, res) => {
   res.json({ player: p, success: true, alliance });
 });
 
+// Alliance applying
+app.post("/api/alliance/apply", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  if (p.allianceId) return res.status(400).json({ error: "Already registered in an Alliance." });
+
+  const { allianceId } = req.body;
+  const alliance = state.alliances[allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+
+  if (!alliance.applications) {
+    alliance.applications = [];
+  }
+
+  // Check if already applied
+  const alreadyApplied = alliance.applications.some(app => app.playerId === p.id);
+  if (alreadyApplied) {
+    return res.status(400).json({ error: "Pending application already exists for this alliance." });
+  }
+
+  alliance.applications.push({
+    playerId: p.id,
+    username: p.username,
+    timestamp: Date.now()
+  });
+
+  saveState();
+  res.json({ player: p, success: true, alliance });
+});
+
+// Alliance approve
+app.post("/api/alliance/approve", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  if (!p.allianceId) return res.status(400).json({ error: "Not in an Alliance." });
+  if (p.allianceRole !== "leader" && p.allianceRole !== "officer") {
+    return res.status(403).json({ error: "Only the Alliance Founder (leader) or Officer can approve application requests." });
+  }
+
+  const { targetPlayerId } = req.body;
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+
+  if (!alliance.applications) {
+    alliance.applications = [];
+  }
+
+  const appIndex = alliance.applications.findIndex(app => app.playerId === targetPlayerId);
+  if (appIndex === -1) {
+    return res.status(404).json({ error: "Application request not found." });
+  }
+
+  const targetPlayer = state.players[targetPlayerId];
+  if (!targetPlayer) {
+    alliance.applications.splice(appIndex, 1);
+    saveState();
+    return res.status(404).json({ error: "Target player profile not found." });
+  }
+
+  if (targetPlayer.allianceId) {
+    alliance.applications.splice(appIndex, 1);
+    saveState();
+    return res.status(400).json({ error: "Player has already joined another alliance." });
+  }
+
+  // Approve!
+  alliance.members.push({
+    playerId: targetPlayer.id,
+    username: targetPlayer.username,
+    role: "member"
+  });
+
+  targetPlayer.allianceId = alliance.id;
+  targetPlayer.allianceRole = "member";
+
+  // Remove application
+  alliance.applications.splice(appIndex, 1);
+
+  // System news alert
+  state.newsEvents.unshift({
+    id: `news_${Math.random().toString(36).substr(2, 9)}`,
+    title: "Application Approved",
+    content: `${targetPlayer.username}'s application was approved to join ${alliance.name} [${alliance.tag}]!`,
+    type: "system",
+    timestamp: Date.now()
+  });
+
+  saveState();
+  res.json({ player: p, success: true, alliance });
+});
+
+// Alliance decline
+app.post("/api/alliance/decline", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  if (!p.allianceId) return res.status(400).json({ error: "Not in an Alliance." });
+  if (p.allianceRole !== "leader" && p.allianceRole !== "officer") {
+    return res.status(403).json({ error: "Only the Alliance Founder or Officer can decline requests." });
+  }
+
+  const { targetPlayerId } = req.body;
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+
+  if (!alliance.applications) {
+    alliance.applications = [];
+  }
+
+  const appIndex = alliance.applications.findIndex(app => app.playerId === targetPlayerId);
+  if (appIndex !== -1) {
+    alliance.applications.splice(appIndex, 1);
+  }
+
+  saveState();
+  res.json({ player: p, success: true, alliance });
+});
+
 // Alliance leaving
 app.post("/api/alliance/leave", (req, res) => {
   const p = getLoggedPlayer(req);
@@ -3754,6 +3880,97 @@ app.post("/api/daily-reward/claim", (req, res) => {
   res.json({ player: p, s_amount: 8000, success: true });
 });
 
+// Claim Academy Task Rewards
+app.post("/api/tutorial/claim", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { taskId, planetId } = req.body;
+  if (taskId === undefined || !planetId) {
+    return res.status(400).json({ error: "Invalid parameters" });
+  }
+
+  const planet = p.planets.find(pl => pl.id === planetId) || p.planets[0];
+  if (!planet) {
+    return res.status(404).json({ error: "Colony planet not found" });
+  }
+
+  const rewards: Record<number, { water: number; plasma: number; fuel: number; food: number; respirant: number; credits: number }> = {
+    1: { water: 150000, plasma: 100000, fuel: 100000, food: 100000, respirant: 100000, credits: 15000 },  // Colonize 2nd planet
+    2: { water: 20000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000, credits: 3000 },      // Rename Outpost
+    3: { water: 25000, plasma: 15000, fuel: 15000, food: 15000, respirant: 15000, credits: 5000 },      // Hydrothermal pump Lvl 2
+    4: { water: 15000, plasma: 15000, fuel: 15000, food: 15000, respirant: 25000, credits: 4000 },      // Air Scrubber Lvl 2
+    5: { water: 15000, plasma: 15000, fuel: 15000, food: 25000, respirant: 15000, credits: 4000 },      // Food bio-synth Lvl 2
+    6: { water: 15000, plasma: 25000, fuel: 15000, food: 15000, respirant: 15500, credits: 4000 },      // Plasma refinery Lvl 2
+    7: { water: 45000, plasma: 35000, fuel: 35000, food: 35000, respirant: 35000, credits: 7500 },      // Launch Scan Attack Mission
+    8: { water: 25000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000, credits: 5000 },      // Extractor Production boost
+    9: { water: 30000, plasma: 25000, fuel: 25000, food: 25000, respirant: 25000, credits: 6000 },      // Fabricator Lvl 2
+    10: { water: 25000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000, credits: 5000 },     // Radar Array Lvl 1
+    11: { water: 20000, plasma: 15000, fuel: 25000, food: 15000, respirant: 15000, credits: 4000 },     // Deep Space sweep
+    12: { water: 35000, plasma: 30000, fuel: 30000, food: 30000, respirant: 30000, credits: 8000 },     // Research Center Lvl 1
+    13: { water: 30000, plasma: 25000, fuel: 25000, food: 25000, respirant: 25000, credits: 5000 },     // Quantum Processor research
+    14: { water: 30000, plasma: 25050, fuel: 25000, food: 25000, respirant: 25000, credits: 6000 },     // War room Command level 1
+    15: { water: 25000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000, credits: 5000 },     // Train 15 troop fighters
+    16: { water: 15000, plasma: 15000, fuel: 15000, food: 15000, respirant: 15000, credits: 3000 },     // Sending a private text PM
+    17: { water: 30000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000, credits: 5000 },     // Nexus Cargo Claim
+    18: { water: 40000, plasma: 30000, fuel: 30000, food: 30000, respirant: 30000, credits: 7000 },     // Join / Create an Alliance Alliance
+    19: { water: 15000, plasma: 15000, fuel: 15000, food: 15000, respirant: 15000, credits: 3000 },     // Send general public Chat msg
+    20: { water: 35000, plasma: 30000, fuel: 35000, food: 30000, respirant: 30000, credits: 8000 },     // Engine Warp tech research
+    21: { water: 20000, plasma: 20000, fuel: 20000, food: 20000, respirant: 20000, credits: 4000 },     // Check local leader or payroll
+    22: { water: 200500, plasma: 150000, fuel: 150000, food: 150000, respirant: 150000, credits: 30000 }, // Settle 3rd Planet outpost!
+  };
+
+  const idNum = parseInt(taskId);
+  const reward = rewards[idNum];
+  if (!reward) {
+    return res.status(400).json({ error: "Invalid tutorial task ID" });
+  }
+
+  if (!p.completedTutorialTasks) {
+    p.completedTutorialTasks = [];
+  }
+
+  if (p.completedTutorialTasks.includes(idNum)) {
+    return res.status(400).json({ error: "Reward for this task has already been claimed." });
+  }
+
+  // Add resources
+  const repositoryLvl = planet.buildings.repository ? planet.buildings.repository.level : 1;
+  const cap = getRepositoryCapacity(repositoryLvl);
+
+  const maxResourceReward = Math.max(reward.water, reward.plasma, reward.fuel, reward.food, reward.respirant);
+  if (cap < maxResourceReward) {
+    let neededLvl = 1;
+    for (let l = 1; l <= 45; l++) {
+      if (getRepositoryCapacity(l) >= maxResourceReward) {
+        neededLvl = l;
+        break;
+      }
+    }
+    return res.status(400).json({ error: `Your Silo storage capacity (${cap.toLocaleString()} units) on ${planet.name} is too low to receive these rewards. You need at least ${maxResourceReward.toLocaleString()} capacity. Please upgrade your Silo on ${planet.name} to at least Level ${neededLvl}!` });
+  }
+
+  planet.resources.water = Math.min(cap, planet.resources.water + reward.water);
+  planet.resources.plasma = Math.min(cap, planet.resources.plasma + reward.plasma);
+  planet.resources.fuel = Math.min(cap, planet.resources.fuel + reward.fuel);
+  planet.resources.food = Math.min(cap, planet.resources.food + reward.food);
+  planet.resources.respirant = Math.min(cap, planet.resources.respirant + reward.respirant);
+
+  // Add credits
+  p.credits = (p.credits || 0) + reward.credits;
+
+  // Add to completed list
+  p.completedTutorialTasks.push(idNum);
+
+  saveState();
+
+  res.json({
+    success: true,
+    player: p,
+    message: `Academy reward claimed on ${planet.name}! Received custom resource crates and +${reward.credits.toLocaleString()} Speed Credits.`
+  });
+});
+
 // Claim Supply Nexus Cargo Shipments
 app.post("/api/planet/claim-supply-nexus", (req, res) => {
   const p = getLoggedPlayer(req);
@@ -3870,6 +4087,18 @@ app.post("/api/messages/send", (req, res) => {
   };
 
   receiver.commandMessages.push(newMessage);
+
+  // Keep a copy in the sender's outbox list
+  if (!p.commandMessages) {
+    p.commandMessages = [];
+  }
+  const sentCopy: CommandMessage = {
+    ...newMessage,
+    isSent: true,
+    isRead: true // Sender has already read their own sent message
+  };
+  p.commandMessages.push(sentCopy);
+
   saveState();
   res.json({ success: true, message: "Holographic command transmission dispatched!" });
 });

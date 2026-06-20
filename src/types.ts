@@ -103,6 +103,7 @@ export interface PlayerProfile {
   bannerId: string; // Alliance/Player banner shape
   lastDailyRewardClaim: number;
   credits: number;
+  completedTutorialTasks?: number[];
   googleEmail?: string;
   password?: string;
   lastActive?: number;
@@ -121,6 +122,7 @@ export interface CommandMessage {
   timestamp: number;
   isRead: boolean;
   isSaved?: boolean;
+  isSent?: boolean;
 }
 
 export interface Alliance {
