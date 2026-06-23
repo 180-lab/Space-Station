@@ -69,9 +69,16 @@ async function safeParseJson(res: Response): Promise<any> {
                  trimmed.startsWith('<!doctype html>') || 
                  trimmed.startsWith('<html') || 
                  trimmed.includes('blocking a required security cookie') || 
-                 trimmed.includes('Cookie check');
+                 trimmed.includes('Cookie check') ||
+                 trimmed.includes('google-signin') ||
+                 trimmed.includes('accounts.google.com');
+
   if (isHtml) {
-    throw new Error('Gateway connection is adjusting. Reconnecting...');
+    const isAppSPA = trimmed.includes('id="root"') || trimmed.includes('/src/main.tsx') || trimmed.includes('/src/index.css');
+    if (isAppSPA) {
+      throw new Error(`API endpoint fallback: endpoint ${res.url} returned parent SPA layout instead of JSON.`);
+    }
+    throw new Error('Secure Iframe Policy: Browser privacy settings on your browser are blocking iframe requests. Please click "Open in New Tab" in the top right of the AI Studio preview to bypass this secure barrier.');
   }
 
   if (!trimmed) {
@@ -90,7 +97,7 @@ async function safeParseJson(res: Response): Promise<any> {
       }
       throw new Error(`Request failed with status ${res.status}`);
     }
-    throw new Error('Gateway connection is adjusting. Reconnecting...');
+    throw new Error('Secure Iframe Policy: Browser privacy settings on your browser are blocking iframe requests. Please click "Open in New Tab" in the top right of the AI Studio preview to bypass this secure barrier.');
   }
 }
 
@@ -1169,12 +1176,16 @@ export default function App() {
         },
         body: JSON.stringify({ channel, content, receiverId })
       });
+      const data = await safeParseJson(res);
       if (res.ok) {
         localStorage.setItem(`moonbase_chatted_${player.id}`, 'true');
+        fetchState();
+      } else {
+        showToast(data.error || 'Failed to dispatch chat transmission.', 'error');
       }
-      fetchState();
     } catch (err) {
       console.error(err);
+      showToast('Quantum transceiver latency detected. Chat transmission failed.', 'error');
     }
   };
 
@@ -2107,7 +2118,7 @@ export default function App() {
 
       {/* Screen view router container */}
       <main className="max-w-5xl mx-auto px-4 pt-8 pb-24 animate-fade-in animate-duration-500">
-        {player && activePlanet && (() => {
+        {activeTab === 'explore' && player && activePlanet && (() => {
           // Compute dynamic operation alerts:
           const incomingAttacks = fleets.filter(
             f => f.targetId === player.id &&
@@ -2365,7 +2376,7 @@ export default function App() {
           );
         })()}
 
-        {player && activePlanet && (
+        {activeTab === 'explore' && player && activePlanet && (
           <CommanderTutorial 
             player={player}
             activePlanet={activePlanet}
@@ -2948,10 +2959,9 @@ export default function App() {
                   <div>
                     <h2 className="text-xl font-black font-mono tracking-tight text-white flex items-center gap-2">
                       {targetPlayer.username}
-                      <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: isOnline ? '#10b981' : '#64748b' }} title={isOnline ? 'Active Commander Online' : 'Commander Offline'} />
                     </h2>
                     <p className="text-[11px] font-mono font-bold tracking-widest uppercase" style={{ color: factionColor }}>
-                      {targetPlayer.faction} Agent • {isOnline ? 'ONLINE' : 'OFFLINE'}
+                      {targetPlayer.faction} Agent
                     </p>
                   </div>
                 </div>
@@ -3062,13 +3072,7 @@ export default function App() {
                 {/* Last Detected Activity */}
                 <div className="pt-3 border-t border-[#1E293B] text-[10px] text-slate-500 flex justify-between items-center text-right sm:text-left gap-2 flex-wrap">
                   <span>TELEMETRY STABILIZATION GRID</span>
-                  <span>
-                    {targetPlayer.lastActive ? (
-                      `LAST DETECTED: ${new Date(targetPlayer.lastActive).toLocaleTimeString()}`
-                    ) : (
-                      'ACTIVITY INDEX CLASSIFIED'
-                    )}
-                  </span>
+                  <span>ACTIVITY INDEX CLASSIFIED</span>
                 </div>
 
               </div>

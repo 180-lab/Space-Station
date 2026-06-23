@@ -1436,8 +1436,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                   <p className="text-xs">No active transmissions decoded on this wavelength.</p>
                 </div>
               ) : (
-                chatMessages
+                [...chatMessages]
                   .filter(msg => msg.channel === 'global')
+                  .reverse()
                   .map((msg) => (
                     <div key={msg.id} className="p-3 border border-slate-900 rounded-xl bg-[#05070A]/60 hover:bg-[#05070A]/95 transition duration-150 leading-snug">
                       <div className="flex items-center gap-1.5 flex-wrap">
