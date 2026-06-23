@@ -1,0 +1,46 @@
+{
+  "name": "Space Station Commander",
+  "short_name": "Space Station",
+  "description": "An online multiplayer game where you manage space stations, gather resources, build fleets, and engage in tactical space battles.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030712",
+  "theme_color": "#020617",
+  "orientation": "any",
+  "id": "/?source=pwa",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["games", "strategy"],
+  "shortcuts": [
+    {
+      "name": "Live Server",
+      "url": "/?source=shortcut",
+      "description": "Launch straight into the space station commander universe."
+    }
+  ]
+}
