@@ -793,11 +793,11 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
 
                  {/* Silo Capacity warning */}
                 {hasSiloStorageIssue && (
-                  <div className="mt-3 p-3 rounded-lg bg-red-950/20 border border-red-500/30 text-left text-[10px] leading-relaxed">
-                    <span className="font-extrabold text-red-400 block uppercase tracking-wide">⚠️ SILO STORAGE OVERFLOW</span>
+                  <div className="mt-3 p-3 rounded-lg bg-orange-950/20 border border-orange-500/30 text-left text-[10px] leading-relaxed animate-pulse">
+                    <span className="font-extrabold text-orange-400 block uppercase tracking-wide">⚠️ STORAGE SATURATION CAUTION</span>
                     <p className="mt-1 text-slate-300 font-sans font-normal">
-                      Claiming now will overflow your storage! This task requires <span className="font-mono font-bold text-white">{maxResourceReward.toLocaleString()}</span> units of storage, but your active planet's Silo capacity is only <span className="font-mono font-bold text-white">{siloCapacity.toLocaleString()}</span> units. 
-                      Please upgrade your <span className="font-bold text-amber-300">Silo</span> to safely receive rewards!
+                      Your Silo capacity (<span className="font-mono font-bold text-white">{siloCapacity.toLocaleString()}</span> units) is lower than this task's maximum reward (<span className="font-mono font-bold text-white">{maxResourceReward.toLocaleString()}</span> units). Claiming now will top off resources to maximum limit.
+                      Upgrade your <span className="font-bold text-amber-300">Silo (Repository)</span> inside your active colony to fully capture all spills without waste!
                     </p>
                   </div>
                 )}

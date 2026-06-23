@@ -76,7 +76,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [showSync, setShowSync] = useState(false);
   const [showRegistryNames, setShowRegistryNames] = useState(false);
   const [showFeedbackConsole, setShowFeedbackConsole] = useState(false);
-  const [gatewayUrl, setGatewayUrl] = useState(() => localStorage.getItem('space_station_backend_url') || 'https://space-station-commander.onrender.com');
+  const [gatewayUrl, setGatewayUrl] = useState(() => localStorage.getItem('space_station_backend_url') || import.meta.env.VITE_API_BASE_URL || 'http://102.133.160.133:3000');
 
   // Suggestions state
   const [feedbackText, setFeedbackText] = useState('');

@@ -22,18 +22,23 @@ import { getUpgradeResourceCost } from "./src/gameUtils";
 const app = express();
 const PORT = process.env.NODE_ENV === "production" ? (process.env.PORT ? parseInt(process.env.PORT) : 3000) : 3000;
 
+// Auto-heal incoming proxy subpaths (e.g. /7/api/state -> /api/state) to prevent SPA fallback issues
+app.use((req, res, next) => {
+  const match = req.url.match(/\/api(\/|$)/);
+  if (match && match.index !== undefined && match.index > 0) {
+    const rewritten = req.url.substring(match.index);
+    console.log(`[ROUTER AUTO-HEAL] Rewriting proxy subpath: ${req.url} -> ${rewritten}`);
+    req.url = rewritten;
+  }
+  next();
+});
+
 // Set up permissive CORS headers for native Android Webviews and browser clients
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Expose-Headers", "Content-Type, Content-Length, Authorization, X-Requested-With, x-user-id");
-  
-  const requestHeaders = req.header("access-control-request-headers");
-  if (requestHeaders) {
-    res.setHeader("Access-Control-Allow-Headers", requestHeaders);
-  } else {
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-user-id");
-  }
+  res.setHeader("Access-Control-Expose-Headers", "Content-Type, Content-Length, Authorization, X-Requested-With, x-user-id, X-User-Id");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-user-id, X-User-Id, accept, origin, *");
   
   // Handle preflight checks
   if (req.method === "OPTIONS") {
@@ -2852,7 +2857,8 @@ app.post("/api/galaxy/intelligence", (req, res) => {
         respirant: targetPlanet.mines?.respirant?.map((m: any) => m.level) || []
       },
       troops: targetPlanet.troops,
-      resources: targetPlanet.resources
+      resources: targetPlanet.resources,
+      lastActive: targetUser.lastActive || now - 600000
     };
   } else {
     // Check if habitable uncharted sector
@@ -2880,6 +2886,7 @@ app.post("/api/galaxy/intelligence", (req, res) => {
     attackerName: p.username,
     defenderId: targetUser ? targetUser.id : "unknown",
     defenderName: targetPlanet ? targetPlanet.name : (isHab ? isHab.name : "Deep Space Void"),
+    defenderLastActive: targetUser ? targetUser.lastActive : undefined,
     isRecon: true,
     attackerCoords: p.planets[0] ? { x: p.planets[0].sectorX, y: p.planets[0].sectorY } : { x: 0, y: 0 },
     defenderCoords: { x: xVal, y: yVal },
@@ -3991,18 +3998,6 @@ app.post("/api/tutorial/claim", (req, res) => {
   // Add resources
   const repositoryLvl = planet.buildings.repository ? planet.buildings.repository.level : 1;
   const cap = getRepositoryCapacity(repositoryLvl);
-
-  const maxResourceReward = Math.max(reward.water, reward.plasma, reward.fuel, reward.food, reward.respirant);
-  if (cap < maxResourceReward) {
-    let neededLvl = 1;
-    for (let l = 1; l <= 45; l++) {
-      if (getRepositoryCapacity(l) >= maxResourceReward) {
-        neededLvl = l;
-        break;
-      }
-    }
-    return res.status(400).json({ error: `Your Silo storage capacity (${cap.toLocaleString()} units) on ${planet.name} is too low to receive these rewards. You need at least ${maxResourceReward.toLocaleString()} capacity. Please upgrade your Silo on ${planet.name} to at least Level ${neededLvl}!` });
-  }
 
   planet.resources.water = Math.min(cap, planet.resources.water + reward.water);
   planet.resources.plasma = Math.min(cap, planet.resources.plasma + reward.plasma);

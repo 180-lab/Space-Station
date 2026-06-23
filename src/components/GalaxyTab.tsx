@@ -2187,6 +2187,30 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   <span className="text-slate-400 font-bold font-mono">[{report.defenderCoords.x}, {report.defenderCoords.y}]</span>
                                 </h4>
                                 <p className="text-[11px] text-slate-400">Drone troops dispatched from Base Coordinate origin [{report.attackerCoords.x}, {report.attackerCoords.y}].</p>
+                                {(() => {
+                                  const defenderActive = report.defenderLastActive;
+                                  if (!defenderActive) return null;
+                                  const diffSec = Math.floor((Date.now() - defenderActive) / 1000);
+                                  const isOnline = diffSec < 120;
+                                  let statusStr = "ACTIVE";
+                                  let statusColor = "text-emerald-400 font-bold";
+                                  if (!isOnline) {
+                                    statusColor = "text-amber-400 font-bold font-mono";
+                                    if (diffSec < 3600) {
+                                      const mins = Math.floor(diffSec / 60);
+                                      statusStr = `LAST SEEN: ${mins} MINS AGO`;
+                                    } else {
+                                      const hrs = Math.floor(diffSec / 3600);
+                                      statusStr = `LAST SEEN: ${hrs} HOURS AGO`;
+                                    }
+                                  }
+                                  return (
+                                    <div className="text-[11px] text-slate-400 font-sans mt-1.5 flex items-center gap-1.5">
+                                      <span className="text-cyan-400 font-mono font-bold uppercase text-[9.5px]">Telemetry Activity:</span>
+                                      <span className={statusColor}>{statusStr}</span>
+                                    </div>
+                                  );
+                                })()}
                               </div>
 
                               {/* Target Garrison Combat Ratings / HP */}
@@ -3363,8 +3387,9 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     <p className="text-xs font-mono select-none">No active transmissions decoded on this wavelength.</p>
                   </div>
                 ) : (
-                  chatMessages
+                  [...chatMessages]
                     .filter(msg => msg.channel === activeChatWindow || (activeChatWindow === 'alliance' && player.allianceId && msg.channel === 'alliance' && msg.allianceTag === alliances[player.allianceId]?.tag))
+                    .reverse()
                     .map((msg) => (
                       <div key={msg.id} className="p-3 border border-slate-900 rounded-xl bg-[#05070A]/60 hover:bg-[#05070A]/95 transition duration-150 leading-snug">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -3482,6 +3507,30 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           {intelReport.faction || 'Neutral Space Alliance'}
                         </span>
                       </p>
+                      {(() => {
+                        const targetActive = intelReport.lastActive;
+                        if (!targetActive) return null;
+                        const diffSec = Math.floor((Date.now() - targetActive) / 1000);
+                        const isOnline = diffSec < 120;
+                        let statusStr = "ACTIVE";
+                        let statusColor = "text-emerald-400 font-bold";
+                        if (!isOnline) {
+                          statusColor = "text-amber-400 font-bold font-mono";
+                          if (diffSec < 3600) {
+                            const mins = Math.floor(diffSec / 60);
+                            statusStr = `LAST SEEN: ${mins} MINS AGO`;
+                          } else {
+                            const hrs = Math.floor(diffSec / 3600);
+                            statusStr = `LAST SEEN: ${hrs} HOURS AGO`;
+                          }
+                        }
+                        return (
+                          <p className="text-xs text-slate-300 font-sans mt-1">
+                            <span className="text-amber-400 font-mono font-bold">SECTOR INTEL STATUS: &bull; </span>
+                            <span className={statusColor}>{statusStr}</span>
+                          </p>
+                        );
+                      })()}
                     </>
                   )}
                   {intelReport.type === 'habitable' && (
@@ -4271,43 +4320,14 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                             <th className="px-4 py-3 font-bold uppercase text-right">Population</th>
                             <th className="px-4 py-3 font-bold uppercase text-right">Militancy HP Killed</th>
                             <th className="px-4 py-3 font-bold uppercase text-center">Bases Count</th>
-                            <th className="px-4 py-3 font-bold uppercase text-center">Access heartbeat activity</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#1E293B]/50">
                           {allianceMemberReports.map((mbr) => {
-                            const lastDiff = Date.now() - (mbr.lastActive || 0);
-                            const isOnline = lastDiff < 120000; // 2 minutes window
-
-                            let activeStatusText = 'OFFLINE';
-                            let activeStatusColor = 'text-slate-500';
-                            let statusPulseDot = 'bg-slate-600';
-
-                            if (isOnline) {
-                              activeStatusText = 'CONNECTED';
-                              activeStatusColor = 'text-emerald-400 font-extrabold';
-                              statusPulseDot = 'bg-emerald-400';
-                            } else if (lastDiff < 600000) { // 10 minutes
-                              activeStatusText = 'RECENT (Idle)';
-                              activeStatusColor = 'text-amber-400 font-bold';
-                              statusPulseDot = 'bg-amber-400';
-                            } else {
-                              const hours = Math.floor(lastDiff / 3600000);
-                              const mins = Math.floor((lastDiff % 3600000) / 60000);
-                              if (hours > 0) {
-                                activeStatusText = `IDLE ${hours}h ${mins}m AGO`;
-                              } else if (mins > 0) {
-                                activeStatusText = `IDLE ${mins} mins ago`;
-                              } else {
-                                activeStatusText = 'IDLE LONG TERM';
-                              }
-                            }
-
                             return (
                               <tr key={mbr.playerId} className="hover:bg-slate-900/30 transition text-xs">
                                 <td className="px-4 py-3.5 font-bold">
                                   <div className="flex items-center gap-2">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${statusPulseDot} ${isOnline ? 'animate-pulse' : ''}`} />
                                     <button
                                       type="button"
                                       onClick={() => onViewPlayerProfile && onViewPlayerProfile(mbr.playerId)}
@@ -4330,9 +4350,6 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 </td>
                                 <td className="px-4 py-3.5 text-center font-bold text-sky-400">
                                   {mbr.planets?.length || 1} bases
-                                </td>
-                                <td className={`px-4 py-3.5 text-center whitespace-nowrap ${activeStatusColor}`}>
-                                  {activeStatusText}
                                 </td>
                               </tr>
                             );
