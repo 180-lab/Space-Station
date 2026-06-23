@@ -317,12 +317,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   return (
     <div className="max-w-4xl mx-auto space-y-6 font-mono animate-fade-in pb-16 text-left">
       {/* Header Banner */}
-      <div className="p-6 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
-        <div className="space-y-1">
-          <p className="text-xs text-slate-400 leading-relaxed max-w-xl">
-            Calibrate core cosmetic skins, graphic display modes, accessibility scaling factors, and warning audio transmissions of your space command module.
-          </p>
-        </div>
+      <div className="p-4 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-xl flex justify-between items-center shadow-xl">
+        <h2 className="text-xs font-black text-white tracking-widest uppercase">TRANSMISSION LINK SETTINGS</h2>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -552,15 +548,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   </button>
                 </div>
 
-                <button
-                  onClick={handleResetServerState}
-                  disabled={resettingServer}
-                  className="w-full py-2.5 px-3 bg-red-950/20 hover:bg-red-900/40 border border-red-600/50 text-red-300 disabled:opacity-50 rounded-xl font-bold font-mono text-[10px] uppercase tracking-widest transition flex items-center justify-center gap-2 cursor-pointer mt-2 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
-                  type="button"
-                >
-                  <RefreshCw size={12} className={resettingServer ? 'animate-spin' : ''} /> 
-                  {resettingServer ? 'Executing reset override...' : '☢️ Force Reset Game Server'}
-                </button>
+                {player.googleEmail && player.googleEmail.toLowerCase() === 'banele180@gmail.com' && (
+                  <button
+                    onClick={handleResetServerState}
+                    disabled={resettingServer}
+                    className="w-full py-2.5 px-3 bg-red-950/20 hover:bg-red-900/40 border border-red-600/50 text-red-300 disabled:opacity-50 rounded-xl font-bold font-mono text-[10px] uppercase tracking-widest transition flex items-center justify-center gap-2 cursor-pointer mt-2 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+                    type="button"
+                  >
+                    <RefreshCw size={12} className={resettingServer ? 'animate-spin' : ''} /> 
+                    {resettingServer ? 'Executing reset override...' : '☢️ Force Reset Game Server'}
+                  </button>
+                )}
               </div>
             </>
           )}

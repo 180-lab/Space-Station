@@ -73,12 +73,12 @@ let state: GameState = {
 
 // Default Troop Specifications
 const TROOP_SPECS = {
-  defender: { name: "Interceptor", defenceHp: 18, attackHp: 10, carry: 600, speed: 7.0, waterConsumption: 0.05 },
-  attacker: { name: "Assault Drone", defenceHp: 9, attackHp: 30, carry: 400, speed: 11.662, waterConsumption: 0.1 },
-  tank: { name: "Disrupter", defenceHp: 5, attackHp: 5, carry: 0, speed: 3.5, waterConsumption: 0.2 },
-  looter: { name: "Matter Extractor", defenceHp: 4, attackHp: 4, carry: 1000, speed: 23.331, waterConsumption: 0.15 },
-  drone: { name: "Missile Launcher", defenceHp: 120, attackHp: 120, carry: 200, speed: 17.5, waterConsumption: 0.02 },
-  settlementShip: { name: "Settlement Ship", defenceHp: 50, attackHp: 0, carry: 5000, speed: 4.662, waterConsumption: 0.25 }
+  defender: { name: "Interceptor", defenceHp: 18, attackHp: 10, carry: 600, speed: 7.0, waterConsumption: 1.0 },
+  attacker: { name: "Assault Drone", defenceHp: 9, attackHp: 30, carry: 400, speed: 11.662, waterConsumption: 2.0 },
+  tank: { name: "Disrupter", defenceHp: 5, attackHp: 5, carry: 0, speed: 3.5, waterConsumption: 4.0 },
+  looter: { name: "Matter Extractor", defenceHp: 4, attackHp: 4, carry: 1000, speed: 23.331, waterConsumption: 3.0 },
+  drone: { name: "Missile Launcher", defenceHp: 120, attackHp: 120, carry: 200, speed: 17.5, waterConsumption: 0.4 },
+  settlementShip: { name: "Settlement Ship", defenceHp: 50, attackHp: 0, carry: 5000, speed: 4.662, waterConsumption: 5.0 }
 };
 
 // Help helper for repository capacity
@@ -173,7 +173,7 @@ function normalizeState(s: GameState) {
       
       const buildingDefaults: Record<string, { level: number, maxLevel: number }> = {
         fabricator: { level: 1, maxLevel: 10 },
-        commsHub: { level: 1, maxLevel: 50 },
+        commsHub: { level: 1, maxLevel: 5 },
         researchCenter: { level: 1, maxLevel: 20 },
         armyBase: { level: 1, maxLevel: 22 },
         repository: { level: 1, maxLevel: 45 },
@@ -318,7 +318,7 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number, isF
     },
     buildings: {
       fabricator: { level: 1, maxLevel: 10, isUpgrading: false, upgradeEnd: null, health: 100 },
-      commsHub: { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 },
+      commsHub: { level: 1, maxLevel: 5, isUpgrading: false, upgradeEnd: null, health: 100 },
       researchCenter: { level: isFirstStation ? 1 : 0, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
       armyBase: { level: isFirstStation ? 1 : 0, maxLevel: 22, isUpgrading: false, upgradeEnd: null, health: 100 },
       repository: { level: 1, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
@@ -638,10 +638,10 @@ function tickPlayerState(playerId: string, now: number): boolean {
         });
       }
 
-      // Deduct consumption rates (Water, Respirant 0.4x, Food 0.15x - divided by 10 as requested)
+      // Deduct consumption rates (Water, Respirant 0.28x, Food 0.18x)
       const waterConsumed = waterConsumptionPerHour * deltaHours;
-      const respirantConsumed = waterConsumptionPerHour * 0.4 * deltaHours;
-      const foodConsumed = waterConsumptionPerHour * 0.15 * deltaHours;
+      const respirantConsumed = waterConsumptionPerHour * 0.28 * deltaHours;
+      const foodConsumed = waterConsumptionPerHour * 0.18 * deltaHours;
 
       planet.resources.water = planet.resources.water - waterConsumed;
       planet.resources.respirant = planet.resources.respirant - respirantConsumed;
@@ -668,8 +668,8 @@ function tickPlayerState(playerId: string, now: number): boolean {
       }
 
       const netWaterProdHourly = hourlyMinesProd.water - waterConsumptionPerHour;
-      const netRespirantProdHourly = hourlyMinesProd.respirant - (waterConsumptionPerHour * 0.4);
-      const netFoodProdHourly = hourlyMinesProd.food - (waterConsumptionPerHour * 0.15);
+      const netRespirantProdHourly = hourlyMinesProd.respirant - (waterConsumptionPerHour * 0.28);
+      const netFoodProdHourly = hourlyMinesProd.food - (waterConsumptionPerHour * 0.18);
 
       const isAnyProdNegative = (netWaterProdHourly < 0) || (netRespirantProdHourly < 0) || (netFoodProdHourly < 0);
 
@@ -1244,6 +1244,29 @@ function simulateMoonbaseCombat(
     }
   }
 
+  // 150% involved HP complete annihilation overwhelm rule
+  if (initialAttHp > 1.5 * initialDefHp && initialDefHp > 0) {
+    // Defender losses set to initial counts, no survivors
+    Object.entries(defTroops).forEach(([tId, count]) => {
+      defRemaining[tId as keyof typeof defRemaining] = 0;
+      defenderLosses[tId as keyof typeof defenderLosses] = count;
+    });
+    defenceHpKilled = initialDefHp;
+    if (rounds.length > 0) {
+      rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Attacker's initial force HP of ${initialAttHp.toLocaleString()} exceeded 150% of the defender's total involved HP (${initialDefHp.toLocaleString()}). Absolute overwhelm triggered; all defender defending forces have been wiped out with ZERO survivors!`);
+    }
+  } else if (initialDefHp > 1.5 * initialAttHp && initialAttHp > 0) {
+    // Attacker losses set to initial counts, no survivors
+    Object.entries(attTroops).forEach(([tId, count]) => {
+      attRemaining[tId as keyof typeof attRemaining] = 0;
+      attackerLosses[tId as keyof typeof attackerLosses] = count;
+    });
+    attackHpKilled = initialAttHp;
+    if (rounds.length > 0) {
+      rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Defender's initial force HP of ${initialDefHp.toLocaleString()} exceeded 150% of the attacker's total involved HP (${initialAttHp.toLocaleString()}). Absolute overwhelm triggered; all attacking squadron forces have been wiped out with ZERO survivors!`);
+    }
+  }
+
   const finalAttCount = Object.values(attRemaining).reduce((s, v) => s + v, 0);
   const finalDefCount = Object.values(defRemaining).reduce((s, v) => s + v, 0);
 
@@ -1260,12 +1283,22 @@ function simulateMoonbaseCombat(
   }, 0);
 
   let winner: "attacker" | "defender" = "defender";
-  if (finalAttHp > finalDefHp) {
+  if (finalAttCount === 0 && finalDefCount > 0) {
+    winner = "defender";
+  } else if (finalDefCount === 0 && finalAttCount > 0) {
     winner = "attacker";
-  } else if (finalAttHp < finalDefHp) {
+  } else if (finalAttCount === 0 && finalDefCount === 0) {
+    // Both sides completely wiped out, defender holds the sector
     winner = "defender";
   } else {
-    winner = finalAttCount >= finalDefCount ? "attacker" : "defender";
+    // Both sides have surviving forces, compare remaining HP
+    if (finalAttHp > finalDefHp) {
+      winner = "attacker";
+    } else if (finalAttHp < finalDefHp) {
+      winner = "defender";
+    } else {
+      winner = finalAttCount >= finalDefCount ? "attacker" : "defender";
+    }
   }
 
   return {
@@ -2089,8 +2122,14 @@ app.post("/api/player/link-google", (req, res) => {
   res.json({ player: p, success: true });
 });
 
-// Developer tool: reset all game data on the server
+// Developer tool: reset all game data on the server (restricted to admin Banele)
 app.post("/api/dev/reset-universe", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.googleEmail || p.googleEmail.toLowerCase() !== 'banele180@gmail.com') {
+    return res.status(403).json({ error: "Access Denied: Server reset is only permitted for the system administrator." });
+  }
+
   bootstrapUniverse();
   saveState();
   res.json({ success: true, message: "Universe successfully reset to initial clean data!" });
@@ -3326,6 +3365,11 @@ app.post("/api/alliance/create", (req, res) => {
 
   if (p.allianceId) return res.status(400).json({ error: "Already member of an Alliance" });
 
+  const maxCommsHubLvl = Math.max(...p.planets.map(pl => pl.buildings.commsHub?.level || 0));
+  if (maxCommsHubLvl < 5) {
+    return res.status(400).json({ error: "Creating an Alliance requires Communications Hub Level 5 or higher." });
+  }
+
   const { name, tag, bannerColor, bannerSymbol } = req.body;
   if (!name || !tag) return res.status(400).json({ error: "Alliance Name and Tag required" });
 
@@ -3372,6 +3416,11 @@ app.post("/api/alliance/join", (req, res) => {
 
   if (p.allianceId) return res.status(400).json({ error: "Already registered in an Alliance." });
 
+  const maxCommsHubLvl = Math.max(...p.planets.map(pl => pl.buildings.commsHub?.level || 0));
+  if (maxCommsHubLvl < 4) {
+    return res.status(400).json({ error: "Joining an Alliance requires Communications Hub Level 4 or higher." });
+  }
+
   const { allianceId } = req.body;
   const alliance = state.alliances[allianceId];
   if (!alliance) return res.status(404).json({ error: "Alliance not found" });
@@ -3404,6 +3453,11 @@ app.post("/api/alliance/apply", (req, res) => {
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
   if (p.allianceId) return res.status(400).json({ error: "Already registered in an Alliance." });
+
+  const maxCommsHubLvl = Math.max(...p.planets.map(pl => pl.buildings.commsHub?.level || 0));
+  if (maxCommsHubLvl < 4) {
+    return res.status(400).json({ error: "Applying to an Alliance requires Communications Hub Level 4 or higher." });
+  }
 
   const { allianceId } = req.body;
   const alliance = state.alliances[allianceId];

@@ -20,13 +20,18 @@ import {
   Radio
 } from 'lucide-react';
 
-const UpgradeCostBar: React.FC<{ type: 'mine' | 'building'; upgradeKey: string; targetLevel: number }> = ({ type, upgradeKey, targetLevel }) => {
+const UpgradeCostBar: React.FC<{ 
+  type: 'mine' | 'building'; 
+  upgradeKey: string; 
+  targetLevel: number; 
+  planetResources: Record<ResourceType, number>;
+}> = ({ type, upgradeKey, targetLevel, planetResources }) => {
   const resourceTypes: ResourceType[] = ['water', 'plasma', 'fuel', 'food', 'respirant'];
   const infoMap = {
     water: { icon: Droplet, color: 'text-cyan-400' },
     plasma: { icon: Zap, color: 'text-purple-400' },
     fuel: { icon: Flame, color: 'text-amber-400' },
-    food: { icon: Apple, color: 'text-emerald-405' },
+    food: { icon: Apple, color: 'text-emerald-400' },
     respirant: { icon: Wind, color: 'text-blue-400' }
   };
 
@@ -35,10 +40,15 @@ const UpgradeCostBar: React.FC<{ type: 'mine' | 'building'; upgradeKey: string; 
       {resourceTypes.map((rKey) => {
         const cost = getUpgradeResourceCost(type, upgradeKey, targetLevel, rKey);
         const { icon: Icon, color } = infoMap[rKey];
+        const isShort = planetResources[rKey] < cost;
         return (
-          <div key={rKey} className="flex items-center gap-1.5 px-2 py-1 bg-white/[0.03] border border-white/5 rounded-lg text-[10px] font-mono font-bold">
-            <Icon size={11} className={color === 'text-emerald-405' ? 'text-emerald-400' : color} />
-            <span className="text-slate-300">{cost.toLocaleString()}</span>
+          <div 
+            key={rKey} 
+            className={`flex items-center gap-1.5 px-2 py-1 bg-white/[0.03] border rounded-lg text-[10px] font-mono font-bold ${isShort ? 'border-red-500/40 bg-red-950/10' : 'border-white/5'}`}
+            title={isShort ? `Short of resources (Have ${Math.round(planetResources[rKey]).toLocaleString()}, need ${cost.toLocaleString()})` : `Requirements met`}
+          >
+            <Icon size={11} className={color} />
+            <span className={isShort ? 'text-red-400 font-extrabold animate-pulse' : 'text-slate-300'}>{cost.toLocaleString()}</span>
           </div>
         );
       })}
@@ -140,11 +150,51 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   localResources = activePlanet.resources
 }) => {
   const [expandedCategory, setExpandedCategory] = useState<ResourceType | null>(null);
-  const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [restoringKeys, setRestoringKeys] = useState<Record<string, boolean>>({});
   const [isQueueMinimized, setIsQueueMinimized] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
+  const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newNameInput, setNewNameInput] = useState(activePlanet.name);
+
+  // Sync newNameInput when activePlanet changes
+  React.useEffect(() => {
+    setNewNameInput(activePlanet.name);
+    setIsEditingName(false);
+  }, [activePlanet.id, activePlanet.name]);
+
+  const handleRenameActiveStation = async () => {
+    if (!newNameInput.trim()) {
+      showToast?.('Station name cannot be empty!', 'error');
+      return;
+    }
+    if (newNameInput.trim().length > 30) {
+      showToast?.('Station name must be 30 characters or less', 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/planet/rename', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ planetId: activePlanet.id, newName: newNameInput })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast?.(`Station renamed to: ${newNameInput}`, 'success');
+        setIsEditingName(false);
+        onRefreshState?.();
+      } else {
+        showToast?.(data.error || 'Failed to rename station', 'error');
+      }
+    } catch (err) {
+      showToast?.('Network error during renaming', 'error');
+    }
+  };
 
   // Check if any upgrade is active right now on this planet
   const isAnyUpgradeInProgress = 
@@ -224,46 +274,6 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
       showToast?.('Verify network connection with terminal gateway.', 'error');
     } finally {
       setIsBoosting(false);
-    }
-  };
-
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [newNameInput, setNewNameInput] = useState(activePlanet.name);
-
-  // Sync newNameInput when activePlanet changes
-  React.useEffect(() => {
-    setNewNameInput(activePlanet.name);
-    setIsEditingName(false);
-  }, [activePlanet.id, activePlanet.name]);
-
-  const handleRenameActiveStation = async () => {
-    if (!newNameInput.trim()) {
-      showToast?.('Station name cannot be empty!', 'error');
-      return;
-    }
-    if (newNameInput.trim().length > 30) {
-      showToast?.('Station name must be 30 characters or less', 'error');
-      return;
-    }
-    try {
-      const res = await fetch('/api/planet/rename', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': player.id
-        },
-        body: JSON.stringify({ planetId: activePlanet.id, newName: newNameInput })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast?.(`Station renamed to: ${newNameInput}`, 'success');
-        setIsEditingName(false);
-        onRefreshState?.();
-      } else {
-        showToast?.(data.error || 'Failed to rename station', 'error');
-      }
-    } catch (err) {
-      showToast?.('Network error during renaming', 'error');
     }
   };
 
@@ -368,7 +378,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   // Let's calculate total troop water consumption per hour
   const getWaterConsumption = () => {
     let tot = 0;
-    const specCosts = { defender: 0.05, attacker: 0.1, tank: 0.2, looter: 0.15, drone: 0.02, settlementShip: 0.25 };
+    const specCosts = { defender: 1.0, attacker: 2.0, tank: 4.0, looter: 3.0, drone: 0.4, settlementShip: 5.0 };
     Object.entries(activePlanet.troops).forEach(([tId, count]) => {
       tot += (Number(count) || 0) * (specCosts[tId as keyof typeof specCosts] || 0);
     });
@@ -376,8 +386,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   };
 
   const waterConsumption = getWaterConsumption();
-  const respirantConsumption = waterConsumption * 0.4;
-  const foodConsumption = waterConsumption * 0.15;
+  const respirantConsumption = waterConsumption * 0.28;
+  const foodConsumption = waterConsumption * 0.18;
 
   const isWaterProductionNegative = waterHourlyTotal < waterConsumption;
   const isRespirantProductionNegative = respirantHourlyTotal < respirantConsumption;
@@ -417,96 +427,105 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   }
 
   return (
-    <div className="space-y-8 pb-24">
-      {/* Action Centerpiece Header with Holographic Glow */}
-      <div className="relative p-6 bg-gradient-to-b from-[#0F172A] to-black border border-white/5 rounded-xl overflow-hidden flex flex-col">
-        {/* Holographic Overlay */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(34,211,238,0.05)_0%,_transparent_70%)] pointer-events-none"></div>
+    <div className="space-y-8 pb-24" id="explore-tab-view">
+      {/* HUD Removed and Synced with App.tsx */}
+      <div className="hidden">
+      <div className="relative z-10 bg-[#0A0F1D]/60 backdrop-blur-sm border border-slate-800/65 rounded-2xl grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-7 p-5 justify-between">
         
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <span className="text-[10px] font-bold text-cyan-400 tracking-widest uppercase font-mono">SECTOR COMMAND SITE</span>
-            {isEditingName ? (
-              <div className="flex items-center gap-2 mt-1 max-w-md">
-                <input
-                  type="text"
-                  maxLength={30}
-                  value={newNameInput}
-                  onChange={(e) => setNewNameInput(e.target.value)}
-                  className="flex-1 px-3 py-1 bg-slate-955 bg-slate-950 border border-cyan-500/50 hover:border-cyan-500 focus:border-cyan-500 focus:outline-none text-sm text-white font-mono rounded-lg transition"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleRenameActiveStation();
-                    if (e.key === 'Escape') {
-                      setIsEditingName(false);
-                      setNewNameInput(activePlanet.name);
-                    }
-                  }}
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={handleRenameActiveStation}
-                  className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
-                  title="Save Name"
-                >
-                  <Check size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditingName(false);
-                    setNewNameInput(activePlanet.name);
-                  }}
-                  className="p-1.5 text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 rounded-lg transition cursor-pointer font-sans"
-                  title="Cancel"
-                >
-                  <span className="text-sm font-semibold select-none font-sans">✕</span>
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 mt-1 group">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">{activePlanet.name}</h2>
-                <button
-                  type="button"
-                  onClick={() => setIsEditingName(true)}
-                  className="p-1 px-2 text-[10px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/30 hover:bg-cyan-950/80 border border-cyan-500/20 hover:border-cyan-500/50 font-bold uppercase rounded-lg transition opacity-60 group-hover:opacity-100 flex items-center gap-1 cursor-pointer"
-                  title="Rename Station Base"
-                >
-                  <Edit2 size={10} /> Rename
-                </button>
-              </div>
-            )}
-            <div className="mt-2 text-xs text-slate-400 flex items-center gap-2 font-mono">
-              <span className={`inline-block w-2 h-2 rounded-full ${pulseDot} animate-pulse`} />
-              <span>Commander: <span className="text-slate-200 font-bold">{player.username}</span> &bull; {activePlanet.name} &bull; Sector Coord: [{activePlanet.sectorX}, {activePlanet.sectorY}]</span>
-            </div>
+        {/* Water Stat */}
+        <div className="flex flex-col animate-fade-in text-left" title="Water (H2O): Essential life fluid. Consumed continuously by troops to maintain Space Force strength. Hover/long press for info.">
+          <div className="flex items-center gap-2 mb-1">
+            <Droplet size={12} className="text-cyan-400 animate-pulse" title="Water icon" />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Water (H2O)</span>
           </div>
-
-          {/* Active Sector Alerts indicator block (Replaces Repository Limit) */}
-          <button
-            id="alerts-hud-trigger"
-            onClick={() => setIsAlertsOpen(true)}
-            className={`p-3 border rounded-lg text-left font-mono min-w-[170px] self-start md:self-auto cursor-pointer transition duration-150 hover:brightness-110 active:scale-95 flex flex-col justify-center ${alertsColor}`}
-          >
-            <span className="text-[9px] uppercase tracking-widest font-bold opacity-75">{alertsLabel}</span>
-            <span className="text-[11px] font-black uppercase mt-1 tracking-tight flex items-center gap-1.5 font-mono">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
-              {alertsValue}
-            </span>
-          </button>
+          <span className="text-base font-mono font-bold text-cyan-400">
+            {Math.round(localResources.water).toLocaleString()}{" "}
+            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+          </span>
+          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+            <div 
+              className="h-full bg-cyan-400 rounded-full shadow-[0_0_6px_#22d3ee] transition-all duration-300"
+              style={{ width: `${Math.min(100, (localResources.water / repositoryLimit) * 100)}%` }}
+            />
+          </div>
         </div>
 
-        {isDehydrated && (
-          <div className="relative z-10 mt-4 p-3 border border-red-900/50 bg-red-950/30 text-red-400 rounded-xl flex items-start gap-2.5 text-xs animate-pulse" title="Critical Alert: High severity base warning">
-            <ShieldAlert size={16} className="shrink-0 mt-0.5 animate-bounce text-red-500" title="Shield warning indicator: Critical dehydration is occurring" />
-            <div>
-              <p className="font-bold uppercase tracking-widest text-[10px]">CRITICAL NEGATIVE PRODUCTION (ATTRITION PASSIVE)</p>
-              <p className="text-red-300/80 leading-relaxed mt-0.5">Troops are suffering rapid attrition due to negative production! Upgrade resource extractors immediately built with deeper wells or dismiss excess troops.</p>
-            </div>
+        {/* Plasma Stat */}
+        <div className="flex flex-col animate-fade-in text-left" title="Plasma: High-energy matter. Essential for building complex spaceship hull grades and hyper-engines. Hover/long press for info.">
+          <div className="flex items-center gap-2 mb-1">
+            <Zap size={12} className="text-purple-400 animate-pulse" title="Plasma icon" />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Plasma</span>
           </div>
-        )}
+          <span className="text-base font-mono font-bold text-purple-400">
+            {Math.round(localResources.plasma).toLocaleString()}{" "}
+            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+          </span>
+          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+            <div 
+              className="h-full bg-purple-500 rounded-full shadow-[0_0_6px_#a855f7] transition-all duration-300"
+              style={{ width: `${Math.min(100, (localResources.plasma / repositoryLimit) * 100)}%` }}
+            />
+          </div>
+        </div>
 
-        {/* Interactive Construction Queue Dashboard */}
+        {/* Fuel Stat */}
+        <div className="flex flex-col animate-fade-in text-left" title="Fuel: Thermonuclear propulsion energy. Required for dispatching fleet traversals across global planetary sectors. Hover/long press for info.">
+          <div className="flex items-center gap-2 mb-1">
+            <Flame size={12} className="text-amber-400 animate-pulse" title="Fuel icon" />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Fuel</span>
+          </div>
+          <span className="text-base font-mono font-bold text-amber-400">
+            {Math.round(localResources.fuel).toLocaleString()}{" "}
+            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+          </span>
+          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+            <div 
+              className="h-full bg-amber-500 rounded-full shadow-[0_0_6px_#fbbf24] transition-all duration-300"
+              style={{ width: `${Math.min(100, (localResources.fuel / repositoryLimit) * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Food Stat */}
+        <div className="flex flex-col animate-fade-in text-left" title="Food: Life support proteins. Vital to sustaining personnel during active colonist station operations. Hover/long press for info.">
+          <div className="flex items-center gap-2 mb-1">
+            <Apple size={12} className="text-emerald-400 animate-pulse" title="Food icon" />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Food</span>
+          </div>
+          <span className="text-base font-mono font-bold text-emerald-400">
+            {Math.round(localResources.food).toLocaleString()}{" "}
+            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+          </span>
+          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+            <div 
+              className="h-full bg-emerald-500 rounded-full shadow-[0_0_6px_#10b981] transition-all duration-300"
+              style={{ width: `${Math.min(100, (localResources.food / repositoryLimit) * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Respirant Stat */}
+        <div className="flex flex-col col-span-2 md:col-span-1 animate-fade-in text-left" title="Respirant (O2): Atmospheric gases. Powering life ventilation systems for astronauts and pilots. Hover/long press for info.">
+          <div className="flex items-center gap-2 mb-1">
+            <Wind size={12} className="text-blue-400 animate-pulse" title="Respirant icon" />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-[#64748b] font-mono">Respirant (O2)</span>
+          </div>
+          <span className="text-base font-mono font-bold text-blue-400">
+            {Math.round(localResources.respirant).toLocaleString()}{" "}
+            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
+          </span>
+          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+            <div 
+              className="h-full bg-blue-500 rounded-full shadow-[0_0_6px_#3b82f6] transition-all duration-300"
+              style={{ width: `${Math.min(100, (localResources.respirant / repositoryLimit) * 100)}%` }}
+            />
+          </div>
+        </div>
+
+      </div>
+      </div>
+
+      {/* Interactive Construction Queue Dashboard */}
         {(() => {
           const queueList = activePlanet.upgradeQueue || [];
           const activeUpgrades: { type: 'mine' | 'building'; key: string; mineIndex?: number; upgradeEnd: number }[] = [];
@@ -609,102 +628,6 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
             </div>
           );
         })()}
-      </div>
-
-      {/* Main Dynamic Resource Stats HUD Panels (Elegant Dark Telemetry Mockup style with mini Progress Bars) */}
-      <div className="bg-[#0A0F1D]/80 backdrop-blur-md border border-[#1E293B] rounded-2xl grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-7 p-5 justify-between">
-        
-        {/* Water Stat */}
-        <div className="flex flex-col animate-fade-in" title="Water (H2O): Essential life fluid. Consumed continuously by troops to maintain Space Force strength. Hover/long press for info.">
-          <div className="flex items-center gap-2 mb-1">
-            <Droplet size={12} className="text-cyan-400 animate-pulse" title="Water icon" />
-            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Water (H2O)</span>
-          </div>
-          <span className="text-base font-mono font-bold text-cyan-400">
-            {Math.round(localResources.water).toLocaleString()}{" "}
-            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-          </span>
-          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-            <div 
-              className="h-full bg-cyan-400 rounded-full shadow-[0_0_6px_#22d3ee] transition-all duration-300"
-              style={{ width: `${Math.min(100, (localResources.water / repositoryLimit) * 100)}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Plasma Stat */}
-        <div className="flex flex-col animate-fade-in" title="Plasma: High-energy matter. Essential for building complex spaceship hull grades and hyper-engines. Hover/long press for info.">
-          <div className="flex items-center gap-2 mb-1">
-            <Zap size={12} className="text-purple-400 animate-pulse" title="Plasma icon" />
-            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Plasma</span>
-          </div>
-          <span className="text-base font-mono font-bold text-purple-400">
-            {Math.round(localResources.plasma).toLocaleString()}{" "}
-            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-          </span>
-          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-            <div 
-              className="h-full bg-purple-500 rounded-full shadow-[0_0_6px_#a855f7] transition-all duration-300"
-              style={{ width: `${Math.min(100, (localResources.plasma / repositoryLimit) * 100)}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Fuel Stat */}
-        <div className="flex flex-col animate-fade-in" title="Fuel: Thermonuclear propulsion energy. Required for dispatching fleet traversals across global planetary sectors. Hover/long press for info.">
-          <div className="flex items-center gap-2 mb-1">
-            <Flame size={12} className="text-amber-400 animate-pulse" title="Fuel icon" />
-            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Fuel</span>
-          </div>
-          <span className="text-base font-mono font-bold text-amber-400">
-            {Math.round(localResources.fuel).toLocaleString()}{" "}
-            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-          </span>
-          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-            <div 
-              className="h-full bg-amber-500 rounded-full shadow-[0_0_6px_#fbbf24] transition-all duration-300"
-              style={{ width: `${Math.min(100, (localResources.fuel / repositoryLimit) * 100)}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Food Stat */}
-        <div className="flex flex-col animate-fade-in" title="Food: Life support proteins. Vital to sustaining personnel during active colonist station operations. Hover/long press for info.">
-          <div className="flex items-center gap-2 mb-1">
-            <Apple size={12} className="text-emerald-400 animate-pulse" title="Food icon" />
-            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Food</span>
-          </div>
-          <span className="text-base font-mono font-bold text-emerald-400">
-            {Math.round(localResources.food).toLocaleString()}{" "}
-            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-          </span>
-          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-            <div 
-              className="h-full bg-emerald-500 rounded-full shadow-[0_0_6px_#10b981] transition-all duration-300"
-              style={{ width: `${Math.min(100, (localResources.food / repositoryLimit) * 100)}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Respirant Stat */}
-        <div className="flex flex-col col-span-2 md:col-span-1 animate-fade-in" title="Respirant (O2): Atmospheric gases. Powering life ventilation systems for astronauts and pilots. Hover/long press for info.">
-          <div className="flex items-center gap-2 mb-1">
-            <Wind size={12} className="text-blue-400 animate-pulse" title="Respirant icon" />
-            <span className="text-[10px] uppercase tracking-widest font-bold text-[#64748b] font-mono">Respirant (O2)</span>
-          </div>
-          <span className="text-base font-mono font-bold text-blue-400">
-            {Math.round(localResources.respirant).toLocaleString()}{" "}
-            <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-          </span>
-          <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-            <div 
-              className="h-full bg-blue-500 rounded-full shadow-[0_0_6px_#3b82f6] transition-all duration-300"
-              style={{ width: `${Math.min(100, (localResources.respirant / repositoryLimit) * 100)}%` }}
-            />
-          </div>
-        </div>
-
-      </div>
 
       {/* TACTICAL METRIC FLIGHT RADAR - INCOMING AND OUTGOING FLEET OBSERVATIONS */}
       {(() => {
@@ -919,31 +842,34 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
       })()}
 
       {/* resource mines category list */}
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-[#1E293B]/60 pb-3" id="extractors_header">
+      <div className="border border-cyan-500/35 bg-[#0C1425]/60 p-4 rounded-2xl mb-8 shadow-[0_0_20px_rgba(34,211,238,0.12)] ring-1 ring-cyan-500/10 hover:shadow-[0_0_25px_rgba(34,211,238,0.22)] transition duration-300">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-cyan-500/25 pb-3" id="extractors_header">
           <button
             onClick={() => setShowExtractorsSec(!showExtractorsSec)}
-            className="flex-1 flex items-center justify-between text-left hover:text-white transition duration-150 cursor-pointer"
+            className="flex-1 flex items-center justify-between text-left hover:brightness-110 transition duration-150 cursor-pointer group"
             type="button"
           >
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 font-mono flex items-center gap-2">
+              <h3 className="text-xs font-black uppercase tracking-widest text-cyan-300 font-mono flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-200 mr-1.5 animate-pulse border border-cyan-400/40 text-[9.5px]">⚡ COMMAND ACTIVE</span>
                 Resource Extractors (Max Level: {maxExtractorLevel})
                 {showExtractorsSec ? (
-                  <ChevronUp size={14} className="text-red-500" />
+                  <ChevronUp size={14} className="text-cyan-400 group-hover:scale-110 transition" />
                 ) : (
-                  <ChevronDown size={14} className="text-emerald-500" />
+                  <ChevronDown size={14} className="text-cyan-400 group-hover:scale-110 transition" />
                 )}
               </h3>
-              <p className="text-[10px] text-slate-500 font-sans mt-0.5">Maximum extractors level: {maxExtractorLevel} for this station (Level 25 for Main ★, Level 20 for Secondary ★★, Level 15 for Colonies).</p>
+              <p className="text-[10px] text-cyan-400/70 font-sans mt-1 leading-relaxed">
+                Maximum extractors level: <strong className="text-white">{maxExtractorLevel}</strong> for this station (Level 25 for Main ★, Level 20 for Secondary ★★, Level 15 for Colonies).
+              </p>
             </div>
           </button>
           <button
             onClick={() => handleOpenBoostModal("all", -1)}
-            className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:shadow-[0_0_12px_rgba(245,158,11,0.25)] border border-amber-500/35 rounded-xl transition duration-150 font-mono text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 hover:shadow-[0_0_15px_rgba(245,158,11,0.55)] border border-amber-400/40 rounded-xl transition duration-150 font-mono text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer self-start sm:self-auto hover:scale-105"
             type="button"
           >
-            <Zap size={10} className="animate-pulse text-amber-400" /> Production Boost
+            <Zap size={11} className="animate-bounce" /> Production Boost
           </button>
         </div>
 
@@ -997,11 +923,11 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         {resKey === 'water' && waterConsumption > 0 && (
                           <span className="text-red-400 font-bold border-l border-[#1E293B] pl-2">(-{Math.round(waterConsumption).toLocaleString()}/hr troops)</span>
                         )}
-                        {resKey === 'respirant' && waterConsumption > 0 && (
-                          <span className="text-red-400 font-bold border-l border-[#1E293B] pl-2">(-{Math.round(waterConsumption * 0.4).toLocaleString()}/hr troops)</span>
+                         {resKey === 'respirant' && waterConsumption > 0 && (
+                          <span className="text-red-400 font-bold border-l border-[#1E293B] pl-2">(-{Math.round(waterConsumption * 0.28).toLocaleString()}/hr troops)</span>
                         )}
                         {resKey === 'food' && waterConsumption > 0 && (
-                          <span className="text-red-400 font-bold border-l border-[#1E293B] pl-2">(-{Math.round(waterConsumption * 0.15).toLocaleString()}/hr troops)</span>
+                          <span className="text-red-400 font-bold border-l border-[#1E293B] pl-2">(-{Math.round(waterConsumption * 0.18).toLocaleString()}/hr troops)</span>
                         )}
                       </div>
                     </div>
@@ -1042,10 +968,10 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                           return (
                             <button
                               onClick={() => handleOpenBoostModal(resKey, -1)}
-                              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider transition cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.2)] shrink-0 self-start sm:self-auto"
+                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider transition cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.55)] hover:scale-[1.03] shrink-0 self-start sm:self-auto"
                               type="button"
                             >
-                              ⚡ BOOST EXTRACTOR (🪙 45)
+                              ⚡ OVERDRIVE BOOST EXTRACTOR (🪙 45)
                             </button>
                           );
                         }
@@ -1096,9 +1022,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                               </div>
                               {mine.level < maxExtractorLevel && (
                                 isDamaged ? (
-                                  <RestoreCostBar type="mine" upgradeKey={resKey} targetLevel={targetLevel} health={mine.health!} planetResources={activePlanet.resources} />
+                                  <RestoreCostBar type="mine" upgradeKey={resKey} targetLevel={targetLevel} health={mine.health!} planetResources={localResources} />
                                 ) : (
-                                  <UpgradeCostBar type="mine" upgradeKey={resKey} targetLevel={targetLevel} />
+                                  <UpgradeCostBar type="mine" upgradeKey={resKey} targetLevel={targetLevel} planetResources={localResources} />
                                 )
                               )}
                             </div>
@@ -1133,9 +1059,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                               ) : (
                                 <button 
                                   onClick={() => onUpgradeMine(resKey, mine.index)}
-                                  className="px-4 py-2 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 hover:shadow-[0_0_12px_rgba(34,211,238,0.25)] text-[10px] uppercase font-bold border border-cyan-500/35 rounded-xl transition duration-150 cursor-pointer"
+                                  className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 border border-cyan-400 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.55)] hover:scale-[1.03]"
                                 >
-                                  Upgrade <span className="text-slate-500">(1min)</span>
+                                  ⚡ UPGRADE EXTRACTOR <span className="text-slate-900 font-bold ml-1">(1min)</span>
                                 </button>
                               )}
                             </div>
@@ -1153,21 +1079,29 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
       </div>
 
       {/* base buildings infrastructure */}
-      <div>
+      <div className="border border-indigo-500/35 bg-[#0C1425]/60 p-4 rounded-2xl mb-8 shadow-[0_0_20px_rgba(99,102,241,0.12)] ring-1 ring-indigo-500/10 hover:shadow-[0_0_25px_rgba(99,102,241,0.22)] transition duration-300">
         <button
           onClick={() => setShowStructures(!showStructures)}
-          className="w-full flex items-center justify-between gap-3 mb-4 border-b border-[#1E293B]/60 pb-3 text-left hover:text-white transition duration-150 cursor-pointer"
+          className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-indigo-500/25 pb-3 text-left hover:brightness-110 transition duration-150 cursor-pointer group"
           type="button"
         >
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#5bc0be] font-mono flex items-center gap-2">
-            Established Structures ({constructedBuildings.length})
-            {showStructures ? (
-              <ChevronUp size={12} className="text-red-500 inline" />
-            ) : (
-              <ChevronDown size={12} className="text-emerald-500 inline" />
-            )}
-          </h3>
-          <span className="text-[10.5px] text-slate-500 font-mono font-bold">({constructedBuildings.length} Facilities)</span>
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-widest text-indigo-350 font-mono flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded bg-indigo-500/25 text-indigo-200 mr-1.5 animate-pulse border border-indigo-400/40 text-[9.5px]">🏯 INFRASTRUCTURE</span>
+              Established Structures ({constructedBuildings.length})
+              {showStructures ? (
+                <ChevronUp size={14} className="text-indigo-400 group-hover:scale-110 transition inline" />
+              ) : (
+                <ChevronDown size={14} className="text-indigo-400 group-hover:scale-110 transition inline" />
+              )}
+            </h3>
+            <p className="text-[10px] text-indigo-400/70 font-sans mt-1 leading-relaxed">
+              Sovereign base facilities, resource repositories, and control command matrices constructed on this site.
+            </p>
+          </div>
+          <span className="text-[10.5px] text-indigo-300 font-mono font-bold bg-indigo-500/20 border border-indigo-500/30 px-2.5 py-1 rounded-xl shrink-0 self-start sm:self-auto">
+            ({constructedBuildings.length} Facilities Built)
+          </span>
         </button>
         {showStructures && (
           <div className="space-y-4">
@@ -1311,9 +1245,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
                       {bState.level < bState.maxLevel && (
                         bState.health !== undefined && bState.health < 100 ? (
-                          <RestoreCostBar type="building" upgradeKey={bKey} targetLevel={targetLvl} health={bState.health} planetResources={activePlanet.resources} />
+                          <RestoreCostBar type="building" upgradeKey={bKey} targetLevel={targetLvl} health={bState.health} planetResources={localResources} />
                         ) : (
-                          <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={targetLvl} />
+                          <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={targetLvl} planetResources={localResources} />
                         )
                       )}
 
@@ -1415,7 +1349,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                     {isExpanded && (
                       <div className="border-t border-[#5bc0be]/20 p-4 bg-slate-950/40 space-y-3.5 text-left text-xs animate-fade-in">
                         <p className="text-slate-350 leading-relaxed font-sans">{info.desc}</p>
-                        <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={1} />
+                        <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={1} planetResources={localResources} />
                         
                         <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-2">
                           <span className="text-[9.5px] text-slate-500 font-mono font-bold tracking-wider">REQUISITE FABRICATOR: Lv. {getRequiredFabricatorLevel(bKey)}</span>

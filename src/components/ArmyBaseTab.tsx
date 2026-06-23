@@ -64,6 +64,7 @@ interface ArmyBaseTabProps {
   setCreatedFleets: React.Dispatch<React.SetStateAction<CreatedFleet[]>>;
   onUpdatePlayer?: (player: PlayerProfile) => void;
   onViewPlayerProfile?: (playerId: string) => void;
+  localResources?: Record<string, number>;
 }
 
 const TROOP_DETAILS = {
@@ -162,7 +163,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   createdFleets,
   setCreatedFleets,
   onUpdatePlayer,
-  onViewPlayerProfile
+  onViewPlayerProfile,
+  localResources
 }) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({
     defender: 1,
@@ -983,12 +985,12 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                   {/* Optional expanded spec panel */}
                   {isInfoActive && (() => {
                     const waterVal = 
-                      tId === 'defender' ? 0.05 :
-                      tId === 'attacker' ? 0.1 :
-                      tId === 'tank' ? 0.2 :
-                      tId === 'looter' ? 0.15 :
-                      tId === 'drone' ? 0.02 :
-                      0.25; // settlementShip is 0.25
+                      tId === 'defender' ? 1.0 :
+                      tId === 'attacker' ? 2.0 :
+                      tId === 'tank' ? 4.0 :
+                      tId === 'looter' ? 3.0 :
+                      tId === 'drone' ? 0.4 :
+                      5.0; // settlementShip is 5.0
 
                     return (
                       <div className="p-4 rounded-xl border border-[#1E293B] bg-[#05070A] text-xs space-y-2.5 font-mono">
@@ -1058,10 +1060,10 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                               💧 H2O: {waterVal}/hr
                             </div>
                             <div className="py-1 px-1.5 rounded bg-blue-950/20 border border-blue-500/15 text-blue-400 font-bold">
-                              💨 O2: {(waterVal * 4).toFixed(1).replace(/\.0$/, '')}/hr
+                              💨 O2: {(waterVal * 0.28).toFixed(3).replace(/\.?0+$/, '')}/hr
                             </div>
                             <div className="py-1 px-1.5 rounded bg-emerald-950/20 border border-emerald-500/15 text-emerald-400 font-bold">
-                              🍏 Food: {(waterVal * 1.5).toFixed(2).replace(/\.00$/, '')}/hr
+                              🍏 Food: {(waterVal * 0.18).toFixed(3).replace(/\.?0+$/, '')}/hr
                             </div>
                           </div>
                         </div>
@@ -1076,10 +1078,10 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                               💧 H2O: {(waterVal * currentCount).toLocaleString(undefined, { maximumFractionDigits: 1 })}/hr
                             </div>
                             <div className="py-1 px-1.5 rounded bg-blue-950/20 border border-blue-500/15 text-blue-400 font-bold">
-                              💨 O2: {(waterVal * 4 * currentCount).toLocaleString(undefined, { maximumFractionDigits: 1 })}/hr
+                              💨 O2: {(waterVal * 0.28 * currentCount).toLocaleString(undefined, { maximumFractionDigits: 2 })}/hr
                             </div>
                             <div className="py-1 px-1.5 rounded bg-emerald-950/20 border border-emerald-500/15 text-emerald-400 font-bold">
-                              🍏 Food: {(waterVal * 1.5 * currentCount).toLocaleString(undefined, { maximumFractionDigits: 1 })}/hr
+                              🍏 Food: {(waterVal * 0.18 * currentCount).toLocaleString(undefined, { maximumFractionDigits: 2 })}/hr
                             </div>
                           </div>
                         </div>
@@ -1087,12 +1089,12 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                         {/* Grand Total Consumable Maintenance for ALL troops in the station */}
                         {(() => {
                           let stationTotalH2o = 0;
-                          const specCosts = { defender: 0.5, attacker: 1.0, tank: 2.0, looter: 1.5, drone: 0.2, settlementShip: 2.5 };
+                          const specCosts = { defender: 1.0, attacker: 2.0, tank: 4.0, looter: 3.0, drone: 0.4, settlementShip: 5.0 };
                           Object.entries(activePlanet.troops).forEach(([tId, count]) => {
                             stationTotalH2o += (count as number) * (specCosts[tId as keyof typeof specCosts] || 0);
                           });
-                          const stationTotalO2 = stationTotalH2o * 4;
-                          const stationTotalFood = stationTotalH2o * 1.5;
+                          const stationTotalO2 = stationTotalH2o * 0.28;
+                          const stationTotalFood = stationTotalH2o * 0.18;
 
                           return (
                             <div className="border-t border-white/5 pt-2.5 mt-2.5">
@@ -1139,7 +1141,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                       Object.entries(details.costs).forEach(([res, amount]) => {
                         const costAmt = amount as number;
                         if (costAmt > 0) {
-                          const available = activePlanet.resources[res as keyof typeof activePlanet.resources] || 0;
+                          const resources = localResources || activePlanet.resources;
+                          const available = resources[res as keyof typeof resources] || 0;
                           const possible = Math.floor(available / costAmt);
                           if (possible < maxVal) {
                             maxVal = possible;

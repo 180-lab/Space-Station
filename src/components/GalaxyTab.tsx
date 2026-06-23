@@ -68,6 +68,7 @@ interface GalaxyTabProps {
   setCreatedFleets: React.Dispatch<React.SetStateAction<CreatedFleet[]>>;
   onUpdatePlayer?: (player: PlayerProfile) => void;
   defaultSubTab?: 'scanner' | 'ranking' | 'comms' | 'news' | 'fleets';
+  localResources?: Record<string, number>;
 }
 
 async function safeParseJson(res: Response): Promise<any> {
@@ -154,7 +155,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   createdFleets,
   setCreatedFleets,
   onUpdatePlayer,
-  defaultSubTab
+  defaultSubTab,
+  localResources
 }) => {
   // Sub-tabs
   const [subTab, setSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>(defaultSubTab || 'scanner');
@@ -347,7 +349,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [intelPopupExpandedMines, setIntelPopupExpandedMines] = useState<Record<string, boolean>>({});
   const [expandedReportBuildings, setExpandedReportBuildings] = useState<Record<string, boolean>>({});
   const [expandedReportMines, setExpandedReportMines] = useState<Record<string, boolean>>({});
-  const [galaxyCombatSavedFilter, setGalaxyCombatSavedFilter] = useState(false);
+  const [combatCategoryFilter, setCombatCategoryFilter] = useState<'all' | 'attack' | 'defense' | 'saved'>('all');
   const [expandedReportRounds, setExpandedReportRounds] = useState<Record<string, number>>({});
 
   // Scanner execution
@@ -616,8 +618,9 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
     // Check availability
     const entriesList = Object.entries(resourceSendValues) as [string, number][];
+    const resources = localResources || activePlanet.resources;
     for (const [resName, qty] of entriesList) {
-      const avail = activePlanet.resources[resName as keyof typeof activePlanet.resources] || 0;
+      const avail = resources[resName as keyof typeof resources] || 0;
       if (qty > avail) {
         if (showToast) showToast(`Not enough ${resName} on current moonbase.`, 'error');
         return;
@@ -657,10 +660,10 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const rankedState = Object.values(alliances) as Alliance[];  return (
     <div className="space-y-8 pb-24 font-mono">
       {/* Visual Navigation Pill Bars as a 2-rowed layout assembly to fit mobile viewports exactly */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-1.5 bg-[#0A0F1D] p-1.5 rounded-xl border border-[#1E293B] shrink-0 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-1 bg-[#0A0F1D] p-1.5 rounded-xl border border-[#1E293B] shrink-0 text-[10px] sm:text-xs">
         <button 
           onClick={() => { setSubTab('scanner'); handleScan(targetCoords.x, targetCoords.y); }}
-          className={`py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'scanner' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+          className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'scanner' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
           title="Surveillance arrays: survey adjacent coordinates, sectors, and cosmic features"
         >
           <Radar size={13} className={subTab === 'scanner' && isScanning ? 'animate-spin' : ''} title="Scanning Radar sweep line" />
@@ -668,7 +671,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         </button>
         <button 
           onClick={() => setSubTab('ranking')}
-          className={`py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'ranking' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+          className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'ranking' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
           title="Sovereignty Leaderboard: inspect combined firepower rank standings of galactic alliances"
         >
           <Trophy size={13} title="Trophy award leader prize" />
@@ -676,7 +679,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         </button>
         <button 
           onClick={() => setSubTab('comms')}
-          className={`py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'comms' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+          className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'comms' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
           title="Alliance Core Hub: form coalitions, manage treaties and covenants"
         >
           <Users size={13} title="Group of astronauts Alliance icon" />
@@ -684,7 +687,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         </button>
         <button 
           onClick={() => setSubTab('news')}
-          className={`py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'news' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+          className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'news' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
           title="Sector DEC_LINKS: review decrypted battle reports and public newsletters feed"
         >
           <Radio size={13} title="Radio waves beacon transceiver" />
@@ -692,11 +695,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         </button>
         <button 
           onClick={() => setSubTab('fleets')}
-          className={`col-span-2 md:col-span-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-150 ${subTab === 'fleets' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+          className={`col-span-2 md:col-span-1 py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'fleets' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
           title="Tactical Fleets array: relocate or deploy offense squadrons with separate routes"
         >
           <Compass size={13} title="Compass locator tool" />
-          <span>TACTICAL FLEETS</span>
+          <span>FLEETS</span>
         </button>
       </div>
 
@@ -1479,70 +1482,89 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   </div>
                 </div>
               )
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Create alliance */}
-                <form onSubmit={handleCreateAllianceSubmit} className="p-5 bg-[#05070A]/90 rounded-xl border border-[#1E293B] space-y-4 font-mono">
-                  <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-widest"><Sparkles size={12} className="text-cyan-400" /> Create Alliance</h4>
-                  <div className="space-y-3 text-xs">
-                    <input 
-                      type="text" 
-                      placeholder="ALLIANCE NAME"
-                      value={allianceName}
-                      onChange={(e) => setAllianceName(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[#0A0F1D] border border-[#1E293B] text-white rounded-xl focus:outline-none focus:border-cyan-500 uppercase font-mono"
-                    />
-                    <input 
-                      type="text" 
-                      placeholder="TAG (max 4 chars)"
-                      maxLength={4}
-                      value={allianceTag}
-                      onChange={(e) => setAllianceTag(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[#0A0F1D] border border-[#1E293B] text-white rounded-xl focus:outline-none focus:border-cyan-500 uppercase font-mono"
-                    />
-                  </div>
-                  <button 
-                    type="submit"
-                    className="w-full px-4 py-3 bg-gradient-to-r from-pink-900/10 to-pink-500/10 hover:from-pink-900/20 hover:to-pink-500/20 border border-pink-500/40 hover:border-pink-500/60 text-pink-400 hover:text-pink-300 font-bold font-mono tracking-widest text-[10px] uppercase rounded-xl transition cursor-pointer"
-                  >
-                    Create alliance
-                  </button>
-                </form>
+            ) : (() => {
+              const commsHubLvl = player ? Math.max(...player.planets.map(pl => pl.buildings.commsHub?.level || 0)) : 0;
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Create alliance */}
+                  {commsHubLvl < 5 ? (
+                    <div className="p-5 bg-pink-950/5 rounded-xl border border-pink-500/10 flex flex-col items-center justify-center text-center space-y-2.5 font-mono">
+                      <Sparkles size={24} className="text-pink-400 opacity-60 animate-pulse" />
+                      <span className="text-[10px] text-pink-400 uppercase tracking-widest font-bold">Create Alliance Blocked</span>
+                      <p className="text-slate-400 text-xs">Requires Communications Hub Level 5 to establish a new alliance sovereignty (Current: Level {commsHubLvl}).</p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleCreateAllianceSubmit} className="p-5 bg-[#05070A]/90 rounded-xl border border-[#1E293B] space-y-4 font-mono">
+                      <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-widest"><Sparkles size={12} className="text-cyan-400" /> Create Alliance</h4>
+                      <div className="space-y-3 text-xs">
+                        <input 
+                          type="text" 
+                          placeholder="ALLIANCE NAME"
+                          value={allianceName}
+                          onChange={(e) => setAllianceName(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-[#0A0F1D] border border-[#1E293B] text-white rounded-xl focus:outline-none focus:border-cyan-500 uppercase font-mono"
+                        />
+                        <input 
+                          type="text" 
+                          placeholder="TAG (max 4 chars)"
+                          maxLength={4}
+                          value={allianceTag}
+                          onChange={(e) => setAllianceTag(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-[#0A0F1D] border border-[#1E293B] text-white rounded-xl focus:outline-none focus:border-cyan-500 uppercase font-mono"
+                        />
+                      </div>
+                      <button 
+                        type="submit"
+                        className="w-full px-4 py-3 bg-gradient-to-r from-pink-900/10 to-pink-500/10 hover:from-pink-900/20 hover:to-pink-500/20 border border-pink-500/40 hover:border-pink-500/60 text-pink-400 hover:text-pink-300 font-bold font-mono tracking-widest text-[10px] uppercase rounded-xl transition cursor-pointer"
+                      >
+                        Create alliance
+                      </button>
+                    </form>
+                  )}
 
-                {/* Join list */}
-                <div className="p-5 bg-[#05070A]/90 rounded-xl border border-[#1E293B] space-y-4 font-mono">
-                  <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-widest"><Users size={12} className="text-yellow-400" /> Join Existing</h4>
-                  <div className="space-y-2.5 max-h-[160px] overflow-y-auto text-xs pr-1">
-                    {rankedState.map((alliance) => {
-                      const alreadyApplied = alliance.applications?.some(a => a.playerId === player.id);
-                      return (
-                        <div key={alliance.id} className="p-2.5 border border-[#1E293B] bg-[#0A0F1D] rounded-xl flex items-center justify-between">
-                          <div>
-                            <span className="font-bold text-yellow-400">[{alliance.tag}]</span>
-                            <span className="text-slate-350 ml-2 font-bold uppercase">{alliance.name}</span>
-                          </div>
-                          {alreadyApplied ? (
-                            <span className="px-3 py-1.5 bg-slate-800 text-slate-400 text-[10px] font-bold font-mono tracking-widest uppercase border border-slate-700 rounded-lg">
-                              Pending Approval 🕒
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                onJoinAlliance(alliance.id);
-                              }}
-                              className="px-3 py-1.5 bg-yellow-600/10 hover:bg-yellow-500/20 text-yellow-400 hover:text-yellow-300 text-[10px] font-bold font-mono tracking-widest uppercase border border-yellow-500/30 rounded-lg cursor-pointer transition duration-150"
-                            >
-                              Apply to Join
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {/* Join list */}
+                  {commsHubLvl < 4 ? (
+                    <div className="p-5 bg-yellow-950/5 rounded-xl border border-yellow-500/10 flex flex-col items-center justify-center text-center space-y-2.5 font-mono">
+                      <Users size={24} className="text-yellow-400 opacity-60 animate-pulse" />
+                      <span className="text-[10px] text-yellow-500 uppercase tracking-widest font-bold">Join Alliance Blocked</span>
+                      <p className="text-slate-400 text-xs">Requires Communications Hub Level 4 to apply/join any galactic alliance coalition (Current: Level {commsHubLvl}).</p>
+                    </div>
+                  ) : (
+                    <div className="p-5 bg-[#05070A]/90 rounded-xl border border-[#1E293B] space-y-4 font-mono">
+                      <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-widest"><Users size={12} className="text-yellow-400" /> Join Existing</h4>
+                      <div className="space-y-2.5 max-h-[160px] overflow-y-auto text-xs pr-1">
+                        {rankedState.map((alliance) => {
+                          const alreadyApplied = alliance.applications?.some(a => a.playerId === player.id);
+                          return (
+                            <div key={alliance.id} className="p-2.5 border border-[#1E293B] bg-[#0A0F1D] rounded-xl flex items-center justify-between">
+                              <div>
+                                <span className="font-bold text-yellow-400">[{alliance.tag}]</span>
+                                <span className="text-slate-350 ml-2 font-bold uppercase">{alliance.name}</span>
+                              </div>
+                              {alreadyApplied ? (
+                                <span className="px-3 py-1.5 bg-slate-800 text-slate-400 text-[10px] font-bold font-mono tracking-widest uppercase border border-slate-700 rounded-lg">
+                                  Pending Approval 🕒
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onJoinAlliance(alliance.id);
+                                  }}
+                                  className="px-3 py-1.5 bg-yellow-600/10 hover:bg-yellow-500/20 text-yellow-400 hover:text-yellow-300 text-[10px] font-bold font-mono tracking-widest uppercase border border-yellow-500/30 rounded-lg cursor-pointer transition duration-150"
+                                >
+                                  Apply to Join
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
             </>
           )}
           </div>
@@ -1701,35 +1723,62 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
             {isCombatOpen && (
               <div className="pt-2 border-t border-white/5 space-y-3">
-                {/* Save/All bookmark filter bar */}
-                <div className="flex gap-2 text-[10px] pb-1">
-                  <button
-                    type="button"
-                    onClick={() => setGalaxyCombatSavedFilter(false)}
-                    className={`flex-1 py-1 px-2.5 font-bold rounded-lg transition-colors border cursor-pointer ${!galaxyCombatSavedFilter ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' : 'bg-slate-950 text-slate-450 border-white/5 hover:text-slate-200'}`}
-                  >
-                    📝 ALL ENCOUNTERS ({battleReports.filter(r => r.isRecon !== true).length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGalaxyCombatSavedFilter(true)}
-                    className={`flex-1 py-1 px-2.5 font-bold rounded-lg transition-colors border cursor-pointer ${galaxyCombatSavedFilter ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-slate-950 text-slate-450 border-white/5 hover:text-slate-200'}`}
-                  >
-                    ⭐ SAVED ({battleReports.filter(r => r.isRecon !== true && savedReports[r.id]).length})
-                  </button>
-                </div>
+                {(() => {
+                  const filtered = battleReports.filter(r => r.isRecon !== true);
+                  return (
+                    /* Category filters (Separating Attacks and Defenses) */
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[9.5px] pb-1">
+                      <button
+                        type="button"
+                        onClick={() => setCombatCategoryFilter('all')}
+                        className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'all' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
+                      >
+                        📝 ALL ({filtered.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCombatCategoryFilter('attack')}
+                        className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'attack' ? 'bg-sky-500/20 text-sky-300 border-sky-500/40' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
+                      >
+                        ⚔️ ATTACKS ({filtered.filter(r => r.attackerId === player.id).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCombatCategoryFilter('defense')}
+                        className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'defense' ? 'bg-rose-500/20 text-rose-350 border-rose-500/40' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
+                      >
+                        🛡️ DEFENSES ({filtered.filter(r => r.defenderId === player.id).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCombatCategoryFilter('saved')}
+                        className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'saved' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
+                      >
+                        ⭐ SAVED ({filtered.filter(r => savedReports[r.id]).length})
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {(() => {
                   const filtered = battleReports.filter(r => r.isRecon !== true);
-                  const resultList = galaxyCombatSavedFilter 
-                    ? filtered.filter(r => savedReports[r.id])
-                    : filtered;
+                  let resultList = filtered;
+                  if (combatCategoryFilter === 'saved') {
+                    resultList = filtered.filter(r => savedReports[r.id]);
+                  } else if (combatCategoryFilter === 'attack') {
+                    resultList = filtered.filter(r => r.attackerId === player.id);
+                  } else if (combatCategoryFilter === 'defense') {
+                    resultList = filtered.filter(r => r.defenderId === player.id);
+                  }
 
                   if (resultList.length === 0) {
                     return (
                       <div className="py-8 border border-dashed border-[#1E293B] text-center rounded-xl">
                         <p className="text-xs text-slate-500 font-mono">
-                          {galaxyCombatSavedFilter ? "No saved entries match your filters." : "No military battle engagements logged in this session."}
+                          {combatCategoryFilter === 'saved' ? "No saved entries match your filters." : 
+                           combatCategoryFilter === 'attack' ? "No offensive attack vectors logged." :
+                           combatCategoryFilter === 'defense' ? "No defensive combat encounters logged." :
+                           "No military battle engagements logged."}
                         </p>
                       </div>
                     );
@@ -2258,11 +2307,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               {(() => {
                                 const reportMines = report.mines || { water: [1], plasma: [1], fuel: [1], food: [1], respirant: [1] };
                                 const categories = {
-                                  water: { name: 'Water Well Pumps', emoji: '💧' },
-                                  plasma: { name: 'Plasma Ion Condensers', emoji: '🔥' },
-                                  fuel: { name: 'Solar Fuel Farms', emoji: '⚡' },
-                                  food: { name: 'Hydroponic Algae Arrays', emoji: '🌾' },
-                                  respirant: { name: 'Respirant Gas Scrubbers', emoji: '🌀' }
+                                  water: { name: 'Water', emoji: '💧' },
+                                  plasma: { name: 'Plasma', emoji: '🔥' },
+                                  fuel: { name: 'Fuel', emoji: '⚡' },
+                                  food: { name: 'Food', emoji: '🌾' },
+                                  respirant: { name: 'Respirant', emoji: '🌀' }
                                 };
                                 return (
                                   <div className="space-y-1.5 border-t border-white/5 pt-3">
@@ -3574,11 +3623,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     {(() => {
                       const reportMines = intelReport.mines || { water: [1], plasma: [1], fuel: [1], food: [1], respirant: [1] };
                       const categories = {
-                        water: { name: 'Water Well Pumps Grid', desc: 'Siphons heavy element liquid aquifers. Vital elements utilized by personnel and rocket fuels.', emoji: '💧' },
-                        plasma: { name: 'Plasma Ion Condensers', desc: 'Synthesizes ionic plasma dust. Essential elements for star shield battery chargers and heavy hulls.', emoji: '🔥' },
-                        fuel: { name: 'Solar Fuel Farms Refineries', desc: 'Synthesizes helium cells. Propels active starships on multi-coordinate deep space missions.', emoji: '⚡' },
-                        food: { name: 'Hydroponics Algae Filters', desc: 'Produces nutrient algae capsules to feed stationed garrisoneers and ship navigators.', emoji: '🌾' },
-                        respirant: { name: 'Atmosphere Respirant Scrubbers', desc: 'Maintains element levels inside star docks so astronauts can survive indefinitely.', emoji: '🌀' }
+                        water: { name: 'Water', desc: 'Siphons heavy element liquid aquifers. Vital elements utilized by personnel and rocket fuels.', emoji: '💧' },
+                        plasma: { name: 'Plasma', desc: 'Synthesizes ionic plasma dust. Essential elements for star shield battery chargers and heavy hulls.', emoji: '🔥' },
+                        fuel: { name: 'Fuel', desc: 'Synthesizes helium cells. Propels active starships on multi-coordinate deep space missions.', emoji: '⚡' },
+                        food: { name: 'Food', desc: 'Produces nutrient algae capsules to feed stationed garrisoneers and ship navigators.', emoji: '🌾' },
+                        respirant: { name: 'Respirant', desc: 'Maintains element levels inside star docks so astronauts can survive indefinitely.', emoji: '🌀' }
                       };
 
                       return (
@@ -3705,7 +3754,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Set Resource Quantities:</span>
               <div className="space-y-1.5 font-mono text-xs">
                 {['water', 'plasma', 'fuel', 'food', 'respirant'].map((resId) => {
-                  const avail = Math.floor(activePlanet.resources[resId as keyof typeof activePlanet.resources] || 0);
+                  const resources = localResources || activePlanet.resources;
+                  const avail = Math.floor(resources[resId as keyof typeof resources] || 0);
                   const val = resourceSendValues[resId] || 0;
 
                   const label = 

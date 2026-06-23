@@ -668,7 +668,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                 {activeTask.id === 1 && (
                   <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-cyan-950/70 to-indigo-950/50 border border-cyan-500/30 text-left">
                     <h4 className="text-xs font-black text-cyan-400 uppercase tracking-widest flex items-center gap-2">
-                      <span>✨ WELCOME CADET COMMANDER!</span>
+                      <span>✨ WELCOME STATION COMMANDER!</span>
                     </h4>
                     <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
                       Rule the stars! We have configured an epic **22-step progress program** to walk you through the core of your empire's assembly lines, science labs, fleet transponders, text DMs, public chat, and outer coordinate expansions. Grab materials and free **Speed Credits** for each task claim!
@@ -708,14 +708,18 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                     </p>
                   </div>
                 ) : (
-                  <div className="p-3.5 rounded-xl bg-[#05070A] border border-[#1E293B]/80 text-[11px] leading-relaxed space-y-1">
-                    <div className="text-slate-400 mb-1">
-                      <span className="text-[10px] uppercase font-bold text-slate-500 block">OBJECTIVE REQUIREMENT:</span>
-                      <span dangerouslySetInnerHTML={{ __html: activeTask.requirementHtml }} />
+                  <div className="p-4 rounded-xl bg-[#05070A] border border-[#1E293B]/80 text-[11.5px] leading-relaxed space-y-3">
+                    <div className="mb-1 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/25">
+                      <span className="text-[10.5px] font-black tracking-wider text-amber-400 block mb-1 uppercase bg-amber-400/10 px-2.5 py-0.5 rounded border border-amber-400/20 w-fit">
+                        🚨 OBJECTIVE REQUIREMENT:
+                      </span>
+                      <span className="font-bold text-white text-xs leading-relaxed" dangerouslySetInnerHTML={{ __html: activeTask.requirementHtml }} />
                     </div>
-                    <div className="text-slate-300">
-                      <span className="text-[10px] uppercase font-bold text-slate-500 block">HINT GUIDE:</span>
-                      <p className="text-slate-400">{activeTask.hint}</p>
+                    <div className="p-2.5 rounded-lg bg-pink-500/5 border border-pink-500/25">
+                      <span className="text-[10.5px] font-black tracking-wider text-pink-400 block mb-1 uppercase bg-pink-400/10 px-2.5 py-0.5 rounded border border-pink-400/20 w-fit">
+                        💡 HINT GUIDE:
+                      </span>
+                      <p className="font-semibold text-slate-200 text-xs leading-relaxed">{activeTask.hint}</p>
                     </div>
                   </div>
                 )}
