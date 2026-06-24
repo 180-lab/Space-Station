@@ -4,10 +4,6 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -60,569 +56,23 @@ function getUpgradeResourceCost(type, key, targetLevel, resKey) {
   return Math.round(baseCost * weights[resKey]);
 }
 
-// src/db/index.ts
-var import_node_postgres = require("drizzle-orm/node-postgres");
-var import_pg = __toESM(require("pg"), 1);
-
-// src/db/schema.ts
-var schema_exports = {};
-__export(schema_exports, {
-  alliances: () => alliances,
-  battleReports: () => battleReports,
-  chatMessages: () => chatMessages,
-  feedbacks: () => feedbacks,
-  fleets: () => fleets,
-  habitablePlanets: () => habitablePlanets,
-  newsEvents: () => newsEvents,
-  planets: () => planets,
-  planetsRelations: () => planetsRelations,
-  players: () => players,
-  playersRelations: () => playersRelations,
-  users: () => users
-});
-var import_pg_core = require("drizzle-orm/pg-core");
-var import_drizzle_orm = require("drizzle-orm");
-var users = (0, import_pg_core.pgTable)("users", {
-  uid: (0, import_pg_core.text)("uid").primaryKey(),
-  email: (0, import_pg_core.text)("email").notNull(),
-  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
-});
-var players = (0, import_pg_core.pgTable)("players", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  username: (0, import_pg_core.text)("username").notNull(),
-  faction: (0, import_pg_core.text)("faction").notNull(),
-  factionColor: (0, import_pg_core.text)("faction_color").notNull(),
-  allianceId: (0, import_pg_core.text)("alliance_id"),
-  allianceRole: (0, import_pg_core.text)("alliance_role"),
-  scores: (0, import_pg_core.jsonb)("scores").notNull(),
-  achievements: (0, import_pg_core.jsonb)("achievements").notNull(),
-  skinId: (0, import_pg_core.text)("skin_id").notNull(),
-  bannerId: (0, import_pg_core.text)("banner_id").notNull(),
-  lastDailyRewardClaim: (0, import_pg_core.bigint)("last_daily_reward_claim", { mode: "number" }).notNull(),
-  credits: (0, import_pg_core.integer)("credits").notNull(),
-  googleEmail: (0, import_pg_core.text)("google_email"),
-  password: (0, import_pg_core.text)("password"),
-  lastActive: (0, import_pg_core.bigint)("last_active", { mode: "number" }),
-  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
-});
-var planets = (0, import_pg_core.pgTable)("planets", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  playerId: (0, import_pg_core.text)("player_id").references(() => players.id, { onDelete: "cascade" }).notNull(),
-  name: (0, import_pg_core.text)("name").notNull(),
-  sectorX: (0, import_pg_core.integer)("sector_x").notNull(),
-  sectorY: (0, import_pg_core.integer)("sector_y").notNull(),
-  skinId: (0, import_pg_core.text)("skin_id").notNull(),
-  mines: (0, import_pg_core.jsonb)("mines").notNull(),
-  buildings: (0, import_pg_core.jsonb)("buildings").notNull(),
-  resources: (0, import_pg_core.jsonb)("resources").notNull(),
-  troops: (0, import_pg_core.jsonb)("troops").notNull(),
-  trainingQueue: (0, import_pg_core.jsonb)("training_queue").notNull(),
-  lastSupplyNexusClaim: (0, import_pg_core.bigint)("last_supply_nexus_claim", { mode: "number" }),
-  upgradeQueue: (0, import_pg_core.jsonb)("upgrade_queue"),
-  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
-});
-var alliances = (0, import_pg_core.pgTable)("alliances", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  name: (0, import_pg_core.text)("name").notNull(),
-  tag: (0, import_pg_core.text)("tag").notNull(),
-  leaderId: (0, import_pg_core.text)("leader_id").notNull(),
-  leaderName: (0, import_pg_core.text)("leader_name").notNull(),
-  members: (0, import_pg_core.jsonb)("members").notNull(),
-  wars: (0, import_pg_core.jsonb)("wars").notNull(),
-  bannerColor: (0, import_pg_core.text)("banner_color").notNull(),
-  bannerSymbol: (0, import_pg_core.text)("banner_symbol").notNull(),
-  highlights: (0, import_pg_core.text)("highlights"),
-  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
-});
-var chatMessages = (0, import_pg_core.pgTable)("chat_messages", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  channel: (0, import_pg_core.text)("channel").notNull(),
-  senderId: (0, import_pg_core.text)("sender_id").notNull(),
-  senderName: (0, import_pg_core.text)("sender_name").notNull(),
-  senderFaction: (0, import_pg_core.text)("sender_faction").notNull(),
-  senderFactionColor: (0, import_pg_core.text)("sender_faction_color").notNull(),
-  allianceTag: (0, import_pg_core.text)("alliance_tag"),
-  receiverId: (0, import_pg_core.text)("receiver_id"),
-  content: (0, import_pg_core.text)("content").notNull(),
-  timestamp: (0, import_pg_core.bigint)("timestamp", { mode: "number" }).notNull()
-});
-var fleets = (0, import_pg_core.pgTable)("fleets", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  senderId: (0, import_pg_core.text)("sender_id").notNull(),
-  senderName: (0, import_pg_core.text)("sender_name").notNull(),
-  senderCoords: (0, import_pg_core.jsonb)("sender_coords").notNull(),
-  targetId: (0, import_pg_core.text)("target_id"),
-  targetName: (0, import_pg_core.text)("target_name").notNull(),
-  targetCoords: (0, import_pg_core.jsonb)("target_coords").notNull(),
-  missionType: (0, import_pg_core.text)("mission_type").notNull(),
-  troops: (0, import_pg_core.jsonb)("troops").notNull(),
-  startedAt: (0, import_pg_core.bigint)("started_at", { mode: "number" }).notNull(),
-  arrivesAt: (0, import_pg_core.bigint)("arrives_at", { mode: "number" }).notNull(),
-  isReturning: (0, import_pg_core.boolean)("is_returning").notNull(),
-  isWaitingToSettle: (0, import_pg_core.boolean)("is_waiting_to_settle"),
-  targetBuilding: (0, import_pg_core.text)("target_building"),
-  lootCarried: (0, import_pg_core.jsonb)("loot_carried"),
-  troopSpeedLevel: (0, import_pg_core.integer)("troop_speed_level"),
-  defenseShieldsLevel: (0, import_pg_core.integer)("defense_shields_level")
-});
-var battleReports = (0, import_pg_core.pgTable)("battle_reports", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  timestamp: (0, import_pg_core.bigint)("timestamp", { mode: "number" }).notNull(),
-  attackerId: (0, import_pg_core.text)("attacker_id").notNull(),
-  attackerName: (0, import_pg_core.text)("attacker_name").notNull(),
-  attackerAlliance: (0, import_pg_core.text)("attacker_alliance"),
-  defenderId: (0, import_pg_core.text)("defender_id").notNull(),
-  defenderName: (0, import_pg_core.text)("defender_name").notNull(),
-  defenderAlliance: (0, import_pg_core.text)("defender_alliance"),
-  isRecon: (0, import_pg_core.boolean)("is_recon"),
-  attackerCoords: (0, import_pg_core.jsonb)("attacker_coords").notNull(),
-  defenderCoords: (0, import_pg_core.jsonb)("defender_coords").notNull(),
-  attackerInitialTroops: (0, import_pg_core.jsonb)("attacker_initial_troops").notNull(),
-  attackerLosses: (0, import_pg_core.jsonb)("attacker_losses").notNull(),
-  defenderInitialTroops: (0, import_pg_core.jsonb)("defender_initial_troops").notNull(),
-  defenderLosses: (0, import_pg_core.jsonb)("defender_losses").notNull(),
-  winner: (0, import_pg_core.text)("winner").notNull(),
-  resourcesStolen: (0, import_pg_core.jsonb)("resources_stolen").notNull(),
-  buildingDamage: (0, import_pg_core.jsonb)("building_damage"),
-  attackHpKilled: (0, import_pg_core.integer)("attack_hp_killed").notNull(),
-  defenceHpKilled: (0, import_pg_core.integer)("defence_hp_killed").notNull(),
-  battleRounds: (0, import_pg_core.jsonb)("battle_rounds"),
-  buildings: (0, import_pg_core.jsonb)("buildings"),
-  mines: (0, import_pg_core.jsonb)("mines"),
-  resources: (0, import_pg_core.jsonb)("resources")
-});
-var newsEvents = (0, import_pg_core.pgTable)("news_events", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  title: (0, import_pg_core.text)("title").notNull(),
-  content: (0, import_pg_core.text)("content").notNull(),
-  type: (0, import_pg_core.text)("type").notNull(),
-  timestamp: (0, import_pg_core.bigint)("timestamp", { mode: "number" }).notNull()
-});
-var habitablePlanets = (0, import_pg_core.pgTable)("habitable_planets", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  name: (0, import_pg_core.text)("name").notNull(),
-  coords: (0, import_pg_core.jsonb)("coords").notNull(),
-  isColonized: (0, import_pg_core.boolean)("is_colonized").notNull()
-});
-var feedbacks = (0, import_pg_core.pgTable)("feedbacks", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  senderId: (0, import_pg_core.text)("sender_id").notNull(),
-  senderName: (0, import_pg_core.text)("sender_name").notNull(),
-  senderEmail: (0, import_pg_core.text)("sender_email").notNull(),
-  content: (0, import_pg_core.text)("content").notNull(),
-  category: (0, import_pg_core.text)("category").notNull(),
-  timestamp: (0, import_pg_core.bigint)("timestamp", { mode: "number" }).notNull()
-});
-var playersRelations = (0, import_drizzle_orm.relations)(players, ({ many }) => ({
-  planets: many(planets)
-}));
-var planetsRelations = (0, import_drizzle_orm.relations)(planets, ({ one }) => ({
-  player: one(players, {
-    fields: [planets.playerId],
-    references: [players.id]
-  })
-}));
-
-// src/db/index.ts
-var { Pool } = import_pg.default;
-var createPool = () => {
-  return new Pool({
-    host: process.env.SQL_HOST,
-    user: process.env.SQL_USER,
-    password: process.env.SQL_PASSWORD,
-    database: process.env.SQL_DB_NAME,
-    connectionTimeoutMillis: 15e3
-  });
-};
-var pool = createPool();
-pool.on("error", (err) => {
-  console.error("Unexpected error on idle SQL pool client:", err);
-});
-var db = (0, import_node_postgres.drizzle)(pool, { schema: schema_exports });
-
-// src/db/state-sync.ts
-async function loadStateFromDB() {
-  const loadedState = {
-    players: {},
-    alliances: {},
-    chatMessages: [],
-    fleets: [],
-    battleReports: [],
-    newsEvents: [],
-    habitablePlanets: [],
-    feedbacks: []
-  };
-  try {
-    const dbPlayers = await db.select().from(players);
-    for (const p of dbPlayers) {
-      const playerProfile = {
-        id: p.id,
-        username: p.username,
-        faction: p.faction,
-        factionColor: p.factionColor,
-        allianceId: p.allianceId || null,
-        allianceRole: p.allianceRole,
-        planets: [],
-        scores: p.scores,
-        achievements: p.achievements,
-        skinId: p.skinId,
-        bannerId: p.bannerId,
-        lastDailyRewardClaim: p.lastDailyRewardClaim,
-        credits: p.credits,
-        googleEmail: p.googleEmail || void 0,
-        password: p.password || void 0,
-        lastActive: p.lastActive || void 0
-      };
-      loadedState.players[p.id] = playerProfile;
-    }
-    const dbPlanPlanets = await db.select().from(planets);
-    for (const pl of dbPlanPlanets) {
-      const colony = {
-        id: pl.id,
-        name: pl.name,
-        sectorX: pl.sectorX,
-        sectorY: pl.sectorY,
-        skinId: pl.skinId,
-        mines: pl.mines,
-        buildings: pl.buildings,
-        resources: pl.resources,
-        troops: pl.troops,
-        trainingQueue: pl.trainingQueue,
-        lastSupplyNexusClaim: pl.lastSupplyNexusClaim || void 0,
-        upgradeQueue: pl.upgradeQueue || void 0
-      };
-      if (loadedState.players[pl.playerId]) {
-        loadedState.players[pl.playerId].planets.push(colony);
-      }
-    }
-    const dbAlliances = await db.select().from(alliances);
-    for (const a of dbAlliances) {
-      const alliance = {
-        id: a.id,
-        name: a.name,
-        tag: a.tag,
-        leaderId: a.leaderId,
-        leaderName: a.leaderName,
-        members: a.members,
-        wars: a.wars,
-        bannerColor: a.bannerColor,
-        bannerSymbol: a.bannerSymbol,
-        highlights: a.highlights || void 0
-      };
-      loadedState.alliances[a.id] = alliance;
-    }
-    const dbChats = await db.select().from(chatMessages);
-    loadedState.chatMessages = dbChats.map((c) => ({
-      id: c.id,
-      channel: c.channel,
-      senderId: c.senderId,
-      senderName: c.senderName,
-      senderFaction: c.senderFaction,
-      senderFactionColor: c.senderFactionColor,
-      allianceTag: c.allianceTag,
-      receiverId: c.receiverId,
-      content: c.content,
-      timestamp: c.timestamp
-    }));
-    const dbFleets = await db.select().from(fleets);
-    loadedState.fleets = dbFleets.map((f) => ({
-      id: f.id,
-      senderId: f.senderId,
-      senderName: f.senderName,
-      senderCoords: f.senderCoords,
-      targetId: f.targetId,
-      targetName: f.targetName,
-      targetCoords: f.targetCoords,
-      missionType: f.missionType,
-      troops: f.troops,
-      startedAt: f.startedAt,
-      arrivesAt: f.arrivesAt,
-      isReturning: f.isReturning,
-      isWaitingToSettle: f.isWaitingToSettle || void 0,
-      targetBuilding: f.targetBuilding || void 0,
-      lootCarried: f.lootCarried || void 0,
-      troopSpeedLevel: f.troopSpeedLevel || void 0,
-      defenseShieldsLevel: f.defenseShieldsLevel || void 0
-    }));
-    const dbReports = await db.select().from(battleReports);
-    loadedState.battleReports = dbReports.map((r) => ({
-      id: r.id,
-      timestamp: r.timestamp,
-      attackerId: r.attackerId,
-      attackerName: r.attackerName,
-      attackerAlliance: r.attackerAlliance || void 0,
-      defenderId: r.defenderId,
-      defenderName: r.defenderName,
-      defenderAlliance: r.defenderAlliance || void 0,
-      isRecon: r.isRecon || void 0,
-      attackerCoords: r.attackerCoords,
-      defenderCoords: r.defenderCoords,
-      attackerInitialTroops: r.attackerInitialTroops,
-      attackerLosses: r.attackerLosses,
-      defenderInitialTroops: r.defenderInitialTroops,
-      defenderLosses: r.defenderLosses,
-      winner: r.winner,
-      resourcesStolen: r.resourcesStolen,
-      buildingDamage: r.buildingDamage || void 0,
-      attackHpKilled: r.attackHpKilled,
-      defenceHpKilled: r.defenceHpKilled,
-      battleRounds: r.battleRounds || void 0,
-      buildings: r.buildings || void 0,
-      mines: r.mines || void 0,
-      resources: r.resources || void 0
-    }));
-    const dbNews = await db.select().from(newsEvents);
-    loadedState.newsEvents = dbNews.map((n) => ({
-      id: n.id,
-      title: n.title,
-      content: n.content,
-      type: n.type,
-      timestamp: n.timestamp
-    }));
-    const dbHabitable = await db.select().from(habitablePlanets);
-    loadedState.habitablePlanets = dbHabitable.map((h) => ({
-      id: h.id,
-      name: h.name,
-      coords: h.coords,
-      isColonized: h.isColonized
-    }));
-    const dbFeedbacks = await db.select().from(feedbacks);
-    loadedState.feedbacks = dbFeedbacks.map((f) => ({
-      id: f.id,
-      senderId: f.senderId,
-      senderName: f.senderName,
-      senderEmail: f.senderEmail,
-      content: f.content,
-      category: f.category,
-      timestamp: f.timestamp
-    }));
-  } catch (error) {
-    console.error("Error loading state from Cloud SQL database:", error);
-    throw error;
-  }
-  return loadedState;
-}
-async function saveStateToDB(state2) {
-  try {
-    for (const a of Object.values(state2.alliances)) {
-      await db.insert(alliances).values({
-        id: a.id,
-        name: a.name,
-        tag: a.tag,
-        leaderId: a.leaderId,
-        leaderName: a.leaderName,
-        members: a.members,
-        wars: a.wars,
-        bannerColor: a.bannerColor,
-        bannerSymbol: a.bannerSymbol,
-        highlights: a.highlights || null
-      }).onConflictDoUpdate({
-        target: alliances.id,
-        set: {
-          name: a.name,
-          tag: a.tag,
-          leaderId: a.leaderId,
-          leaderName: a.leaderName,
-          members: a.members,
-          wars: a.wars,
-          bannerColor: a.bannerColor,
-          bannerSymbol: a.bannerSymbol,
-          highlights: a.highlights || null
-        }
-      });
-    }
-    for (const p of Object.values(state2.players)) {
-      await db.insert(players).values({
-        id: p.id,
-        username: p.username,
-        faction: p.faction,
-        factionColor: p.factionColor,
-        allianceId: p.allianceId || null,
-        allianceRole: p.allianceRole || null,
-        scores: p.scores,
-        achievements: p.achievements,
-        skinId: p.skinId,
-        bannerId: p.bannerId,
-        lastDailyRewardClaim: p.lastDailyRewardClaim,
-        credits: p.credits,
-        googleEmail: p.googleEmail || null,
-        password: p.password || null,
-        lastActive: p.lastActive || null
-      }).onConflictDoUpdate({
-        target: players.id,
-        set: {
-          username: p.username,
-          faction: p.faction,
-          factionColor: p.factionColor,
-          allianceId: p.allianceId || null,
-          allianceRole: p.allianceRole || null,
-          scores: p.scores,
-          achievements: p.achievements,
-          skinId: p.skinId,
-          bannerId: p.bannerId,
-          lastDailyRewardClaim: p.lastDailyRewardClaim,
-          credits: p.credits,
-          googleEmail: p.googleEmail || null,
-          password: p.password || null,
-          lastActive: p.lastActive || null
-        }
-      });
-      if (p.planets) {
-        for (const pl of p.planets) {
-          await db.insert(planets).values({
-            id: pl.id,
-            playerId: p.id,
-            name: pl.name,
-            sectorX: pl.sectorX,
-            sectorY: pl.sectorY,
-            skinId: pl.skinId,
-            mines: pl.mines,
-            buildings: pl.buildings,
-            resources: pl.resources,
-            troops: pl.troops,
-            trainingQueue: pl.trainingQueue,
-            lastSupplyNexusClaim: pl.lastSupplyNexusClaim || null,
-            upgradeQueue: pl.upgradeQueue || null
-          }).onConflictDoUpdate({
-            target: planets.id,
-            set: {
-              name: pl.name,
-              sectorX: pl.sectorX,
-              sectorY: pl.sectorY,
-              skinId: pl.skinId,
-              mines: pl.mines,
-              buildings: pl.buildings,
-              resources: pl.resources,
-              troops: pl.troops,
-              trainingQueue: pl.trainingQueue,
-              lastSupplyNexusClaim: pl.lastSupplyNexusClaim || null,
-              upgradeQueue: pl.upgradeQueue || null
-            }
-          });
-        }
-      }
-    }
-    for (const c of state2.chatMessages) {
-      await db.insert(chatMessages).values({
-        id: c.id,
-        channel: c.channel,
-        senderId: c.senderId,
-        senderName: c.senderName,
-        senderFaction: c.senderFaction,
-        senderFactionColor: c.senderFactionColor,
-        allianceTag: c.allianceTag || null,
-        receiverId: c.receiverId || null,
-        content: c.content,
-        timestamp: c.timestamp
-      }).onConflictDoNothing();
-    }
-    await db.delete(fleets);
-    for (const f of state2.fleets) {
-      await db.insert(fleets).values({
-        id: f.id,
-        senderId: f.senderId,
-        senderName: f.senderName,
-        senderCoords: f.senderCoords,
-        targetId: f.targetId || null,
-        targetName: f.targetName,
-        targetCoords: f.targetCoords,
-        missionType: f.missionType,
-        troops: f.troops,
-        startedAt: f.startedAt,
-        arrivesAt: f.arrivesAt,
-        isReturning: f.isReturning,
-        isWaitingToSettle: f.isWaitingToSettle || false,
-        targetBuilding: f.targetBuilding || null,
-        lootCarried: f.lootCarried || null,
-        troopSpeedLevel: f.troopSpeedLevel || null,
-        defenseShieldsLevel: f.defenseShieldsLevel || null
-      });
-    }
-    for (const r of state2.battleReports) {
-      await db.insert(battleReports).values({
-        id: r.id,
-        timestamp: r.timestamp,
-        attackerId: r.attackerId,
-        attackerName: r.attackerName,
-        attackerAlliance: r.attackerAlliance || null,
-        defenderId: r.defenderId,
-        defenderName: r.defenderName,
-        defenderAlliance: r.defenderAlliance || null,
-        isRecon: r.isRecon || false,
-        attackerCoords: r.attackerCoords,
-        defenderCoords: r.defenderCoords,
-        attackerInitialTroops: r.attackerInitialTroops,
-        attackerLosses: r.attackerLosses,
-        defenderInitialTroops: r.defenderInitialTroops,
-        defenderLosses: r.defenderLosses,
-        winner: r.winner,
-        resourcesStolen: r.resourcesStolen,
-        buildingDamage: r.buildingDamage || null,
-        attackHpKilled: r.attackHpKilled,
-        defenceHpKilled: r.defenceHpKilled,
-        battleRounds: r.battleRounds || null,
-        buildings: r.buildings || null,
-        mines: r.mines || null,
-        resources: r.resources || null
-      }).onConflictDoNothing();
-    }
-    for (const n of state2.newsEvents) {
-      await db.insert(newsEvents).values({
-        id: n.id,
-        title: n.title,
-        content: n.content,
-        type: n.type,
-        timestamp: n.timestamp
-      }).onConflictDoNothing();
-    }
-    if (state2.habitablePlanets) {
-      for (const h of state2.habitablePlanets) {
-        await db.insert(habitablePlanets).values({
-          id: h.id,
-          name: h.name,
-          coords: h.coords,
-          isColonized: h.isColonized
-        }).onConflictDoUpdate({
-          target: habitablePlanets.id,
-          set: {
-            name: h.name,
-            coords: h.coords,
-            isColonized: h.isColonized
-          }
-        });
-      }
-    }
-    if (state2.feedbacks) {
-      for (const f of state2.feedbacks) {
-        await db.insert(feedbacks).values({
-          id: f.id,
-          senderId: f.senderId,
-          senderName: f.senderName,
-          senderEmail: f.senderEmail,
-          content: f.content,
-          category: f.category,
-          timestamp: f.timestamp
-        }).onConflictDoNothing();
-      }
-    }
-  } catch (error) {
-    console.error("Error saving state to Cloud SQL database (non-blocking fallback active):", error);
-  }
-}
-
 // server.ts
 var app = (0, import_express.default)();
-var PORT = process.env.PORT ? parseInt(process.env.PORT) : 3e3;
+var PORT = process.env.NODE_ENV === "production" ? process.env.PORT ? parseInt(process.env.PORT) : 3e3 : 3e3;
+app.use((req, res, next) => {
+  const match = req.url.match(/\/api(\/|$)/);
+  if (match && match.index !== void 0 && match.index > 0) {
+    const rewritten = req.url.substring(match.index);
+    console.log(`[ROUTER AUTO-HEAL] Rewriting proxy subpath: ${req.url} -> ${rewritten}`);
+    req.url = rewritten;
+  }
+  next();
+});
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Expose-Headers", "Content-Type, Content-Length, Authorization, X-Requested-With, x-user-id");
-  const requestHeaders = req.header("access-control-request-headers");
-  if (requestHeaders) {
-    res.setHeader("Access-Control-Allow-Headers", requestHeaders);
-  } else {
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-user-id");
-  }
+  res.setHeader("Access-Control-Expose-Headers", "Content-Type, Content-Length, Authorization, X-Requested-With, x-user-id, X-User-Id");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-user-id, X-User-Id, accept, origin, *");
   if (req.method === "OPTIONS") {
     res.sendStatus(200);
     return;
@@ -654,12 +104,12 @@ var state = {
   ]
 };
 var TROOP_SPECS = {
-  defender: { name: "Interceptor", defenceHp: 18, attackHp: 10, carry: 600, speed: 7, waterConsumption: 0.05 },
-  attacker: { name: "Assault Drone", defenceHp: 9, attackHp: 30, carry: 400, speed: 11.662, waterConsumption: 0.1 },
-  tank: { name: "Disrupter", defenceHp: 5, attackHp: 5, carry: 0, speed: 3.5, waterConsumption: 0.2 },
-  looter: { name: "Matter Extractor", defenceHp: 4, attackHp: 4, carry: 1e3, speed: 23.331, waterConsumption: 0.15 },
-  drone: { name: "Missile Launcher", defenceHp: 120, attackHp: 120, carry: 200, speed: 17.5, waterConsumption: 0.02 },
-  settlementShip: { name: "Settlement Ship", defenceHp: 50, attackHp: 0, carry: 5e3, speed: 4.662, waterConsumption: 0.25 }
+  defender: { name: "Interceptor", defenceHp: 18, attackHp: 10, carry: 600, speed: 7, waterConsumption: 1 },
+  attacker: { name: "Assault Drone", defenceHp: 9, attackHp: 30, carry: 400, speed: 11.662, waterConsumption: 2 },
+  tank: { name: "Disrupter", defenceHp: 5, attackHp: 5, carry: 0, speed: 3.5, waterConsumption: 4 },
+  looter: { name: "Matter Extractor", defenceHp: 4, attackHp: 4, carry: 1e3, speed: 23.331, waterConsumption: 3 },
+  drone: { name: "Missile Launcher", defenceHp: 120, attackHp: 120, carry: 200, speed: 17.5, waterConsumption: 0.4 },
+  settlementShip: { name: "Settlement Ship", defenceHp: 50, attackHp: 0, carry: 5e3, speed: 4.662, waterConsumption: 5 }
 };
 function getRepositoryCapacity(level) {
   if (level <= 1) return 1e4;
@@ -667,7 +117,7 @@ function getRepositoryCapacity(level) {
   return Math.round(1e4 * Math.pow(5e6 / 1e4, (level - 1) / 44));
 }
 function getMineProductionPerHour(level, type) {
-  if (level <= 0) return 100;
+  if (level <= 0) return 0;
   if (type === "water") {
     return Math.round(level / 15 * 14e3);
   }
@@ -680,23 +130,132 @@ function saveState() {
   } catch (err) {
     console.error("Failed to save state", err);
   }
-  saveStateToDB(state).catch((err) => {
-    console.error("Failed async Cloud SQL save session:", err);
+}
+function normalizeState(s) {
+  if (!s) return;
+  ensureMinimumHabitablePlanets();
+  if (!s.players) s.players = {};
+  if (!s.alliances) s.alliances = {};
+  if (!s.chatMessages) s.chatMessages = [];
+  if (!s.fleets) s.fleets = [];
+  if (!s.battleReports) s.battleReports = [];
+  if (!s.newsEvents) s.newsEvents = [];
+  if (!s.feedbacks) s.feedbacks = [];
+  Object.values(s.players).forEach((p) => {
+    if (!p) return;
+    if (!p.scores) {
+      p.scores = { population: 100, attack: 0, defence: 0, raiders: 0 };
+    }
+    if (!p.achievements) {
+      p.achievements = [];
+    }
+    if (!p.commandMessages) {
+      p.commandMessages = [];
+    }
+    if (!p.credits || p.credits < 1e4) {
+      p.credits = 1e4;
+    }
+    if (!Array.isArray(p.planets)) {
+      p.planets = [];
+    }
+    p.planets.forEach((pl, plIdx) => {
+      if (!pl) return;
+      if (pl.name && typeof pl.name === "string" && pl.name.includes("Outpost")) {
+        pl.name = pl.name.replace(/Outpost/g, "Station");
+      }
+      const isFirst = plIdx === 0;
+      if (!pl.troops) pl.troops = {};
+      const troopDefaults = {
+        defender: isFirst ? 12500 : 0,
+        attacker: isFirst ? 28600 : 0,
+        tank: isFirst ? 100 : 0,
+        looter: isFirst ? 1e3 : 0,
+        drone: isFirst ? 100 : 0,
+        settlementShip: 0
+      };
+      Object.keys(troopDefaults).forEach((tKey) => {
+        if (pl.troops[tKey] === void 0 || !isFirst) {
+          pl.troops[tKey] = troopDefaults[tKey];
+        }
+      });
+      if (!pl.trainingQueue) {
+        pl.trainingQueue = [];
+      }
+      if (!pl.upgradeQueue) {
+        pl.upgradeQueue = [];
+      }
+      if (!pl.buildings) pl.buildings = {};
+      const buildingDefaults = {
+        fabricator: { level: isFirst ? 10 : 0, maxLevel: 10 },
+        commsHub: { level: isFirst ? 5 : 0, maxLevel: 5 },
+        researchCenter: { level: isFirst ? 20 : 0, maxLevel: 20 },
+        armyBase: { level: isFirst ? 22 : 0, maxLevel: 22 },
+        repository: { level: isFirst ? 45 : 0, maxLevel: 45 },
+        radar: { level: isFirst ? 15 : 0, maxLevel: 15 },
+        supplyNexus: { level: isFirst ? 50 : 0, maxLevel: 50 }
+      };
+      Object.entries(buildingDefaults).forEach(([bKey, bDef]) => {
+        const defaultLvl = bDef.level;
+        if (!pl.buildings[bKey]) {
+          pl.buildings[bKey] = {
+            level: defaultLvl,
+            maxLevel: bDef.maxLevel,
+            isUpgrading: false,
+            upgradeEnd: null,
+            health: 100
+          };
+        } else {
+          if (isFirst) {
+            pl.buildings[bKey].level = bDef.maxLevel;
+          } else if (pl.buildings[bKey].level === 1 && (bKey === "fabricator" || bKey === "commsHub" || bKey === "repository")) {
+            pl.buildings[bKey].level = 0;
+          }
+          const bObj = pl.buildings[bKey];
+          if (bObj.level === void 0) bObj.level = defaultLvl;
+          bObj.maxLevel = bDef.maxLevel;
+          if (bObj.level > bDef.maxLevel) bObj.level = bDef.maxLevel;
+          if (bObj.isUpgrading === void 0) bObj.isUpgrading = false;
+          if (bObj.upgradeEnd === void 0) bObj.upgradeEnd = null;
+          if (bObj.health === void 0) bObj.health = 100;
+        }
+      });
+      if (!pl.mines) pl.mines = {};
+      const mineKeys = ["water", "plasma", "fuel", "food", "respirant"];
+      const mineCounts = { water: 6, plasma: 3, fuel: 3, food: 3, respirant: 3 };
+      mineKeys.forEach((mKey) => {
+        const count = mineCounts[mKey];
+        if (!pl.mines[mKey]) {
+          pl.mines[mKey] = Array.from({ length: count }, (_, i) => ({
+            index: i,
+            level: isFirst ? 25 : 0,
+            isUpgrading: false,
+            upgradeEnd: null,
+            health: 100
+          }));
+        } else {
+          pl.mines[mKey].forEach((mine) => {
+            if (isFirst) {
+              mine.level = 25;
+            } else if (mine.level === void 0 || mine.level === 1) {
+              mine.level = 0;
+            }
+            if (mine.isUpgrading === void 0) mine.isUpgrading = false;
+            if (mine.upgradeEnd === void 0) mine.upgradeEnd = null;
+            if (mine.health === void 0) mine.health = 100;
+          });
+        }
+      });
+      if (isFirst) {
+        if (pl.resources.water < 5e6) pl.resources.water = 5e6;
+        if (pl.resources.plasma < 5e6) pl.resources.plasma = 5e6;
+        if (pl.resources.fuel < 5e6) pl.resources.fuel = 5e6;
+        if (pl.resources.food < 5e6) pl.resources.food = 5e6;
+        if (pl.resources.respirant < 5e6) pl.resources.respirant = 5e6;
+      }
+    });
   });
 }
 async function loadState() {
-  try {
-    console.log("Attempting to restore active state from Cloud SQL...");
-    const dbState = await loadStateFromDB();
-    if (dbState && Object.keys(dbState.players).length > 0) {
-      state = dbState;
-      console.log("Successfully restored active state from Cloud SQL! Players count:", Object.keys(state.players).length);
-      return;
-    }
-    console.log("Cloud SQL database is empty. Fallback seeding...");
-  } catch (err) {
-    console.error("Cloud SQL load failed, preparing backup files restore...", err);
-  }
   try {
     if (import_fs.default.existsSync(STATE_FILE)) {
       const data = import_fs.default.readFileSync(STATE_FILE, "utf8");
@@ -715,11 +274,11 @@ async function loadState() {
                 if (pl.troops.settlementShip === void 0) {
                   pl.troops.settlementShip = 0;
                 }
-                pl.troops.defender = 12500;
-                pl.troops.attacker = 28600;
-                pl.troops.tank = 100;
-                pl.troops.looter = 1e3;
-                pl.troops.drone = 100;
+                if (pl.troops.defender === void 0) pl.troops.defender = 0;
+                if (pl.troops.attacker === void 0) pl.troops.attacker = 0;
+                if (pl.troops.tank === void 0) pl.troops.tank = 0;
+                if (pl.troops.looter === void 0) pl.troops.looter = 0;
+                if (pl.troops.drone === void 0) pl.troops.drone = 0;
               }
               if (pl && !pl.trainingQueue) {
                 pl.trainingQueue = [];
@@ -727,6 +286,9 @@ async function loadState() {
               if (pl && pl.buildings) {
                 if (!pl.buildings.supplyNexus) {
                   pl.buildings.supplyNexus = { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null };
+                }
+                if (!pl.buildings.fabricator) {
+                  pl.buildings.fabricator = { level: 1, maxLevel: 10, isUpgrading: false, upgradeEnd: null, health: 100 };
                 }
               }
             });
@@ -749,24 +311,27 @@ async function loadState() {
           { id: "hab_40_40", name: "Habitable Station Midway", coords: { x: 40, y: 40 }, isColonized: false }
         ];
       }
+      normalizeState(state);
       saveState();
       console.log("backup state loaded successfully. Players count:", Object.keys(state.players).length);
     } else {
       console.log("No existing state file found. Bootstrapping universe...");
       bootstrapUniverse();
+      normalizeState(state);
       saveState();
     }
   } catch (err) {
     console.error("Failed to load state", err);
     bootstrapUniverse();
+    normalizeState(state);
     saveState();
   }
 }
-function createInitialPlanet(name, sectorX, sectorY) {
+function createInitialPlanet(name, sectorX, sectorY, isFirstStation = false) {
   const createMines = (count) => {
     return Array.from({ length: count }, (_, i) => ({
       index: i,
-      level: 1,
+      level: isFirstStation ? 25 : 0,
       isUpgrading: false,
       upgradeEnd: null,
       health: 100
@@ -786,26 +351,27 @@ function createInitialPlanet(name, sectorX, sectorY) {
       respirant: createMines(3)
     },
     buildings: {
-      commsHub: { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 },
-      researchCenter: { level: 1, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
-      armyBase: { level: 1, maxLevel: 30, isUpgrading: false, upgradeEnd: null, health: 100 },
-      repository: { level: 1, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
-      radar: { level: 1, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
-      supplyNexus: { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 }
+      fabricator: { level: isFirstStation ? 10 : 0, maxLevel: 10, isUpgrading: false, upgradeEnd: null, health: 100 },
+      commsHub: { level: isFirstStation ? 5 : 0, maxLevel: 5, isUpgrading: false, upgradeEnd: null, health: 100 },
+      researchCenter: { level: isFirstStation ? 20 : 0, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
+      armyBase: { level: isFirstStation ? 22 : 0, maxLevel: 22, isUpgrading: false, upgradeEnd: null, health: 100 },
+      repository: { level: isFirstStation ? 45 : 0, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
+      radar: { level: isFirstStation ? 15 : 0, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
+      supplyNexus: { level: isFirstStation ? 50 : 0, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 }
     },
     resources: {
-      water: 5e3,
-      plasma: 5e3,
-      fuel: 5e3,
-      food: 5e3,
-      respirant: 5e3
+      water: isFirstStation ? 5e6 : 5e3,
+      plasma: isFirstStation ? 5e6 : 5e3,
+      fuel: isFirstStation ? 5e6 : 5e3,
+      food: isFirstStation ? 5e6 : 5e3,
+      respirant: isFirstStation ? 5e6 : 5e3
     },
     troops: {
-      defender: 12500,
-      attacker: 28600,
-      tank: 100,
-      looter: 1e3,
-      drone: 100,
+      defender: isFirstStation ? 12500 : 0,
+      attacker: isFirstStation ? 28600 : 0,
+      tank: isFirstStation ? 100 : 0,
+      looter: isFirstStation ? 1e3 : 0,
+      drone: isFirstStation ? 100 : 0,
       settlementShip: 0
     },
     trainingQueue: []
@@ -854,7 +420,7 @@ function applyBomberDamage(defPlanet, numTanks, chosenTarget) {
     if (computedHealth > 0) {
       targetState.health = computedHealth;
       buildingDamageReports.push({
-        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Repository" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName,
+        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName,
         levelsDestroyed: 0,
         previousLevel: prevLvl,
         newLevel: prevLvl
@@ -869,7 +435,7 @@ function applyBomberDamage(defPlanet, numTanks, chosenTarget) {
       const newHealth = newLvl === 1 ? Math.max(0, 100 - remainingDamage) : 100 - remainingDamage;
       targetState.health = newHealth;
       buildingDamageReports.push({
-        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Repository" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName,
+        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName,
         levelsDestroyed: levelsLost,
         previousLevel: prevLvl,
         newLevel: newLvl
@@ -877,6 +443,76 @@ function applyBomberDamage(defPlanet, numTanks, chosenTarget) {
     }
   }
   return buildingDamageReports;
+}
+function ensureMinimumHabitablePlanets() {
+  if (!state.habitablePlanets) {
+    state.habitablePlanets = [];
+  }
+  const uncolonized = state.habitablePlanets.filter((p) => !p.isColonized);
+  if (uncolonized.length >= 20) return;
+  const countNeeded = 20 - uncolonized.length;
+  const namesPool = [
+    "Gaia Aurelia",
+    "Kepler-Prime",
+    "Gliese-91",
+    "New Hope",
+    "Epsilon-D",
+    "Zephyr-9",
+    "Arcadia",
+    "Core Dome-A",
+    "Oasis-1",
+    "Eden-X",
+    "Genesis",
+    "Midway",
+    "Vanguard Outpost",
+    "Nova Sol",
+    "Horizon Delta",
+    "Apex Hub",
+    "Thera Prime",
+    "Verdant Reach",
+    "Seraphim V",
+    "Titan Alpha",
+    "Nexus Beta",
+    "Elysium VI",
+    "Hyperion",
+    "Astraea",
+    "Polaris Junction",
+    "Chronos III",
+    "Solaris Sector",
+    "Sentinel Dome",
+    "Obsidian Station",
+    "Olympus Basin"
+  ];
+  for (let i = 0; i < countNeeded; i++) {
+    let foundCoords = false;
+    let targetX = 0;
+    let targetY = 0;
+    let attempts = 0;
+    while (!foundCoords && attempts < 200) {
+      attempts++;
+      targetX = Math.floor(Math.random() * 90) + 5;
+      targetY = Math.floor(Math.random() * 90) + 5;
+      const overlapHabitable = state.habitablePlanets.some((hp) => hp.coords.x === targetX && hp.coords.y === targetY);
+      if (overlapHabitable) continue;
+      let overlapPlayer = false;
+      for (const player of Object.values(state.players)) {
+        if (player.planets && player.planets.some((pl) => pl.sectorX === targetX && pl.sectorY === targetY)) {
+          overlapPlayer = true;
+          break;
+        }
+      }
+      if (overlapPlayer) continue;
+      foundCoords = true;
+    }
+    const name = "Habitable " + namesPool[Math.floor(Math.random() * namesPool.length)];
+    const id = `hab_${targetX}_${targetY}`;
+    state.habitablePlanets.push({
+      id,
+      name,
+      coords: { x: targetX, y: targetY },
+      isColonized: false
+    });
+  }
 }
 function bootstrapUniverse() {
   state.players = {};
@@ -1000,6 +636,7 @@ function bootstrapUniverse() {
     type: "war",
     timestamp: Date.now() - 36e5
   });
+  ensureMinimumHabitablePlanets();
   saveState();
 }
 function tickPlayerState(playerId, now) {
@@ -1050,8 +687,8 @@ function tickPlayerState(playerId, now) {
         });
       }
       const waterConsumed = waterConsumptionPerHour * deltaHours;
-      const respirantConsumed = waterConsumptionPerHour * 0.4 * deltaHours;
-      const foodConsumed = waterConsumptionPerHour * 0.15 * deltaHours;
+      const respirantConsumed = waterConsumptionPerHour * 0.28 * deltaHours;
+      const foodConsumed = waterConsumptionPerHour * 0.18 * deltaHours;
       planet.resources.water = planet.resources.water - waterConsumed;
       planet.resources.respirant = planet.resources.respirant - respirantConsumed;
       planet.resources.food = planet.resources.food - foodConsumed;
@@ -1069,8 +706,8 @@ function tickPlayerState(playerId, now) {
         });
       }
       const netWaterProdHourly = hourlyMinesProd.water - waterConsumptionPerHour;
-      const netRespirantProdHourly = hourlyMinesProd.respirant - waterConsumptionPerHour * 0.4;
-      const netFoodProdHourly = hourlyMinesProd.food - waterConsumptionPerHour * 0.15;
+      const netRespirantProdHourly = hourlyMinesProd.respirant - waterConsumptionPerHour * 0.28;
+      const netFoodProdHourly = hourlyMinesProd.food - waterConsumptionPerHour * 0.18;
       const isAnyProdNegative = netWaterProdHourly < 0 || netRespirantProdHourly < 0 || netFoodProdHourly < 0;
       if (netWaterProdHourly < 0) {
         planet.resources.water = Math.min(storageLimit, planet.resources.water);
@@ -1500,6 +1137,25 @@ function simulateMoonbaseCombat(attackerName, defenderName, attTroops, defTroops
       rounds[rounds.length - 1].logs.push(...salvageLogs);
     }
   }
+  if (initialAttHp > 1.5 * initialDefHp && initialDefHp > 0) {
+    Object.entries(defTroops).forEach(([tId, count]) => {
+      defRemaining[tId] = 0;
+      defenderLosses[tId] = count;
+    });
+    defenceHpKilled = initialDefHp;
+    if (rounds.length > 0) {
+      rounds[rounds.length - 1].logs.push(`\u{1F4A5} [TACTICAL OVERWHELM] Attacker's initial force HP of ${initialAttHp.toLocaleString()} exceeded 150% of the defender's total involved HP (${initialDefHp.toLocaleString()}). Absolute overwhelm triggered; all defender defending forces have been wiped out with ZERO survivors!`);
+    }
+  } else if (initialDefHp > 1.5 * initialAttHp && initialAttHp > 0) {
+    Object.entries(attTroops).forEach(([tId, count]) => {
+      attRemaining[tId] = 0;
+      attackerLosses[tId] = count;
+    });
+    attackHpKilled = initialAttHp;
+    if (rounds.length > 0) {
+      rounds[rounds.length - 1].logs.push(`\u{1F4A5} [TACTICAL OVERWHELM] Defender's initial force HP of ${initialDefHp.toLocaleString()} exceeded 150% of the attacker's total involved HP (${initialAttHp.toLocaleString()}). Absolute overwhelm triggered; all attacking squadron forces have been wiped out with ZERO survivors!`);
+    }
+  }
   const finalAttCount = Object.values(attRemaining).reduce((s, v) => s + v, 0);
   const finalDefCount = Object.values(defRemaining).reduce((s, v) => s + v, 0);
   const finalAttHp = Object.entries(attRemaining).reduce((sum, [tId, qty]) => {
@@ -1513,12 +1169,20 @@ function simulateMoonbaseCombat(attackerName, defenderName, attTroops, defTroops
     return sum + qty * Math.round(totalUnitHP * defMult);
   }, 0);
   let winner = "defender";
-  if (finalAttHp > finalDefHp) {
+  if (finalAttCount === 0 && finalDefCount > 0) {
+    winner = "defender";
+  } else if (finalDefCount === 0 && finalAttCount > 0) {
     winner = "attacker";
-  } else if (finalAttHp < finalDefHp) {
+  } else if (finalAttCount === 0 && finalDefCount === 0) {
     winner = "defender";
   } else {
-    winner = finalAttCount >= finalDefCount ? "attacker" : "defender";
+    if (finalAttHp > finalDefHp) {
+      winner = "attacker";
+    } else if (finalAttHp < finalDefHp) {
+      winner = "defender";
+    } else {
+      winner = finalAttCount >= finalDefCount ? "attacker" : "defender";
+    }
   }
   return {
     winner,
@@ -1580,7 +1244,20 @@ function resolveFleetMission(fleet, now, remainingFleets) {
   const defender = fleet.targetId ? state.players[fleet.targetId] : null;
   if (fleet.missionType === "move") {
     if (attacker) {
-      const targetPlanet = attacker.planets.find((pl) => pl.sectorX === fleet.targetCoords.x && pl.sectorY === fleet.targetCoords.y);
+      let targetPlanet = attacker.planets.find((pl) => pl.sectorX === fleet.targetCoords.x && pl.sectorY === fleet.targetCoords.y);
+      let targetOwner = attacker;
+      if (!targetPlanet && attacker.allianceId) {
+        for (const playerObj of Object.values(state.players)) {
+          if (playerObj.allianceId === attacker.allianceId) {
+            const pl = playerObj.planets.find((p) => p.sectorX === fleet.targetCoords.x && p.sectorY === fleet.targetCoords.y);
+            if (pl) {
+              targetPlanet = pl;
+              targetOwner = playerObj;
+              break;
+            }
+          }
+        }
+      }
       if (targetPlanet) {
         Object.entries(fleet.troops).forEach(([tId, count]) => {
           targetPlanet.troops[tId] = (targetPlanet.troops[tId] || 0) + count;
@@ -1590,7 +1267,7 @@ function resolveFleetMission(fleet, now, remainingFleets) {
           timestamp: now,
           attackerId: fleet.senderId,
           attackerName: fleet.senderName,
-          defenderId: fleet.senderId,
+          defenderId: targetOwner.id,
           defenderName: targetPlanet.name,
           isRecon: false,
           attackerCoords: fleet.senderCoords,
@@ -1870,34 +1547,13 @@ function resolveFleetMission(fleet, now, remainingFleets) {
   }
 }
 function runAISimulatedActivity(now) {
-  const players2 = Object.values(state.players).filter((p) => p.id.startsWith("ai_"));
-  if (players2.length === 0) return;
-  const luckyAI = players2[Math.floor(Math.random() * players2.length)];
+  const players = Object.values(state.players).filter((p) => p.id.startsWith("ai_"));
+  if (players.length === 0) return;
+  const luckyAI = players[Math.floor(Math.random() * players.length)];
   const actionType = Math.random();
   if (actionType < 0.25) {
-    const banter = [
-      "Securing boundaries in sector " + luckyAI.planets[0].sectorX + ", peace is a planetary illusion.",
-      "Any active alliance looking for a strong merger? VOID is recruiting officers.",
-      "Just upgraded my research center! The speed of light is no longer a restriction.",
-      "Scouting for coordinates coordinates. Watch your back!",
-      "Water consumption is getting tight, need to construct more water pumps!"
-    ];
-    const message = {
-      id: `chat_${Math.random().toString(36).substr(2, 9)}`,
-      channel: "global",
-      senderId: luckyAI.id,
-      senderName: luckyAI.username,
-      senderFaction: luckyAI.faction,
-      senderFactionColor: luckyAI.factionColor,
-      allianceTag: luckyAI.allianceId ? state.alliances[luckyAI.allianceId]?.tag : null,
-      receiverId: null,
-      content: banter[Math.floor(Math.random() * banter.length)],
-      timestamp: now
-    };
-    state.chatMessages.push(message);
-    if (state.chatMessages.length > 100) state.chatMessages.shift();
   } else if (actionType < 0.45) {
-    const defender = players2[Math.floor(Math.random() * players2.length)];
+    const defender = players[Math.floor(Math.random() * players.length)];
     if (defender && defender.id !== luckyAI.id) {
       const p = luckyAI.planets[0];
       const targetP = defender.planets[0];
@@ -1952,6 +1608,8 @@ function runAISimulatedActivity(now) {
 }
 loadState().then(() => {
   console.log("Game Engine database/file systems synced and initialized!");
+}).catch((err) => {
+  console.error("Game Engine CRITICAL sync error on startup:", err);
 });
 setInterval(() => {
   const now = Date.now();
@@ -1989,23 +1647,12 @@ app.post("/api/register", (req, res) => {
   const id = `user_${Math.random().toString(36).substr(2, 9)}`;
   const startX = Math.floor(Math.random() * 90) + 5;
   const startY = Math.floor(Math.random() * 90) + 5;
-  const planet = createInitialPlanet(`${username}'s Station`, startX, startY);
-  planet.buildings.commsHub.level = planet.buildings.commsHub.maxLevel;
-  planet.buildings.researchCenter.level = planet.buildings.researchCenter.maxLevel;
-  planet.buildings.armyBase.level = planet.buildings.armyBase.maxLevel;
-  planet.buildings.repository.level = planet.buildings.repository.maxLevel;
-  planet.buildings.radar.level = planet.buildings.radar.maxLevel;
-  planet.buildings.supplyNexus.level = planet.buildings.supplyNexus.maxLevel;
-  for (const key of Object.keys(planet.mines)) {
-    planet.mines[key].forEach((m) => m.level = 25);
-  }
-  const maxCap = getRepositoryCapacity(planet.buildings.repository.level);
-  planet.resources.water = maxCap;
-  planet.resources.plasma = maxCap;
-  planet.resources.fuel = maxCap;
-  planet.resources.food = maxCap;
-  planet.resources.respirant = maxCap;
-  planet.troops.settlementShip = 1;
+  const planet = createInitialPlanet(`${username}'s Station`, startX, startY, true);
+  planet.resources.water = 5e6;
+  planet.resources.plasma = 5e6;
+  planet.resources.fuel = 5e6;
+  planet.resources.food = 5e6;
+  planet.resources.respirant = 5e6;
   const newPlayer = {
     id,
     username,
@@ -2091,23 +1738,12 @@ app.post("/api/auth/google", (req, res) => {
   const startX = Math.floor(Math.random() * 90) + 5;
   const startY = Math.floor(Math.random() * 90) + 5;
   const defaultUsername = username || email.split("@")[0];
-  const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY);
-  planet.buildings.commsHub.level = planet.buildings.commsHub.maxLevel;
-  planet.buildings.researchCenter.level = planet.buildings.researchCenter.maxLevel;
-  planet.buildings.armyBase.level = planet.buildings.armyBase.maxLevel;
-  planet.buildings.repository.level = planet.buildings.repository.maxLevel;
-  planet.buildings.radar.level = planet.buildings.radar.maxLevel;
-  planet.buildings.supplyNexus.level = planet.buildings.supplyNexus.maxLevel;
-  for (const key of Object.keys(planet.mines)) {
-    planet.mines[key].forEach((m) => m.level = 25);
-  }
-  const maxCap = getRepositoryCapacity(planet.buildings.repository.level);
-  planet.resources.water = maxCap;
-  planet.resources.plasma = maxCap;
-  planet.resources.fuel = maxCap;
-  planet.resources.food = maxCap;
-  planet.resources.respirant = maxCap;
-  planet.troops.settlementShip = 1;
+  const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY, true);
+  planet.resources.water = 5e6;
+  planet.resources.plasma = 5e6;
+  planet.resources.fuel = 5e6;
+  planet.resources.food = 5e6;
+  planet.resources.respirant = 5e6;
   const newPlayer = {
     id,
     username: defaultUsername,
@@ -2171,6 +1807,11 @@ app.post("/api/player/link-google", (req, res) => {
   res.json({ player: p, success: true });
 });
 app.post("/api/dev/reset-universe", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.googleEmail || p.googleEmail.toLowerCase() !== "banele180@gmail.com") {
+    return res.status(403).json({ error: "Access Denied: Server reset is only permitted for the system administrator." });
+  }
   bootstrapUniverse();
   saveState();
   res.json({ success: true, message: "Universe successfully reset to initial clean data!" });
@@ -2198,6 +1839,7 @@ app.get("/api/state", (req, res) => {
     scores: pl.scores || { population: 0, attack: 0, defence: 0, raiders: 0 },
     achievements: pl.achievements || [],
     planetsCount: pl.planets?.length || 1,
+    planets: (pl.planets || []).map((plt) => ({ id: plt.id, name: plt.name, sectorX: plt.sectorX, sectorY: plt.sectorY })),
     lastActive: pl.lastActive || now - 6e5
   }));
   const relevantFleets = state.fleets.filter((f) => {
@@ -2226,6 +1868,10 @@ app.post("/api/upgrade/mine", (req, res) => {
   const { planetId, resType, mineIndex, queue: reqQueue } = req.body;
   const planet = p.planets.find((pl) => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
+  const fab = planet.buildings.fabricator;
+  if (!fab || fab.level < 1) {
+    return res.status(400).json({ error: "A Fabricator level 1 or higher is required to construct or upgrade resource extractors." });
+  }
   const mines = planet.mines[resType];
   if (!mines || !mines[mineIndex]) return res.status(404).json({ error: "Mine not found" });
   const mine = mines[mineIndex];
@@ -2358,6 +2004,28 @@ app.post("/api/upgrade/building", (req, res) => {
   if (!planet) return res.status(404).json({ error: "Planet not found" });
   const building = planet.buildings[buildingKey];
   if (!building) return res.status(404).json({ error: "Building not found" });
+  if (buildingKey !== "fabricator" && buildingKey !== "commsHub" && buildingKey !== "repository") {
+    const fab = planet.buildings.fabricator;
+    if (!fab || fab.level < 1) {
+      return res.status(400).json({ error: "A Fabricator level 1 or higher is required to construct or upgrade other modular structures." });
+    }
+  }
+  const isSecondaryBase = p.planets[0]?.id !== planet.id;
+  if (isSecondaryBase && building.level === 0) {
+    const fabLevel = planet.buildings.fabricator?.level || 0;
+    if (buildingKey === "radar" && fabLevel < 2) {
+      return res.status(400).json({ error: "A Fabricator level 2 or higher is required to construct your Radar Array on this secondary station!" });
+    }
+    if (buildingKey === "researchCenter" && fabLevel < 4) {
+      return res.status(400).json({ error: "A Fabricator level 4 or higher is required to construct your Research Center on this secondary station!" });
+    }
+    if (buildingKey === "armyBase" && fabLevel < 7) {
+      return res.status(400).json({ error: "A Fabricator level 7 or higher is required to construct your War Room on this secondary station!" });
+    }
+    if (buildingKey === "supplyNexus" && fabLevel < 10) {
+      return res.status(400).json({ error: "A Fabricator level 10 or higher is required to construct your Supply Nexus on this secondary station!" });
+    }
+  }
   const isBuildingUpgrading = Object.values(planet.buildings).some((b) => b.isUpgrading);
   let isMineUpgrading = false;
   for (const rKey of Object.keys(planet.mines)) {
@@ -2502,7 +2170,30 @@ app.post("/api/train/troop", (req, res) => {
   if (!specs) return res.status(404).json({ error: "Troop spec not found" });
   const count = parseInt(quantity, 10);
   if (isNaN(count) || count <= 0) return res.status(400).json({ error: "Invalid quantity" });
+  const armyBaseLevel = planet.buildings.armyBase?.level || 0;
+  const troopLevelLocks = {
+    defender: 3,
+    // Interceptor
+    drone: 6,
+    // Missile Launcher
+    attacker: 10,
+    // Assault Drone
+    looter: 15,
+    // Matter Extractor
+    tank: 19,
+    // Disrupter
+    settlementShip: 1
+    // Settlement Ship
+  };
+  const requiredLevel = troopLevelLocks[troopId];
+  if (requiredLevel !== void 0 && armyBaseLevel < requiredLevel) {
+    return res.status(400).json({ error: `Requires War Room Level ${requiredLevel} (Your Level: ${armyBaseLevel}) to produce ${specs.name}!` });
+  }
   if (troopId === "settlementShip") {
+    const hasActiveBaseLevel1 = (planet.buildings.armyBase?.level || 0) >= 1;
+    if (!hasActiveBaseLevel1) {
+      return res.status(400).json({ error: "To build a Settlement Ship, this base's War Room (Army Base) must be upgraded to Level 1!" });
+    }
     if (count > 1) {
       return res.status(400).json({ error: "You can only construct one Settlement Ship at a time!" });
     }
@@ -2659,6 +2350,7 @@ app.post("/api/galaxy/intelligence", (req, res) => {
       type: "occupied",
       planetName: targetPlanet.name,
       commander: targetUser.username,
+      commanderId: targetUser.id,
       faction: targetUser.faction,
       coords: { x: xVal, y: yVal },
       scores: targetUser.scores,
@@ -2678,7 +2370,8 @@ app.post("/api/galaxy/intelligence", (req, res) => {
         respirant: targetPlanet.mines?.respirant?.map((m) => m.level) || []
       },
       troops: targetPlanet.troops,
-      resources: targetPlanet.resources
+      resources: targetPlanet.resources,
+      lastActive: targetUser.lastActive || now - 6e5
     };
   } else {
     if (isHab) {
@@ -2703,6 +2396,7 @@ app.post("/api/galaxy/intelligence", (req, res) => {
     attackerName: p.username,
     defenderId: targetUser ? targetUser.id : "unknown",
     defenderName: targetPlanet ? targetPlanet.name : isHab ? isHab.name : "Deep Space Void",
+    defenderLastActive: targetUser ? targetUser.lastActive : void 0,
     isRecon: true,
     attackerCoords: p.planets[0] ? { x: p.planets[0].sectorX, y: p.planets[0].sectorY } : { x: 0, y: 0 },
     defenderCoords: { x: xVal, y: yVal },
@@ -2756,9 +2450,12 @@ app.post("/api/galaxy/intelligence", (req, res) => {
 app.post("/api/fleet/send", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
-  const { planetId, missionType, troops, targetId, targetName, targetBuilding } = req.body;
+  const { planetId, missionType, troops, targetId, targetName, targetBuilding, createdFleetId } = req.body;
   const targetX = parseInt(String(req.body.targetX), 10);
   const targetY = parseInt(String(req.body.targetY), 10);
+  if (isNaN(targetX) || isNaN(targetY)) {
+    return res.status(400).json({ error: "Invalid target coordinates. Directives must specify a numeric zone on the coordinate grid." });
+  }
   const planet = p.planets.find((pl) => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
   const troopSend = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
@@ -2798,7 +2495,21 @@ app.post("/api/fleet/send", (req, res) => {
   if (missionType === "move") {
     const destPlanet = p.planets.find((pl) => pl.sectorX === targetX && pl.sectorY === targetY);
     if (!destPlanet) {
-      return res.status(400).json({ error: "Move relocation directives are only authorized to target your own colonized planets and moonbases!" });
+      let isAllianceMemberPlanet = false;
+      if (p.allianceId) {
+        for (const playerObj of Object.values(state.players)) {
+          if (playerObj.allianceId === p.allianceId) {
+            const memberPlanet = playerObj.planets.find((pl) => pl.sectorX === targetX && pl.sectorY === targetY);
+            if (memberPlanet) {
+              isAllianceMemberPlanet = true;
+              break;
+            }
+          }
+        }
+      }
+      if (!isAllianceMemberPlanet) {
+        return res.status(400).json({ error: "Move relocation directives are only authorized to target your own colonized planets and moonbases or an Alliance member's coordinates!" });
+      }
     }
   }
   for (const [tId, qty] of Object.entries(troopSend)) {
@@ -2816,13 +2527,32 @@ app.post("/api/fleet/send", (req, res) => {
     return sp < slowest ? sp : slowest;
   }, 100) * speedMultiplier;
   const travelTimeMs = Math.round(dist / slowestTroopSpeed * 6e4);
+  let resolvedTargetId = targetId || null;
+  let resolvedTargetName = targetName || `Sector [${targetX}, ${targetY}]`;
+  if (!resolvedTargetId) {
+    for (const playerObj of Object.values(state.players)) {
+      const pl = playerObj.planets.find((p2) => p2.sectorX === targetX && p2.sectorY === targetY);
+      if (pl) {
+        resolvedTargetId = playerObj.id;
+        resolvedTargetName = pl.name || `${playerObj.username}'s Station`;
+        break;
+      }
+    }
+  }
+  if (!resolvedTargetId && state.habitablePlanets) {
+    const hp = state.habitablePlanets.find((item) => item.coords.x === targetX && item.coords.y === targetY);
+    if (hp) {
+      resolvedTargetId = "habitable";
+      resolvedTargetName = hp.name;
+    }
+  }
   const mission = {
     id: `fleet_${Math.random().toString(36).substr(2, 9)}`,
     senderId: p.id,
     senderName: p.username,
     senderCoords: { x: planet.sectorX, y: planet.sectorY },
-    targetId: targetId || null,
-    targetName: targetName || `Sector [${targetX}, ${targetY}]`,
+    targetId: resolvedTargetId,
+    targetName: resolvedTargetName,
     targetCoords: { x: targetX, y: targetY },
     missionType,
     troops: troopSend,
@@ -2831,11 +2561,35 @@ app.post("/api/fleet/send", (req, res) => {
     isReturning: false,
     isWaitingToSettle: false,
     targetBuilding: targetBuilding || void 0,
-    troopSpeedLevel: speedLvl
+    troopSpeedLevel: speedLvl,
+    createdFleetId: createdFleetId || void 0
   };
   state.fleets.push(mission);
   saveState();
   res.json({ player: p, success: true, fleets: state.fleets });
+});
+app.post("/api/troops/adjust", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { planetId, troopChanges } = req.body;
+  const planet = p.planets.find((pl) => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+  if (!troopChanges || typeof troopChanges !== "object") {
+    return res.status(400).json({ error: "Invalid troop changes payload" });
+  }
+  for (const [tId, change] of Object.entries(troopChanges)) {
+    const changeVal = parseInt(String(change), 10) || 0;
+    const current = planet.troops[tId] || 0;
+    if (current + changeVal < 0) {
+      return res.status(400).json({ error: `Not enough ${tId} on the station to fulfill this adjustment!` });
+    }
+  }
+  for (const [tId, change] of Object.entries(troopChanges)) {
+    const changeVal = parseInt(String(change), 10) || 0;
+    planet.troops[tId] = (planet.troops[tId] || 0) + changeVal;
+  }
+  saveState();
+  res.json({ player: p, success: true });
 });
 app.post("/api/fleet/settle", (req, res) => {
   const p = getLoggedPlayer(req);
@@ -2886,6 +2640,7 @@ app.post("/api/fleet/settle", (req, res) => {
     timestamp: Date.now()
   });
   state.fleets.splice(fleetIndex, 1);
+  ensureMinimumHabitablePlanets();
   saveState();
   return res.json({ player: p, success: true, fleets: state.fleets });
 });
@@ -3025,6 +2780,10 @@ app.post("/api/alliance/create", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
   if (p.allianceId) return res.status(400).json({ error: "Already member of an Alliance" });
+  const maxCommsHubLvl = Math.max(...p.planets.map((pl) => pl.buildings.commsHub?.level || 0));
+  if (maxCommsHubLvl < 5) {
+    return res.status(400).json({ error: "Creating an Alliance requires Communications Hub Level 5 or higher." });
+  }
   const { name, tag, bannerColor, bannerSymbol } = req.body;
   if (!name || !tag) return res.status(400).json({ error: "Alliance Name and Tag required" });
   const exists = Object.values(state.alliances).some((a) => a.name.toLowerCase() === name.toLowerCase() || a.tag.toUpperCase() === tag.toUpperCase());
@@ -3060,6 +2819,10 @@ app.post("/api/alliance/join", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
   if (p.allianceId) return res.status(400).json({ error: "Already registered in an Alliance." });
+  const maxCommsHubLvl = Math.max(...p.planets.map((pl) => pl.buildings.commsHub?.level || 0));
+  if (maxCommsHubLvl < 4) {
+    return res.status(400).json({ error: "Joining an Alliance requires Communications Hub Level 4 or higher." });
+  }
   const { allianceId } = req.body;
   const alliance = state.alliances[allianceId];
   if (!alliance) return res.status(404).json({ error: "Alliance not found" });
@@ -3077,6 +2840,98 @@ app.post("/api/alliance/join", (req, res) => {
     type: "system",
     timestamp: Date.now()
   });
+  saveState();
+  res.json({ player: p, success: true, alliance });
+});
+app.post("/api/alliance/apply", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (p.allianceId) return res.status(400).json({ error: "Already registered in an Alliance." });
+  const maxCommsHubLvl = Math.max(...p.planets.map((pl) => pl.buildings.commsHub?.level || 0));
+  if (maxCommsHubLvl < 4) {
+    return res.status(400).json({ error: "Applying to an Alliance requires Communications Hub Level 4 or higher." });
+  }
+  const { allianceId } = req.body;
+  const alliance = state.alliances[allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+  if (!alliance.applications) {
+    alliance.applications = [];
+  }
+  const alreadyApplied = alliance.applications.some((app2) => app2.playerId === p.id);
+  if (alreadyApplied) {
+    return res.status(400).json({ error: "Pending application already exists for this alliance." });
+  }
+  alliance.applications.push({
+    playerId: p.id,
+    username: p.username,
+    timestamp: Date.now()
+  });
+  saveState();
+  res.json({ player: p, success: true, alliance });
+});
+app.post("/api/alliance/approve", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.allianceId) return res.status(400).json({ error: "Not in an Alliance." });
+  if (p.allianceRole !== "leader" && p.allianceRole !== "officer") {
+    return res.status(403).json({ error: "Only the Alliance Founder (leader) or Officer can approve application requests." });
+  }
+  const { targetPlayerId } = req.body;
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+  if (!alliance.applications) {
+    alliance.applications = [];
+  }
+  const appIndex = alliance.applications.findIndex((app2) => app2.playerId === targetPlayerId);
+  if (appIndex === -1) {
+    return res.status(404).json({ error: "Application request not found." });
+  }
+  const targetPlayer = state.players[targetPlayerId];
+  if (!targetPlayer) {
+    alliance.applications.splice(appIndex, 1);
+    saveState();
+    return res.status(404).json({ error: "Target player profile not found." });
+  }
+  if (targetPlayer.allianceId) {
+    alliance.applications.splice(appIndex, 1);
+    saveState();
+    return res.status(400).json({ error: "Player has already joined another alliance." });
+  }
+  alliance.members.push({
+    playerId: targetPlayer.id,
+    username: targetPlayer.username,
+    role: "member"
+  });
+  targetPlayer.allianceId = alliance.id;
+  targetPlayer.allianceRole = "member";
+  alliance.applications.splice(appIndex, 1);
+  state.newsEvents.unshift({
+    id: `news_${Math.random().toString(36).substr(2, 9)}`,
+    title: "Application Approved",
+    content: `${targetPlayer.username}'s application was approved to join ${alliance.name} [${alliance.tag}]!`,
+    type: "system",
+    timestamp: Date.now()
+  });
+  saveState();
+  res.json({ player: p, success: true, alliance });
+});
+app.post("/api/alliance/decline", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.allianceId) return res.status(400).json({ error: "Not in an Alliance." });
+  if (p.allianceRole !== "leader" && p.allianceRole !== "officer") {
+    return res.status(403).json({ error: "Only the Alliance Founder or Officer can decline requests." });
+  }
+  const { targetPlayerId } = req.body;
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+  if (!alliance.applications) {
+    alliance.applications = [];
+  }
+  const appIndex = alliance.applications.findIndex((app2) => app2.playerId === targetPlayerId);
+  if (appIndex !== -1) {
+    alliance.applications.splice(appIndex, 1);
+  }
   saveState();
   res.json({ player: p, success: true, alliance });
 });
@@ -3259,30 +3114,53 @@ app.get("/api/alliance/member-reports", (req, res) => {
 app.post("/api/resources/send", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
-  const { targetId, resources } = req.body;
-  if (p.id === targetId) {
-    return res.status(400).json({ error: "You cannot transmit resources to your own coordinates!" });
-  }
-  const targetPlayer = state.players[targetId] || Object.values(state.players).find((u) => u.id === targetId);
-  if (!targetPlayer) {
-    return res.status(404).json({ error: "Recipient commander coordinates not found" });
-  }
-  const senderPlanet = p.planets[0];
-  const targetPlanet = targetPlayer.planets[0];
+  const { targetId, resources, sourcePlanetId } = req.body;
+  const targetX = parseInt(req.body.targetX, 10);
+  const targetY = parseInt(req.body.targetY, 10);
+  const senderPlanet = p.planets.find((pl) => pl.id === sourcePlanetId) || p.planets[0];
   if (!senderPlanet) {
     return res.status(400).json({ error: "Sender starbase planet configuration mismatch." });
   }
-  if (!targetPlanet) {
-    return res.status(400).json({ error: "Recipient starbase planet configuration mismatch." });
+  let targetPlanet = null;
+  let targetPlayer = null;
+  if (targetId) {
+    for (const player of Object.values(state.players)) {
+      const pl = player.planets.find((item) => item.id === targetId || player.id === targetId);
+      if (pl) {
+        targetPlanet = pl;
+        targetPlayer = player;
+        break;
+      }
+    }
+  } else if (!isNaN(targetX) && !isNaN(targetY)) {
+    for (const player of Object.values(state.players)) {
+      const pl = player.planets.find((item) => item.sectorX === targetX && item.sectorY === targetY);
+      if (pl) {
+        targetPlanet = pl;
+        targetPlayer = player;
+        break;
+      }
+    }
+  }
+  if (!targetPlanet || !targetPlayer) {
+    return res.status(404).json({ error: "Recipient coordinates or target Space Station not detected! Double check coordinates scanner." });
+  }
+  if (senderPlanet.id === targetPlanet.id) {
+    return res.status(400).json({ error: "You cannot transmit resources to the same space station!" });
   }
   const keys = ["water", "plasma", "fuel", "food", "respirant"];
+  let hasItems = false;
   for (const k of keys) {
     const qty = Math.max(0, parseInt(resources[k], 10) || 0);
     if (qty > 0) {
       if ((senderPlanet.resources[k] || 0) < qty) {
-        return res.status(400).json({ error: `Not enough ${k} on your active moonbase planetary reserves.` });
+        return res.status(400).json({ error: `Not enough ${k} on your active planetary reserves.` });
       }
+      hasItems = true;
     }
+  }
+  if (!hasItems) {
+    return res.status(400).json({ error: "You must specify at least one resource quantity to transmit." });
   }
   keys.forEach((k) => {
     const qty = Math.max(0, parseInt(resources[k], 10) || 0);
@@ -3294,7 +3172,7 @@ app.post("/api/resources/send", (req, res) => {
   state.newsEvents.push({
     id: `news_trade_${Date.now()}`,
     title: "Quantum Trade Portal Activated!",
-    content: `Commander ${p.username} successfully transmitted a massive payload cargo shipment to Commander ${targetPlayer.username}!`,
+    content: `Commander ${p.username} successfully transmitted resources from ${senderPlanet.name} to ${targetPlayer.username}'s ${targetPlanet.name}!`,
     type: "system",
     timestamp: Date.now()
   });
@@ -3352,6 +3230,90 @@ app.post("/api/daily-reward/claim", (req, res) => {
   p.lastDailyRewardClaim = now;
   saveState();
   res.json({ player: p, s_amount: 8e3, success: true });
+});
+app.post("/api/tutorial/claim", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { taskId, planetId } = req.body;
+  if (taskId === void 0 || !planetId) {
+    return res.status(400).json({ error: "Invalid parameters" });
+  }
+  const planet = p.planets.find((pl) => pl.id === planetId) || p.planets[0];
+  if (!planet) {
+    return res.status(404).json({ error: "Colony planet not found" });
+  }
+  const rewards = {
+    1: { water: 1e4, plasma: 1e4, fuel: 1e4, food: 1e4, respirant: 1e4, credits: 15e3 },
+    // Colonize 2nd planet
+    2: { water: 10280, plasma: 10180, fuel: 10180, food: 10180, respirant: 10180, credits: 3e3 },
+    // Rename Outpost
+    3: { water: 10180, plasma: 10180, fuel: 10180, food: 10180, respirant: 10280, credits: 5e3 },
+    // Hydrothermal pump Lvl 2
+    4: { water: 10180, plasma: 10180, fuel: 10180, food: 10280, respirant: 10180, credits: 4e3 },
+    // Air Scrubber Lvl 2
+    5: { water: 10180, plasma: 10280, fuel: 10180, food: 10180, respirant: 10180, credits: 4e3 },
+    // Food bio-synth Lvl 2
+    6: { water: 10150, plasma: 1e4, fuel: 1e4, food: 10200, respirant: 10100, credits: 4e3 },
+    // Plasma refinery Lvl 2
+    7: { water: 1e4, plasma: 1e4, fuel: 1e4, food: 1e4, respirant: 1e4, credits: 7500 },
+    // Launch Scan Attack Mission
+    8: { water: 10291, plasma: 10302, fuel: 10302, food: 10302, respirant: 10302, credits: 5e3 },
+    // Extractor Production boost
+    9: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 6e3 },
+    // Fabricator Lvl 2
+    10: { water: 1e4, plasma: 1e4, fuel: 1e4, food: 1e4, respirant: 1e4, credits: 5005 },
+    // Radar Array Lvl 1
+    11: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 4e3 },
+    // Deep Space sweep
+    12: { water: 13e3, plasma: 14e3, fuel: 15e3, food: 12e3, respirant: 12e3, credits: 8e3 },
+    // Research Center Lvl 1
+    13: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 5e3 },
+    // Quantum Processor research
+    14: { water: 12250, plasma: 1e4, fuel: 1e4, food: 13e3, respirant: 11500, credits: 6e3 },
+    // War room Command level 1
+    15: { water: 1e4, plasma: 1e4, fuel: 1e4, food: 1e4, respirant: 1e4, credits: 5e3 },
+    // Train 15 troop fighters
+    16: { water: 1e4, plasma: 1e4, fuel: 1e4, food: 1e4, respirant: 1e4, credits: 3e3 },
+    // Sending a private text PM
+    17: { water: 1e4, plasma: 1e4, fuel: 1e4, food: 1e4, respirant: 1e4, credits: 5e3 },
+    // Nexus Cargo Claim
+    18: { water: 1e4, plasma: 1e4, fuel: 1e4, food: 1e4, respirant: 1e4, credits: 7e3 },
+    // Join / Create an Alliance Alliance
+    19: { water: 13e3, plasma: 14e3, fuel: 15e3, food: 12e3, respirant: 12e3, credits: 3e3 },
+    // Send general public Chat msg
+    20: { water: 1e4, plasma: 1e4, fuel: 1e4, food: 1e4, respirant: 1e4, credits: 8e3 },
+    // Engine Warp tech research
+    21: { water: 11500, plasma: 11e3, fuel: 12e3, food: 11500, respirant: 11e3, credits: 4e3 },
+    // Check local leader or payroll
+    22: { water: 1e4, plasma: 1e4, fuel: 1e4, food: 1e4, respirant: 1e4, credits: 3e4 }
+    // Settle 3rd Planet outpost!
+  };
+  const idNum = parseInt(taskId);
+  const reward = rewards[idNum];
+  if (!reward) {
+    return res.status(400).json({ error: "Invalid tutorial task ID" });
+  }
+  if (!p.completedTutorialTasks) {
+    p.completedTutorialTasks = [];
+  }
+  if (p.completedTutorialTasks.includes(idNum)) {
+    return res.status(400).json({ error: "Reward for this task has already been claimed." });
+  }
+  const repositoryLvl = planet.buildings.repository ? planet.buildings.repository.level : 1;
+  const cap = getRepositoryCapacity(repositoryLvl);
+  planet.resources.water = Math.min(cap, planet.resources.water + reward.water);
+  planet.resources.plasma = Math.min(cap, planet.resources.plasma + reward.plasma);
+  planet.resources.fuel = Math.min(cap, planet.resources.fuel + reward.fuel);
+  planet.resources.food = Math.min(cap, planet.resources.food + reward.food);
+  planet.resources.respirant = Math.min(cap, planet.resources.respirant + reward.respirant);
+  p.credits = (p.credits || 0) + reward.credits;
+  p.completedTutorialTasks.push(idNum);
+  saveState();
+  res.json({
+    success: true,
+    player: p,
+    message: `Academy reward claimed on ${planet.name}! Received custom resource crates and +${reward.credits.toLocaleString()} Speed Credits.`
+  });
 });
 app.post("/api/planet/claim-supply-nexus", (req, res) => {
   const p = getLoggedPlayer(req);
@@ -3413,6 +3375,83 @@ app.post("/api/buy-credits", (req, res) => {
   saveState();
   res.json({ player: p, success: true });
 });
+app.post("/api/messages/send", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { receiverId, content } = req.body;
+  if (!receiverId || !content || typeof content !== "string" || !content.trim()) {
+    return res.status(400).json({ error: "Invalid receiver or empty transmission content." });
+  }
+  const receiver = state.players[receiverId];
+  if (!receiver) {
+    return res.status(404).json({ error: "Target transmitter station not found." });
+  }
+  if (!receiver.commandMessages) {
+    receiver.commandMessages = [];
+  }
+  const newMessage = {
+    id: `msg_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`,
+    senderId: p.id,
+    senderName: p.username,
+    senderFaction: p.faction,
+    senderFactionColor: p.factionColor,
+    receiverId: receiver.id,
+    receiverName: receiver.username,
+    content: content.trim(),
+    timestamp: Date.now(),
+    isRead: false,
+    isSaved: false
+  };
+  receiver.commandMessages.push(newMessage);
+  if (!p.commandMessages) {
+    p.commandMessages = [];
+  }
+  const sentCopy = {
+    ...newMessage,
+    isSent: true,
+    isRead: true
+    // Sender has already read their own sent message
+  };
+  p.commandMessages.push(sentCopy);
+  saveState();
+  res.json({ success: true, message: "Holographic command transmission dispatched!" });
+});
+app.post("/api/messages/mark-read", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { messageId, isRead } = req.body;
+  if (!messageId) return res.status(400).json({ error: "Transmission ID required" });
+  if (!p.commandMessages) p.commandMessages = [];
+  const msg = p.commandMessages.find((m) => m.id === messageId);
+  if (msg) {
+    msg.isRead = isRead !== void 0 ? isRead : true;
+    saveState();
+  }
+  res.json({ success: true, player: p });
+});
+app.post("/api/messages/save", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { messageId, isSaved } = req.body;
+  if (!messageId) return res.status(400).json({ error: "Transmission ID required" });
+  if (!p.commandMessages) p.commandMessages = [];
+  const msg = p.commandMessages.find((m) => m.id === messageId);
+  if (msg) {
+    msg.isSaved = isSaved !== void 0 ? isSaved : true;
+    saveState();
+  }
+  res.json({ success: true, player: p });
+});
+app.post("/api/messages/delete", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { messageId } = req.body;
+  if (!messageId) return res.status(400).json({ error: "Transmission ID required" });
+  if (!p.commandMessages) p.commandMessages = [];
+  p.commandMessages = p.commandMessages.filter((m) => m.id !== messageId);
+  saveState();
+  res.json({ success: true, player: p });
+});
 app.post("/api/feedback/send", (req, res) => {
   const p = getLoggedPlayer(req);
   const { content, category } = req.body;
@@ -3467,5 +3506,7 @@ async function startServer() {
     console.log(`Universe active. Server listening on http://0.0.0.0:${PORT}`);
   });
 }
-startServer();
+startServer().catch((err) => {
+  console.error("CRITICAL: Failed to start server:", err);
+});
 //# sourceMappingURL=server.cjs.map
