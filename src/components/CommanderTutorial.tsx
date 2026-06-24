@@ -55,9 +55,9 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       title: '🚀 Voyage of Discovery: Colonize your 2nd Station',
       shortDesc: 'Launch a Settlement Ship to habitable planetary coordinates and authorize settlement. Welcome, Commander!',
       requirementHtml: 'Acquire <strong>at least 2 colony stations</strong> under your Royal Command.',
-      hint: 'First, build a Settlement Ship in your War Room (Army base Tab). Then open the Galaxy Tab to locate a green dot marked "Habitable Planet", select it, adjust your fleet deployment to include the Settlement Ship, and click "Confirm & Dispatch"! Once arrived at destination, load that planet to materialize your new colony!',
-      howToGetThere: '1. Navigate to the <strong>Army</strong> tab.<br/>2. Locate the <strong>Settlement Ship</strong> unit and recruit 1 of them.<br/>3. Navigate to the <strong>Galaxy</strong> view scanner.<br/>4. Locate any free green-colored <strong>Habitable Planet</strong> inside the sector.<br/>5. Click coordinate action, select <strong>"Settle on Planet"</strong>, type 1 in Settlement Ship and dispatch cargo flight!',
-      commanderTip: 'Inside Galaxy Scanner View (look for green nodes marked Habitable Planet).',
+      hint: 'First, build a Settlement Ship in your War Room (CMD tab). Then open the RDR tab to locate a green dot marked "Habitable Planet", select it, adjust your fleet deployment to include the Settlement Ship, and click "Confirm & Dispatch"! Once arrived at destination, load that planet to materialize your new colony!',
+      howToGetThere: '1. Navigate to the <strong>CMD (War Room)</strong> tab.<br/>2. Locate the <strong>Settlement Ship</strong> unit and recruit 1 of them.<br/>3. Navigate to the <strong>RDR (Galaxy)</strong> view scanner.<br/>4. Locate any free green-colored <strong>Habitable Planet</strong> inside the sector.<br/>5. Click coordinate action, select <strong>"Settle on Planet"</strong>, type 1 in Settlement Ship and dispatch cargo flight!',
+      commanderTip: 'Inside RDR (Galaxy) Scanner View (look for green nodes marked Habitable Planet).',
       congratsMessage: '🌟 OUTSTANDING FLIGHT TRAJECTORY, COMMANDER! You colonized a brand new sector world, establishing your secondary station and expanding your galactic footprint!',
       encouragementQuote: 'Elite stride, Admiral! Having a dual-station outpost prepares your empire for massive economy scaling and fleet deployments!',
       targetTab: 'galaxy',
@@ -71,9 +71,9 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       title: '🏷️ Sovereignty Station Designation',
       shortDesc: 'Establish your grand brand across the cosmos by customizing your new station designation.',
       requirementHtml: 'Rename your colony station <strong>anything other than the default names</strong> (Colony Station, Default Base, etc.)',
-      hint: 'Under the Explore Tab, click on your station name at the top page or the "Rename Planet" button, type a majestic sovereign name of your choice, and confirm your choice design.',
-      howToGetThere: '1. Navigate to the <strong>Explore</strong> tab.<br/>2. Look closely at the top of the interface next to your station overview stats where the planet name is displayed.<br/>3. Click the <strong>pencil/edit icon</strong> or <strong>"Rename Station"</strong> button.<br/>4. Type any awesome custom name and click <strong>"Save Name"</strong>.',
-      commanderTip: 'Look at the very top of the Station Overview on the Explore Tab.',
+      hint: 'Under the XPL (Explore) Tab, click on your station name at the top page or the "Rename Planet" button, type a majestic sovereign name of your choice, and confirm your choice design.',
+      howToGetThere: '1. Navigate to the <strong>XPL (Explore)</strong> tab.<br/>2. Look closely at the top of the interface next to your station overview stats where the planet name is displayed.<br/>3. Click the <strong>pencil/edit icon</strong> or <strong>"Rename Station"</strong> button.<br/>4. Type any awesome custom name and click <strong>"Save Name"</strong>.',
+      commanderTip: 'Look at the very top of the Station Overview on the XPL (Explore) Tab.',
       congratsMessage: '🏷️ MAGNIFICENT DESIGNATION CHOSEN! Your space colony station is now officially chartered under a majestic galactic name! Sovereign power represents reputation!',
       encouragementQuote: 'Brilliant! A space empire represents its leader - choose a label that sends shivers of glory down the spines of rogue pirate syndicates!',
       targetTab: 'explore',
@@ -732,7 +732,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                       onClick={() => setActiveTab(activeTask.targetTab)}
                       className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-950/90 to-cyan-900/80 hover:brightness-110 text-cyan-300 hover:text-white border border-cyan-500/40 rounded-lg text-[10px] font-bold tracking-wider uppercase transition cursor-pointer flex items-center gap-1.5"
                     >
-                      🚀 NAVIGATE TO TAB
+                      🚀 NAVIGATE TO {activeTask.targetTab === 'explore' ? 'XPL' : activeTask.targetTab === 'army' ? 'CMD' : activeTask.targetTab === 'galaxy' ? 'RDR' : activeTask.targetTab === 'research' ? 'Res' : 'SETTINGS'}
                     </button>
                     <button
                       type="button"

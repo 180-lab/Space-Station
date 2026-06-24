@@ -48,7 +48,8 @@ import {
   Forward,
   Edit2,
   Check,
-  Send
+  Send,
+  Reply
 } from 'lucide-react';
 
 const TROOP_NAME_MAPPING: Record<string, string> = {
@@ -74,7 +75,10 @@ async function safeParseJson(res: Response): Promise<any> {
                  trimmed.includes('accounts.google.com');
 
   if (isHtml) {
-    const isAppSPA = trimmed.includes('id="root"') || trimmed.includes('/src/main.tsx') || trimmed.includes('/src/index.css');
+    const isAppSPA = trimmed.includes('id="root"') || 
+                     trimmed.includes('Space Station Commander') || 
+                     trimmed.includes('/src/main.tsx') || 
+                     trimmed.includes('/src/index.css');
     if (isAppSPA) {
       throw new Error(`API endpoint fallback: endpoint ${res.url} returned parent SPA layout instead of JSON.`);
     }
@@ -191,6 +195,79 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('space_station_created_fleets_v1', JSON.stringify(createdFleets));
   }, [createdFleets]);
+
+  // Automatically re-dock traveling reserve fleets when their active mission is no longer in flight
+  useEffect(() => {
+    if (!player || !fleets) return;
+    
+    const hasReturnedFleet = createdFleets.some(fleet => 
+      fleet.activeMissionId && !fleets.some(f => f.id === fleet.activeMissionId)
+    );
+    
+    if (!hasReturnedFleet) return;
+    
+    const checkAndReDockFleets = async () => {
+      let stateChanged = false;
+      const updatedCreatedFleets = [...createdFleets];
+      let latestPlayer = player;
+      
+      for (let i = 0; i < updatedCreatedFleets.length; i++) {
+        const fleet = updatedCreatedFleets[i];
+        if (fleet.activeMissionId) {
+          const isStillTraveling = fleets.some(f => f.id === fleet.activeMissionId);
+          if (!isStillTraveling) {
+            console.log(`Reserve fleet ${fleet.name} is no longer in active fleets. Re-docking/deducting troops from planet base...`);
+            
+            // Adjust troops back down (i.e. deduct them to store inside the reserve fleet again)
+            const changes: Record<string, number> = {};
+            for (const [tId, val] of Object.entries(fleet.troops)) {
+              const qty = Number(val) || 0;
+              if (qty > 0) {
+                changes[tId] = qty; 
+              }
+            }
+            
+            try {
+              const res = await fetch('/api/troops/adjust', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-user-id': player.id
+                },
+                body: JSON.stringify({
+                  planetId: fleet.planetId,
+                  troopChanges: changes
+                })
+              });
+              const data = await safeParseJson(res);
+              if (res.ok && data.player) {
+                latestPlayer = data.player;
+                stateChanged = true;
+              }
+            } catch (err) {
+              console.error("Failed to re-dock returned reserve fleet", err);
+            }
+            
+            updatedCreatedFleets[i] = {
+              ...fleet,
+              activeMissionId: null,
+              isTraveling: false
+            };
+          }
+        }
+      }
+      
+      if (stateChanged) {
+        setPlayer(latestPlayer);
+        setCreatedFleets(updatedCreatedFleets);
+        showToast("A tactical reserve fleet has returned to base and docked successfully!", "success");
+      } else {
+        setCreatedFleets(updatedCreatedFleets);
+      }
+    };
+    
+    checkAndReDockFleets();
+  }, [fleets, player, createdFleets]);
 
   // Selected active colony planet ID
   const [selectedPlanetId, setSelectedPlanetId] = useState<string | null>(null);
@@ -894,11 +971,9 @@ export default function App() {
 
     let manufacturingSpeedLevel = 1;
     try {
-      const savedTech = localStorage.getItem(`moonbase_tech_${player.id}`);
-      if (savedTech) {
-        const parsed = JSON.parse(savedTech);
-        manufacturingSpeedLevel = parsed.manufacturing_speed || 1;
-      }
+      const isFirstPlanet = player.planets[0]?.id === currentPlanet.id;
+      const savedTech = localStorage.getItem(`moonbase_tech_${player.id}_${currentPlanet.id}`);
+      manufacturingSpeedLevel = savedTech ? (JSON.parse(savedTech).manufacturing_speed ?? (isFirstPlanet ? 20 : 0)) : (isFirstPlanet ? 20 : 0);
     } catch {
       // fallback
     }
@@ -942,6 +1017,7 @@ export default function App() {
     targetBuilding?: string;
     numFleets?: number;
     planetId?: string;
+    createdFleetId?: string;
   }) => {
     if (!player) return;
     const currentPlanet = player.planets.find(pl => pl.id === (mission.planetId || selectedPlanetId)) || player.planets[0];
@@ -949,11 +1025,15 @@ export default function App() {
     let troopSpeedLevel = 1;
     let defenseShieldsLevel = 1;
     try {
-      const savedTech = localStorage.getItem(`moonbase_tech_${player.id}`);
+      const isFirstPlanet = player.planets[0]?.id === currentPlanet.id;
+      const savedTech = localStorage.getItem(`moonbase_tech_${player.id}_${currentPlanet.id}`);
       if (savedTech) {
         const parsed = JSON.parse(savedTech);
-        troopSpeedLevel = parsed.troop_speed || 1;
-        defenseShieldsLevel = parsed.defense_shields || 1;
+        troopSpeedLevel = parsed.troop_speed ?? (isFirstPlanet ? 20 : 0);
+        defenseShieldsLevel = parsed.defense_shields ?? (isFirstPlanet ? 20 : 0);
+      } else {
+        troopSpeedLevel = isFirstPlanet ? 20 : 0;
+        defenseShieldsLevel = isFirstPlanet ? 20 : 0;
       }
     } catch {
       // fallback
@@ -979,8 +1059,14 @@ export default function App() {
         const data = await safeParseJson(res);
         if (res.ok) {
           setPlayer(data.player);
+          if (data.fleets) {
+            setFleets(data.fleets);
+          }
           showToast(`FLEET DEPLOYED! Mission: ${mission.missionType.toUpperCase()} dispatched.`, 'success');
           setActiveTab('galaxy'); // Swapp tab to allow monitoring of travels!
+          const newMission = data.fleets?.find((f: any) => f.createdFleetId === mission.createdFleetId) 
+            || (data.fleets && data.fleets[data.fleets.length - 1]);
+          return newMission;
         } else {
           showToast(data.error || 'Fleet blocked by flight control', 'error');
         }
@@ -3408,6 +3494,20 @@ export default function App() {
                                 }`}
                               >
                                 <Star size={9.5} className={isSaved ? 'fill-current' : ''} /> {isSaved ? 'Unsave' : 'Save'}
+                              </button>
+
+                              {/* Reply button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCommDeckTab('compose');
+                                  setDirectMsgTargetId(msg.senderId);
+                                  setDirectMsgContent(`Replying to: "${msg.content.slice(0, 45)}${msg.content.length > 45 ? '...' : ''}"\n\n`);
+                                }}
+                                className="px-2 py-1 rounded border border-emerald-500/30 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300 transition duration-150 font-bold uppercase flex items-center gap-1 cursor-pointer"
+                              >
+                                <Reply size={9.5} /> Reply
                               </button>
                             </>
                           )}

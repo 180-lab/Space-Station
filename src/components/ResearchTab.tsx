@@ -167,27 +167,37 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
 
   // Local storage tech levels and current upgrades - starts fully maxed when game starts
   const [techLevels, setTechLevels] = useState<Record<string, number>>(() => {
+    const isFirstPlanet = player.planets[0]?.id === activePlanet.id;
     try {
-      const data = localStorage.getItem(`moonbase_tech_${player.id}`);
+      const data = localStorage.getItem(`moonbase_tech_${player.id}_${activePlanet.id}`);
       if (data) {
         const parsed = JSON.parse(data);
         // Map old levels to new levels if present
         if (parsed.plating && !parsed.defense_shields) {
           parsed.defense_shields = Math.min(20, parsed.plating * 2);
         }
-        if (!parsed.defense_shields) parsed.defense_shields = 20;
-        if (!parsed.manufacturing_speed) parsed.manufacturing_speed = 20;
+        if (parsed.defense_shields === undefined) parsed.defense_shields = isFirstPlanet ? 20 : 0;
+        if (parsed.manufacturing_speed === undefined) parsed.manufacturing_speed = isFirstPlanet ? 20 : 0;
+        if (parsed.troop_speed === undefined) parsed.troop_speed = isFirstPlanet ? 20 : 0;
         return parsed;
       }
-      return { defense_shields: 20, manufacturing_speed: 20, troop_speed: 20 };
+      return {
+        defense_shields: isFirstPlanet ? 20 : 0,
+        manufacturing_speed: isFirstPlanet ? 20 : 0,
+        troop_speed: isFirstPlanet ? 20 : 0
+      };
     } catch {
-      return { defense_shields: 20, manufacturing_speed: 20, troop_speed: 20 };
+      return {
+        defense_shields: isFirstPlanet ? 20 : 0,
+        manufacturing_speed: isFirstPlanet ? 20 : 0,
+        troop_speed: isFirstPlanet ? 20 : 0
+      };
     }
   });
 
   const [activeResearch, setActiveResearch] = useState<{ techId: string; endAt: number } | null>(() => {
     try {
-      const data = localStorage.getItem(`moonbase_activeres_${player.id}`);
+      const data = localStorage.getItem(`moonbase_activeres_${player.id}_${activePlanet.id}`);
       return data ? JSON.parse(data) : null;
     } catch {
       return null;
@@ -199,17 +209,51 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   const [faqSearch, setFaqSearch] = useState('');
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
 
+  // Synchronize state when active planet changes
   useEffect(() => {
-    localStorage.setItem(`moonbase_tech_${player.id}`, JSON.stringify(techLevels));
-  }, [techLevels, player.id]);
+    const isFirstPlanet = player.planets[0]?.id === activePlanet.id;
+    try {
+      const data = localStorage.getItem(`moonbase_tech_${player.id}_${activePlanet.id}`);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (parsed.defense_shields === undefined) parsed.defense_shields = isFirstPlanet ? 20 : 0;
+        if (parsed.manufacturing_speed === undefined) parsed.manufacturing_speed = isFirstPlanet ? 20 : 0;
+        if (parsed.troop_speed === undefined) parsed.troop_speed = isFirstPlanet ? 20 : 0;
+        setTechLevels(parsed);
+      } else {
+        setTechLevels({
+          defense_shields: isFirstPlanet ? 20 : 0,
+          manufacturing_speed: isFirstPlanet ? 20 : 0,
+          troop_speed: isFirstPlanet ? 20 : 0
+        });
+      }
+    } catch {
+      setTechLevels({
+        defense_shields: isFirstPlanet ? 20 : 0,
+        manufacturing_speed: isFirstPlanet ? 20 : 0,
+        troop_speed: isFirstPlanet ? 20 : 0
+      });
+    }
+
+    try {
+      const data = localStorage.getItem(`moonbase_activeres_${player.id}_${activePlanet.id}`);
+      setActiveResearch(data ? JSON.parse(data) : null);
+    } catch {
+      setActiveResearch(null);
+    }
+  }, [activePlanet.id, player.id]);
+
+  useEffect(() => {
+    localStorage.setItem(`moonbase_tech_${player.id}_${activePlanet.id}`, JSON.stringify(techLevels));
+  }, [techLevels, player.id, activePlanet.id]);
 
   useEffect(() => {
     if (activeResearch) {
-      localStorage.setItem(`moonbase_activeres_${player.id}`, JSON.stringify(activeResearch));
+      localStorage.setItem(`moonbase_activeres_${player.id}_${activePlanet.id}`, JSON.stringify(activeResearch));
     } else {
-      localStorage.removeItem(`moonbase_activeres_${player.id}`);
+      localStorage.removeItem(`moonbase_activeres_${player.id}_${activePlanet.id}`);
     }
-  }, [activeResearch, player.id]);
+  }, [activeResearch, player.id, activePlanet.id]);
 
   // Handle ticking research complete
   useEffect(() => {

@@ -96,7 +96,7 @@ function getRepositoryCapacity(level: number): number {
 
 // Help helper for mine hourly production
 function getMineProductionPerHour(level: number, type: ResourceType): number {
-  if (level <= 0) return 100; // Base baseline
+  if (level <= 0) return 0; // Base baseline is 0 when unconstructed/level 0
   // Max at level 15: 25000 sum for non-water (3 mines -> 8333.33 each)
   // Max for water: 84000 sum (6 mines -> 14000 each)
   if (type === "water") {
@@ -118,6 +118,7 @@ function saveState() {
 // Normalize GameState to ensure all newly-added properties exist across legacy states
 function normalizeState(s: GameState) {
   if (!s) return;
+  ensureMinimumHabitablePlanets();
   if (!s.players) s.players = {};
   if (!s.alliances) s.alliances = {};
   if (!s.chatMessages) s.chatMessages = [];
@@ -150,18 +151,20 @@ function normalizeState(s: GameState) {
         pl.name = pl.name.replace(/Outpost/g, "Station");
       }
       
+      const isFirst = plIdx === 0;
+
       // Ensure all troops are present
       if (!pl.troops) pl.troops = {};
       const troopDefaults: Record<string, number> = {
-        defender: 12500,
-        attacker: 28600,
-        tank: 100,
-        looter: 1000,
-        drone: 100,
+        defender: isFirst ? 12500 : 0,
+        attacker: isFirst ? 28600 : 0,
+        tank: isFirst ? 100 : 0,
+        looter: isFirst ? 1000 : 0,
+        drone: isFirst ? 100 : 0,
         settlementShip: 0
       };
       Object.keys(troopDefaults).forEach(tKey => {
-        if (pl.troops[tKey] === undefined) {
+        if (pl.troops[tKey] === undefined || !isFirst) {
           pl.troops[tKey] = troopDefaults[tKey];
         }
       });
@@ -177,19 +180,17 @@ function normalizeState(s: GameState) {
       if (!pl.buildings) pl.buildings = {};
       
       const buildingDefaults: Record<string, { level: number, maxLevel: number }> = {
-        fabricator: { level: 1, maxLevel: 10 },
-        commsHub: { level: 1, maxLevel: 5 },
-        researchCenter: { level: 1, maxLevel: 20 },
-        armyBase: { level: 1, maxLevel: 22 },
-        repository: { level: 1, maxLevel: 45 },
-        radar: { level: 1, maxLevel: 15 },
-        supplyNexus: { level: 1, maxLevel: 50 }
+        fabricator: { level: isFirst ? 10 : 0, maxLevel: 10 },
+        commsHub: { level: isFirst ? 5 : 0, maxLevel: 5 },
+        researchCenter: { level: isFirst ? 20 : 0, maxLevel: 20 },
+        armyBase: { level: isFirst ? 22 : 0, maxLevel: 22 },
+        repository: { level: isFirst ? 45 : 0, maxLevel: 45 },
+        radar: { level: isFirst ? 15 : 0, maxLevel: 15 },
+        supplyNexus: { level: isFirst ? 50 : 0, maxLevel: 50 }
       };
 
-      const isFirst = plIdx === 0;
-
       Object.entries(buildingDefaults).forEach(([bKey, bDef]) => {
-        const defaultLvl = (bKey === 'fabricator' || bKey === 'commsHub' || bKey === 'repository' || isFirst) ? 1 : 0;
+        const defaultLvl = bDef.level;
         if (!pl.buildings[bKey]) {
           pl.buildings[bKey] = {
             level: defaultLvl,
@@ -199,7 +200,12 @@ function normalizeState(s: GameState) {
             health: 100
           };
         } else {
-          // Fill missing properties inside structure
+          // Force first planet to be maxed, subsequent to start from zero
+          if (isFirst) {
+            pl.buildings[bKey].level = bDef.maxLevel;
+          } else if (pl.buildings[bKey].level === 1 && (bKey === "fabricator" || bKey === "commsHub" || bKey === "repository")) {
+            pl.buildings[bKey].level = 0;
+          }
           const bObj = pl.buildings[bKey];
           if (bObj.level === undefined) bObj.level = defaultLvl;
           bObj.maxLevel = bDef.maxLevel; // Enforce updated maxLevels like fabricator limit 10
@@ -209,6 +215,43 @@ function normalizeState(s: GameState) {
           if (bObj.health === undefined) bObj.health = 100;
         }
       });
+
+      // Ensure all mines are present and conform
+      if (!pl.mines) pl.mines = {};
+      const mineKeys = ["water", "plasma", "fuel", "food", "respirant"];
+      const mineCounts = { water: 6, plasma: 3, fuel: 3, food: 3, respirant: 3 };
+      mineKeys.forEach((mKey) => {
+        const count = mineCounts[mKey as keyof typeof mineCounts];
+        if (!pl.mines[mKey]) {
+          pl.mines[mKey] = Array.from({ length: count }, (_, i) => ({
+            index: i,
+            level: isFirst ? 25 : 0,
+            isUpgrading: false,
+            upgradeEnd: null,
+            health: 100
+          }));
+        } else {
+          pl.mines[mKey].forEach((mine: any) => {
+            if (isFirst) {
+              mine.level = 25;
+            } else if (mine.level === undefined || mine.level === 1) {
+              mine.level = 0;
+            }
+            if (mine.isUpgrading === undefined) mine.isUpgrading = false;
+            if (mine.upgradeEnd === undefined) mine.upgradeEnd = null;
+            if (mine.health === undefined) mine.health = 100;
+          });
+        }
+      });
+
+      // Ensure first planet has maxed resources
+      if (isFirst) {
+        if (pl.resources.water < 5000000) pl.resources.water = 5000000;
+        if (pl.resources.plasma < 5000000) pl.resources.plasma = 5000000;
+        if (pl.resources.fuel < 5000000) pl.resources.fuel = 5000000;
+        if (pl.resources.food < 5000000) pl.resources.food = 5000000;
+        if (pl.resources.respirant < 5000000) pl.resources.respirant = 5000000;
+      }
     });
   });
 }
@@ -236,12 +279,11 @@ async function loadState() {
                   pl.troops.settlementShip = 0;
                 }
                 
-                // Refresh loaded users to exactly the target 1,000,000 attack HP and 500,000 defense HP setup
-                pl.troops.defender = 12500;
-                pl.troops.attacker = 28600;
-                pl.troops.tank = 100;
-                pl.troops.looter = 1000;
-                pl.troops.drone = 100;
+                if (pl.troops.defender === undefined) pl.troops.defender = 0;
+                if (pl.troops.attacker === undefined) pl.troops.attacker = 0;
+                if (pl.troops.tank === undefined) pl.troops.tank = 0;
+                if (pl.troops.looter === undefined) pl.troops.looter = 0;
+                if (pl.troops.drone === undefined) pl.troops.drone = 0;
               }
               if (pl && !pl.trainingQueue) {
                 pl.trainingQueue = [];
@@ -301,7 +343,7 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number, isF
   const createMines = (count: number): MineState[] => {
     return Array.from({ length: count }, (_, i) => ({
       index: i,
-      level: 1,
+      level: isFirstStation ? 25 : 0,
       isUpgrading: false,
       upgradeEnd: null,
       health: 100
@@ -322,27 +364,27 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number, isF
       respirant: createMines(3)
     },
     buildings: {
-      fabricator: { level: 1, maxLevel: 10, isUpgrading: false, upgradeEnd: null, health: 100 },
-      commsHub: { level: 1, maxLevel: 5, isUpgrading: false, upgradeEnd: null, health: 100 },
-      researchCenter: { level: isFirstStation ? 1 : 0, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
-      armyBase: { level: isFirstStation ? 1 : 0, maxLevel: 22, isUpgrading: false, upgradeEnd: null, health: 100 },
-      repository: { level: 1, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
-      radar: { level: isFirstStation ? 1 : 0, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
-      supplyNexus: { level: isFirstStation ? 1 : 0, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 }
+      fabricator: { level: isFirstStation ? 10 : 0, maxLevel: 10, isUpgrading: false, upgradeEnd: null, health: 100 },
+      commsHub: { level: isFirstStation ? 5 : 0, maxLevel: 5, isUpgrading: false, upgradeEnd: null, health: 100 },
+      researchCenter: { level: isFirstStation ? 20 : 0, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
+      armyBase: { level: isFirstStation ? 22 : 0, maxLevel: 22, isUpgrading: false, upgradeEnd: null, health: 100 },
+      repository: { level: isFirstStation ? 45 : 0, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
+      radar: { level: isFirstStation ? 15 : 0, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
+      supplyNexus: { level: isFirstStation ? 50 : 0, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 }
     },
     resources: {
-      water: 5000,
-      plasma: 5000,
-      fuel: 5000,
-      food: 5000,
-      respirant: 5000
+      water: isFirstStation ? 5000000 : 5000,
+      plasma: isFirstStation ? 5000000 : 5000,
+      fuel: isFirstStation ? 5000000 : 5000,
+      food: isFirstStation ? 5000000 : 5000,
+      respirant: isFirstStation ? 5000000 : 5000
     },
     troops: {
-      defender: 12500,
-      attacker: 28600,
-      tank: 100,
-      looter: 1000,
-      drone: 100,
+      defender: isFirstStation ? 12500 : 0,
+      attacker: isFirstStation ? 28600 : 0,
+      tank: isFirstStation ? 100 : 0,
+      looter: isFirstStation ? 1000 : 0,
+      drone: isFirstStation ? 100 : 0,
       settlementShip: 0
     },
     trainingQueue: []
@@ -427,6 +469,61 @@ function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarg
   }
 
   return buildingDamageReports;
+}
+
+function ensureMinimumHabitablePlanets() {
+  if (!state.habitablePlanets) {
+    state.habitablePlanets = [];
+  }
+  
+  const uncolonized = state.habitablePlanets.filter(p => !p.isColonized);
+  if (uncolonized.length >= 20) return;
+
+  const countNeeded = 20 - uncolonized.length;
+  const namesPool = [
+    "Gaia Aurelia", "Kepler-Prime", "Gliese-91", "New Hope", "Epsilon-D", 
+    "Zephyr-9", "Arcadia", "Core Dome-A", "Oasis-1", "Eden-X", 
+    "Genesis", "Midway", "Vanguard Outpost", "Nova Sol", "Horizon Delta",
+    "Apex Hub", "Thera Prime", "Verdant Reach", "Seraphim V", "Titan Alpha",
+    "Nexus Beta", "Elysium VI", "Hyperion", "Astraea", "Polaris Junction",
+    "Chronos III", "Solaris Sector", "Sentinel Dome", "Obsidian Station", "Olympus Basin"
+  ];
+
+  for (let i = 0; i < countNeeded; i++) {
+    let foundCoords = false;
+    let targetX = 0;
+    let targetY = 0;
+    let attempts = 0;
+
+    while (!foundCoords && attempts < 200) {
+      attempts++;
+      targetX = Math.floor(Math.random() * 90) + 5;
+      targetY = Math.floor(Math.random() * 90) + 5;
+
+      const overlapHabitable = state.habitablePlanets.some(hp => hp.coords.x === targetX && hp.coords.y === targetY);
+      if (overlapHabitable) continue;
+
+      let overlapPlayer = false;
+      for (const player of Object.values(state.players)) {
+        if (player.planets && player.planets.some(pl => pl.sectorX === targetX && pl.sectorY === targetY)) {
+          overlapPlayer = true;
+          break;
+        }
+      }
+      if (overlapPlayer) continue;
+
+      foundCoords = true;
+    }
+
+    const name = "Habitable " + namesPool[Math.floor(Math.random() * namesPool.length)];
+    const id = `hab_${targetX}_${targetY}`;
+    state.habitablePlanets.push({
+      id,
+      name,
+      coords: { x: targetX, y: targetY },
+      isColonized: false
+    });
+  }
 }
 
 // Bootstrap AI players to make the world feel populated and active
@@ -569,6 +666,7 @@ function bootstrapUniverse() {
     timestamp: Date.now() - 3600000
   });
 
+  ensureMinimumHabitablePlanets();
   saveState();
 }
 
@@ -1378,13 +1476,28 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
   const defender = fleet.targetId ? state.players[fleet.targetId] : null;
 
   if (fleet.missionType === "move") {
-    // Relocation / Move: Depositing troops permanently to the target planet owned by sender
+    // Relocation / Move: Depositing troops permanently to the target planet owned by sender or alliance member
     if (attacker) {
-      const targetPlanet = attacker.planets.find(pl => pl.sectorX === fleet.targetCoords.x && pl.sectorY === fleet.targetCoords.y);
+      let targetPlanet = attacker.planets.find(pl => pl.sectorX === fleet.targetCoords.x && pl.sectorY === fleet.targetCoords.y);
+      let targetOwner = attacker;
+
+      if (!targetPlanet && attacker.allianceId) {
+        for (const playerObj of Object.values(state.players)) {
+          if (playerObj.allianceId === attacker.allianceId) {
+            const pl = playerObj.planets.find(p => p.sectorX === fleet.targetCoords.x && p.sectorY === fleet.targetCoords.y);
+            if (pl) {
+              targetPlanet = pl;
+              targetOwner = playerObj;
+              break;
+            }
+          }
+        }
+      }
+
       if (targetPlanet) {
         // Transfer all troops to the destination planet
         Object.entries(fleet.troops).forEach(([tId, count]) => {
-          targetPlanet.troops[tId as keyof typeof targetPlanet.troops] = (targetPlanet.troops[tId as keyof typeof targetPlanet.troops] || 0) + count;
+          targetPlanet!.troops[tId as keyof typeof targetPlanet.troops] = (targetPlanet!.troops[tId as keyof typeof targetPlanet.troops] || 0) + count;
         });
 
         // Add relocation report/log
@@ -1393,7 +1506,7 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
           timestamp: now,
           attackerId: fleet.senderId,
           attackerName: fleet.senderName,
-          defenderId: fleet.senderId,
+          defenderId: targetOwner.id,
           defenderName: targetPlanet.name,
           isRecon: false,
           attackerCoords: fleet.senderCoords,
@@ -1753,30 +1866,7 @@ function runAISimulatedActivity(now: number) {
   const actionType = Math.random();
 
   if (actionType < 0.25) {
-    // 25% chance of sending a diplomatic banter in global chat!
-    const banter = [
-      "Securing boundaries in sector " + luckyAI.planets[0].sectorX + ", peace is a planetary illusion.",
-      "Any active alliance looking for a strong merger? VOID is recruiting officers.",
-      "Just upgraded my research center! The speed of light is no longer a restriction.",
-      "Scouting for coordinates coordinates. Watch your back!",
-      "Water consumption is getting tight, need to construct more water pumps!"
-    ];
-
-    const message: ChatMessage = {
-      id: `chat_${Math.random().toString(36).substr(2, 9)}`,
-      channel: "global",
-      senderId: luckyAI.id,
-      senderName: luckyAI.username,
-      senderFaction: luckyAI.faction,
-      senderFactionColor: luckyAI.factionColor,
-      allianceTag: luckyAI.allianceId ? state.alliances[luckyAI.allianceId]?.tag : null,
-      receiverId: null,
-      content: banter[Math.floor(Math.random() * banter.length)],
-      timestamp: now
-    };
-    state.chatMessages.push(message);
-    if (state.chatMessages.length > 100) state.chatMessages.shift();
-
+    // Bots do not talk on global chat anymore
   } else if (actionType < 0.45) {
     // 20% chance of launching an AI fleet towards an inactive/other AI player
     const defender = players[Math.floor(Math.random() * players.length)];
@@ -1898,30 +1988,12 @@ app.post("/api/register", (req, res) => {
 
   const planet = createInitialPlanet(`${username}'s Station`, startX, startY, true);
   
-  // Max out default user station buildings
-  if (planet.buildings.fabricator) planet.buildings.fabricator.level = planet.buildings.fabricator.maxLevel;
-  planet.buildings.commsHub.level = planet.buildings.commsHub.maxLevel;
-  planet.buildings.researchCenter.level = planet.buildings.researchCenter.maxLevel;
-  planet.buildings.armyBase.level = planet.buildings.armyBase.maxLevel;
-  planet.buildings.repository.level = planet.buildings.repository.maxLevel;
-  planet.buildings.radar.level = planet.buildings.radar.maxLevel;
-  planet.buildings.supplyNexus.level = planet.buildings.supplyNexus.maxLevel;
-
-  // Max out default user station mines to level 25 (max for first station)
-  for (const key of Object.keys(planet.mines)) {
-    planet.mines[key as ResourceType].forEach(m => m.level = 25);
-  }
-
-  // Supply starting resources up to max capacity (5,000,000)
-  const maxCap = getRepositoryCapacity(planet.buildings.repository.level);
-  planet.resources.water = maxCap;
-  planet.resources.plasma = maxCap;
-  planet.resources.fuel = maxCap;
-  planet.resources.food = maxCap;
-  planet.resources.respirant = maxCap;
-
-  // Supply exactly one settlement ship
-  planet.troops.settlementShip = 1;
+  // Set reasonable starting resources
+  planet.resources.water = 5000000;
+  planet.resources.plasma = 5000000;
+  planet.resources.fuel = 5000000;
+  planet.resources.food = 5000000;
+  planet.resources.respirant = 5000000;
   
   const newPlayer: PlayerProfile = {
     id,
@@ -2031,25 +2103,12 @@ app.post("/api/auth/google", (req, res) => {
   const defaultUsername = username || email.split("@")[0];
   const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY, true);
   
-  if (planet.buildings.fabricator) planet.buildings.fabricator.level = planet.buildings.fabricator.maxLevel;
-  planet.buildings.commsHub.level = planet.buildings.commsHub.maxLevel;
-  planet.buildings.researchCenter.level = planet.buildings.researchCenter.maxLevel;
-  planet.buildings.armyBase.level = planet.buildings.armyBase.maxLevel;
-  planet.buildings.repository.level = planet.buildings.repository.maxLevel;
-  planet.buildings.radar.level = planet.buildings.radar.maxLevel;
-  planet.buildings.supplyNexus.level = planet.buildings.supplyNexus.maxLevel;
-
-  for (const key of Object.keys(planet.mines)) {
-    planet.mines[key as ResourceType].forEach(m => m.level = 25);
-  }
-
-  const maxCap = getRepositoryCapacity(planet.buildings.repository.level);
-  planet.resources.water = maxCap;
-  planet.resources.plasma = maxCap;
-  planet.resources.fuel = maxCap;
-  planet.resources.food = maxCap;
-  planet.resources.respirant = maxCap;
-  planet.troops.settlementShip = 1;
+  // Set reasonable starting resources
+  planet.resources.water = 5000000;
+  planet.resources.plasma = 5000000;
+  planet.resources.fuel = 5000000;
+  planet.resources.food = 5000000;
+  planet.resources.respirant = 5000000;
 
   const newPlayer: PlayerProfile = {
     id,
@@ -2205,6 +2264,12 @@ app.post("/api/upgrade/mine", (req, res) => {
   const { planetId, resType, mineIndex, queue: reqQueue } = req.body;
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  // Pre-requisite check: Fabricator must be level >= 1 to upgrade/construct extractors (mines)
+  const fab = planet.buildings.fabricator;
+  if (!fab || fab.level < 1) {
+    return res.status(400).json({ error: "A Fabricator level 1 or higher is required to construct or upgrade resource extractors." });
+  }
 
   const mines = planet.mines[resType as ResourceType];
   if (!mines || !mines[mineIndex]) return res.status(404).json({ error: "Mine not found" });
@@ -2616,18 +2681,18 @@ app.post("/api/train/troop", (req, res) => {
     attacker: 10,      // Assault Drone
     looter: 15,        // Matter Extractor
     tank: 19,          // Disrupter
-    settlementShip: 22  // Settlement Ship
+    settlementShip: 1  // Settlement Ship
   };
   const requiredLevel = troopLevelLocks[troopId];
   if (requiredLevel !== undefined && armyBaseLevel < requiredLevel) {
     return res.status(400).json({ error: `Requires War Room Level ${requiredLevel} (Your Level: ${armyBaseLevel}) to produce ${specs.name}!` });
   }
 
-  // If training a Settlement Ship, enforce "you can only have one on each base" and "all bases must be at level 22 on their war room"
+  // If training a Settlement Ship, enforce "you can only have one on each base" and "this base's war room must be level 1"
   if (troopId === "settlementShip") {
-    const hasAllBasesLevel22 = p.planets.every(pl => (pl.buildings.armyBase?.level || 0) >= 22);
-    if (!hasAllBasesLevel22) {
-      return res.status(400).json({ error: "To build a Settlement Ship, all of your colonized bases must have their War Room (Army Base) upgraded to Level 22!" });
+    const hasActiveBaseLevel1 = (planet.buildings.armyBase?.level || 0) >= 1;
+    if (!hasActiveBaseLevel1) {
+      return res.status(400).json({ error: "To build a Settlement Ship, this base's War Room (Army Base) must be upgraded to Level 1!" });
     }
 
     if (count > 1) {
@@ -2947,7 +3012,7 @@ app.post("/api/fleet/send", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { planetId, missionType, troops, targetId, targetName, targetBuilding } = req.body;
+  const { planetId, missionType, troops, targetId, targetName, targetBuilding, createdFleetId } = req.body;
   const targetX = parseInt(String(req.body.targetX), 10);
   const targetY = parseInt(String(req.body.targetY), 10);
   
@@ -3003,10 +3068,25 @@ app.post("/api/fleet/send", (req, res) => {
   }
 
   if (missionType === "move") {
-    // Validate target coordinates are owned by the sender
+    // Validate target coordinates are owned by the sender or an alliance member
     const destPlanet = p.planets.find(pl => pl.sectorX === targetX && pl.sectorY === targetY);
     if (!destPlanet) {
-      return res.status(400).json({ error: "Move relocation directives are only authorized to target your own colonized planets and moonbases!" });
+      let isAllianceMemberPlanet = false;
+      if (p.allianceId) {
+        for (const playerObj of Object.values(state.players)) {
+          if (playerObj.allianceId === p.allianceId) {
+            const memberPlanet = playerObj.planets.find(pl => pl.sectorX === targetX && pl.sectorY === targetY);
+            if (memberPlanet) {
+              isAllianceMemberPlanet = true;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!isAllianceMemberPlanet) {
+        return res.status(400).json({ error: "Move relocation directives are only authorized to target your own colonized planets and moonbases or an Alliance member's coordinates!" });
+      }
     }
   }
 
@@ -3074,7 +3154,8 @@ app.post("/api/fleet/send", (req, res) => {
     isReturning: false,
     isWaitingToSettle: false,
     targetBuilding: targetBuilding || undefined,
-    troopSpeedLevel: speedLvl
+    troopSpeedLevel: speedLvl,
+    createdFleetId: createdFleetId || undefined
   };
 
   state.fleets.push(mission);
@@ -3181,6 +3262,7 @@ app.post("/api/fleet/settle", (req, res) => {
   // Remove fleet from active fleets
   state.fleets.splice(fleetIndex, 1);
 
+  ensureMinimumHabitablePlanets();
   saveState();
   return res.json({ player: p, success: true, fleets: state.fleets });
 });
@@ -3817,36 +3899,61 @@ app.post("/api/resources/send", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { targetId, resources } = req.body;
+  const { targetId, resources, sourcePlanetId } = req.body;
+  const targetX = parseInt(req.body.targetX, 10);
+  const targetY = parseInt(req.body.targetY, 10);
 
-  if (p.id === targetId) {
-    return res.status(400).json({ error: "You cannot transmit resources to your own coordinates!" });
-  }
-
-  const targetPlayer = state.players[targetId] || Object.values(state.players).find(u => u.id === targetId);
-  if (!targetPlayer) {
-    return res.status(404).json({ error: "Recipient commander coordinates not found" });
-  }
-
-  const senderPlanet = p.planets[0];
-  const targetPlanet = targetPlayer.planets[0];
-
+  const senderPlanet = p.planets.find(pl => pl.id === sourcePlanetId) || p.planets[0];
   if (!senderPlanet) {
     return res.status(400).json({ error: "Sender starbase planet configuration mismatch." });
   }
-  if (!targetPlanet) {
-    return res.status(400).json({ error: "Recipient starbase planet configuration mismatch." });
+
+  let targetPlanet: any = null;
+  let targetPlayer: any = null;
+
+  if (targetId) {
+    for (const player of Object.values(state.players)) {
+      const pl = player.planets.find(item => item.id === targetId || player.id === targetId);
+      if (pl) {
+        targetPlanet = pl;
+        targetPlayer = player;
+        break;
+      }
+    }
+  } else if (!isNaN(targetX) && !isNaN(targetY)) {
+    for (const player of Object.values(state.players)) {
+      const pl = player.planets.find(item => item.sectorX === targetX && item.sectorY === targetY);
+      if (pl) {
+        targetPlanet = pl;
+        targetPlayer = player;
+        break;
+      }
+    }
+  }
+
+  if (!targetPlanet || !targetPlayer) {
+    return res.status(404).json({ error: "Recipient coordinates or target Space Station not detected! Double check coordinates scanner." });
+  }
+
+  if (senderPlanet.id === targetPlanet.id) {
+    return res.status(400).json({ error: "You cannot transmit resources to the same space station!" });
   }
 
   // Validate quantities
   const keys = ["water", "plasma", "fuel", "food", "respirant"];
+  let hasItems = false;
   for (const k of keys) {
     const qty = Math.max(0, parseInt(resources[k], 10) || 0);
     if (qty > 0) {
       if ((senderPlanet.resources[k as ResourceType] || 0) < qty) {
-        return res.status(400).json({ error: `Not enough ${k} on your active moonbase planetary reserves.` });
+        return res.status(400).json({ error: `Not enough ${k} on your active planetary reserves.` });
       }
+      hasItems = true;
     }
+  }
+
+  if (!hasItems) {
+    return res.status(400).json({ error: "You must specify at least one resource quantity to transmit." });
   }
 
   // Subtract & Add
@@ -3862,7 +3969,7 @@ app.post("/api/resources/send", (req, res) => {
   state.newsEvents.push({
     id: `news_trade_${Date.now()}`,
     title: "Quantum Trade Portal Activated!",
-    content: `Commander ${p.username} successfully transmitted a massive payload cargo shipment to Commander ${targetPlayer.username}!`,
+    content: `Commander ${p.username} successfully transmitted resources from ${senderPlanet.name} to ${targetPlayer.username}'s ${targetPlanet.name}!`,
     type: "system",
     timestamp: Date.now()
   });

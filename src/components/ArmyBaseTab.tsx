@@ -58,7 +58,9 @@ interface ArmyBaseTabProps {
     missionType: 'attack' | 'colonize' | 'recon' | 'move';
     troops: Record<string, number>;
     targetBuilding?: string;
-  }) => void;
+    createdFleetId?: string;
+    planetId?: string;
+  }) => Promise<any> | any;
   onSettle?: (fleetId: string) => void;
   createdFleets: CreatedFleet[];
   setCreatedFleets: React.Dispatch<React.SetStateAction<CreatedFleet[]>>;
@@ -142,7 +144,7 @@ const TROOP_REQUIRED_LEVELS: Record<string, number> = {
   attacker: 10,      // Assault Drone
   looter: 15,        // Matter Extractor
   tank: 19,          // Disrupter
-  settlementShip: 22  // Settlement Ship
+  settlementShip: 1  // Settlement Ship
 };
 
 export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
@@ -405,19 +407,30 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
         }
 
         // Step 2: Dispatch the fleet mission!
+        let activeMission = null;
         if (onSendFleet) {
-          onSendFleet({
+          activeMission = await onSendFleet({
             targetX: directLaunchX,
             targetY: directLaunchY,
             missionType: directMissionType,
             troops: fleet.troops as any,
             targetBuilding: (fleet.troops.tank || 0) > 0 ? directTargetBuilding : undefined,
-            planetId: activePlanet.id
+            planetId: activePlanet.id,
+            createdFleetId: fleet.id
           });
         }
 
-        // Step 3: Remove the reserve fleet from local state
-        setCreatedFleets(prev => prev.filter(item => item.id !== fleet.id));
+        // Step 3: Keep the reserve fleet and mark it as traveling
+        setCreatedFleets(prev => prev.map(item => {
+          if (item.id === fleet.id) {
+            return {
+              ...item,
+              activeMissionId: activeMission?.id || `fleet_temp_${Date.now()}`,
+              isTraveling: true
+            };
+          }
+          return item;
+        }));
         setActiveLaunchFleetId(null);
         alert(`Dispatched reserve fleet ${fleet.name} into space flight!`);
       } else {
@@ -457,12 +470,10 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
   let shieldMultiplier = 1.0;
   try {
-    const savedTech = localStorage.getItem(`moonbase_tech_${player.id}`);
-    if (savedTech) {
-      const parsed = JSON.parse(savedTech);
-      const shieldLvl = parsed.defense_shields || 1;
-      shieldMultiplier = 1.0 + (shieldLvl / 20) * 0.15;
-    }
+    const isFirstPlanet = player.planets[0]?.id === activePlanet.id;
+    const savedTech = localStorage.getItem(`moonbase_tech_${player.id}_${activePlanet.id}`);
+    const shieldLvl = savedTech ? (JSON.parse(savedTech).defense_shields ?? (isFirstPlanet ? 20 : 0)) : (isFirstPlanet ? 20 : 0);
+    shieldMultiplier = 1.0 + (shieldLvl / 20) * 0.15;
   } catch {
     // fallback
   }
@@ -1411,15 +1422,22 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 text-left">
                               <span className="font-bold text-xs text-slate-100 block truncate">{fleet.name}</span>
-                              <span className="text-[9px] text-cyan-400 font-mono px-1.5 py-0.5 bg-cyan-950/30 border border-cyan-800/30 rounded inline-block mt-0.5 uppercase tracking-wide">
-                                {fleet.subsidiary}
-                              </span>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                <span className="text-[9px] text-cyan-400 font-mono px-1.5 py-0.5 bg-cyan-950/30 border border-cyan-800/30 rounded inline-block uppercase tracking-wide">
+                                  {fleet.subsidiary}
+                                </span>
+                                {fleet.isTraveling && (
+                                  <span className="text-[9px] text-amber-400 font-mono px-1.5 py-0.5 bg-amber-950/35 border border-amber-850/40 rounded inline-block uppercase tracking-wide animate-pulse">
+                                    🚀 IN FLIGHT
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <button
                               type="button"
-                              disabled={isRefunding === fleet.id}
+                              disabled={isRefunding === fleet.id || fleet.isTraveling}
                               onClick={() => handleDisbandFleet(fleet)}
-                              className="px-2 py-1 text-[9px] font-bold text-red-400 hover:text-red-300 bg-red-950/20 hover:bg-red-900/30 border border-red-500/25 rounded transition cursor-pointer font-mono select-none"
+                              className="px-2 py-1 text-[9px] font-bold text-red-400 hover:text-red-300 bg-red-950/20 hover:bg-red-900/30 border border-red-500/25 rounded transition cursor-pointer font-mono select-none disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               {isRefunding === fleet.id ? 'Refunding...' : 'Disassemble'}
                             </button>
@@ -1438,119 +1456,125 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                             })}
                           </div>
 
-                          {/* Inline direct launch form for this fleet */}
-                          <div className="mt-2.5 pt-2.5 border-t border-[#1E293B]/60 space-y-2 text-left">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (activeLaunchFleetId === fleet.id) {
-                                  setActiveLaunchFleetId(null);
-                                } else {
-                                  setActiveLaunchFleetId(fleet.id);
-                                  // Prefit mission type
-                                  const hasSettlement = (fleet.troops.settlementShip || 0) >= 1;
-                                  const hasCombat = (fleet.troops.attacker || 0) >= 1 || (fleet.troops.tank || 0) >= 1 || (fleet.troops.looter || 0) >= 1 || (fleet.troops.defender || 0) >= 1;
-                                  setDirectMissionType(hasSettlement ? 'colonize' : hasCombat ? 'attack' : 'move');
-                                  setDirectLaunchX(activePlanet.sectorX);
-                                  setDirectLaunchY(activePlanet.sectorY);
-                                  setDirectTargetBuilding('random');
-                                }
-                              }}
-                              className={`w-full py-1 text-[10px] font-bold uppercase rounded font-mono transition duration-150 cursor-pointer flex items-center justify-center gap-1 ${
-                                activeLaunchFleetId === fleet.id
-                                  ? 'bg-slate-800 text-slate-300 hover:bg-slate-750'
-                                  : 'bg-cyan-950/40 text-cyan-400 hover:bg-cyan-900/30 border border-cyan-500/30 hover:border-cyan-455'
-                              }`}
-                            >
-                              <span>🛫</span>
-                              <span>{activeLaunchFleetId === fleet.id ? 'CANCEL DISPATCH' : 'LAUNCH RESERVE FLEET'}</span>
-                            </button>
+                          {fleet.isTraveling ? (
+                            <div className="mt-2.5 pt-2 text-center text-[10px] font-mono text-amber-400 bg-amber-950/15 border border-amber-550/20 rounded py-1.5 leading-tight">
+                              🚀 Tactical fleet currently traveling in deep space on active mission orders.
+                            </div>
+                          ) : (
+                            /* Inline direct launch form for this fleet */
+                            <div className="mt-2.5 pt-2.5 border-t border-[#1E293B]/60 space-y-2 text-left">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (activeLaunchFleetId === fleet.id) {
+                                    setActiveLaunchFleetId(null);
+                                  } else {
+                                    setActiveLaunchFleetId(fleet.id);
+                                    // Prefit mission type
+                                    const hasSettlement = (fleet.troops.settlementShip || 0) >= 1;
+                                    const hasCombat = (fleet.troops.attacker || 0) >= 1 || (fleet.troops.tank || 0) >= 1 || (fleet.troops.looter || 0) >= 1 || (fleet.troops.defender || 0) >= 1;
+                                    setDirectMissionType(hasSettlement ? 'colonize' : hasCombat ? 'attack' : 'move');
+                                    setDirectLaunchX(activePlanet.sectorX);
+                                    setDirectLaunchY(activePlanet.sectorY);
+                                    setDirectTargetBuilding('random');
+                                  }
+                                }}
+                                className={`w-full py-1 text-[10px] font-bold uppercase rounded font-mono transition duration-150 cursor-pointer flex items-center justify-center gap-1 ${
+                                  activeLaunchFleetId === fleet.id
+                                    ? 'bg-slate-800 text-slate-300 hover:bg-slate-750'
+                                    : 'bg-cyan-950/40 text-cyan-400 hover:bg-cyan-900/30 border border-cyan-500/30 hover:border-cyan-455'
+                                }`}
+                              >
+                                <span>🛫</span>
+                                <span>{activeLaunchFleetId === fleet.id ? 'CANCEL DISPATCH' : 'LAUNCH RESERVE FLEET'}</span>
+                              </button>
 
-                            {activeLaunchFleetId === fleet.id && (
-                              <div className="p-2 border border-cyan-500/20 bg-cyan-950/10 rounded-lg space-y-2 mt-2 font-sans">
-                                <p className="text-[9px] text-slate-400 leading-tight">
-                                  Configure destination sector coordinates and operational parameters immediately.
-                                </p>
+                              {activeLaunchFleetId === fleet.id && (
+                                <div className="p-2 border border-cyan-500/20 bg-cyan-950/10 rounded-lg space-y-2 mt-2 font-sans">
+                                  <p className="text-[9px] text-slate-400 leading-tight">
+                                    Configure destination sector coordinates and operational parameters immediately.
+                                  </p>
 
-                                {/* Target coordinates inputs */}
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div>
-                                    <label className="text-[8px] font-bold uppercase text-slate-500 font-mono block mb-0.5">Vector X</label>
-                                    <input
-                                      type="number"
-                                      value={directLaunchX}
-                                      onChange={(e) => setDirectLaunchX(parseInt(e.target.value, 10) || 0)}
-                                      className="w-full bg-[#05070A] border border-[#1E293B] rounded px-1.5 py-1 text-[10px] text-white font-mono focus:outline-none focus:border-cyan-400"
-                                    />
+                                  {/* Target coordinates inputs */}
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="text-[8px] font-bold uppercase text-slate-500 font-mono block mb-0.5">Vector X</label>
+                                      <input
+                                        type="number"
+                                        value={directLaunchX}
+                                        onChange={(e) => setDirectLaunchX(parseInt(e.target.value, 10) || 0)}
+                                        className="w-full bg-[#05070A] border border-[#1E293B] rounded px-1.5 py-1 text-[10px] text-white font-mono focus:outline-none focus:border-cyan-400"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[8px] font-bold uppercase text-slate-500 font-mono block mb-0.5">Vector Y</label>
+                                      <input
+                                        type="number"
+                                        value={directLaunchY}
+                                        onChange={(e) => setDirectLaunchY(parseInt(e.target.value, 10) || 0)}
+                                        className="w-full bg-[#05070A] border border-[#1E293B] rounded px-1.5 py-1 text-[10px] text-white font-mono focus:outline-none focus:border-cyan-400"
+                                      />
+                                    </div>
                                   </div>
+
+                                  {/* Mission action selector */}
                                   <div>
-                                    <label className="text-[8px] font-bold uppercase text-slate-500 font-mono block mb-0.5">Vector Y</label>
-                                    <input
-                                      type="number"
-                                      value={directLaunchY}
-                                      onChange={(e) => setDirectLaunchY(parseInt(e.target.value, 10) || 0)}
-                                      className="w-full bg-[#05070A] border border-[#1E293B] rounded px-1.5 py-1 text-[10px] text-white font-mono focus:outline-none focus:border-cyan-400"
-                                    />
-                                  </div>
-                                </div>
-
-                                {/* Mission action selector */}
-                                <div>
-                                  <label className="text-[8px] font-bold uppercase text-slate-500 font-mono block mb-0.5">Mission Directives</label>
-                                  <select
-                                    value={directMissionType}
-                                    onChange={(e) => setDirectMissionType(e.target.value as any)}
-                                    className="w-full bg-[#05070A] border border-[#1E293B] text-cyan-300 text-[10px] font-mono rounded px-1.5 py-1 focus:outline-none cursor-pointer"
-                                  >
-                                    <option value="move" className="bg-slate-950">MOVE (Transit/Reinforcements)</option>
-                                    <option value="attack" className="bg-slate-950">ATTACK (Planetary Raid)</option>
-                                    <option value="colonize" className="bg-slate-950">COLONIZE (New Planet Settlement)</option>
-                                    <option value="recon" className="bg-slate-950">RECON (Stealth Probe)</option>
-                                  </select>
-                                </div>
-
-                                {/* Disrupter target building choice */}
-                                {(fleet.troops.tank || 0) > 0 && directMissionType === 'attack' && (
-                                  <div className="space-y-1">
-                                    <label className="text-[8px] font-bold uppercase text-amber-500 font-mono block mb-0.5">Disrupter Demolition Target</label>
+                                    <label className="text-[8px] font-bold uppercase text-slate-500 font-mono block mb-0.5">Mission Directives</label>
                                     <select
-                                      value={directTargetBuilding}
-                                      onChange={(e) => setDirectTargetBuilding(e.target.value)}
-                                      className="w-full bg-[#05070A] text-[9.5px] text-amber-400 font-mono border border-amber-500/20 py-1 px-1.5 rounded focus:outline-none cursor-pointer"
+                                      value={directMissionType}
+                                      onChange={(e) => setDirectMissionType(e.target.value as any)}
+                                      className="w-full bg-[#05070A] border border-[#1E293B] text-cyan-300 text-[10px] font-mono rounded px-1.5 py-1 focus:outline-none cursor-pointer"
                                     >
-                                      <option value="random">Random Structure (Default)</option>
-                                      <optgroup label="Colony Buildings" className="bg-[#05070A] text-slate-300">
-                                        <option value="fabricator">Fabricator</option>
-                                        <option value="commsHub">Communications Hub</option>
-                                        <option value="researchCenter">Research Center</option>
-                                        <option value="armyBase">War Room</option>
-                                        <option value="repository">Silo</option>
-                                        <option value="radar">Radar Array</option>
-                                        <option value="supplyNexus">Supply Nexus</option>
-                                      </optgroup>
-                                      <optgroup label="Extraction Mines" className="bg-[#05070A] text-slate-300">
-                                        <option value="mines.water">Water Condenser Mine</option>
-                                        <option value="mines.plasma">Plasma Synthesizer Mine</option>
-                                        <option value="mines.fuel">Thermonuclear Fuel Mine</option>
-                                        <option value="mines.food">Hydroponic Food Mine</option>
-                                        <option value="mines.respirant">Aerosol Respirant Mine</option>
-                                      </optgroup>
+                                      <option value="move" className="bg-slate-950">MOVE (Transit/Reinforcements)</option>
+                                      <option value="attack" className="bg-slate-950">ATTACK (Planetary Raid)</option>
+                                      <option value="colonize" className="bg-slate-950">COLONIZE (New Planet Settlement)</option>
+                                      <option value="recon" className="bg-slate-950">RECON (Stealth Probe)</option>
                                     </select>
                                   </div>
-                                )}
 
-                                {/* Button to confirm direct launch */}
-                                <button
-                                  type="button"
-                                  disabled={isLaunchingDirect}
-                                  onClick={() => handleLaunchDirect(fleet)}
-                                  className="w-full py-1.5 bg-gradient-to-r from-cyan-400 to-indigo-500 hover:brightness-115 text-[#05070A] text-[10px] font-black uppercase tracking-wider rounded font-mono transition-all cursor-pointer"
-                                >
-                                  {isLaunchingDirect ? 'LAUNCHING DIRECT...' : 'CONFIRM FLIGHT DISPATCH'}
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                                  {/* Disrupter target building choice */}
+                                  {(fleet.troops.tank || 0) > 0 && directMissionType === 'attack' && (
+                                    <div className="space-y-1">
+                                      <label className="text-[8px] font-bold uppercase text-amber-500 font-mono block mb-0.5">Disrupter Demolition Target</label>
+                                      <select
+                                        value={directTargetBuilding}
+                                        onChange={(e) => setDirectTargetBuilding(e.target.value)}
+                                        className="w-full bg-[#05070A] text-[9.5px] text-amber-400 font-mono border border-amber-500/20 py-1 px-1.5 rounded focus:outline-none cursor-pointer"
+                                      >
+                                        <option value="random">Random Structure (Default)</option>
+                                        <optgroup label="Colony Buildings" className="bg-[#05070A] text-slate-300">
+                                          <option value="fabricator">Fabricator</option>
+                                          <option value="commsHub">Communications Hub</option>
+                                          <option value="researchCenter">Research Center</option>
+                                          <option value="armyBase">War Room</option>
+                                          <option value="repository">Silo</option>
+                                          <option value="radar">Radar Array</option>
+                                          <option value="supplyNexus">Supply Nexus</option>
+                                        </optgroup>
+                                        <optgroup label="Extraction Mines" className="bg-[#05070A] text-slate-300">
+                                          <option value="mines.water">Water Condenser Mine</option>
+                                          <option value="mines.plasma">Plasma Synthesizer Mine</option>
+                                          <option value="mines.fuel">Thermonuclear Fuel Mine</option>
+                                          <option value="mines.food">Hydroponic Food Mine</option>
+                                          <option value="mines.respirant">Aerosol Respirant Mine</option>
+                                        </optgroup>
+                                      </select>
+                                    </div>
+                                  )}
+
+                                  {/* Button to confirm direct launch */}
+                                  <button
+                                    type="button"
+                                    disabled={isLaunchingDirect}
+                                    onClick={() => handleLaunchDirect(fleet)}
+                                    className="w-full py-1.5 bg-gradient-to-r from-cyan-400 to-indigo-500 hover:brightness-115 text-[#05070A] text-[10px] font-black uppercase tracking-wider rounded font-mono transition-all cursor-pointer"
+                                  >
+                                    {isLaunchingDirect ? 'LAUNCHING DIRECT...' : 'CONFIRM FLIGHT DISPATCH'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
