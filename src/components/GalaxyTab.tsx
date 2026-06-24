@@ -48,7 +48,8 @@ interface GalaxyTabProps {
     targetName?: string;
     targetBuilding?: string;
     numFleets?: number;
-  }) => void;
+    createdFleetId?: string;
+  }) => Promise<any> | any;
   onRerouteFleet?: (fleetId: string, targetX: number, targetY: number, missionType?: string) => void;
   onSendChat: (channel: 'global' | 'alliance' | 'private', content: string, receiverId?: string) => void;
   onCreateAlliance: (name: string, tag: string, bannerColor: string, bannerSymbol: string) => void;
@@ -423,6 +424,10 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         alert("Reserve fleet not found!");
         return;
       }
+      if (fleet.isTraveling) {
+        alert("This reserve fleet is currently in space flight!");
+        return;
+      }
 
       setIsLaunchingReserve(true);
       try {
@@ -454,7 +459,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           }
 
           // Step 2: Dispatch the fleet mission!
-          onSendFleet({
+          const activeMission = await onSendFleet({
             targetX: selectedTarget.coords.x,
             targetY: selectedTarget.coords.y,
             missionType: fleetType,
@@ -463,11 +468,21 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             targetName: selectedTarget.planetName || `Sector [${selectedTarget.coords.x}, ${selectedTarget.coords.y}]`,
             targetBuilding: (fleet.troops.tank || 0) > 0 ? targetBuilding : undefined,
             numFleets: 1,
-            planetId: activePlanet.id
+            planetId: activePlanet.id,
+            createdFleetId: fleet.id
           });
 
-          // Step 3: Remove the reserve fleet since it's now an active traveler!
-          setCreatedFleets(prev => prev.filter(item => item.id !== fleet.id));
+          // Step 3: Keep the reserve fleet and mark it as traveling
+          setCreatedFleets(prev => prev.map(item => {
+            if (item.id === fleet.id) {
+              return {
+                ...item,
+                activeMissionId: activeMission?.id || `fleet_temp_${Date.now()}`,
+                isTraveling: true
+              };
+            }
+            return item;
+          }));
           if (showToast) showToast(`Dispatched reserve fleet ${fleet.name} into space flight!`, 'success');
         } else {
           alert(data.error || 'Failed to assemble reserve fleet for launch');
@@ -2881,7 +2896,10 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         const hasCombat = (fleetTroops.attacker || 0) >= 1 || (fleetTroops.tank || 0) >= 1 || (fleetTroops.looter || 0) >= 1 || (fleetTroops.defender || 0) >= 1;
         const hasSettlement = (fleetTroops.settlementShip || 0) >= 1;
 
-        const isMissionReady = selectedReserveFleetId !== 'manual' ? true : (hasDrone || hasCombat || hasSettlement);
+        const selectedRf = selectedReserveFleetId !== 'manual' ? createdFleets.find(f => f.id === selectedReserveFleetId) : null;
+        const isMissionReady = selectedReserveFleetId !== 'manual' 
+          ? (selectedRf ? !selectedRf.isTraveling : false)
+          : (hasDrone || hasCombat || hasSettlement);
 
         let inferredType: 'attack' | 'colonize' | 'recon' | 'move' = 'move';
         if (selectedReserveFleetId !== 'manual') {
@@ -2996,7 +3014,9 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           >
                             <option value="manual">🛠️ Compose New Custom Fleet (Manual)</option>
                             {planetReserves.map(rf => (
-                              <option key={rf.id} value={rf.id}>🚀 {rf.name} ({rf.subsidiary})</option>
+                              <option key={rf.id} value={rf.id} className="bg-[#05070A] text-white">
+                                🚀 {rf.name} ({rf.subsidiary}){rf.isTraveling ? ' ⚠️ [IN FLIGHT]' : ''}
+                              </option>
                             ))}
                           </select>
 
@@ -3004,8 +3024,14 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                             const selectedFleet = planetReserves.find(f => f.id === selectedReserveFleetId);
                             if (!selectedFleet) return null;
                             return (
-                              <div className="p-2.5 bg-slate-950/60 border border-slate-900 rounded-lg text-left font-mono text-[9.5px] space-y-1.5">
-                                <p className="font-bold text-cyan-400 uppercase">Pre-Loaded Fleet Components:</p>
+                              <div className="space-y-2">
+                                {selectedFleet.isTraveling && (
+                                  <div className="p-2.5 bg-amber-950/20 border border-amber-500/35 rounded-lg text-left text-[9.5px] font-mono text-amber-400 leading-normal animate-pulse">
+                                    ⚠️ <strong>IN SPACE TRANSIT:</strong> This squadron is currently on mission orders and is not docked. It will automatically dock and become ready for flight upon returning to base.
+                                  </div>
+                                )}
+                                <div className="p-2.5 bg-slate-950/60 border border-slate-900 rounded-lg text-left font-mono text-[9.5px] space-y-1.5">
+                                  <p className="font-bold text-cyan-400 uppercase">Pre-Loaded Fleet Components:</p>
                                 <div className="grid grid-cols-2 gap-1.5 text-slate-300">
                                   {Object.entries(selectedFleet.troops).map(([tId, count]) => {
                                     const qty = Number(count) || 0;
@@ -3026,7 +3052,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   })}
                                 </div>
                               </div>
-                            );
+                            </div>
+                          );
                           })()}
                         </div>
                       )}
@@ -3229,11 +3256,9 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
                   let troopSpeedLevel = 1;
                   try {
-                    const savedTech = localStorage.getItem(`moonbase_tech_${player.id}`);
-                    if (savedTech) {
-                      const parsed = JSON.parse(savedTech);
-                      troopSpeedLevel = parsed.troop_speed || 1;
-                    }
+                    const isFirstPlanet = player.planets[0]?.id === activePlanet.id;
+                    const savedTech = localStorage.getItem(`moonbase_tech_${player.id}_${activePlanet.id}`);
+                    troopSpeedLevel = savedTech ? (JSON.parse(savedTech).troop_speed ?? (isFirstPlanet ? 20 : 0)) : (isFirstPlanet ? 20 : 0);
                   } catch (err) {
                     // ignore
                   }

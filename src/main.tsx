@@ -25,7 +25,9 @@ try {
         }
 
         const cleanBase = backendUrl.replace(/\/+$/, '');
-        targetInput = `${cleanBase}${targetInput}`;
+        const prefixMatch = (!backendUrl && typeof window !== 'undefined') ? window.location.pathname.match(/^\/(\d+)(?:\/|$)/) : null;
+        const prefix = prefixMatch ? `/${prefixMatch[1]}` : '';
+        targetInput = `${cleanBase}${prefix}${targetInput}`;
       }
       return originalFetch(targetInput, init);
     };

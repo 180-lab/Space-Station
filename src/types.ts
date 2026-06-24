@@ -195,6 +195,7 @@ export interface FleetMission {
   };
   troopSpeedLevel?: number;
   defenseShieldsLevel?: number;
+  createdFleetId?: string | null;
 }
 
 export interface BattleReport {
@@ -313,6 +314,8 @@ export interface CreatedFleet {
     settlementShip: number;
   };
   planetId: string;
+  activeMissionId?: string | null;
+  isTraveling?: boolean;
 }
 
 export { getUpgradeWeights, getUpgradeResourceCost } from './gameUtils';

@@ -165,6 +165,20 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
     setIsEditingName(false);
   }, [activePlanet.id, activePlanet.name]);
 
+  // Resource sending form states
+  const [showSendResources, setShowSendResources] = useState(false);
+  const [transferTargetId, setTransferTargetId] = useState('');
+  const [transferCoords, setTransferCoords] = useState({ x: '', y: '' });
+  const [useCoords, setUseCoords] = useState(false);
+  const [transferResources, setTransferResources] = useState<Record<string, string>>({
+    water: '0',
+    plasma: '0',
+    fuel: '0',
+    food: '0',
+    respirant: '0'
+  });
+  const [isTransmitting, setIsTransmitting] = useState(false);
+
   const handleRenameActiveStation = async () => {
     if (!newNameInput.trim()) {
       showToast?.('Station name cannot be empty!', 'error');
@@ -208,6 +222,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(null);
 
   const getRequiredFabricatorLevel = (key: string): number => {
+    if (key === 'fabricator') return 0;
     if (key === 'radar') return 2;
     if (key === 'researchCenter') return 4;
     if (key === 'armyBase') return 7;
@@ -1189,54 +1204,172 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                       )}
 
                       {bKey === 'supplyNexus' && (
-                        <div className="space-y-3 text-xs text-left">
-                          <div className="text-sky-400 font-mono font-bold flex items-center gap-1">
-                            Current Shipment: <span className="text-white bg-sky-950/40 border border-sky-800/30 px-1.5 py-0.5 rounded font-bold">+{(bState.level * 20000).toLocaleString()}</span> units of <span className="text-emerald-400">each resource type</span> {(bState.level === bState.maxLevel) && <span className="text-amber-400 animate-pulse">(MAX DELIVER)</span>}
+                        <div className="space-y-4 text-xs text-left">
+                          <div className="text-emerald-400 font-mono font-bold flex items-center gap-1">
+                            Supply Nexus Status: <span className="text-white bg-emerald-950/40 border border-emerald-800/30 px-1.5 py-0.5 rounded font-bold">Trading Network Link Level {bState.level}</span>
                           </div>
                           <div className="font-sans text-[11px] text-slate-400 bg-slate-950/60 p-2.5 border border-[#1E293B]/60 rounded-lg max-w-md">
-                            🌌 <span className="font-bold text-slate-200">Quantum Dispatch System:</span> Summon planetary logistics cargo ships directly to this sector. At maximum level 50, a full shipment dispatches a total of <span className="font-bold text-amber-400">5,000,000 resources</span> (1,000,000 each of Water, Plasma, Fuel, Food, and Respirants)!
+                            🌌 <span className="font-bold text-slate-200">Quantum Cargo Link:</span> Wire resources directly to other planets in the sector. Enter coordinates manually or select from your colonized space stations.
                           </div>
+
                           {bState.level > 0 && (
-                            <div className="pt-1 flex items-center gap-3 flex-wrap">
+                            <div className="space-y-3 pt-1">
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  try {
-                                    const response = await fetch('/api/planet/claim-supply-nexus', {
-                                      method: 'POST',
-                                      headers: { 
-                                        'Content-Type': 'application/json',
-                                        'x-user-id': player.id
-                                      },
-                                      body: JSON.stringify({ planetId: activePlanet.id })
-                                    });
-                                    const data = await response.json();
-                                    if (response.ok) {
-                                      localStorage.setItem(`moonbase_nexus_claimed_${player.id}`, 'true');
-                                      if (showToast) {
-                                        showToast(`Quantum shipment received! +${data.qtyPerResource.toLocaleString()} of all 5 resource types loaded (+${data.totalVolume.toLocaleString()} total resources)!`, 'success');
-                                      }
-                                      if (onRefreshState) onRefreshState();
-                                    } else {
-                                      if (showToast) showToast(data.error || 'Failed to claim shipment', 'error');
-                                    }
-                                  } catch (err) {
-                                    if (showToast) showToast('Network or quantum instability occurred.', 'error');
-                                  }
-                                }}
-                                className="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold font-mono text-[10px] uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95 hover:brightness-110"
+                                onClick={() => setShowSendResources(!showSendResources)}
+                                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold font-mono text-[10px] uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95 hover:brightness-110"
                               >
-                                🚀 REQUEST QUANTUM SHIPMENT
+                                📦 SEND RESOURCES
                               </button>
-                              
-                              {activePlanet.lastSupplyNexusClaim && (Date.now() - activePlanet.lastSupplyNexusClaim < 120000) ? (
-                                <span className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-1 font-mono font-bold animate-pulse">
-                                  Portal recharging...
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md px-2 py-1 font-mono font-bold">
-                                  Stable & Charged
-                                </span>
+
+                              {showSendResources && (
+                                <div className="p-3 bg-[#0a0f18] border border-[#1e293b] rounded-lg max-w-md space-y-3">
+                                  {/* Target Selection Header */}
+                                  <div className="flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => { setUseCoords(false); setTransferTargetId(''); }}
+                                      className={`px-2 py-1 rounded text-[10px] font-mono font-bold ${!useCoords ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'}`}
+                                    >
+                                      MY STATIONS
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setUseCoords(true); setTransferTargetId(''); }}
+                                      className={`px-2 py-1 rounded text-[10px] font-mono font-bold ${useCoords ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'}`}
+                                    >
+                                      COORDINATES
+                                    </button>
+                                  </div>
+
+                                  {/* Target inputs */}
+                                  {!useCoords ? (
+                                    <div className="space-y-1">
+                                      <label className="text-[10px] font-bold text-slate-400 uppercase">Select Target Space Station</label>
+                                      <select
+                                        value={transferTargetId}
+                                        onChange={(e) => setTransferTargetId(e.target.value)}
+                                        className="w-full bg-[#03070c] border border-[#1e293b] rounded p-1.5 text-xs text-slate-100"
+                                      >
+                                        <option value="">-- Choose target planet --</option>
+                                        {player.planets.filter(pl => pl.id !== activePlanet.id).map(pl => (
+                                          <option key={pl.id} value={pl.id}>
+                                            {pl.name} [{pl.sectorX}, {pl.sectorY}]
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-1">
+                                      <label className="text-[10px] font-bold text-slate-400 uppercase">Target sector coordinates</label>
+                                      <div className="flex gap-2">
+                                        <input
+                                          type="number"
+                                          placeholder="Sector X"
+                                          value={transferCoords.x}
+                                          onChange={(e) => setTransferCoords(prev => ({ ...prev, x: e.target.value }))}
+                                          className="w-1/2 bg-[#03070c] border border-[#1e293b] rounded p-1 text-slate-100 font-mono text-xs"
+                                        />
+                                        <input
+                                          type="number"
+                                          placeholder="Sector Y"
+                                          value={transferCoords.y}
+                                          onChange={(e) => setTransferCoords(prev => ({ ...prev, y: e.target.value }))}
+                                          className="w-1/2 bg-[#03070c] border border-[#1e293b] rounded p-1 text-slate-100 font-mono text-xs"
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Resource inputs */}
+                                  <div className="space-y-2 border-t border-[#1e293b]/60 pt-2.5">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Specify Resource cargo load</span>
+                                    {['water', 'plasma', 'fuel', 'food', 'respirant'].map((resKey) => {
+                                      const label = resKey.charAt(0).toUpperCase() + resKey.slice(1);
+                                      const maxVal = Math.floor(localResources[resKey as ResourceType] || 0);
+                                      return (
+                                        <div key={resKey} className="flex items-center justify-between gap-2 bg-[#03070c] p-1.5 rounded border border-[#1e293b]/30">
+                                          <span className="text-slate-300 font-medium w-20">{label}</span>
+                                          <div className="flex items-center gap-1">
+                                            <input
+                                              type="number"
+                                              min="0"
+                                              max={maxVal}
+                                              value={transferResources[resKey] || '0'}
+                                              onChange={(e) => {
+                                                const v = Math.min(maxVal, Math.max(0, parseInt(e.target.value, 10) || 0));
+                                                setTransferResources(prev => ({ ...prev, [resKey]: String(v) }));
+                                              }}
+                                              className="bg-[#0a101d] border border-[#1e293b] rounded text-slate-100 text-right w-24 p-1 text-xs font-mono"
+                                            />
+                                            <button
+                                              type="button"
+                                              onClick={() => setTransferResources(prev => ({ ...prev, [resKey]: String(maxVal) }))}
+                                              className="px-1.5 py-1 text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold uppercase rounded"
+                                            >
+                                              MAX
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Submit button */}
+                                  <button
+                                    type="button"
+                                    disabled={isTransmitting}
+                                    onClick={async () => {
+                                      if (!useCoords && !transferTargetId) {
+                                        showToast?.('Please select a target space station!', 'error');
+                                        return;
+                                      }
+                                      if (useCoords && (!transferCoords.x || !transferCoords.y)) {
+                                        showToast?.('Please specify target sector coordinates!', 'error');
+                                        return;
+                                      }
+                                      setIsTransmitting(true);
+                                      try {
+                                        const response = await fetch('/api/resources/send', {
+                                          method: 'POST',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            'x-user-id': player.id
+                                          },
+                                          body: JSON.stringify({
+                                            targetId: useCoords ? undefined : transferTargetId,
+                                            targetX: useCoords ? parseInt(transferCoords.x, 10) : undefined,
+                                            targetY: useCoords ? parseInt(transferCoords.y, 10) : undefined,
+                                            sourcePlanetId: activePlanet.id,
+                                            resources: {
+                                              water: parseInt(transferResources.water, 10) || 0,
+                                              plasma: parseInt(transferResources.plasma, 10) || 0,
+                                              fuel: parseInt(transferResources.fuel, 10) || 0,
+                                              food: parseInt(transferResources.food, 10) || 0,
+                                              respirant: parseInt(transferResources.respirant, 10) || 0
+                                            }
+                                          })
+                                        });
+                                        const data = await response.json();
+                                        if (response.ok) {
+                                          showToast?.(data.message || 'Resources transmitted successfully via Quantum Cargo link!', 'success');
+                                          // Reset fields
+                                          setTransferResources({ water: '0', plasma: '0', fuel: '0', food: '0', respirant: '0' });
+                                          if (onRefreshState) onRefreshState();
+                                        } else {
+                                          showToast?.(data.error || 'Failed to transmit resource shipment.', 'error');
+                                        }
+                                      } catch (err) {
+                                        showToast?.('Network transmission failed.', 'error');
+                                      } finally {
+                                        setIsTransmitting(false);
+                                      }
+                                    }}
+                                    className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold uppercase font-mono tracking-wide rounded-md cursor-pointer text-center"
+                                  >
+                                    {isTransmitting ? 'TRANSMITTING LINK...' : 'DISPATCH CARGO SHIPS'}
+                                  </button>
+                                </div>
                               )}
                             </div>
                           )}
