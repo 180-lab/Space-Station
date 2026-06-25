@@ -202,6 +202,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [searchX, setSearchX] = useState(activePlanet.sectorX.toString());
   const [searchY, setSearchY] = useState(activePlanet.sectorY.toString());
   const [scanResults, setScanResults] = useState<any[]>([]);
+  const [radarFilter, setRadarFilter] = useState<'all' | 'habitable' | 'player'>('all');
   const [expandedTargets, setExpandedTargets] = useState<Record<string, boolean>>({});
   const [radarRadius, setRadarRadius] = useState(1);
   const [isScanning, setIsScanning] = useState(false);
@@ -833,16 +834,53 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   <span className="text-xs text-cyan-400 bg-cyan-950/30 border border-cyan-800/20 px-2 py-0.5 rounded font-bold">Scope [{targetCoords.x}, {targetCoords.y}]</span>
                 </div>
 
-                {scanResults.length === 0 ? (
-                  <div className="py-12 border border-dashed border-[#1E293B] text-center rounded-xl space-y-3" title="Static scanner feed diagnostics: no active targets found in area">
-                    <Radar size={40} className="mx-auto text-slate-600 animate-pulse text-cyan-500/40" title="Scanning wave telemetry sweep feedback" />
-                    <p className="text-sm font-bold text-slate-350">No active sector signatures detected</p>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">Coordinate index matches might be out of radar scanning bounds. Ready deep scanner upgrade units.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="space-y-4 pr-1">
-                      {scanResults.slice(radarPage * 10, (radarPage + 1) * 10).map((target) => {
+                {/* Radar Segment Filter Buttons */}
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#0A0F1D] border border-[#1E293B] rounded-xl text-[10px] font-mono">
+                  <button
+                    type="button"
+                    onClick={() => { setRadarFilter('all'); setRadarPage(0); }}
+                    className={`py-2 rounded-lg font-bold transition-all ${radarFilter === 'all' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_8px_rgba(34,211,238,0.1)]' : 'text-slate-400 hover:text-white border border-transparent cursor-pointer'}`}
+                  >
+                    ALL ({scanResults.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setRadarFilter('habitable'); setRadarPage(0); }}
+                    className={`py-2 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${radarFilter === 'habitable' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.1)]' : 'text-slate-400 hover:text-white border border-transparent cursor-pointer'}`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                    HABITABLE ({scanResults.filter(t => t.isHabitable).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setRadarFilter('player'); setRadarPage(0); }}
+                    className={`py-2 rounded-lg font-bold transition-all ${radarFilter === 'player' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_8px_rgba(34,211,238,0.1)]' : 'text-slate-400 hover:text-white border border-transparent cursor-pointer'}`}
+                  >
+                    STATIONS ({scanResults.filter(t => !t.isHabitable).length})
+                  </button>
+                </div>
+
+                {(() => {
+                  const filteredResults = scanResults.filter(target => {
+                    if (radarFilter === 'habitable') return !!target.isHabitable;
+                    if (radarFilter === 'player') return !target.isHabitable;
+                    return true;
+                  });
+
+                  if (filteredResults.length === 0) {
+                    return (
+                      <div className="py-12 border border-dashed border-[#1E293B] text-center rounded-xl space-y-3" title="Static scanner feed diagnostics: no active targets found in area">
+                        <Radar size={40} className="mx-auto text-slate-600 animate-pulse text-cyan-500/40" title="Scanning wave telemetry sweep feedback" />
+                        <p className="text-sm font-bold text-slate-350">No matching sector signatures</p>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">No targets match the active radar filter option. Try changing your filters or scan coordinates.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="space-y-4 pr-1">
+                        {filteredResults.slice(radarPage * 10, (radarPage + 1) * 10).map((target) => {
                       const isUserSelf = target.id === player.id;
                       const targetDist = Math.hypot(target.coords.x - activePlanet.sectorX, target.coords.y - activePlanet.sectorY);
                       const spaceMiles = targetDist * 1.917;
@@ -1009,7 +1047,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     </div>
 
                     {/* Pagination Controls */}
-                    {scanResults.length > 10 && (
+                    {filteredResults.length > 10 && (
                       <div className="flex items-center justify-between border-t border-[#1E293B]/60 pt-4 mt-2 font-mono text-xs">
                         <button
                           type="button"
@@ -1022,12 +1060,12 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                         </button>
                         
                         <span className="text-slate-400 font-bold bg-[#05070A] border border-[#1E293B] px-3.5 py-1.5 rounded-xl">
-                          Page <span className="text-cyan-400">{radarPage + 1}</span> of {Math.ceil(scanResults.length / 10)}
+                          Page <span className="text-cyan-400">{radarPage + 1}</span> of {Math.ceil(filteredResults.length / 10)}
                         </span>
 
                         <button
                           type="button"
-                          disabled={(radarPage + 1) * 10 >= scanResults.length}
+                          disabled={(radarPage + 1) * 10 >= filteredResults.length}
                           onClick={() => setRadarPage(prev => prev + 1)}
                           className="px-3.5 py-2 bg-[#0D1527] border border-[#1E293B] text-slate-350 hover:text-cyan-400 hover:bg-[#0F1E36] disabled:opacity-30 disabled:pointer-events-none rounded-xl flex items-center gap-1.5 transition cursor-pointer font-bold"
                         >
@@ -1037,7 +1075,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                       </div>
                     )}
                   </div>
-                )}
+                );
+              })()}
               </div>
             )}
           </div>

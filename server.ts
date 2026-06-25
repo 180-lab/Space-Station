@@ -2794,6 +2794,10 @@ app.post("/api/galaxy/scan", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
+  // Self-heal and ensure habitable planets list is fully populated at runtime
+  ensureMinimumHabitablePlanets();
+  saveState();
+
   const { centerX, centerY, planetId } = req.body;
   const planet = p.planets.find(pl => pl.id === planetId);
 
