@@ -164,7 +164,7 @@ function normalizeState(s: GameState) {
         settlementShip: 0
       };
       Object.keys(troopDefaults).forEach(tKey => {
-        if (pl.troops[tKey] === undefined || !isFirst) {
+        if (pl.troops[tKey] === undefined) {
           pl.troops[tKey] = troopDefaults[tKey];
         }
       });
@@ -2822,6 +2822,9 @@ app.post("/api/galaxy/scan", (req, res) => {
     });
   });
 
+  const hasSettlementShip = p.planets.some(pl => (pl.troops?.settlementShip || 0) > 0) ||
+                            state.fleets.some(f => f.senderId === p.id && (f.troops?.settlementShip || 0) > 0);
+
   // Inject uncharted habitable planets/stations currently visible
   if (state.habitablePlanets) {
     state.habitablePlanets.forEach(hp => {
@@ -2846,12 +2849,35 @@ app.post("/api/galaxy/scan", (req, res) => {
   // Sort targets by distance ascending
   allTargets.sort((a, b) => a.dist - b.dist);
 
-  // Return targets that are within scanRadius * 10, or at least the top 5 closest targets in the universe
   const maxScanDist = scanRadius * 10;
-  let targets = allTargets.filter(t => t.dist <= maxScanDist);
+  
+  // Separate habitable targets and non-habitable targets
+  const habTargets = allTargets.filter(t => t.isHabitable);
+  const otherTargets = allTargets.filter(t => !t.isHabitable);
+
+  // Filter non-habitable targets by range, keeping a fallback if empty
+  const visibleOthers = otherTargets.filter(t => t.dist <= maxScanDist);
+
+  // Filter habitable targets:
+  // - If hasSettlementShip is true, show ALL habitable planets in the universe.
+  // - If hasSettlementShip is false, show those in range, but guarantee at least the 10 closest ones in the universe are shown.
+  let visibleHabs: any[] = [];
+  if (hasSettlementShip) {
+    visibleHabs = habTargets;
+  } else {
+    const inRangeHabs = habTargets.filter(t => t.dist <= maxScanDist);
+    if (inRangeHabs.length >= 10) {
+      visibleHabs = inRangeHabs;
+    } else {
+      visibleHabs = habTargets.slice(0, 10);
+    }
+  }
+
+  // Combine and sort by distance
+  let targets = [...visibleOthers, ...visibleHabs];
+  targets.sort((a, b) => a.dist - b.dist);
   
   if (targets.length < 5) {
-    // If not enough targets within range, supplement up to 5 closest targets so scanner is never empty
     targets = allTargets.slice(0, 6);
   }
 
@@ -2891,10 +2917,13 @@ app.post("/api/galaxy/intelligence", (req, res) => {
     });
   });
 
+  const hasSettlementShip = p.planets.some(pl => (pl.troops?.settlementShip || 0) > 0) ||
+                            state.fleets.some(f => f.senderId === p.id && (f.troops?.settlementShip || 0) > 0);
+
   let report: any = null;
   const now = Date.now();
   const reportId = `battle_intel_${Math.random().toString(36).substr(2, 9)}`;
-  const isHab = state.habitablePlanets?.find(hp => hp.coords.x === xVal && hp.coords.y === yVal);
+  const isHab = state.habitablePlanets?.find(hp => hp.coords.x === xVal && hp.coords.y === yVal) || null;
 
   if (targetPlanet && targetUser) {
     // Occupied Planet Report

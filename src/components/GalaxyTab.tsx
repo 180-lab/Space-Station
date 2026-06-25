@@ -654,6 +654,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           targetName: targetForResources.username,
           targetX: targetForResources.coords.x,
           targetY: targetForResources.coords.y,
+          sourcePlanetId: activePlanet.id,
           resources: resourceSendValues
         })
       });

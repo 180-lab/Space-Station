@@ -462,10 +462,23 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       case 12:
         return (checkTargetPlanet.buildings.researchCenter?.level || 0) >= 1;
       case 13:
-        const hasStartedRes = localStorage.getItem(`moonbase_activeres_${player.id}`) !== null;
+        const hasStartedResGlobally = player.planets.some(pl => localStorage.getItem(`moonbase_activeres_${player.id}_${pl.id}`) !== null);
+        const hasTechResearchedGlobally = player.planets.some(pl => {
+          const techData = localStorage.getItem(`moonbase_tech_${player.id}_${pl.id}`);
+          if (!techData) return false;
+          try {
+            const parsed = JSON.parse(techData);
+            return Object.values(parsed).some((lvl: any) => lvl > 0);
+          } catch {
+            return false;
+          }
+        });
+        const hasResearchCenterGlobally = player.planets.some(pl => (pl.buildings.researchCenter?.level || 0) >= 1);
         return (
-          hasStartedRes ||
-          (checkTargetPlanet.buildings.researchCenter?.level || 0) > 1 ||
+          hasStartedResGlobally ||
+          hasTechResearchedGlobally ||
+          hasResearchCenterGlobally ||
+          localStorage.getItem(`moonbase_activeres_${player.id}`) === 'true' ||
           localStorage.getItem(`tech_researched_${player.id}`) === 'true' ||
           completedList.includes(13)
         );

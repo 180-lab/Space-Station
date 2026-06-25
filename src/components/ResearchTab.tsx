@@ -328,6 +328,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       techId,
       endAt: Date.now() + durationMs
     });
+    localStorage.setItem(`tech_researched_${player.id}`, 'true');
+    localStorage.setItem(`moonbase_activeres_${player.id}`, 'true');
     showToast(`Authorizing telemetry files for ${tech.name} upgrade!`, 'success');
   };
 

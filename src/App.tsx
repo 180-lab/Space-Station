@@ -13,6 +13,7 @@ import {
   CreatedFleet
 } from './types';
 import { sendMobileNotification } from './lib/mobileNotifications';
+import { playAlertySound, playChilledSound } from './lib/soundUtils';
 import { ExploreTab } from './components/ExploreTab';
 import { ArmyBaseTab } from './components/ArmyBaseTab';
 import { GalaxyTab } from './components/GalaxyTab';
@@ -167,6 +168,15 @@ export default function App() {
   const [serverTime, setServerTime] = useState<number>(Date.now());
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [viewingPlayerId, setViewingPlayerId] = useState<string | null>(null);
+
+  // Auto-dismiss toast after 3.5 seconds
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => {
+      setToast(null);
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // Command message deck states
   const [showCommDeck, setShowCommDeck] = useState(false);
@@ -597,6 +607,20 @@ export default function App() {
   // Toast notifier helper
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
+
+    // Play notification sound if SFX is enabled
+    const soundEnabled = localStorage.getItem('moonbase_sound_enabled') !== 'false';
+    if (soundEnabled) {
+      const isAttack = message.toLowerCase().includes('tactical alert') || 
+                       message.toLowerCase().includes('intel warning') || 
+                       message.toLowerCase().includes('attack') || 
+                       message.toLowerCase().includes('hostile');
+      if (isAttack) {
+        playAlertySound();
+      } else {
+        playChilledSound();
+      }
+    }
   };
 
   // Building and Mine upgrade completed detector effect
@@ -688,10 +712,9 @@ export default function App() {
       return;
     }
     
-    // Find all active incoming attacks against any of our colonized planets
+    // Find all active incoming attacks in the universe
     const myPlanetIds = player.planets.map(p => p.id);
     const activeIncomingAttacks = fleets.filter(f => 
-      myPlanetIds.includes(f.targetId) && 
       f.missionType === 'attack' && 
       !f.isReturning && 
       f.arrivesAt > serverTime
@@ -703,11 +726,18 @@ export default function App() {
     // Detect if we have any NEW incoming attacks
     activeIncomingAttacks.forEach(f => {
       if (!prevAttackIds.includes(f.id)) {
-        const targetPlanet = player.planets.find(p => p.id === f.targetId);
-        const pName = targetPlanet ? targetPlanet.name : "Station Core";
-        const message = `Hostile space fleet from Commander ${f.senderName} detected on attack trajectory to ${pName}! Arriving in ${Math.round((f.arrivesAt - serverTime) / 1000)} seconds!`;
-        showToast(`⚠️ TACTICAL ALERT: ${message}`, 'error');
-        sendMobileNotification(`⚠️ TACTICAL ALERT!`, message);
+        // Skip if attack notifications are toggled off
+        const attackAlertsEnabled = localStorage.getItem('moonbase_attack_notifications_enabled') !== 'false';
+        if (!attackAlertsEnabled) return;
+
+        const isMine = myPlanetIds.includes(f.targetId || '');
+        if (isMine) {
+          const targetPlanet = player.planets.find(p => p.id === f.targetId);
+          const pName = targetPlanet ? targetPlanet.name : "Station Core";
+          const message = `Hostile space fleet from Commander ${f.senderName} detected on attack trajectory to your station ${pName}! Arriving in ${Math.round((f.arrivesAt - serverTime) / 1000)} seconds!`;
+          showToast(`⚠️ TACTICAL ALERT: ${message}`, 'error');
+          sendMobileNotification(`⚠️ TACTICAL ALERT!`, message);
+        }
       }
     });
 
@@ -1844,7 +1874,7 @@ export default function App() {
       
       {/* Toast Notice alerts */}
       {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 p-4 border rounded-xl font-mono text-xs flex items-center gap-3 max-w-sm w-full animate-bounce bg-[#0A0F1D] border-[#1E293B] shadow-[0_0_30px_rgba(34,211,238,0.2)]">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 p-4 border rounded-xl font-mono text-xs flex items-center gap-3 max-w-sm w-full animate-bounce bg-[#0A0F1D] border-[#1E293B] shadow-[0_0_30px_rgba(34,211,238,0.2)]">
           <Info size={16} className={toast.type === 'error' ? 'text-red-400' : 'text-cyan-400'} />
           <span className="text-slate-100 flex-1 font-sans">{toast.message}</span>
           <button onClick={() => setToast(null)} className="text-slate-500 hover:text-white font-sans text-lg">&times;</button>
