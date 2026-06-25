@@ -1,6 +1,0 @@
-# update for SpaceStationServer
-ssh -i C:\Users\hp\Downloads\SpaceStationServer.pem azureuser@102.133.160.133 "cd SpaceStationGame && git stash && npm run build && pm2 restart space-universe"
-# .git file must not be replaced
-
-# Wipe game data
-ssh -i C:\Users\hp\Downloads\SpaceStationServer.pem azureuser@102.133.160.133 "cd SpaceStationGame && echo {} > galaxy_state.json && pm2 restart space-universe"

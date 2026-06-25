@@ -342,7 +342,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   // Collapsible States for DEC_LINKS and radar folder
   const [isCombatOpen, setIsCombatOpen] = useState(false);
   const [isIntelOpen, setIsIntelOpen] = useState(false);
-  const [isRadarFolderOpen, setIsRadarFolderOpen] = useState(false);
+  const [isRadarFolderOpen, setIsRadarFolderOpen] = useState(true);
   const [radarPage, setRadarPage] = useState(0);
   const [expandedCombatReports, setExpandedCombatReports] = useState<Record<string, boolean>>({});
   const [expandedIntelReports, setExpandedIntelReports] = useState<Record<string, boolean>>({});

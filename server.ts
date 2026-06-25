@@ -2858,20 +2858,8 @@ app.post("/api/galaxy/scan", (req, res) => {
   // Filter non-habitable targets by range, keeping a fallback if empty
   const visibleOthers = otherTargets.filter(t => t.dist <= maxScanDist);
 
-  // Filter habitable targets:
-  // - If hasSettlementShip is true, show ALL habitable planets in the universe.
-  // - If hasSettlementShip is false, show those in range, but guarantee at least the 10 closest ones in the universe are shown.
-  let visibleHabs: any[] = [];
-  if (hasSettlementShip) {
-    visibleHabs = habTargets;
-  } else {
-    const inRangeHabs = habTargets.filter(t => t.dist <= maxScanDist);
-    if (inRangeHabs.length >= 10) {
-      visibleHabs = inRangeHabs;
-    } else {
-      visibleHabs = habTargets.slice(0, 10);
-    }
-  }
+  // Always show all uncolonized habitable planets in the universe to make them visible and discoverable from the start
+  const visibleHabs = habTargets;
 
   // Combine and sort by distance
   let targets = [...visibleOthers, ...visibleHabs];
