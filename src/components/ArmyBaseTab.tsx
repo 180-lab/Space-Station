@@ -575,20 +575,22 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
       <div className="flex border border-[#1E293B] bg-[#0A0F1D]/80 p-1.5 rounded-2xl gap-2 shadow-inner">
         <button
           onClick={() => setSubTab('troops')}
-          className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-mono text-xs font-bold transition-all duration-250 cursor-pointer relative ${
+          className={`flex-1 flex flex-col items-center justify-center py-2 px-4 rounded-xl font-mono text-xs font-bold transition-all duration-250 cursor-pointer relative ${
             subTab === 'troops' 
               ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/35 shadow-[0_0_15px_rgba(6,182,212,0.15)]' 
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
           }`}
         >
-          <Users size={15} className={`${subTab === 'troops' ? 'text-cyan-400 animate-pulse' : 'text-slate-400'}`} title="Troops icon: overview overall space forces garrisons" />
-          <span className="tracking-wider">TROOPS</span>
+          <div className="flex items-center gap-1.5">
+            <Users size={14} className={`${subTab === 'troops' ? 'text-cyan-400 animate-pulse' : 'text-slate-400'}`} title="Troops icon: overview overall space forces garrisons" />
+            <span className="tracking-wider text-[11px]">TROOPS</span>
+          </div>
           
-          {/* Badge displaying the total number of troops on the troops icon */}
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
+          {/* Badge displaying the total number of troops under the word TROOPS */}
+          <span className={`text-[10px] font-sans font-black transition-colors ${
             subTab === 'troops' 
-              ? 'bg-cyan-400 text-slate-950 font-sans' 
-              : 'bg-slate-800 text-slate-400'
+              ? 'text-cyan-300' 
+              : 'text-slate-500'
           }`} title="Total active space forces stationed on this world sector">
             {totalTroopsCount.toLocaleString()}
           </span>

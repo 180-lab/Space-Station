@@ -233,11 +233,13 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   const fabLevel = activePlanet.buildings.fabricator?.level || 0;
 
   const constructedBuildings = Object.entries(activePlanet.buildings).filter(([bKey, val]: [string, any]) => {
-    return val.level > 0 || val.isUpgrading;
+    const isQueued = activePlanet.upgradeQueue?.some((item: any) => item.type === 'building' && item.key === bKey);
+    return val.level > 0 || val.isUpgrading || isQueued;
   });
 
   const unconstructedBuildings = Object.entries(activePlanet.buildings).filter(([bKey, val]: [string, any]) => {
-    return val.level === 0 && !val.isUpgrading;
+    const isQueued = activePlanet.upgradeQueue?.some((item: any) => item.type === 'building' && item.key === bKey);
+    return val.level === 0 && !val.isUpgrading && !isQueued;
   });
 
   const visibleBlueprints = unconstructedBuildings.filter(([bKey]) => {
@@ -563,21 +565,60 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
           const totalActiveAndQueued = activeUpgrades.length + queueList.length;
           if (totalActiveAndQueued === 0) return null;
 
+          // Calculate total duration remaining of active and queued items
+          let totalTimeMs = 0;
+          const nowMs = Date.now();
+          
+          activeUpgrades.forEach(act => {
+            if (act.upgradeEnd > nowMs) {
+              totalTimeMs += (act.upgradeEnd - nowMs);
+            }
+          });
+          
+          queueList.forEach(q => {
+            const level = q.targetLevel || 1;
+            if (q.type === 'building') {
+              totalTimeMs += level * 120 * 1000;
+            } else {
+              totalTimeMs += level * 60 * 1000;
+            }
+          });
+
+          const formatTotalTime = (ms: number) => {
+            if (ms <= 0) return '0s';
+            const totalSecs = Math.ceil(ms / 1000);
+            const hrs = Math.floor(totalSecs / 3600);
+            const mins = Math.floor((totalSecs % 3600) / 60);
+            const secs = totalSecs % 60;
+            
+            const parts = [];
+            if (hrs > 0) parts.push(`${hrs}h`);
+            if (mins > 0) parts.push(`${mins}m`);
+            if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
+            return parts.join(' ');
+          };
+
           return (
             <div className="relative z-10 mt-4 p-4 border border-cyan-500/25 bg-cyan-950/10 rounded-2xl font-mono text-xs text-slate-350 shadow-inner">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-cyan-400 uppercase tracking-widest font-extrabold flex items-center gap-1.5 animate-pulse">
-                    <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full" />
-                    Station Construction Queue ({queueList.length}/25 queued)
-                  </span>
-                  {activeUpgrades.length > 0 && (
-                    <span className="text-[9px] bg-cyan-500/10 text-cyan-300 px-1.5 py-0.5 rounded font-bold uppercase">
-                      {activeUpgrades.length} Active
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-cyan-500/10 pb-3">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-cyan-400 uppercase tracking-widest font-extrabold flex items-center gap-1.5 animate-pulse">
+                      <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full" />
+                      Station Construction Queue ({queueList.length}/25 queued)
                     </span>
-                  )}
+                    {activeUpgrades.length > 0 && (
+                      <span className="text-[9px] bg-cyan-500/10 text-cyan-300 px-1.5 py-0.5 rounded font-bold uppercase">
+                        {activeUpgrades.length} Active
+                      </span>
+                    )}
+                  </div>
+                  {/* Estimated total duration for all queues to be done */}
+                  <span className="text-[10.5px] text-amber-400 font-extrabold flex items-center gap-1">
+                    ⌛ TOTAL REMAINING TIME: {formatTotalTime(totalTimeMs)}
+                  </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-end sm:self-auto">
                   <span className="text-[9px] text-slate-500 uppercase hidden sm:inline">Sequential Processing</span>
                   <button
                     onClick={() => setIsQueueMinimized(!isQueueMinimized)}
@@ -626,6 +667,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                     const bName = q.type === 'mine'
                       ? `${q.key.toUpperCase()} Extractor #${q.mineIndex! + 1}`
                       : q.key.toUpperCase();
+                    // Each upgrade queue time (1 min per level for mines, 2 min per level for buildings)
+                    const durationMins = q.targetLevel * (q.type === 'building' ? 2 : 1);
                     return (
                       <div key={`queued-${index}`} className="flex items-center justify-between bg-slate-900/30 hover:bg-slate-900/50 border border-slate-800 p-2 px-3 rounded-xl transition">
                         <div className="flex items-center gap-2">
@@ -634,7 +677,10 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                             {q.type === 'mine' ? '⛏️' : '🏗️'} {bName} &rarr; <span className="text-cyan-400 font-extrabold font-mono">Lv. {q.targetLevel}</span>
                           </span>
                         </div>
-                        <span className="text-[9px] text-slate-500 border border-slate-800 px-1.5 py-0.5 rounded uppercase">Pending</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-400 font-bold font-mono">⏳ {durationMins}m</span>
+                          <span className="text-[9px] text-slate-500 border border-slate-800 px-1.5 py-0.5 rounded uppercase">Pending</span>
+                        </div>
                       </div>
                     );
                   })}
@@ -1004,6 +1050,12 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         const baseOutput = Math.round((mine.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
                         const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
 
+                        const mineQueueCount = activePlanet.upgradeQueue?.filter((item: any) => item.type === 'mine' && item.key === resKey && item.mineIndex === mine.index).length || 0;
+                        const activeUpgradeCount = mine.isUpgrading ? 1 : 0;
+                        const currentTotalUpgrades = activeUpgradeCount + mineQueueCount;
+                        const nextMineTargetLvl = mine.level + currentTotalUpgrades + 1;
+                        const nextMineUpgradeTimeMins = nextMineTargetLvl * 1;
+
                         return (
                           <div 
                             key={mine.index}
@@ -1039,7 +1091,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                 isDamaged ? (
                                   <RestoreCostBar type="mine" upgradeKey={resKey} targetLevel={targetLevel} health={mine.health!} planetResources={localResources} />
                                 ) : (
-                                  <UpgradeCostBar type="mine" upgradeKey={resKey} targetLevel={targetLevel} planetResources={localResources} />
+                                  <UpgradeCostBar type="mine" upgradeKey={resKey} targetLevel={nextMineTargetLvl} planetResources={localResources} />
                                 )
                               )}
                             </div>
@@ -1052,6 +1104,15 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                     <Clock size={12} className="animate-spin" title="Spinning dynamic timer indicator" />
                                     <span>Compressing Flux {getTimerString(mine.upgradeEnd)}</span>
                                   </div>
+                                  {nextMineTargetLvl <= maxExtractorLevel && (
+                                    <button 
+                                      onClick={() => onUpgradeMine(resKey, mine.index, true)}
+                                      className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[9px] font-bold uppercase flex items-center gap-1.5"
+                                    >
+                                      <span className="text-emerald-400">Queue Upgrade</span>
+                                      <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl}, {nextMineUpgradeTimeMins}m)</span>
+                                    </button>
+                                  )}
                                 </div>
                               ) : mine.level >= maxExtractorLevel && !isDamaged ? (
                                 <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase bg-slate-900 border border-slate-850 px-2 py-1 rounded">MAX CAP</span>
@@ -1066,17 +1127,17 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                               ) : isAnyUpgradeInProgress ? (
                                 <button 
                                   onClick={() => onUpgradeMine(resKey, mine.index, true)}
-                                  className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[10px] font-bold uppercase flex items-center gap-1.5"
+                                  className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[10px] font-bold uppercase flex items-center gap-1.5"
                                 >
                                   <span className="text-emerald-400">Queue Upgrade</span>
-                                  <span className="text-amber-400 font-extrabold">(15 SG)</span>
+                                  <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl}, {nextMineUpgradeTimeMins}m)</span>
                                 </button>
                               ) : (
                                 <button 
                                   onClick={() => onUpgradeMine(resKey, mine.index)}
                                   className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 border border-cyan-400 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.55)] hover:scale-[1.03]"
                                 >
-                                  ⚡ UPGRADE EXTRACTOR <span className="text-slate-900 font-bold ml-1">(1min)</span>
+                                  ⚡ UPGRADE EXTRACTOR <span className="text-slate-900 font-bold ml-1">({nextMineUpgradeTimeMins}m)</span>
                                 </button>
                               )}
                             </div>
@@ -1124,6 +1185,12 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
               const bState = val as any;
               const info = BUILDING_INFO[bKey];
               if (!info) return null;
+
+              const buildingQueueCount = activePlanet.upgradeQueue?.filter((item: any) => item.type === 'building' && item.key === bKey).length || 0;
+              const activeUpgradeCount = bState.isUpgrading ? 1 : 0;
+              const currentTotalUpgrades = activeUpgradeCount + buildingQueueCount;
+              const nextTargetLvl = bState.level + currentTotalUpgrades + 1;
+              const nextUpgradeTimeMins = nextTargetLvl * 2;
 
               const targetLvl = bState.level + 1;
               const cost = targetLvl * 150;
@@ -1378,9 +1445,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
                       {bState.level < bState.maxLevel && (
                         bState.health !== undefined && bState.health < 100 ? (
-                          <RestoreCostBar type="building" upgradeKey={bKey} targetLevel={targetLvl} health={bState.health} planetResources={localResources} />
+                          <RestoreCostBar type="building" upgradeKey={bKey} targetLevel={nextTargetLvl} health={bState.health} planetResources={localResources} />
                         ) : (
-                          <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={targetLvl} planetResources={localResources} />
+                          <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={nextTargetLvl} planetResources={localResources} />
                         )
                       )}
 
@@ -1392,6 +1459,16 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                               <Clock size={12} className="animate-spin" title="Spinning build progress timer" />
                               <span>{bState.level === 0 ? 'Constructing' : 'Upgrading'} {getTimerString(bState.upgradeEnd)}</span>
                             </div>
+                            {nextTargetLvl <= bState.maxLevel && (
+                              <button 
+                                onClick={() => onUpgradeBuilding(bKey, true)}
+                                className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer"
+                                type="button"
+                              >
+                                <span className="text-emerald-400">Queue Upgrade</span>
+                                <span className="text-amber-400 font-extrabold">(Lv. {nextTargetLvl}, {nextUpgradeTimeMins}m)</span>
+                              </button>
+                            )}
                           </div>
                         ) : isFabricatorRequiredMissing ? (
                           <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-3 py-1.5 rounded" title="Fabricator modular structure at level 1 or higher is required.">
@@ -1415,7 +1492,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                             type="button"
                           >
                             <span className="text-emerald-400">{bState.level === 0 ? 'Queue Construction' : 'Queue Upgrade'}</span>
-                            <span className="text-amber-400 font-extrabold">(15 SG)</span>
+                            <span className="text-amber-400 font-extrabold">(Lv. {nextTargetLvl}, {nextUpgradeTimeMins}m)</span>
                           </button>
                         ) : (
                           <button 

@@ -610,7 +610,13 @@ export default function App() {
 
     // Play notification sound if SFX is enabled
     const soundEnabled = localStorage.getItem('moonbase_sound_enabled') !== 'false';
-    if (soundEnabled) {
+    const isTroopBuildOrStationChange = message.toLowerCase().includes('switched active command site') || 
+                                        message.toLowerCase().includes('troop assembly queue') ||
+                                        message.toLowerCase().includes('commenced successfully') ||
+                                        message.toLowerCase().includes('started training') ||
+                                        message.toLowerCase().includes('started fabricating');
+
+    if (soundEnabled && !isTroopBuildOrStationChange) {
       const isAttack = message.toLowerCase().includes('tactical alert') || 
                        message.toLowerCase().includes('intel warning') || 
                        message.toLowerCase().includes('attack') || 
