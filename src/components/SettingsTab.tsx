@@ -34,6 +34,8 @@ interface SettingsTabProps {
   setFontSizeScale: (scale: string) => void;
   interactiveTabs: boolean;
   setInteractiveTabs: (interactive: boolean) => void;
+  showStationsTop: boolean;
+  setShowStationsTop: (show: boolean) => void;
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
   onRefreshState?: () => void;
   onLinkGoogle?: (email: string) => void;
@@ -59,6 +61,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   setFontSizeScale,
   interactiveTabs,
   setInteractiveTabs,
+  showStationsTop,
+  setShowStationsTop,
   showToast,
   onRefreshState,
   onLinkGoogle,
@@ -437,6 +441,32 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     }`}
                   >
                     {interactiveTabs ? 'DYNAMIC' : 'PINNED'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Show Stations Top Option */}
+              <div className="space-y-2 pt-4 border-t border-[#1E293B]/40">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-200 block uppercase">Show Stations</span>
+                    <p className="text-[10.5px] text-slate-500 leading-relaxed font-sans">
+                      Displays a fast-switching persistent dock at the top of all tactical navigation screens for quick status monitoring and orbital relocation.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowStationsTop(!showStationsTop);
+                      showToast(!showStationsTop ? 'Persistent Top Stations enabled' : 'Top Stations dock hidden', 'info');
+                    }}
+                    className={`py-1.5 px-3 rounded-lg border text-[10px] font-bold uppercase tracking-wider shrink-0 transition cursor-pointer ${
+                      showStationsTop 
+                        ? 'bg-cyan-950/20 text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(34,211,238,0.15)]' 
+                        : 'bg-slate-950 text-slate-500 border-slate-900 hover:text-slate-400 hover:border-slate-800'
+                    }`}
+                  >
+                    {showStationsTop ? 'ONLINE' : 'MUTED'}
                   </button>
                 </div>
               </div>

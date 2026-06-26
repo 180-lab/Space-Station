@@ -307,6 +307,9 @@ export default function App() {
   const [interactiveTabs, setInteractiveTabs] = useState<boolean>(() => {
     return localStorage.getItem('moonbase_interactive_tabs') === 'true';
   });
+  const [showStationsTop, setShowStationsTop] = useState<boolean>(() => {
+    return localStorage.getItem('moonbase_show_stations_top') === 'true';
+  });
   const [isScrolling, setIsScrolling] = useState(false);
   const [isMobileView, setIsMobileView] = useState(() => {
     return typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
@@ -329,6 +332,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('moonbase_interactive_tabs', String(interactiveTabs));
   }, [interactiveTabs]);
+
+  useEffect(() => {
+    localStorage.setItem('moonbase_show_stations_top', String(showStationsTop));
+  }, [showStationsTop]);
 
   // Profile dropdown state
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
@@ -2143,6 +2150,42 @@ export default function App() {
         </div>
       </header>
 
+      {/* Persistent Top Stations Dock */}
+      {showStationsTop && player && activePlanet && (
+        <div className="sticky top-20 z-30 bg-[#070B16] border-b border-[#1E293B]/70 shadow-md backdrop-blur-md bg-opacity-95 py-2 px-6 overflow-x-auto scrollbar-none flex items-center gap-3">
+          <div className="flex items-center gap-1.5 shrink-0 border-r border-[#1E293B]/60 pr-3 mr-1">
+            <span className="text-[10px] font-bold text-slate-400 font-mono tracking-widest uppercase">STATIONS</span>
+          </div>
+          <div className="flex items-center gap-2.5 min-w-0">
+            {player.planets.map((pl, idx) => {
+              const isActive = pl.id === activePlanet.id;
+              return (
+                <button
+                  key={pl.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedPlanetId(pl.id);
+                    showToast(`Switched active command site to ${pl.name}`, 'success');
+                  }}
+                  className={`relative px-3.5 py-1.5 rounded-xl border text-left font-mono transition duration-150 cursor-pointer flex items-center gap-2 shrink-0 select-none ${
+                    isActive 
+                      ? 'bg-cyan-500/10 border-cyan-400 text-white shadow-[0_0_12px_rgba(34,211,238,0.15)]' 
+                      : 'bg-[#0E1528]/40 border-[#1E293B] hover:border-slate-700 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span className={`text-[10px] font-bold truncate ${isActive ? 'text-cyan-400 font-black' : 'text-slate-300'}`}>
+                    {pl.name}
+                  </span>
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_6px_#22d3ee] shrink-0 ml-1" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Screen view router container */}
       <main className="max-w-5xl mx-auto px-4 pt-8 pb-24 animate-fade-in animate-duration-500">
         {activeTab === 'explore' && player && activePlanet && (() => {
@@ -2525,6 +2568,8 @@ export default function App() {
             setFontSizeScale={setFontSizeScale}
             interactiveTabs={interactiveTabs}
             setInteractiveTabs={setInteractiveTabs}
+            showStationsTop={showStationsTop}
+            setShowStationsTop={setShowStationsTop}
             showToast={showToast}
             onRefreshState={fetchState}
             onLinkGoogle={handleLinkGoogleAccount}
