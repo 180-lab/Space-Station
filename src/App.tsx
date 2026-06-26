@@ -620,7 +620,19 @@ export default function App() {
       if (isAttack) {
         playAlertySound();
       } else {
-        playChilledSound();
+        const isCommonMutedAction = 
+          message.toLowerCase().includes('switched') || 
+          message.toLowerCase().includes('rename') || 
+          message.toLowerCase().includes('setting') || 
+          message.toLowerCase().includes('profile') || 
+          message.toLowerCase().includes('clipboard') || 
+          message.toLowerCase().includes('copied');
+        
+        const nonCriticalSoundEnabled = localStorage.getItem('moonbase_non_critical_sound_enabled') === 'true';
+
+        if (!isCommonMutedAction && nonCriticalSoundEnabled) {
+          playChilledSound();
+        }
       }
     }
   };
@@ -732,10 +744,10 @@ export default function App() {
         const attackAlertsEnabled = localStorage.getItem('moonbase_attack_notifications_enabled') !== 'false';
         if (!attackAlertsEnabled) return;
 
-        const isMine = myPlanetIds.includes(f.targetId || '');
+        const isMine = f.targetId === player.id || myPlanetIds.includes(f.targetId || '');
         if (isMine) {
           const targetPlanet = player.planets.find(p => p.id === f.targetId);
-          const pName = targetPlanet ? targetPlanet.name : "Station Core";
+          const pName = targetPlanet ? targetPlanet.name : (f.targetName || "Station Core");
           const message = `Hostile space fleet from Commander ${f.senderName} detected on attack trajectory to your station ${pName}! Arriving in ${Math.round((f.arrivesAt - serverTime) / 1000)} seconds!`;
           showToast(`⚠️ TACTICAL ALERT: ${message}`, 'error');
           sendMobileNotification(`⚠️ TACTICAL ALERT!`, message);
@@ -1995,11 +2007,11 @@ export default function App() {
               setGalaxyInitialSubTab('ranking');
               setActiveTab('galaxy');
             }}
-            className="flex flex-col items-end font-mono cursor-pointer group hover:opacity-90 transition-all"
+            className="flex flex-col items-end gap-0.5 font-mono cursor-pointer group hover:opacity-90 transition-all text-right"
             title="Click to view Sovereignty Leaderboard rankings"
           >
-            <span className="text-[8px] text-slate-500 uppercase tracking-widest font-bold group-hover:text-cyan-400">Commander Rank</span>
-            <span className="text-[11px] font-black text-cyan-400 group-hover:underline decoration-dotted">
+            <span className="text-[8px] text-slate-500 uppercase tracking-widest font-bold group-hover:text-cyan-400 block leading-none">Commander Rank</span>
+            <span className="text-[11px] font-black text-cyan-400 group-hover:underline decoration-dotted block leading-normal">
               #{myPopulationRankIndex} 🏆
             </span>
           </div>
@@ -2104,29 +2116,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Quick Logout option */}
-              <div className="pt-2.5 border-t border-[#1E293B]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAppConfirmModal({
-                      title: 'CONFIRM SESSION DE-SYNCHRONIZATION',
-                      message: 'Are you sure you want to log out of your session? Your current account session reference will be purged from LocalStorage and you will be re-routed to registration.',
-                      onConfirm: () => {
-                        localStorage.removeItem('moonbase_userId');
-                        setProfileDropdownOpen(false);
-                        showToast('Commander keys de-synchronized. Reloading terminal...', 'info');
-                        setTimeout(() => {
-                          window.location.reload();
-                        }, 600);
-                      }
-                    });
-                  }}
-                  className="w-full py-2 bg-gradient-to-r from-red-950/40 to-red-900/40 hover:from-red-950/60 hover:to-red-900/60 border border-red-500/30 text-red-400 rounded-lg text-[9.5px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <LogOut size={11} /> Log Out / New Username
-                </button>
-              </div>
             </div>
           )}
 
@@ -2150,26 +2139,7 @@ export default function App() {
             })()}
           </button>
 
-          <button 
-            type="button"
-            onClick={() => {
-              setAppConfirmModal({
-                title: 'CONFIRM SESSION DE-SYNCHRONIZATION',
-                message: 'Are you sure you want to log out of your session? Your current account session reference will be purged from LocalStorage and you will be re-routed to registration.',
-                onConfirm: () => {
-                  localStorage.removeItem('moonbase_userId');
-                  showToast('Commander keys de-synchronized. Reloading terminal...', 'info');
-                  setTimeout(() => {
-                    window.location.reload();
-                  }, 600);
-                }
-              });
-            }}
-            className="w-10 h-10 border border-red-500/30 hover:border-red-500/60 flex items-center justify-center rounded bg-red-950/10 hover:bg-red-950/25 active:scale-95 transition-all duration-150 cursor-pointer text-red-400"
-            title="Log Out & Create/Use a New Username"
-          >
-            <LogOut size={16} />
-          </button>
+
         </div>
       </header>
 

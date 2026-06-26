@@ -234,6 +234,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [musicEnabled, setMusicEnabled] = useState(() => {
     return localStorage.getItem('moonbase_music_enabled') !== 'false';
   });
+  const [nonCriticalSoundEnabled, setNonCriticalSoundEnabled] = useState(() => {
+    return localStorage.getItem('moonbase_non_critical_sound_enabled') === 'true';
+  });
   
   // Tactical notifications toggle
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
@@ -253,6 +256,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   useEffect(() => {
     localStorage.setItem('moonbase_music_enabled', String(musicEnabled));
   }, [musicEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem('moonbase_non_critical_sound_enabled', String(nonCriticalSoundEnabled));
+  }, [nonCriticalSoundEnabled]);
 
   useEffect(() => {
     localStorage.setItem('moonbase_notifications_enabled', String(notificationsEnabled));
@@ -477,6 +484,29 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     }`}
                   >
                     {soundEnabled ? 'ONLINE' : 'MUTED'}
+                  </button>
+                </div>
+
+                {/* Non-Critical UI Sound FX Toggle */}
+                <div className="flex items-start justify-between gap-4 pt-1">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-200 block uppercase">Non-Critical UI Sounds</span>
+                    <p className="text-[10.5px] text-slate-500 leading-relaxed font-sans">
+                      Plays ambient sound triggers for routine actions like switching stations, renaming, settings modifications, or menu navigation.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setNonCriticalSoundEnabled(!nonCriticalSoundEnabled);
+                      showToast(`Non-critical UI sounds ${!nonCriticalSoundEnabled ? 'activated' : 'deactivated'}`, 'info');
+                    }}
+                    className={`py-1.5 px-3 rounded-lg border text-[10px] font-bold uppercase tracking-wider shrink-0 transition ${
+                      nonCriticalSoundEnabled 
+                        ? 'bg-emerald-950/20 text-emerald-400 border-emerald-500/30' 
+                        : 'bg-slate-950 text-slate-500 border-slate-900'
+                    }`}
+                  >
+                    {nonCriticalSoundEnabled ? 'ONLINE' : 'MUTED'}
                   </button>
                 </div>
 
