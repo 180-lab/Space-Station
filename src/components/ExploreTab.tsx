@@ -1094,6 +1094,23 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                   <UpgradeCostBar type="mine" upgradeKey={resKey} targetLevel={nextMineTargetLvl} planetResources={localResources} />
                                 )
                               )}
+                              {(() => {
+                                const specificMineQueue = (activePlanet.upgradeQueue || []).filter(
+                                  (item: any) => item.type === 'mine' && item.key === resKey && item.mineIndex === mine.index
+                                );
+                                if (specificMineQueue.length === 0) return null;
+                                return (
+                                  <div className="mt-2 space-y-1 p-2 bg-slate-950/40 border border-[#1E293B]/60 rounded-lg max-w-sm">
+                                    <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-extrabold font-mono">Queued Upgrades:</div>
+                                    {specificMineQueue.map((q, idx) => (
+                                      <div key={idx} className="text-[10px] text-slate-400 font-mono flex items-center justify-between gap-4">
+                                        <span className="text-slate-450">↳ Upgrade to Level {q.targetLevel}</span>
+                                        <span className="text-amber-400 font-bold">⏳ {q.targetLevel * 1}m</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
                             </div>
 
                             {/* Upgrade/Repair panel */}
@@ -1419,6 +1436,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                         });
                                         const data = await response.json();
                                         if (response.ok) {
+                                          localStorage.setItem(`moonbase_resources_sent_${player.id}`, 'true');
                                           showToast?.(data.message || 'Resources transmitted successfully via Quantum Cargo link!', 'success');
                                           // Reset fields
                                           setTransferResources({ water: '0', plasma: '0', fuel: '0', food: '0', respirant: '0' });
@@ -1450,6 +1468,23 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                           <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={nextTargetLvl} planetResources={localResources} />
                         )
                       )}
+                      {(() => {
+                        const specificBuildingQueue = (activePlanet.upgradeQueue || []).filter(
+                          (item: any) => item.type === 'building' && item.key === bKey
+                        );
+                        if (specificBuildingQueue.length === 0) return null;
+                        return (
+                          <div className="mt-2 space-y-1 p-2 bg-slate-950/40 border border-[#1E293B]/60 rounded-lg max-w-sm text-left">
+                            <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-extrabold font-mono">Queued Upgrades:</div>
+                            {specificBuildingQueue.map((q, idx) => (
+                              <div key={idx} className="text-[10px] text-slate-400 font-mono flex items-center justify-between gap-4">
+                                <span className="text-slate-450">↳ Upgrade to Level {q.targetLevel}</span>
+                                <span className="text-amber-400 font-bold">⏳ {q.targetLevel * 2}m</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
 
                       <div className="pt-3 border-t border-white/5 flex items-center justify-between gap-2">
                         <span className="text-[10px] text-slate-500 font-mono uppercase font-bold">Actions & Progress Control:</span>

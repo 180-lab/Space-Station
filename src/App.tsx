@@ -610,13 +610,8 @@ export default function App() {
 
     // Play notification sound if SFX is enabled
     const soundEnabled = localStorage.getItem('moonbase_sound_enabled') !== 'false';
-    const isTroopBuildOrStationChange = message.toLowerCase().includes('switched active command site') || 
-                                        message.toLowerCase().includes('troop assembly queue') ||
-                                        message.toLowerCase().includes('commenced successfully') ||
-                                        message.toLowerCase().includes('started training') ||
-                                        message.toLowerCase().includes('started fabricating');
 
-    if (soundEnabled && !isTroopBuildOrStationChange) {
+    if (soundEnabled) {
       const isAttack = message.toLowerCase().includes('tactical alert') || 
                        message.toLowerCase().includes('intel warning') || 
                        message.toLowerCase().includes('attack') || 
@@ -1098,6 +1093,9 @@ export default function App() {
           if (data.fleets) {
             setFleets(data.fleets);
           }
+          if (mission.missionType === 'recon') {
+            localStorage.setItem(`moonbase_recon_dispatched_${player.id}`, 'true');
+          }
           showToast(`FLEET DEPLOYED! Mission: ${mission.missionType.toUpperCase()} dispatched.`, 'success');
           setActiveTab('galaxy'); // Swapp tab to allow monitoring of travels!
           const newMission = data.fleets?.find((f: any) => f.createdFleetId === mission.createdFleetId) 
@@ -1174,6 +1172,9 @@ export default function App() {
 
       if (anySuccess) {
         setPlayer(latestPlayer);
+        if (mission.missionType === 'recon') {
+          localStorage.setItem(`moonbase_recon_dispatched_${player.id}`, 'true');
+        }
         showToast(`DISPATCHED MULTIPLE FLEETS! Created ${numFleets} distinct en-route tactical squadrons.`, 'success');
         setActiveTab('galaxy');
       } else {

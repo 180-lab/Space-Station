@@ -48,7 +48,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   const repositoryLevel = activePlanet?.buildings?.repository?.level || 1;
   const siloCapacity = Math.round(10000 * Math.pow(500, (repositoryLevel - 1) / 44));
 
-  // Tutorial Quest definitions (total 22 progressive tasks with customized step-by-step instructions)
+  // Tutorial Quest definitions (total 30 progressive tasks with customized step-by-step instructions)
   const tasks: TutorialTask[] = [
     {
       id: 1,
@@ -148,6 +148,70 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     },
     {
       id: 7,
+      title: '📡 Comms Hub Activation',
+      shortDesc: 'Establish orbital communications arrays to relay incoming subspace trade frequencies.',
+      requirementHtml: 'Upgrade active station <strong>Comms Hub to Level 1 or higher</strong>.',
+      hint: 'Upgrade Comms Hub under Base Infrastructure Buildings inside the Explore (XPL) Tab.',
+      howToGetThere: '1. Navigate to the <strong>Explore</strong> tab.<br/>2. Scroll down below construction lists to find <strong>Comms Hub</strong> under infrastructure.<br/>3. Click the yellow <strong>"Upgrade Building"</strong> button to establish Level 1 relay links.',
+      commanderTip: 'Explore Tab -> Base Infrastructure Buildings -> Comms Hub slot.',
+      congratsMessage: '📡 COMMUNICATIONS ROUTER ACTIVE! Sub-space arrays are fully humming, tracking incoming trade and message frequencies!',
+      encouragementQuote: 'Superb! An active communications hub acts as the main node for diplomatic transactions, coordinate scanning, and alliance communication portals.',
+      targetTab: 'explore',
+      rewards: {
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
+        credits: 5000,
+      },
+    },
+    {
+      id: 8,
+      title: '🏦 Expand Materials Repository',
+      shortDesc: 'Extend local warehouse capacities to safely store large resource reserves.',
+      requirementHtml: 'Upgrade <strong>Materials Repository to Level 10 or higher</strong> on your planetary starbase.',
+      hint: 'Upgrade the Materials Repository building under your Explore Tab infrastructure list.',
+      howToGetThere: '1. Open the <strong>Explore</strong> tab.<br/>2. Locate the <strong>Materials Repository</strong> building slot in infrastructure grid.<br/>3. Upgrade it to Level 10 or higher (use Speed Credits to complete instantly if desired).',
+      commanderTip: 'Explore Tab -> Base Infrastructure Buildings -> Materials Repository.',
+      congratsMessage: '🏦 STORAGE CAPACITY EXTENDED! Heavy-duty vaults are successfully reinforced to contain massive fluid reserves without pressure failure risks!',
+      encouragementQuote: 'Incredible early infrastructure development, Admiral! Larger repositories ensure you never lose passive yields during long offline cycles.',
+      targetTab: 'explore',
+      rewards: {
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
+        credits: 6000,
+      },
+    },
+    {
+      id: 9,
+      title: '🤝 Dispatch Interstellar Resources',
+      shortDesc: 'Transmit vital fluids directly to another commander to establish safe commerce relations.',
+      requirementHtml: 'Successfully <strong>transmit resources to any other player station</strong> using the Cargo Warp Link.',
+      hint: 'Under Galaxy (RDR) Tab select another player coordinates on map, click "Transmit Resources", select any amount and dispatch.',
+      howToGetThere: '1. Open the <strong>Galaxy</strong> tab.<br/>2. Select another commander station node from leaderboards or coordinate scanner.<br/>3. Click <strong>"Transmit Resources"</strong> or load Cargo link.<br/>4. Select at least 1 unit of resource and click <strong>"Transmit Resource Shipment"</strong>.',
+      commanderTip: 'Galaxy Tab map coordinates -> Click Player node -> Transmit Resources.',
+      congratsMessage: '🤝 CARGO PORTAL ENGAGED! Resource capsules successfully warped through deep coordinates, depositing cargo straight to target reserves!',
+      encouragementQuote: 'Marvelous diplomacy! Trading and cooperating with other commanders builds undying trust, ensuring mutual defensive pact support during border wars.',
+      targetTab: 'galaxy',
+      rewards: {
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
+        credits: 5000,
+      },
+    },
+    {
+      id: 10,
+      title: '🛰️ Deep Space Recon Scout',
+      shortDesc: 'Deploy stealth scanner drones to explore surrounding sectors and map uncharted solar anomalies.',
+      requirementHtml: 'Dispatch a <strong>Recon scout mission fleet</strong> to any sector coordinate node.',
+      hint: 'Train a fleet unit under CMD (Army), open Galaxy Tab scanner grid, select action on a coordinate node, set mission type to "Recon", and dispatch.',
+      howToGetThere: '1. Draft a scout drone or fighter in the <strong>Army</strong> tab.<br/>2. Navigate to <strong>Galaxy</strong> view scanner.<br/>3. Click any coordinate, pick <strong>"Deploy Fleet / Settle"</strong>, change mission type to <strong>"Recon"</strong>, allocate a ship, and click Deploy.',
+      commanderTip: 'Galaxy Tab -> Sector Node Coordinates -> Deploy Fleet (Set Mission: RECON).',
+      congratsMessage: '🛰️ SCOUT PROBES LAUNCHED! Cloaked scouting wings successfully breached orbit, mapping coordinate structures without triggering defensive arrays!',
+      encouragementQuote: 'Superb tactical wisdom! Recon scout flights reveal precise troop composition, cargo loads, and structures of foreign hostiles without triggering alert sensors!',
+      targetTab: 'galaxy',
+      rewards: {
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
+        credits: 5000,
+      },
+    },
+    {
+      id: 11,
       title: '🎯 Launch a Strike Fleet Attack',
       shortDesc: 'Launch an attack from your radar or galaxy menu on rebel pirate outposts to test weapon systems.',
       requirementHtml: 'Dispatch a <strong>strike attack fleet</strong> towards any target coordinate on the deep space radar.',
@@ -163,7 +227,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 8,
+      id: 12,
       title: '🔋 Extractor Production Overdrive',
       shortDesc: 'Use your accumulated Space Gold credits to boost planetary extraction pump outputs.',
       requirementHtml: 'Activate a <strong>Production Boost overdrive</strong> on any active extractor category.',
@@ -179,7 +243,23 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 9,
+      id: 13,
+      title: '⚡ Dual Overdrive Mechanics',
+      shortDesc: 'Activate concurrent energy boosters across multiple mine types to maximize industrial yields.',
+      requirementHtml: 'Have <strong>at least two extractor types running production boosts simultaneously</strong> on your starbase.',
+      hint: 'In the Explore Tab, click "Boost Production" and purchase overdrive boosts on multiple different resource types.',
+      howToGetThere: '1. Navigate to the <strong>Explore</strong> tab.<br/>2. Click the yellow <strong>"BOOST PRODUCTION"</strong> console.<br/>3. Enable active overdrives on a second distinct fluid class (like Fuel, Plasma, or Respirant).',
+      commanderTip: 'Explore Tab -> Boost Production -> Activate multiple concurrent category siphons.',
+      congratsMessage: '⚡ DUAL SYNERGETIC BOOST ENGINES HUMMING! Multiple extractor pipelines are successfully operating at overclocked parameters!',
+      encouragementQuote: 'Brilliant economics initiative, Admiral! Stacking boosters on both fuel and water guarantees heavy industry assembly lines never run dry!',
+      targetTab: 'explore',
+      rewards: {
+        resources: { water: 11000, plasma: 11000, fuel: 11000, food: 11000, respirant: 11000 },
+        credits: 6000,
+      },
+    },
+    {
+      id: 14,
       title: '🏭 Molecular Nano-yard Assembly Upgrade',
       shortDesc: 'Upgrade your core station Fabricator building to reduce general construction times.',
       requirementHtml: 'Upgrade the <strong>Fabricator building to Level 2 or higher</strong>.',
@@ -195,7 +275,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 10,
+      id: 15,
       title: '📡 Construct deep-space Radar Array',
       shortDesc: 'Construct a space Radar Array to sweep surrounding lightyears for rogue pirate signals.',
       requirementHtml: 'Upgrade the <strong>Radar Array building to Level 1 or higher</strong>.',
@@ -212,7 +292,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 11,
+      id: 16,
       title: '🛰️ Deep Space Scan Execution',
       shortDesc: 'Use your operational Radar scanner to sweep galaxy coordinates in quest of resources.',
       requirementHtml: 'Perform a <strong>sector grid scanner scan</strong> under the Galaxy Tab.',
@@ -228,7 +308,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 12,
+      id: 17,
       title: '🧪 Establish Academy Research Center',
       shortDesc: 'Build a high-energy physics Science Lab to research advanced planetary tech.',
       requirementHtml: 'Upgrade active station <strong>Research Center building to Level 1 or higher</strong>.',
@@ -244,7 +324,23 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 13,
+      id: 18,
+      title: '🧬 Advanced Metallurgy Sciences',
+      shortDesc: 'Enhance structural integrity or harvester siphons to Level 2 inside science labs.',
+      requirementHtml: 'Upgrade <strong>any research technology node to Level 2 or higher</strong>.',
+      hint: 'Inside the Research Tab, find any technology project you have already started and upgrade it to Level 2 or higher.',
+      howToGetThere: '1. Navigate to the <strong>Research</strong> tab.<br/>2. Review started projects (e.g., Mineral Siphons, Defence Shields, Speed Thrusters).<br/>3. Ensure you have the materials and trigger <strong>"Start Quantum Research"</strong> to reach Level 2.',
+      commanderTip: 'Research Tab -> Science Project Upgrades List.',
+      congratsMessage: '🧬 PHYSICAL BLUEPRINTS OPTIMIZED! Permanent global technology upgrades successfully calibrated to Level 2!',
+      encouragementQuote: 'Magnificent intellect! Technology upgrades offer static multipliers that make all your fleets and buildings perform better on every world.',
+      targetTab: 'research',
+      rewards: {
+        resources: { water: 12000, plasma: 12000, fuel: 12000, food: 12000, respirant: 12000 },
+        credits: 6000,
+      },
+    },
+    {
+      id: 19,
       title: '🔬 Quantum Microchips Research',
       shortDesc: 'Perform active tech development inside your science Research Center tab.',
       requirementHtml: 'Start or complete <strong>any quantum scientific technology research project</strong> inside the Research Tab.',
@@ -260,7 +356,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 14,
+      id: 20,
       title: '🛡️ Army Base War Room Command',
       shortDesc: 'Set up barracks and launch coordinates decks for military defenses.',
       requirementHtml: 'Upgrade <strong>Army Base building to Level 1 or higher</strong> on your station.',
@@ -276,7 +372,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 15,
+      id: 21,
       title: '⚔️ Mobilize local combat troops',
       shortDesc: 'Recruit at least 15 combat troops to garrison your colony shield walls.',
       requirementHtml: 'Raise a total <strong>combat troop garrison count of at least 15 units</strong> on your planet station.',
@@ -292,7 +388,39 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 16,
+      id: 22,
+      title: '✈️ Assemble Interceptor Escorts',
+      shortDesc: 'Recruit specialized atmospheric robotic fighters to guard airspace quadrants.',
+      requirementHtml: 'Maintain a garrison of <strong>at least 5 Interceptor Drones (Defenders)</strong> on your active starbase.',
+      hint: 'Ensure your War Room (Army Base) is Level 1, navigate to CMD (Army), input 5 or higher in the Interceptor block and click Train.',
+      howToGetThere: '1. Navigate to the <strong>Army</strong> tab.<br/>2. Identify the **Interceptor Drone (Defender)** troop recruiter row.<br/>3. Input **5** or higher and select **Train Military Troops**.',
+      commanderTip: 'Army Tab -> Recruit Interceptor Drones.',
+      congratsMessage: '✈️ SKY DEFENSE PATROL ESTABLISHED! Robotic Interceptor systems are successfully cycling orbit grids, ready to lock onto incoming payloads!',
+      encouragementQuote: 'Spectacular military safety measures, Admiral! Interceptor escorts soak up tremendous pressure, countering enemy orbital bomber strikes.',
+      targetTab: 'army',
+      rewards: {
+        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
+        credits: 5000,
+      },
+    },
+    {
+      id: 23,
+      title: '🛸 Establish Heavy Assault Bombers',
+      shortDesc: 'Assemble high-yield tactical bombers to pierce alien planetary shielding fields during sector raids.',
+      requirementHtml: 'Recruit and maintain <strong>at least 2 Assault Fighters (Attackers)</strong> inside your hangar.',
+      hint: 'Go to CMD (Army) Tab, look for Assault Fighter (Attacker) and initiate training of at least 2 military starfighters.',
+      howToGetThere: '1. Navigate to the <strong>Army</strong> tab.<br/>2. Find the <strong>Assault Fighter (Attacker)</strong> recruit slot.<br/>3. Order a batch of **2** or more starships.',
+      commanderTip: 'Army Tab -> Recruit Assault Fighters.',
+      congratsMessage: '🛸 ATTACK PAYLOADS SECURED! Heavy assault bombers are fully fueled and stationed in launch bays, awaiting destination warp coordinates!',
+      encouragementQuote: 'Brilliant expansion! Assault Fighters deal immense structural damage to target planetary shield grids, maximizing raider loot coefficients!',
+      targetTab: 'army',
+      rewards: {
+        resources: { water: 12000, plasma: 12000, fuel: 12000, food: 12000, respirant: 12000 },
+        credits: 6000,
+      },
+    },
+    {
+      id: 24,
       title: '💬 Interstellar Secure Private Comms',
       shortDesc: 'Send a private secure holographic message transmission directly to another player station.',
       requirementHtml: 'Send <strong>at least 1 direct PM message/transmission</strong> to any other commander.',
@@ -308,7 +436,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 17,
+      id: 25,
       title: '📦 Cargo Supply Nexus Salvage Claim',
       shortDesc: 'Summon galactic logistics transport ships or unlock daily payroll supply packages.',
       requirementHtml: 'Harvest resources by calling a <strong>Supply Nexus Cargo dispatch</strong> OR claiming <strong>Daily Rewards Crates</strong>.',
@@ -324,7 +452,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 18,
+      id: 26,
       title: '🤝 Interstellar Star Alliance Foundation',
       shortDesc: 'Unite together with other commanders by joining or creating a sovereign star alliance.',
       requirementHtml: 'Become a <strong>registered member of an Alliance sector pack</strong> (Join or Create an Alliance).',
@@ -340,7 +468,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 19,
+      id: 27,
       title: '📣 Public Holo-Chat Broadcast',
       shortDesc: 'Broadcast a friendly transmission in the public sector general channel radio chat.',
       requirementHtml: 'Type and publish <strong>at least 1 message in the public General chat</strong>.',
@@ -356,7 +484,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 20,
+      id: 28,
       title: '🛰️ Engine Warp Thruster Research',
       shortDesc: 'Increase thruster acceleration curves to speed up travel and strike times.',
       requirementHtml: 'Upgrade the <strong>Warp Thruster technology node</strong> to Level 1 or higher.',
@@ -372,7 +500,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 21,
+      id: 29,
       title: '📊 Daily Galactic Payroll Audit',
       shortDesc: 'Inspect rankings, leader positions, and Space gold logs to keep books tidy.',
       requirementHtml: 'Review your <strong>Commander summary scores</strong> on the global Leaderboard stats roster.',
@@ -388,14 +516,14 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       },
     },
     {
-      id: 22,
+      id: 30,
       title: '👑 Grand Sovereign Emperor System',
       shortDesc: 'Colonize your 3rd distinct planetary outpost to secure an official 3-planet cosmic system!',
       requirementHtml: 'Acquire <strong>at least 3 colonized starbase stations</strong> under your royal empire command.',
       hint: 'Produce a second Settlement Ship inside your Army barracks. Sweep the Sector radar grid inside Galaxy tab to discover a habitable star coordinate, dispatch settlement, and authorize colony designation!',
       howToGetThere: '1. Earn resources and go to <strong>Army</strong> tab.<br/>2. Draft another <strong>Settlement Ship</strong>.<br/>3. Navigate to <strong>Galaxy Tab</strong> map scan.<br/>4. Locate another green <strong>Habitable Planet</strong>, click coordinates, select <strong>"Settle on Planet"</strong>, allocate the settlement unit, and dispatch flight travel.<br/>5. Once arrived, authorize station designation!',
       commanderTip: 'Galaxy Tab -> locate a third green habitable node coordinate and settle!',
-      congratsMessage: '👑 HAIL VICTORIOUS GRAND SOVEREIGN EMPEROR! You have colonized 3 unique star systems and successfully finished all 22 aspects of space command! This sector is officially yours!',
+      congratsMessage: '👑 HAIL VICTORIOUS GRAND SOVEREIGN EMPEROR! You have colonized 3 unique star systems and successfully finished all aspects of space command! This sector is officially yours!',
       encouragementQuote: 'Outstanding galactic mastery, Supreme Admiral! You have successfully mastered space building, science, military troops recruitment, chat broadcasts, and alliances! Go on and rule the stars!',
       targetTab: 'galaxy',
       rewards: {
@@ -407,8 +535,8 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
 
   // Logic to determine if task objective is met
   const checkObjectiveMet = (task: TutorialTask): boolean => {
-    // For tasks 2 to 21, check criteria on the 2nd station (player.planets[1]) if colonized
-    const checkTargetPlanet = (task.id > 1 && task.id < 22) 
+    // For tasks 2 to 29, check criteria on the 2nd station (player.planets[1]) if colonized
+    const checkTargetPlanet = (task.id > 1 && task.id < 30) 
       ? (player.planets[1] || activePlanet) 
       : activePlanet;
 
@@ -436,32 +564,73 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       case 6:
         return checkTargetPlanet.mines.plasma.some((m) => m.level >= 2);
       case 7:
+        return (checkTargetPlanet.buildings.commsHub?.level || 0) >= 1;
+      case 8:
+        return (checkTargetPlanet.buildings.repository?.level || 0) >= 10;
+      case 9:
+        return (
+          localStorage.getItem(`moonbase_resources_sent_${player.id}`) === 'true' ||
+          completedList.includes(9)
+        );
+      case 10:
+        return (
+          localStorage.getItem(`moonbase_recon_dispatched_${player.id}`) === 'true' ||
+          completedList.includes(10)
+        );
+      case 11:
         return (
           fleets.some((f) => f.senderId === player.id && f.missionType === 'attack') ||
           localStorage.getItem(`moonbase_attack_dispatched_${player.id}`) === 'true' ||
-          completedList.includes(7)
+          completedList.includes(11)
         );
-      case 8:
+      case 12:
         const isMineBoosted = Object.values(checkTargetPlanet.mines).some((minesList: any) =>
           minesList.some((m: any) => m.boostedUntil && Number(m.boostedUntil) > Date.now())
         );
         return (
           isMineBoosted ||
           localStorage.getItem(`moonbase_boosted_${player.id}`) === 'true' ||
-          completedList.includes(8)
+          completedList.includes(12)
         );
-      case 9:
+      case 13:
+        // Dual boosted overdrive
+        const boostedCount = Object.values(checkTargetPlanet.mines).filter((minesList: any) =>
+          minesList.some((m: any) => m.boostedUntil && Number(m.boostedUntil) > Date.now())
+        ).length;
+        return (
+          boostedCount >= 2 ||
+          localStorage.getItem(`moonbase_dual_boosted_${player.id}`) === 'true' ||
+          completedList.includes(13)
+        );
+      case 14:
         return (checkTargetPlanet.buildings.fabricator?.level || 0) >= 2;
-      case 10:
+      case 15:
         return (checkTargetPlanet.buildings.radar?.level || 0) >= 1;
-      case 11:
+      case 16:
         return (
           localStorage.getItem(`moonbase_scan_${player.id}`) === 'true' ||
-          completedList.includes(11)
+          completedList.includes(16)
         );
-      case 12:
+      case 17:
         return (checkTargetPlanet.buildings.researchCenter?.level || 0) >= 1;
-      case 13:
+      case 18:
+        // Any research node level >= 2
+        const hasTechLvl2Globally = player.planets.some(pl => {
+          const techData = localStorage.getItem(`moonbase_tech_${player.id}_${pl.id}`);
+          if (!techData) return false;
+          try {
+            const parsed = JSON.parse(techData);
+            return Object.values(parsed).some((lvl: any) => lvl >= 2);
+          } catch {
+            return false;
+          }
+        });
+        return (
+          hasTechLvl2Globally ||
+          localStorage.getItem(`tech_lvl2_${player.id}`) === 'true' ||
+          completedList.includes(18)
+        );
+      case 19:
         const hasStartedResGlobally = player.planets.some(pl => localStorage.getItem(`moonbase_activeres_${player.id}_${pl.id}`) !== null);
         const hasTechResearchedGlobally = player.planets.some(pl => {
           const techData = localStorage.getItem(`moonbase_tech_${player.id}_${pl.id}`);
@@ -480,11 +649,11 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
           hasResearchCenterGlobally ||
           localStorage.getItem(`moonbase_activeres_${player.id}`) === 'true' ||
           localStorage.getItem(`tech_researched_${player.id}`) === 'true' ||
-          completedList.includes(13)
+          completedList.includes(19)
         );
-      case 14:
+      case 20:
         return (checkTargetPlanet.buildings.armyBase?.level || 0) >= 1;
-      case 15:
+      case 21:
         const totalCombatSquads =
           (checkTargetPlanet.troops?.defender || 0) +
           (checkTargetPlanet.troops?.attacker || 0) +
@@ -492,39 +661,43 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
           (checkTargetPlanet.troops?.looter || 0) +
           (checkTargetPlanet.troops?.drone || 0);
         return totalCombatSquads >= 15;
-      case 16:
+      case 22:
+        return (checkTargetPlanet.troops?.defender || 0) >= 5;
+      case 23:
+        return (checkTargetPlanet.troops?.attacker || 0) >= 2;
+      case 24:
         const sentMsgLog =
           (player.commandMessages && player.commandMessages.some((m) => m.senderId === player.id)) ||
           localStorage.getItem(`moonbase_msg_sent_${player.id}`) === 'true';
-        return sentMsgLog || completedList.includes(16);
-      case 17:
+        return sentMsgLog || completedList.includes(24);
+      case 25:
         return (
           localStorage.getItem(`moonbase_nexus_claimed_${player.id}`) === 'true' ||
-          completedList.includes(17)
+          completedList.includes(25)
         );
-      case 18:
+      case 26:
         return (
           (player.allianceId !== null && player.allianceId !== '') ||
           localStorage.getItem(`moonbase_alliance_joined_${player.id}`) === 'true' ||
-          completedList.includes(18)
+          completedList.includes(26)
         );
-      case 19:
+      case 27:
         const hasChattedLog =
           chatMessages.some((msg: any) => msg.senderId === player.id) ||
           localStorage.getItem(`moonbase_chatted_${player.id}`) === 'true';
-        return hasChattedLog || completedList.includes(19);
-      case 20:
+        return hasChattedLog || completedList.includes(27);
+      case 28:
         return (
           localStorage.getItem(`moonbase_activeres_${player.id}`) !== null ||
-          completedList.includes(20)
+          completedList.includes(28)
         );
-      case 21:
+      case 29:
         return (
           localStorage.getItem(`moonbase_payroll_checked_${player.id}`) === 'true' ||
           player.lastDailyRewardClaim !== undefined ||
-          completedList.includes(21)
+          completedList.includes(29)
         );
-      case 22:
+      case 30:
         return player.planets.length >= 3;
       default:
         return false;
@@ -549,7 +722,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
         <div className="flex flex-col items-center gap-2">
           <span className="text-4xl animate-bounce">🏆</span>
           <h3 className="text-base font-black text-emerald-400 uppercase tracking-widest">
-            STAR ADMIRAL ACADEMY - ALL 22 CAMPAIGN TASKS COMPLETED!
+            STAR ADMIRAL ACADEMY - ALL CAMPAIGN TASKS COMPLETED!
           </h3>
           <p className="text-xs text-slate-300 max-w-2xl leading-relaxed mt-1 font-sans font-normal">
             Absolute Sovereign Command established! You have mastered the star building, physics sciences, battle troop recruitment, messaging, alliances, public radio communications, and interstellar coordinate colonizations. The high command stands in total awe of your grand space empire!
@@ -634,7 +807,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
               STATION ROADMAP & CAMPAIGN
             </span>
             <h2 className="text-xs font-bold text-slate-150 uppercase tracking-tight flex items-center gap-1.5 leading-none mt-0.5">
-              Commander Academy: Task {activeTask.id} of {tasks.length}
+              Commander Academy: Task {activeTask.id}
             </h2>
           </div>
         </div>
@@ -642,7 +815,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
         {/* ProgressBar */}
         <div className="hidden md:flex items-center gap-3 shrink-0">
           <div className="text-right text-[10px] text-slate-400">
-            {completedList.length}/{tasks.length} Claims Complete
+            {completedList.length} Claims Complete
           </div>
           <div className="w-24 h-1.5 bg-slate-900 rounded-full overflow-hidden border border-white/5">
             <div 
@@ -684,22 +857,22 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                       <span>✨ WELCOME STATION COMMANDER!</span>
                     </h4>
                     <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                      Rule the stars! We have configured an epic **22-step progress program** to walk you through the core of your empire's assembly lines, science labs, fleet transponders, text DMs, public chat, and outer coordinate expansions. Grab materials and free **Speed Credits** for each task claim!
+                      Rule the stars! We have configured an epic progressive training program to walk you through the core of your empire's assembly lines, science labs, fleet transponders, text DMs, public chat, and outer coordinate expansions. Grab materials and free **Speed Credits** for each task claim!
                     </p>
                   </div>
                 )}
 
                 <div className="flex items-start gap-2.5">
                   <div className={`mt-0.5 rounded-full p-0.5 flex shrink-0 items-center justify-center ${isMet ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-300 animate-pulse'}`}>
-                    <span className="text-sm">{isMet ? '✓' : '●'}</span>
+                     <span className="text-sm">{isMet ? '✓' : '●'}</span>
                   </div>
                   <div>
                     <span className="text-[9px] uppercase font-bold text-amber-400 block tracking-wider">ACTIVE MISSION STATUS:</span>
                     <h3 className="text-sm font-bold text-slate-200">
                       {activeTask.title}
                     </h3>
-                    {activeTask.id > 1 && activeTask.id < 22 && (
-                      <div className="my-1.5 px-2.5 py-1 text-[10px] bg-sky-500/15 text-sky-450 text-sky-300 border border-sky-500/20 rounded-lg inline-flex items-center gap-1.5 font-bold uppercase tracking-wider animate-pulse">
+                    {activeTask.id > 1 && activeTask.id < 30 && (
+                      <div className="my-1.5 px-2.5 py-1 text-[10px] bg-sky-500/15 text-sky-450 text-sky-305 text-sky-300 border border-sky-500/20 rounded-lg inline-flex items-center gap-1.5 font-bold uppercase tracking-wider animate-pulse">
                         <span>📡 SECTOR OUTPOST TARGET: SECOND STATION ({player.planets[1]?.name || 'Colony Station 2'})</span>
                       </div>
                     )}

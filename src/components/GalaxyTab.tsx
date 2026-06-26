@@ -664,6 +664,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
       if (!res.ok) {
         if (showToast) showToast(data.error || 'Failed to transmit resources.', 'error');
       } else {
+        localStorage.setItem(`moonbase_resources_sent_${player.id}`, 'true');
         if (showToast) showToast('Cargo Portal successfully activated! Resources transmitted.', 'success');
         setTargetForResources(null);
         if (onRefreshState) onRefreshState();
