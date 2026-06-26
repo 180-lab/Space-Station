@@ -927,7 +927,9 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                 const isInfoActive = activeTroopInfo === tId;
                 const qty = quantities[tId] || 1;
                 const requiredLevel = TROOP_REQUIRED_LEVELS[tId] || 0;
-                const isLocked = armyBaseLevel < requiredLevel;
+                
+                const allWarRoomsReached22 = player.planets.every(pl => (pl.buildings.armyBase?.level || 0) >= 22);
+                const isLocked = (armyBaseLevel < requiredLevel) || (tId === 'settlementShip' && !allWarRoomsReached22);
 
                 return (
                   <div 
@@ -970,7 +972,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                           <span className="font-bold text-white text-base font-mono">{details.name}</span>
                           {isLocked ? (
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-red-950/50 text-red-400 border border-red-500/30 flex items-center gap-1 animate-pulse shadow-sm">
-                              🔒 REQ WAR ROOM LV. {requiredLevel}
+                              {tId === 'settlementShip' && !allWarRoomsReached22 ? "🔒 ALL WAR ROOMS REQ LV. 22" : `🔒 REQ WAR ROOM LV. ${requiredLevel}`}
                             </span>
                           ) : (
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 text-cyan-400 border border-[#1E293B]">
@@ -1143,7 +1145,15 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                             <span>🔒 Fabrication Status: Off-line</span>
                           </div>
                           <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
-                            Upgrade your War Room to <strong className="text-white">Level {requiredLevel}</strong> to assemble {details.name}s on this base.
+                            {tId === 'settlementShip' && !allWarRoomsReached22 ? (
+                              <>
+                                Upgrade <strong className="text-white">ALL your War Rooms to Level 22</strong> to construct a Settlement Ship.
+                              </>
+                            ) : (
+                              <>
+                                Upgrade your War Room to <strong className="text-white">Level {requiredLevel}</strong> to assemble {details.name}s on this base.
+                              </>
+                            )}
                           </p>
                         </div>
                       );

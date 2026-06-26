@@ -2690,6 +2690,11 @@ app.post("/api/train/troop", (req, res) => {
 
   // If training a Settlement Ship, enforce "you can only have one on each base" and "this base's war room must be level 1"
   if (troopId === "settlementShip") {
+    const allWarRoomsReached22 = p.planets.every(pl => (pl.buildings.armyBase?.level || 0) >= 22);
+    if (!allWarRoomsReached22) {
+      return res.status(400).json({ error: "To queue/train a Settlement Ship, ALL of your War Rooms (Army Bases) must be upgraded to Level 22 or higher!" });
+    }
+
     const hasActiveBaseLevel1 = (planet.buildings.armyBase?.level || 0) >= 1;
     if (!hasActiveBaseLevel1) {
       return res.status(400).json({ error: "To build a Settlement Ship, this base's War Room (Army Base) must be upgraded to Level 1!" });
