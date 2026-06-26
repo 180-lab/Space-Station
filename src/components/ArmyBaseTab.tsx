@@ -1330,21 +1330,21 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                   {/* Allocated Troops layout list */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Allocate Ships inside Each Fleet Cargo</label>
-                    <div className="space-y-2 max-h-52 overflow-y-auto pr-1 bg-slate-950/20 p-2.5 border border-[#1E293B]/40 rounded-xl font-mono text-[10px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-950/20 p-2 border border-[#1E293B]/40 rounded-xl font-mono text-[10px]">
                       {Object.keys(TROOP_NAME_MAPPING).map((tId) => {
                         const avail = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
                         return (
-                          <div key={tId} className="flex items-center justify-between border-b border-slate-900/40 pb-1.5 last:border-0 last:pb-0">
-                            <div className="min-w-0">
-                              <span className="font-bold text-slate-200 block">{TROOP_NAME_MAPPING[tId]}</span>
-                              <span className="text-[8.5px] text-slate-500 font-bold">In-Hangar count: <strong className="text-cyan-400 font-extrabold">{avail}</strong></span>
+                          <div key={tId} className="flex items-center justify-between p-1.5 bg-[#05070A]/80 border border-[#1E293B]/40 hover:border-cyan-500/20 rounded-lg transition-colors">
+                            <div className="min-w-0 pr-1">
+                              <span className="font-bold text-slate-200 block truncate" title={TROOP_NAME_MAPPING[tId]}>{TROOP_NAME_MAPPING[tId]}</span>
+                              <span className="text-[8.5px] text-slate-500 font-bold block">In-Hangar: <strong className="text-cyan-400 font-extrabold">{avail}</strong></span>
                             </div>
                             
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1 shrink-0 bg-slate-950/40 p-0.5 rounded-lg border border-[#1E293B]/40">
                               <button
                                 type="button"
                                 onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: 0 }))}
-                                className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700/80 text-[8px] rounded font-bold"
+                                className="px-1.5 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] font-bold text-slate-300 rounded"
                               >
                                 Min
                               </button>
@@ -1352,18 +1352,19 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                 type="number"
                                 min={0}
                                 max={avail}
-                                value={fleetTroops[tId] || 0}
+                                value={fleetTroops[tId] === 0 ? '' : fleetTroops[tId]}
+                                placeholder="0"
                                 onChange={(e) => {
                                   const val = Math.min(avail, Math.max(0, parseInt(e.target.value, 10) || 0));
                                   setFleetTroops(prev => ({ ...prev, [tId]: val }));
                                 }}
-                                className="w-12 text-center bg-slate-950 border border-slate-800 text-[10px] text-white focus:outline-none focus:border-cyan-500 font-bold p-0.5 rounded"
+                                className="w-14 text-center bg-[#05070A] border border-[#1E293B]/30 rounded font-mono text-[10px] text-white py-0.5 focus:outline-none focus:border-cyan-500 font-extrabold"
                               />
                               <button
                                 type="button"
                                 disabled={avail === 0}
                                 onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: avail }))}
-                                className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700/80 text-[8px] rounded deactivated:opacity-20 font-bold"
+                                className="px-1.5 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-cyan-400 rounded disabled:opacity-30 font-bold"
                               >
                                 Max
                               </button>

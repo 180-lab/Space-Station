@@ -41,6 +41,15 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isHowToOpen, setIsHowToOpen] = useState(false);
   const [claimingId, setClaimingId] = useState<number | null>(null);
+  const [allowOverflow, setAllowOverflow] = useState(false);
+  const [isWelcomeClosed, setIsWelcomeClosed] = useState(() => {
+    return localStorage.getItem(`moonbase_welcome_closed_${player.id}`) === 'true';
+  });
+
+  const handleCloseWelcome = () => {
+    localStorage.setItem(`moonbase_welcome_closed_${player.id}`, 'true');
+    setIsWelcomeClosed(true);
+  };
 
   // Completed tasks array retrieved from server (or defaults to empty)
   const completedList = player.completedTutorialTasks || [];
@@ -533,12 +542,11 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     },
   ];
 
+  // Tasks must be done on the player's latest planet (the last one in the planets array) and not any earlier planet
+  const checkTargetPlanet = player.planets[player.planets.length - 1] || activePlanet;
+
   // Logic to determine if task objective is met
   const checkObjectiveMet = (task: TutorialTask): boolean => {
-    // For tasks 2 to 29, check criteria on the 2nd station (player.planets[1]) if colonized
-    const checkTargetPlanet = (task.id > 1 && task.id < 30) 
-      ? (player.planets[1] || activePlanet) 
-      : activePlanet;
 
     switch (task.id) {
       case 1:
@@ -756,7 +764,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
           'Content-Type': 'application/json',
           'x-user-id': player.id,
         },
-        body: JSON.stringify({ taskId, planetId: activePlanet.id }),
+        body: JSON.stringify({ taskId, planetId: activePlanet.id, allowOverflow }),
       });
 
       const data = await res.json();
@@ -851,8 +859,16 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
               <div className="flex-1 text-left space-y-3">
                 
                 {/* Optional Welcome Banner overlaying Task 1 */}
-                {activeTask.id === 1 && (
-                  <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-cyan-950/70 to-indigo-950/50 border border-cyan-500/30 text-left">
+                {activeTask.id === 1 && !isWelcomeClosed && (
+                  <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-cyan-950/70 to-indigo-950/50 border border-cyan-500/30 text-left relative pr-10">
+                    <button
+                      type="button"
+                      onClick={handleCloseWelcome}
+                      className="absolute top-3 right-3 text-slate-400 hover:text-white transition duration-150 text-xs font-bold cursor-pointer"
+                      title="Dismiss welcome message"
+                    >
+                      ✕
+                    </button>
                     <h4 className="text-xs font-black text-cyan-400 uppercase tracking-widest flex items-center gap-2">
                       <span>✨ WELCOME STATION COMMANDER!</span>
                     </h4>
@@ -872,8 +888,8 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                       {activeTask.title}
                     </h3>
                     {activeTask.id > 1 && activeTask.id < 30 && (
-                      <div className="my-1.5 px-2.5 py-1 text-[10px] bg-sky-500/15 text-sky-450 text-sky-305 text-sky-300 border border-sky-500/20 rounded-lg inline-flex items-center gap-1.5 font-bold uppercase tracking-wider animate-pulse">
-                        <span>📡 SECTOR OUTPOST TARGET: SECOND STATION ({player.planets[1]?.name || 'Colony Station 2'})</span>
+                      <div className="my-1.5 px-2.5 py-1 text-[10px] bg-sky-500/15 text-sky-300 border border-sky-500/20 rounded-lg inline-flex items-center gap-1.5 font-bold uppercase tracking-wider animate-pulse">
+                        <span>📡 TARGET STATION: LATEST COLONY ({checkTargetPlanet.name})</span>
                       </div>
                     )}
                     <p className="text-xs text-slate-400 leading-relaxed mt-1">
@@ -985,6 +1001,15 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                       Your Silo capacity (<span className="font-mono font-bold text-white">{siloCapacity.toLocaleString()}</span> units) is lower than this task's maximum reward (<span className="font-mono font-bold text-white">{maxResourceReward.toLocaleString()}</span> units). Claiming now will top off resources to maximum limit.
                       Upgrade your <span className="font-bold text-amber-300">Silo (Repository)</span> inside your active colony to fully capture all spills without waste!
                     </p>
+                    <label className="flex items-center gap-2 mt-2.5 p-2 bg-slate-950/60 border border-[#1E293B]/60 rounded-lg cursor-pointer text-[10px] select-none font-bold text-cyan-300">
+                      <input 
+                        type="checkbox" 
+                        checked={allowOverflow} 
+                        onChange={(e) => setAllowOverflow(e.target.checked)}
+                        className="accent-cyan-500 rounded cursor-pointer"
+                      />
+                      <span>Let resources overflow (bypass Silo limits)</span>
+                    </label>
                   </div>
                 )}
 

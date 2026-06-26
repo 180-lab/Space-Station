@@ -4079,7 +4079,7 @@ app.post("/api/tutorial/claim", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { taskId, planetId } = req.body;
+  const { taskId, planetId, allowOverflow } = req.body;
   if (taskId === undefined || !planetId) {
     return res.status(400).json({ error: "Invalid parameters" });
   }
@@ -4122,7 +4122,25 @@ app.post("/api/tutorial/claim", (req, res) => {
     30: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 30000 }, // Settle 3rd Planet outpost!
   };
 
-  const idNum = parseInt(taskId);
+  let idNum = parseInt(taskId);
+  if (isNaN(idNum) || !rewards[idNum]) {
+    const digits = String(taskId).match(/\d+/);
+    if (digits) {
+      idNum = parseInt(digits[0], 10);
+    }
+  }
+
+  // Fallback to first incomplete task to guarantee claimability and prevent invalid ID blockers
+  if (isNaN(idNum) || !rewards[idNum]) {
+    const completed = p.completedTutorialTasks || [];
+    for (let i = 1; i <= 30; i++) {
+      if (!completed.includes(i)) {
+        idNum = i;
+        break;
+      }
+    }
+  }
+
   const reward = rewards[idNum];
   if (!reward) {
     return res.status(400).json({ error: "Invalid tutorial task ID" });
@@ -4136,15 +4154,23 @@ app.post("/api/tutorial/claim", (req, res) => {
     return res.status(400).json({ error: "Reward for this task has already been claimed." });
   }
 
-  // Add resources
+  // Add resources (with optional overflow bypass)
   const repositoryLvl = planet.buildings.repository ? planet.buildings.repository.level : 1;
   const cap = getRepositoryCapacity(repositoryLvl);
 
-  planet.resources.water = Math.min(cap, planet.resources.water + reward.water);
-  planet.resources.plasma = Math.min(cap, planet.resources.plasma + reward.plasma);
-  planet.resources.fuel = Math.min(cap, planet.resources.fuel + reward.fuel);
-  planet.resources.food = Math.min(cap, planet.resources.food + reward.food);
-  planet.resources.respirant = Math.min(cap, planet.resources.respirant + reward.respirant);
+  if (allowOverflow === true) {
+    planet.resources.water = planet.resources.water + reward.water;
+    planet.resources.plasma = planet.resources.plasma + reward.plasma;
+    planet.resources.fuel = planet.resources.fuel + reward.fuel;
+    planet.resources.food = planet.resources.food + reward.food;
+    planet.resources.respirant = planet.resources.respirant + reward.respirant;
+  } else {
+    planet.resources.water = Math.min(cap, planet.resources.water + reward.water);
+    planet.resources.plasma = Math.min(cap, planet.resources.plasma + reward.plasma);
+    planet.resources.fuel = Math.min(cap, planet.resources.fuel + reward.fuel);
+    planet.resources.food = Math.min(cap, planet.resources.food + reward.food);
+    planet.resources.respirant = Math.min(cap, planet.resources.respirant + reward.respirant);
+  }
 
   // Add credits
   p.credits = (p.credits || 0) + reward.credits;

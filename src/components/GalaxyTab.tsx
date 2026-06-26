@@ -334,6 +334,18 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [chatInput, setChatInput] = useState('');
   const [activeChatWindow, setActiveChatWindow] = useState<'global' | 'alliance' | null>(null);
 
+  // Prevent background scrolling when a modal or dispatch overlay is active
+  React.useEffect(() => {
+    if (selectedTarget || targetForResources || activeChatWindow) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [selectedTarget, targetForResources, activeChatWindow]);
+
   // Alliance setup panel
   const [allianceName, setAllianceName] = useState('');
   const [allianceTag, setAllianceTag] = useState('');
@@ -2630,7 +2642,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           {/* Right Column: Allocate Forces counts */}
                           <div className="space-y-2 text-xs">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Allocate Units:</span>
-                            <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto pr-1">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {Object.entries(planet.troops).map(([tId, count]) => {
                                 const nameLabel = 
                                   tId === 'drone' ? 'Missile Launcher' : 
@@ -2639,25 +2651,39 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   tId === 'tank' ? 'Disrupter' : 
                                   tId === 'attacker' ? 'Assault Drone' : 
                                   tId === 'settlementShip' ? 'Settlement Ship' : tId;
+                                const avail = count as number;
                                 return (
-                                  <div key={tId} className="flex flex-col bg-[#05070A]/80 p-2 rounded-lg border border-[#1E293B]">
-                                    <span className="text-[9px] text-slate-500 font-sans block truncate">{nameLabel}</span>
-                                    <div className="flex items-center justify-between mt-1 gap-1">
+                                  <div key={tId} className="flex items-center justify-between p-1.5 bg-[#05070A]/80 border border-[#1E293B]/40 hover:border-cyan-500/20 rounded-lg transition-colors">
+                                    <div className="min-w-0 pr-1">
+                                      <span className="font-bold text-slate-200 block truncate text-[10.5px]" title={nameLabel}>{nameLabel}</span>
+                                      <span className="text-[8.5px] text-slate-500 font-bold block">In-Hangar: <strong className="text-cyan-400 font-extrabold">{avail}</strong></span>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-1 shrink-0 bg-slate-950/40 p-0.5 rounded-lg border border-[#1E293B]/40">
+                                      <button
+                                        type="button"
+                                        onClick={() => setCustomTroops(prev => ({ ...prev, [tId]: 0 }))}
+                                        className="px-1.5 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] font-bold text-slate-300 rounded"
+                                      >
+                                        Min
+                                      </button>
                                       <input
                                         type="number"
                                         min="0"
-                                        max={count as number}
-                                        value={(customTroops[tId] as number) || 0}
+                                        max={avail}
+                                        value={customTroops[tId] === 0 ? '' : customTroops[tId] || 0}
+                                        placeholder="0"
                                         onChange={(e) => {
-                                          const val = Math.min(count as number, Math.max(0, parseInt(e.target.value, 10) || 0));
+                                          const val = Math.min(avail, Math.max(0, parseInt(e.target.value, 10) || 0));
                                           setCustomTroops(prev => ({ ...prev, [tId]: val }));
                                         }}
-                                        className="bg-transparent border-none text-white text-[11px] font-bold font-mono focus:outline-none w-full"
+                                        className="w-14 text-center bg-[#05070A] border border-[#1E293B]/30 rounded font-mono text-[10px] text-white py-0.5 focus:outline-none focus:border-cyan-500 font-extrabold"
                                       />
                                       <button
                                         type="button"
-                                        onClick={() => setCustomTroops(prev => ({ ...prev, [tId]: count as number }))}
-                                        className="text-[9px] text-cyan-404 text-cyan-400 hover:text-white font-bold"
+                                        disabled={avail === 0}
+                                        onClick={() => setCustomTroops(prev => ({ ...prev, [tId]: avail }))}
+                                        className="px-1.5 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-cyan-400 rounded disabled:opacity-30 font-bold"
                                       >
                                         Max
                                       </button>
@@ -2966,8 +2992,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           : (fleetTroops.tank || 0);
 
         return (
-          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-xl bg-[#090D1A] border border-cyan-500/35 rounded-2xl p-6 font-mono shadow-[0_0_50px_rgba(6,182,212,0.2)] animate-fade-in text-left max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+          <div className="fixed inset-0 bg-[#05070A]/95 backdrop-blur-md z-50 overflow-y-auto p-4 sm:p-6 md:p-8 flex items-center justify-center">
+            <div className="w-full max-w-2xl bg-[#090D1A] border border-cyan-500/35 rounded-2xl p-6 md:p-8 font-mono shadow-[0_0_50px_rgba(6,182,212,0.15)] animate-fade-in text-left my-auto space-y-5 flex flex-col">
               <div className="flex justify-between items-start pb-2.5 border-b border-[#1E293B]/60 shrink-0 mb-4">
                 <div>
                   <span className="text-[9px] font-black text-cyan-300 uppercase tracking-widest bg-cyan-950/25 border border-cyan-500/25 px-2.5 py-1 rounded-lg">FLEET DEPLOYMENT TRANSMISSION</span>
@@ -3024,8 +3050,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 </button>
               </div>
 
-              {/* Scrollable Content Container */}
-              <div className="flex-1 overflow-y-auto pr-1.5 space-y-4">
+              {/* Scrollable Content Container (Overflow disabled, scrolled via fullscreen overlay) */}
+              <div className="space-y-4">
                 
                 {/* RESERVE FLEET DEPLOYMENT OPTION */}
                 {(() => {
@@ -3136,11 +3162,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 </span>
                                 <p className="text-[9px] text-slate-500 mt-0.5">Aval: <strong className="text-cyan-400">{count}</strong></p>
                               </div>
-                              <div className="flex items-center gap-0.5 shrink-0 bg-slate-950/40 p-0.5 rounded-lg border border-[#1E293B]/40">
+                              <div className="flex items-center gap-1 shrink-0 bg-slate-950/40 p-0.5 rounded-lg border border-[#1E293B]/40">
                                 <button 
                                   type="button"
                                   onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: 0 }))}
-                                  className="px-1 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-slate-300 font-mono rounded"
+                                  className="px-1.5 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-slate-300 font-mono rounded font-bold"
                                 >
                                   Min
                                 </button>
@@ -3148,18 +3174,19 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   type="number"
                                   min={0}
                                   max={count}
-                                  value={fleetTroops[tId] || 0}
+                                  value={fleetTroops[tId] === 0 ? '' : fleetTroops[tId]}
+                                  placeholder="0"
                                   onChange={(e) => {
                                     const val = Math.min(count, Math.max(0, parseInt(e.target.value, 10) || 0));
                                     setFleetTroops(prev => ({ ...prev, [tId]: val }));
                                   }}
-                                  className="w-8 text-center bg-[#05070A] border border-[#1E293B]/30 rounded font-mono text-[10px] text-white py-0.5 focus:outline-none focus:border-cyan-500 font-extrabold"
+                                  className="w-14 text-center bg-[#05070A] border border-[#1E293B]/30 rounded font-mono text-[10px] text-white py-0.5 focus:outline-none focus:border-cyan-500 font-extrabold"
                                 />
                                 <button 
                                   type="button"
                                   disabled={count === 0}
                                   onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: count }))}
-                                  className="px-1 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-cyan-400 font-mono rounded disabled:opacity-30"
+                                  className="px-1.5 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-cyan-400 font-mono rounded disabled:opacity-30 font-bold"
                                 >
                                   Max
                                 </button>
