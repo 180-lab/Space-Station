@@ -557,52 +557,16 @@ function bootstrapUniverse() {
     }
   ];
 
-  const factions = ["Solar Alliance", "Nexus Syndicate", "Eclipse Vanguard"];
+  const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
   const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
 
-  // Create 2 AI Alliances
-  const voidAlliance: Alliance = {
-    id: "alliance_void",
-    name: "VOID SYNDICATE",
-    tag: "VOID",
-    leaderId: "ai_1",
-    leaderName: "VoidLord",
-    members: [
-      { playerId: "ai_1", username: "VoidLord", role: "leader" },
-      { playerId: "ai_2", username: "XenonHunter", role: "officer" },
-      { playerId: "ai_3", username: "NebulaKnight", role: "member" }
-    ],
-    wars: [],
-    bannerColor: "#FF007A",
-    bannerSymbol: "▲"
-  };
-
-  const empireAlliance: Alliance = {
-    id: "alliance_empire",
-    name: "SOLAR EMPIRE",
-    tag: "SOL",
-    leaderId: "ai_4",
-    leaderName: "Astraea",
-    members: [
-      { playerId: "ai_4", username: "Astraea", role: "leader" },
-      { playerId: "ai_5", username: "TitanKing", role: "officer" },
-      { playerId: "ai_6", username: "StarEclipse", role: "member" }
-    ],
-    wars: [],
-    bannerColor: "#00F0FF",
-    bannerSymbol: "◈"
-  };
-
-  state.alliances[voidAlliance.id] = voidAlliance;
-  state.alliances[empireAlliance.id] = empireAlliance;
-
   const aiNames = [
-    { name: "VoidLord", coords: { x: 12, y: 34 }, allianceId: "alliance_void", faction: factions[1], color: factionColors[1] },
-    { name: "XenonHunter", coords: { x: 18, y: 40 }, allianceId: "alliance_void", faction: factions[1], color: factionColors[1] },
-    { name: "NebulaKnight", coords: { x: 8, y: 22 }, allianceId: "alliance_void", faction: factions[1], color: factionColors[1] },
-    { name: "Astraea", coords: { x: 55, y: 78 }, allianceId: "alliance_empire", faction: factions[0], color: factionColors[0] },
-    { name: "TitanKing", coords: { x: 62, y: 82 }, allianceId: "alliance_empire", faction: factions[0], color: factionColors[0] },
-    { name: "StarEclipse", coords: { x: 50, y: 70 }, allianceId: "alliance_empire", faction: factions[0], color: factionColors[0] },
+    { name: "VoidLord", coords: { x: 12, y: 34 }, allianceId: null, faction: factions[1], color: factionColors[1] },
+    { name: "XenonHunter", coords: { x: 18, y: 40 }, allianceId: null, faction: factions[1], color: factionColors[1] },
+    { name: "NebulaKnight", coords: { x: 8, y: 22 }, allianceId: null, faction: factions[1], color: factionColors[1] },
+    { name: "Astraea", coords: { x: 55, y: 78 }, allianceId: null, faction: factions[0], color: factionColors[0] },
+    { name: "TitanKing", coords: { x: 62, y: 82 }, allianceId: null, faction: factions[0], color: factionColors[0] },
+    { name: "StarEclipse", coords: { x: 50, y: 70 }, allianceId: null, faction: factions[0], color: factionColors[0] },
     { name: "CosmoPirate", coords: { x: 88, y: 15 }, allianceId: null, faction: factions[2], color: factionColors[2] },
     { name: "NovaSlayer", coords: { x: 42, y: 45 }, allianceId: null, faction: factions[2], color: factionColors[2] },
     { name: "SolarWing", coords: { x: 30, y: 90 }, allianceId: null, faction: factions[0], color: factionColors[0] },
@@ -629,8 +593,8 @@ function bootstrapUniverse() {
       username: ai.name,
       faction: ai.faction,
       factionColor: ai.color,
-      allianceId: ai.allianceId,
-      allianceRole: ai.allianceId ? "member" : null,
+      allianceId: null,
+      allianceRole: null,
       planets: [planet],
       scores: {
         population: Math.floor(Math.random() * 1000) + 200,
@@ -645,25 +609,7 @@ function bootstrapUniverse() {
       credits: 10000
     };
 
-    if (id === voidAlliance.leaderId) player.allianceRole = "leader";
-    if (id === empireAlliance.leaderId) player.allianceRole = "leader";
-
     state.players[id] = player;
-  });
-
-  // Make VOID & SOL declare war!
-  voidAlliance.wars.push({
-    targetAllianceId: empireAlliance.id,
-    targetAllianceName: empireAlliance.name,
-    declaredAt: Date.now() - 3600000
-  });
-
-  state.newsEvents.push({
-    id: "news_war_bootstrap",
-    title: "War Declared!",
-    content: "The VOID SYNDICATE has officially declared war against the SOLAR EMPIRE! Alliance boundaries are now borders under attack.",
-    type: "war",
-    timestamp: Date.now() - 3600000
   });
 
   ensureMinimumHabitablePlanets();
@@ -1976,7 +1922,7 @@ app.post("/api/register", (req, res) => {
     return res.status(400).json({ error: "Commander username already registered" });
   }
 
-  const factions = ["Solar Alliance", "Nexus Syndicate", "Eclipse Vanguard"];
+  const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
   const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
   const selectFaction = factions.includes(faction) ? faction : factions[0];
   const idx = factions.indexOf(selectFaction);
@@ -2090,7 +2036,7 @@ app.post("/api/auth/google", (req, res) => {
   }
 
   // Create a brand new Google-secured Commander Profile
-  const factions = ["Solar Alliance", "Nexus Syndicate", "Eclipse Vanguard"];
+  const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
   const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
   const selectFaction = factions.includes(faction) ? faction : factions[0];
   const idx = factions.indexOf(selectFaction);
@@ -3012,7 +2958,7 @@ app.post("/api/galaxy/intelligence", (req, res) => {
           ? [
               "--- COORDINATE TELEMETRY DECRYPTION ---",
               `Sector [${xVal}, ${yVal}] analyzed successfully.`,
-              `Detected station commander: ${targetUser.username} (${targetUser.faction})`,
+              `Detected station commander: ${targetUser.username}`,
               `Industrial building scans completed.`,
               `Combat garrison scanned successfully.`
             ]
@@ -3515,7 +3461,7 @@ app.post("/api/alliance/create", (req, res) => {
   state.newsEvents.unshift({
     id: `news_${Math.random().toString(36).substr(2, 9)}`,
     title: "New Alliance Formed",
-    content: `${p.username} has launched a new military faction: [${tag.toUpperCase()}] ${name.toUpperCase()}!`,
+    content: `${p.username} has launched a new military Alliance: [${tag.toUpperCase()}] ${name.toUpperCase()}!`,
     type: "system",
     timestamp: Date.now()
   });

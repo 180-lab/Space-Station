@@ -112,7 +112,7 @@ export default function App() {
   const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('moonbase_userId'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [faction, setFaction] = useState('Solar Alliance');
+  const [faction, setFaction] = useState('Solar Federation');
   const [showSignup, setShowSignup] = useState(true);
 
   // Connection error handling
@@ -1681,7 +1681,7 @@ export default function App() {
                     const sel = e.target.value as 'normal' | 'light' | 'dark';
                     setTheme(sel);
                     localStorage.setItem('moonbase_theme', sel);
-                    setFaction('Solar Alliance');
+                    setFaction('Solar Federation');
                   }}
                   className="w-full px-4 py-3 bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-xl text-sm focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_10px_rgba(34,211,238,0.15)] transition-all duration-200"
                 >
@@ -3012,7 +3012,7 @@ export default function App() {
           <div className="fixed inset-0 bg-[#05070A]/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <div className="w-full max-w-lg bg-[#0A0F1D] border border-cyan-500/20 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.15)] overflow-hidden font-sans relative flex flex-col">
               
-              {/* Header Banner representing player Faction */}
+              {/* Header Banner representing player */}
               <div 
                 className="h-28 relative flex items-end p-5"
                 style={{ backgroundColor: factionColor + '15', borderBottom: `2px solid ${factionColor}` }}
@@ -3033,7 +3033,7 @@ export default function App() {
                       {targetPlayer.username}
                     </h2>
                     <p className="text-[11px] font-mono font-bold tracking-widest uppercase" style={{ color: factionColor }}>
-                      {targetPlayer.faction} Agent
+                      Active Commander
                     </p>
                   </div>
                 </div>
@@ -3331,7 +3331,7 @@ export default function App() {
                       <option value="">-- Choose active Commander --</option>
                       {playersList.filter(p => p.id !== player.id).map(p => (
                         <option key={p.id} value={p.id}>
-                          {p.username} [{p.faction || 'Neutral'}]
+                          {p.username}
                         </option>
                       ))}
                     </select>
@@ -3551,7 +3551,7 @@ export default function App() {
                               <option value="">-- Click to choose Commander --</option>
                               {playersList.filter(p => p.id !== player.id).map(p => (
                                 <option key={p.id} value={p.id}>
-                                  {p.username} [{p.faction || 'Neutral'}]
+                                  {p.username}
                                 </option>
                               ))}
                             </select>

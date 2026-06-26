@@ -1159,7 +1159,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 <div>
                   <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest block font-mono">YOUR COSMIC STANDING</span>
                   <p className="text-xs font-mono text-slate-350 font-bold mt-0.5">
-                    ★ <span className="text-white text-sm">{player.username}</span> [{player.faction}]
+                    ★ <span className="text-white text-sm">{player.username}</span>
                   </p>
                 </div>
               </div>
@@ -3595,10 +3595,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           </span>
                         ) : (
                           intelReport.commander
-                        )}{' '}
-                        <span className="text-slate-500 bg-white/5 px-1.5 py-0.2 rounded border border-white/5 uppercase ml-1.5 text-[9px]">
-                          {intelReport.faction || 'Neutral Space Alliance'}
-                        </span>
+                        )}
                       </p>
                       {(() => {
                         const targetActive = intelReport.lastActive;
