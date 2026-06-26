@@ -50,7 +50,8 @@ import {
   Edit2,
   Check,
   Send,
-  Reply
+  Reply,
+  Compass
 } from 'lucide-react';
 
 const TROOP_NAME_MAPPING: Record<string, string> = {
@@ -1936,11 +1937,11 @@ export default function App() {
               id="active-station-selector-btn"
               type="button"
               onClick={() => setStationDropdownOpen(!stationDropdownOpen)}
-              className="bg-[#05070A]/90 hover:bg-[#1E293B]/40 text-cyan-400 hover:text-white text-xs font-bold py-2 px-3 rounded-xl border border-cyan-500/15 focus:border-cyan-500/50 hover:border-cyan-500/40 focus:outline-none cursor-pointer transition flex items-center gap-2 shadow-[0_0_15px_rgba(34,211,238,0.06)] active:scale-95"
+              className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-white text-xs font-black py-2.5 px-4 rounded-xl border border-cyan-400/40 hover:border-cyan-400/60 shadow-[0_0_15px_rgba(34,211,238,0.15)] focus:border-cyan-400/80 focus:outline-none cursor-pointer transition flex items-center gap-2 active:scale-95 tracking-wide uppercase font-mono"
+              title="Open change station selector options"
             >
-              <span className="text-[9px] text-slate-500 tracking-wider">STATION:</span>
-              <span className="truncate max-w-[125px] text-slate-100 font-black tracking-tight">{activePlanet.name}</span>
-              <span className="text-cyan-400 text-[10px] font-bold">[{activePlanet.sectorX}, {activePlanet.sectorY}]</span>
+              <Compass size={13} className="text-cyan-400 animate-pulse" />
+              <span>Change Station</span>
               <ChevronDown size={12} className={`text-cyan-400 transition-transform duration-200 shrink-0 ${stationDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
             
@@ -1952,7 +1953,7 @@ export default function App() {
                   className="absolute left-0 top-11 mt-1 w-64 bg-[#0A0F1D]/98 border border-cyan-500/40 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.85)] p-2 z-50 text-left font-mono backdrop-blur-md animate-fade-in flex flex-col gap-1"
                 >
                   <div className="px-2.5 py-1.5 border-b border-[#1E293B]/45 mb-1">
-                    <span className="text-[8.5px] text-slate-500 font-bold uppercase tracking-widest">Select Tactical Station</span>
+                    <span className="text-[8.5px] text-cyan-400 font-bold uppercase tracking-widest">Change Station Option List</span>
                   </div>
                   {player.planets.map((pl, idx) => {
                     const isActive = pl.id === activePlanet.id;
@@ -2005,61 +2006,19 @@ export default function App() {
 
           <button 
             type="button"
-            onClick={() => setShowCommDeck(true)}
-            className="w-10 h-10 border border-cyan-500/40 flex items-center justify-center rounded bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20 active:scale-101 transition-all duration-150 cursor-pointer relative z-50 mr-1"
-            title="Open Secure Command Comm-Messages"
-          >
-            <Mail size={18} className="text-cyan-400" />
-            {(() => {
-              const count = player.commandMessages?.filter(m => !m.isRead).length || 0;
-              if (count > 0) {
-                return (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 font-mono text-[9px] font-black text-white ring-1 ring-[#1E293B] animate-pulse shadow-[0_0_8px_#ef4444]">
-                    {count}
-                  </span>
-                );
-              }
-              return null;
-            })()}
-          </button>
-
-          <button 
-            type="button"
             onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-            className="w-10 h-10 border border-cyan-500/40 flex items-center justify-center rounded bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20 active:scale-95 transition-all duration-150 cursor-pointer relative z-50"
-            title="Open Commander Stations & HP status"
+            className="w-10 h-10 border border-cyan-500/40 flex items-center justify-center rounded bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20 active:scale-95 transition-all duration-150 cursor-pointer relative z-50 mr-1"
+            title="Open Commander Profile Hub"
           >
             <User size={18} className="text-cyan-400" />
             
-            {/* Pulsing indicator to show it's interactive */}
             <span className="absolute -bottom-1 -right-1 flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
             </span>
           </button>
 
-          <button 
-            type="button"
-            onClick={() => {
-              setAppConfirmModal({
-                title: 'CONFIRM SESSION DE-SYNCHRONIZATION',
-                message: 'Are you sure you want to log out of your session? Your current account session reference will be purged from LocalStorage and you will be re-routed to registration.',
-                onConfirm: () => {
-                  localStorage.removeItem('moonbase_userId');
-                  showToast('Commander keys de-synchronized. Reloading terminal...', 'info');
-                  setTimeout(() => {
-                    window.location.reload();
-                  }, 600);
-                }
-              });
-            }}
-            className="w-10 h-10 border border-red-500/30 hover:border-red-500/60 flex items-center justify-center rounded bg-red-950/10 hover:bg-red-950/25 active:scale-95 transition-all duration-150 cursor-pointer text-red-400"
-            title="Log Out & Create/Use a New Username"
-          >
-            <LogOut size={16} />
-          </button>
-
-          {/* Invisible backdrop to support closing the dropdown */}
+          {/* Invisible backdrop to support closing the profile dropdown */}
           {profileDropdownOpen && (
             <div 
               className="fixed inset-0 z-40 bg-transparent cursor-default" 
@@ -2067,92 +2026,26 @@ export default function App() {
             />
           )}
 
-          {/* Commander Stations & HP/troop dropdown card */}
+          {/* Commander Profile Dropdown Panel */}
           {profileDropdownOpen && (
             <div className="absolute right-0 top-12 mt-2 w-72 bg-[#0A0F1D]/95 border border-cyan-500/35 rounded-xl shadow-[0_4px_30px_rgba(34,211,238,0.35)] p-4.5 z-50 text-left font-mono backdrop-blur-md animate-fade-in space-y-3 max-h-[80vh] overflow-y-auto">
               <div className="border-b border-[#1E293B] pb-2.5">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-[#22D3EE] flex items-center gap-1.5">
-                  🛰️ Commander Stations Hub
-                </h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <User size={14} className="text-[#22D3EE]" />
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-[#22D3EE]">
+                    Commander Profile
+                  </h3>
+                </div>
+                <div className="text-sm font-black text-slate-100 truncate">
+                  {player.username}
+                </div>
                 <p className="text-[9px] text-[#94A3B8] leading-tight font-sans mt-1">
-                  Active tactical deployment & garrison strength overview.
+                  Commanding {player.planets.length} Sovereign Space Stations.
                 </p>
               </div>
 
-              {/* Planets detailed listing */}
-              <div className="space-y-2">
-                {player.planets.map((planet, index) => {
-                  const isPlExpanded = expandedDropdownPlanetIds[planet.id] || false;
-                  
-                  // HP & Firepower mapping details
-                  const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
-                  const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
-                  const troops = planet.troops || {};
-                  
-                  const planetDefHp = Object.entries(troops).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (defHpMap[k] || 0), 0);
-                  const planetAtkHp = Object.entries(troops).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (atkHpMap[k] || 0), 0);
-                  
-                  return (
-                    <div key={planet.id} className="bg-slate-950/50 border border-[#1E293B]/60 rounded-lg overflow-hidden transition hover:border-[#1E293B]">
-                      <button
-                        type="button"
-                        onClick={() => setExpandedDropdownPlanetIds(prev => ({ ...prev, [planet.id]: !isPlExpanded }))}
-                        className="w-full p-2.5 flex items-center justify-between text-left text-xs text-slate-300 font-bold hover:text-cyan-300 transition-colors duration-150 cursor-pointer"
-                      >
-                        <div className="flex flex-col gap-0.5 truncate pr-2">
-                          <span className="truncate text-white font-mono text-[11px]">
-                            {index === 0 ? "★ " : index === 1 ? "★★ " : "🛰️ "}{planet.name}
-                          </span>
-                          <span className="text-[9px] text-slate-500 font-mono tracking-wide">
-                            Sector [{planet.sectorX}, {planet.sectorY}]
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0 font-mono text-[10px]">
-                          <span className="text-blue-400 font-bold" title="Defensive Shields (Defense HP)">
-                            🛡️ {planetDefHp.toLocaleString()}
-                          </span>
-                          <span className="text-slate-600">/</span>
-                          <span className="text-orange-400 font-bold" title="Strike Firepower (Attack HP)">
-                            ⚔️ {planetAtkHp.toLocaleString()}
-                          </span>
-                          <span className="text-[8px] text-slate-500 font-bold ml-1">
-                            {isPlExpanded ? '▲' : '▼'}
-                          </span>
-                        </div>
-                      </button>
-
-                      {/* Expandable Planet troops */}
-                      {isPlExpanded && (
-                        <div className="px-2.5 pb-2.5 pt-1 space-y-2 text-[10.5px] border-t border-[#1E293B]/40 bg-black/40 text-slate-400">
-                          {Object.entries(troops).filter(([_, qty]) => (Number(qty) || 0) > 0).length === 0 ? (
-                            <p className="text-[9.5px] text-slate-500 italic py-1 text-center">Garrison is currently empty.</p>
-                          ) : (
-                            <div className="space-y-1">
-                              {Object.entries(troops).map(([type, qty]) => {
-                                if (!qty) return null;
-                                const uDefHp = defHpMap[type] || 10;
-                                const uAtkHp = atkHpMap[type] || 10;
-                                const quantityNum = Number(qty) || 0;
-                                return (
-                                  <div key={type} className="flex justify-between text-[10px] leading-relaxed">
-                                    <span className="text-slate-400 font-sans">{TROOP_NAME_MAPPING[type] || type}:</span>
-                                    <span className="font-bold text-slate-200 font-mono text-right">
-                                      {quantityNum.toLocaleString()} <span className="text-[8.5px] text-blue-400">({(quantityNum * uDefHp).toLocaleString()} DEF)</span> <span className="text-[8.5px] text-orange-400">({(quantityNum * uAtkHp).toLocaleString()} ATK)</span>
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
               {/* Cumulative forces section */}
-              <div className="pt-2.5 pb-1 border-t border-[#1E293B] space-y-1">
+              <div className="space-y-1">
                 <span className="text-[9.5px] text-cyan-400 font-mono font-bold uppercase tracking-widest block mb-1">CUMULATIVE COMBAT FORCES</span>
                 <div className="space-y-1 bg-[#05070A]/50 p-2 rounded-lg border border-[#1E293B]/40">
                   {(() => {
@@ -2211,7 +2104,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Quick Logout and New Commander activation button */}
+              {/* Quick Logout option */}
               <div className="pt-2.5 border-t border-[#1E293B]">
                 <button
                   type="button"
@@ -2231,11 +2124,52 @@ export default function App() {
                   }}
                   className="w-full py-2 bg-gradient-to-r from-red-950/40 to-red-900/40 hover:from-red-950/60 hover:to-red-900/60 border border-red-500/30 text-red-400 rounded-lg text-[9.5px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  <LogOut size={11} /> Log Out / Register New Name
+                  <LogOut size={11} /> Log Out / New Username
                 </button>
               </div>
             </div>
           )}
+
+          <button 
+            type="button"
+            onClick={() => setShowCommDeck(true)}
+            className="w-10 h-10 border border-cyan-500/40 flex items-center justify-center rounded bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20 active:scale-101 transition-all duration-150 cursor-pointer relative z-50 mr-1"
+            title="Open Secure Command Comm-Messages"
+          >
+            <Mail size={18} className="text-cyan-400" />
+            {(() => {
+              const count = player.commandMessages?.filter(m => !m.isRead).length || 0;
+              if (count > 0) {
+                return (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 font-mono text-[9px] font-black text-white ring-1 ring-[#1E293B] animate-pulse shadow-[0_0_8px_#ef4444]">
+                    {count}
+                  </span>
+                );
+              }
+              return null;
+            })()}
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => {
+              setAppConfirmModal({
+                title: 'CONFIRM SESSION DE-SYNCHRONIZATION',
+                message: 'Are you sure you want to log out of your session? Your current account session reference will be purged from LocalStorage and you will be re-routed to registration.',
+                onConfirm: () => {
+                  localStorage.removeItem('moonbase_userId');
+                  showToast('Commander keys de-synchronized. Reloading terminal...', 'info');
+                  setTimeout(() => {
+                    window.location.reload();
+                  }, 600);
+                }
+              });
+            }}
+            className="w-10 h-10 border border-red-500/30 hover:border-red-500/60 flex items-center justify-center rounded bg-red-950/10 hover:bg-red-950/25 active:scale-95 transition-all duration-150 cursor-pointer text-red-400"
+            title="Log Out & Create/Use a New Username"
+          >
+            <LogOut size={16} />
+          </button>
         </div>
       </header>
 
