@@ -45,14 +45,27 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   const [isWelcomeClosed, setIsWelcomeClosed] = useState(() => {
     return localStorage.getItem(`moonbase_welcome_closed_${player.id}`) === 'true';
   });
+  const [isPermanentlyClosed, setIsPermanentlyClosed] = useState(() => {
+    return localStorage.getItem(`moonbase_tutorial_permanently_closed_${player.id}`) === 'true';
+  });
 
   const handleCloseWelcome = () => {
     localStorage.setItem(`moonbase_welcome_closed_${player.id}`, 'true');
     setIsWelcomeClosed(true);
   };
 
+  const handlePermanentClose = () => {
+    localStorage.setItem(`moonbase_tutorial_permanently_closed_${player.id}`, 'true');
+    setIsPermanentlyClosed(true);
+    showToast('Star Admiral Academy training campaign completed and permanently closed!', 'success');
+  };
+
   // Completed tasks array retrieved from server (or defaults to empty)
   const completedList = player.completedTutorialTasks || [];
+
+  if (isPermanentlyClosed) {
+    return null;
+  }
 
   const repositoryLevel = activePlanet?.buildings?.repository?.level || 1;
   const siloCapacity = Math.round(10000 * Math.pow(500, (repositoryLevel - 1) / 44));
@@ -735,18 +748,27 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
           <p className="text-xs text-slate-300 max-w-2xl leading-relaxed mt-1 font-sans font-normal">
             Absolute Sovereign Command established! You have mastered the star building, physics sciences, battle troop recruitment, messaging, alliances, public radio communications, and interstellar coordinate colonizations. The high command stands in total awe of your grand space empire!
           </p>
-          <div className="mt-4 p-4 border border-cyan-500/30 bg-[#060B14]/80 rounded-xl space-y-3 max-w-xl text-center">
-            <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-widest">📬 SHARE YOUR FEEDBACK & SUGGESTIONS!</h4>
+          <div className="mt-4 p-4 border border-cyan-500/30 bg-[#060B14]/80 rounded-xl space-y-4 max-w-xl text-center">
+            <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-widest">👑 CONGRATULATIONS, GRAND COMMANDER!</h4>
             <p className="text-[11px] text-slate-300 leading-relaxed font-sans font-normal">
-              As an elite Admiral who completed the Academy Roadmap, your feedback is crucial in shaping future outer-rim operations. Let us know how we can improve, what balance changes you want, or what new systems you would love to see!
+              You have successfully completed all academy requirements and established absolute stellar coordination! With your defensive grid fully optimized and warp conduits operational, your dominion over the stars is sealed.
             </p>
-            <button 
-              type="button"
-              onClick={() => setActiveTab('settings')}
-              className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold uppercase text-[10px] tracking-widest rounded-lg cursor-pointer transition duration-150 block mx-auto hover:shadow-[0_0_15px_rgba(6,182,212,0.4)]"
-            >
-              Open Settings & Send Suggestions ⚡
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+              <button 
+                type="button"
+                onClick={() => setActiveTab('settings')}
+                className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-extrabold uppercase text-[10px] tracking-widest rounded-lg cursor-pointer transition duration-150 block mx-auto hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] border-0"
+              >
+                Open Settings & Feedback ⚡
+              </button>
+              <button 
+                type="button"
+                onClick={handlePermanentClose}
+                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold uppercase text-[10px] tracking-widest rounded-lg cursor-pointer transition duration-150 block mx-auto hover:shadow-[0_0_15px_rgba(16,185,129,0.4)] border-0"
+              >
+                Complete & Permanently Close ✓
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ColonyPlanet, PlayerProfile, ResourceType, getUpgradeResourceCost, FleetMission, BuildingState, ChatMessage } from '../types';
+import { CommanderTutorial } from './CommanderTutorial';
 import { 
   Droplet, 
   Flame, 
@@ -112,6 +113,7 @@ interface ExploreTabProps {
   chatMessages: ChatMessage[];
   onSendChat: (channel: 'global' | 'alliance' | 'private', content: string, receiverId?: string) => void;
   localResources?: Record<ResourceType, number>;
+  setActiveTab: (tab: any) => void;
 }
 
 const RESOURCE_INFO: Record<ResourceType, { name: string; color: string; icon: any; desc: string }> = {
@@ -147,7 +149,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   onNavigateToLeaderboard,
   chatMessages,
   onSendChat,
-  localResources = activePlanet.resources
+  localResources = activePlanet.resources,
+  setActiveTab
 }) => {
   const [expandedCategory, setExpandedCategory] = useState<ResourceType | null>(null);
   const [restoringKeys, setRestoringKeys] = useState<Record<string, boolean>>({});
@@ -902,266 +905,6 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
         );
       })()}
 
-      {/* resource mines category list */}
-      <div className="border border-cyan-500/35 bg-[#0C1425]/60 p-4 rounded-2xl mb-8 shadow-[0_0_20px_rgba(34,211,238,0.12)] ring-1 ring-cyan-500/10 hover:shadow-[0_0_25px_rgba(34,211,238,0.22)] transition duration-300">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-cyan-500/25 pb-3" id="extractors_header">
-          <div className="flex-1 flex items-center justify-between text-left">
-            <div>
-              <h3 className="text-xs font-black uppercase tracking-widest text-cyan-300 font-mono flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-200 mr-1.5 animate-pulse border border-cyan-400/40 text-[9.5px]">⚡ COMMAND ACTIVE</span>
-                Resource Extractors (Max Level: {maxExtractorLevel})
-              </h3>
-              <p className="text-[10px] text-cyan-400/70 font-sans mt-1 leading-relaxed">
-                Maximum extractors level: <strong className="text-white">{maxExtractorLevel}</strong> for this station (Level 25 for Main ★, Level 20 for Secondary ★★, Level 15 for Colonies).
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => handleOpenBoostModal("all", -1)}
-            className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 hover:shadow-[0_0_15px_rgba(245,158,11,0.55)] border border-amber-400/40 rounded-xl transition duration-150 font-mono text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer self-start sm:self-auto hover:scale-105"
-            type="button"
-          >
-            <Zap size={11} className="animate-bounce" /> Production Boost
-          </button>
-        </div>
-
-        {showExtractorsSec && (
-          <div className="space-y-4">
-          {(Object.keys(RESOURCE_INFO) as ResourceType[]).map((resKey) => {
-            const info = RESOURCE_INFO[resKey];
-            const mines = activePlanet.mines[resKey];
-            const isExpanded = expandedCategory === resKey;
-            
-            // Calc total production
-            const repositoryLimit = Math.round(10000 * Math.pow(500, (activePlanet.buildings.repository.level - 1) / 44));
-            const isOtherMaxed = 
-              activePlanet.resources.plasma >= repositoryLimit &&
-              activePlanet.resources.fuel >= repositoryLimit &&
-              activePlanet.resources.food >= repositoryLimit &&
-              activePlanet.resources.respirant >= repositoryLimit;
-            
-            const totalProd = isOtherMaxed
-              ? (resKey === 'water' ? 84000 : 42000)
-              : mines.reduce((sum, m) => {
-                  const isMineBoosted = m.boostedUntil && Number(m.boostedUntil) > serverTime;
-                  const baseOutput = Math.round((m.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
-                  const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
-                  return sum + output;
-                }, 0);
-            
-            return (
-              <div 
-                key={resKey}
-                className="border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md overflow-hidden transition-all duration-200"
-                id={`mining_cat_${resKey}`}
-              >
-                {/* Accordion Trigger */}
-                <button 
-                  onClick={() => setExpandedCategory(isExpanded ? null : resKey)}
-                  className="w-full p-4 flex items-center justify-between text-left transition hover:bg-white/[0.02]"
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div className={`p-2.5 rounded-xl border ${info.color} shadow-inner`} title={`${info.name}: ${info.desc}. Click/long-press to open sector pumps list.`}>
-                      <info.icon size={18} title={`${info.name}: ${info.desc}`} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-base font-mono">{info.name} Extractors</span>
-                        <span className="text-[10px] text-slate-500 font-mono uppercase bg-white/5 px-1.5 py-0.5 rounded border border-white/5">({mines.length} Pumps)</span>
-                      </div>
-                      <div className="text-xs text-slate-400 font-mono mt-1 flex items-center gap-2">
-                        <TrendingUp size={12} className="text-slate-500" title="Hourly production delta indicator" />
-                        <span className="font-bold text-emerald-400">+{totalProd.toLocaleString()}/hr</span>
-                        {resKey === 'water' && waterConsumption > 0 && (
-                          <span className="text-red-400 font-bold border-l border-[#1E293B] pl-2">(-{Math.round(waterConsumption).toLocaleString()}/hr troops)</span>
-                        )}
-                         {resKey === 'respirant' && waterConsumption > 0 && (
-                          <span className="text-red-400 font-bold border-l border-[#1E293B] pl-2">(-{Math.round(waterConsumption * 0.28).toLocaleString()}/hr troops)</span>
-                        )}
-                        {resKey === 'food' && waterConsumption > 0 && (
-                          <span className="text-red-400 font-bold border-l border-[#1E293B] pl-2">(-{Math.round(waterConsumption * 0.18).toLocaleString()}/hr troops)</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    {isExpanded ? (
-                      <ChevronUp size={18} className="text-red-500" title="Click or long press to hide detail parameters" />
-                    ) : (
-                      <ChevronDown size={18} className="text-emerald-500" title="Click or long press to show detail parameters" />
-                    )}
-                  </div>
-                </button>
-
-                {/* Mines Panel */}
-                {isExpanded && (
-                  <div className="p-4 border-t border-[#1E293B] bg-black/20 space-y-3.5">
-                    
-                    {/* Category-Level Boost Option */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-500/5 p-4 rounded-xl border border-amber-500/15">
-                      <div className="space-y-1">
-                        <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-widest block flex items-center gap-1.5">
-                          <Zap size={12} className="text-amber-400" /> {info.name} Extractor Array Boost
-                        </span>
-                        <p className="text-[10.5px] text-slate-400 leading-normal max-w-xl">
-                          Authorize tactical production acceleration to boost ALL {mines.length} {info.name.toLowerCase()} pumps on <span className="text-slate-200 font-semibold">{activePlanet.name}</span> by <span className="text-amber-400 font-semibold">+14% hourly output</span>.
-                        </p>
-                      </div>
-                      {(() => {
-                        const isCategoryBoosted = mines.some(m => m.boostedUntil && Number(m.boostedUntil) > serverTime);
-                        if (isCategoryBoosted) {
-                          const maxBoostedTime = Math.max(...mines.map(m => m.boostedUntil ? Number(m.boostedUntil) : 0));
-                          return (
-                            <span className="px-3.5 py-2 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs font-mono font-bold flex items-center gap-1.5 animate-pulse select-none shrink-0 self-start sm:self-auto uppercase tracking-wider">
-                              <Zap size={11} className="text-amber-400 animate-bounce" /> ACTIVE: {getTimerString(maxBoostedTime)}
-                            </span>
-                          );
-                        } else {
-                          return (
-                            <button
-                              onClick={() => handleOpenBoostModal(resKey, -1)}
-                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider transition cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.55)] hover:scale-[1.03] shrink-0 self-start sm:self-auto"
-                              type="button"
-                            >
-                              ⚡ OVERDRIVE BOOST EXTRACTOR (🪙 45)
-                            </button>
-                          );
-                        }
-                      })()}
-                    </div>
-
-                    <p className="text-xs text-slate-400 leading-relaxed max-w-2xl">{info.desc}</p>
-                    
-                    <div className="grid grid-cols-1 gap-3">
-                      {mines.map((mine) => {
-                        const targetLevel = mine.level + 1;
-                        const cost = targetLevel * 100;
-                        const isDamaged = mine.health !== undefined && mine.health < 100;
-                        const isMineBoosted = mine.boostedUntil && Number(mine.boostedUntil) > serverTime;
-                        const baseOutput = Math.round((mine.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
-                        const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
-
-                        const mineQueueCount = activePlanet.upgradeQueue?.filter((item: any) => item.type === 'mine' && item.key === resKey && item.mineIndex === mine.index).length || 0;
-                        const activeUpgradeCount = mine.isUpgrading ? 1 : 0;
-                        const currentTotalUpgrades = activeUpgradeCount + mineQueueCount;
-                        const nextMineTargetLvl = mine.level + currentTotalUpgrades + 1;
-                        const nextMineUpgradeTimeMins = nextMineTargetLvl * 1;
-
-                        return (
-                          <div 
-                            key={mine.index}
-                            className="p-4 rounded-xl border border-[#1E293B] bg-[#05070A] flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition duration-150 hover:border-white/10"
-                            id={`mine_${resKey}_${mine.index}`}
-                          >
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2.5 flex-wrap">
-                                <span className="font-bold text-sm text-slate-200">Extractor Pump #{mine.index + 1}</span>
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 text-cyan-400 border border-[#1E293B]">
-                                  Lv. {mine.level}
-                                </span>
-                                {isDamaged && (
-                                  <span className="px-2 py-0.5 rounded bg-red-950/40 text-red-400 border border-red-900/30 text-[10px] font-mono font-bold animate-pulse">
-                                    ⚠️ DAMAGED: {mine.health}% Health
-                                  </span>
-                                )}
-                                {isMineBoosted && (
-                                  <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/25 text-[10px] font-mono font-bold flex items-center gap-1 animate-pulse" title="Production boost active!">
-                                    <Zap size={10} className="text-amber-400 animate-bounce" /> BOOST ACCELERATED
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 font-mono">
-                                <span>Hourly Output: <span className={isMineBoosted ? "text-amber-400 font-bold" : "text-slate-350"}>{output.toLocaleString()}/hr {isMineBoosted && "⚡ (1.14x)"}</span></span>
-                                {mine.level < maxExtractorLevel && (
-                                  <span className="text-emerald-400 font-bold bg-emerald-950/30 border border-emerald-900/20 px-1.5 py-0.5 rounded text-[10px] flex items-center gap-1.5 select-none" title="Every mine upgrade increases your account population score by 10 points">
-                                    🌾 Pop: +10
-                                  </span>
-                                )}
-                              </div>
-                              {mine.level < maxExtractorLevel && (
-                                isDamaged ? (
-                                  <RestoreCostBar type="mine" upgradeKey={resKey} targetLevel={targetLevel} health={mine.health!} planetResources={localResources} />
-                                ) : (
-                                  <UpgradeCostBar type="mine" upgradeKey={resKey} targetLevel={nextMineTargetLvl} planetResources={localResources} />
-                                )
-                              )}
-                              {(() => {
-                                const specificMineQueue = (activePlanet.upgradeQueue || []).filter(
-                                  (item: any) => item.type === 'mine' && item.key === resKey && item.mineIndex === mine.index
-                                );
-                                if (specificMineQueue.length === 0) return null;
-                                return (
-                                  <div className="mt-2 space-y-1 p-2 bg-slate-950/40 border border-[#1E293B]/60 rounded-lg max-w-sm">
-                                    <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-extrabold font-mono">Queued Upgrades:</div>
-                                    {specificMineQueue.map((q, idx) => (
-                                      <div key={idx} className="text-[10px] text-slate-400 font-mono flex items-center justify-between gap-4">
-                                        <span className="text-slate-450">↳ Upgrade to Level {q.targetLevel}</span>
-                                        <span className="text-amber-400 font-bold">⏳ {q.targetLevel * 1}m</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                );
-                              })()}
-                            </div>
-
-                            {/* Upgrade/Repair panel */}
-                            <div className="font-mono text-xs self-end sm:self-auto">
-                              {mine.isUpgrading ? (
-                                <div className="flex flex-col sm:items-end gap-1.5">
-                                  <div className="flex items-center gap-1.5 text-xs text-amber-400 font-mono" title="Undergoing deep flux compression. Countdown until completion.">
-                                    <Clock size={12} className="animate-spin" title="Spinning dynamic timer indicator" />
-                                    <span>Compressing Flux {getTimerString(mine.upgradeEnd)}</span>
-                                  </div>
-                                  {nextMineTargetLvl <= maxExtractorLevel && (
-                                    <button 
-                                      onClick={() => onUpgradeMine(resKey, mine.index, true)}
-                                      className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[9px] font-bold uppercase flex items-center gap-1.5"
-                                    >
-                                      <span className="text-emerald-400">Queue Upgrade</span>
-                                      <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl}, {nextMineUpgradeTimeMins}m)</span>
-                                    </button>
-                                  )}
-                                </div>
-                              ) : mine.level >= maxExtractorLevel && !isDamaged ? (
-                                <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase bg-slate-900 border border-slate-850 px-2 py-1 rounded">MAX CAP</span>
-                              ) : isDamaged ? (
-                                <button 
-                                  onClick={() => handleRestoreMine(resKey, mine.index)}
-                                  disabled={restoringKeys[`mine-${resKey}-${mine.index}`]}
-                                  className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:shadow-[0_0_12px_rgba(239,68,68,0.25)] text-[10px] uppercase font-bold border border-red-500/35 rounded-xl transition duration-150 cursor-pointer disabled:opacity-50"
-                                >
-                                  {restoringKeys[`mine-${resKey}-${mine.index}`] ? 'Repairing...' : '🛠️ Restore Extractor'}
-                                </button>
-                              ) : isAnyUpgradeInProgress ? (
-                                <button 
-                                  onClick={() => onUpgradeMine(resKey, mine.index, true)}
-                                  className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[10px] font-bold uppercase flex items-center gap-1.5"
-                                >
-                                  <span className="text-emerald-400">Queue Upgrade</span>
-                                  <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl}, {nextMineUpgradeTimeMins}m)</span>
-                                </button>
-                              ) : (
-                                <button 
-                                  onClick={() => onUpgradeMine(resKey, mine.index)}
-                                  className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 border border-cyan-400 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.55)] hover:scale-[1.03]"
-                                >
-                                  ⚡ UPGRADE EXTRACTOR <span className="text-slate-900 font-bold ml-1">({nextMineUpgradeTimeMins}m)</span>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        )}
-      </div>
-
       {/* base buildings infrastructure */}
       <div className="border border-indigo-500/35 bg-[#0C1425]/60 p-4 rounded-2xl mb-8 shadow-[0_0_20px_rgba(99,102,241,0.12)] ring-1 ring-indigo-500/10 hover:shadow-[0_0_25px_rgba(99,102,241,0.22)] transition duration-300">
         <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-indigo-500/25 pb-3 text-left">
@@ -1607,6 +1350,277 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
               })}
             </div>
           </div>
+        )}
+      </div>
+
+            {/* Tasks / Commander Tutorial */}
+      <CommanderTutorial 
+        player={player}
+        activePlanet={activePlanet}
+        fleets={fleets}
+        onRefreshState={onRefreshState || (() => {})}
+        showToast={showToast}
+        setActiveTab={setActiveTab}
+        chatMessages={chatMessages}
+      />
+
+      {/* resource mines category list */}
+      <div className="border border-cyan-500/35 bg-[#0C1425]/60 p-4 rounded-2xl mb-8 shadow-[0_0_20px_rgba(34,211,238,0.12)] ring-1 ring-cyan-500/10 hover:shadow-[0_0_25px_rgba(34,211,238,0.22)] transition duration-300">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-cyan-500/25 pb-3" id="extractors_header">
+          <div className="flex-1 flex items-center justify-between text-left">
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-cyan-300 font-mono flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-200 mr-1.5 animate-pulse border border-cyan-400/40 text-[9.5px]">⚡ COMMAND ACTIVE</span>
+                Resource Extractors (Max Level: {maxExtractorLevel})
+              </h3>
+              <p className="text-[10px] text-cyan-400/70 font-sans mt-1 leading-relaxed">
+                Maximum extractors level: <strong className="text-white">{maxExtractorLevel}</strong> for this station (Level 25 for Main ★, Level 20 for Secondary ★★, Level 15 for Colonies).
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleOpenBoostModal("all", -1)}
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 hover:shadow-[0_0_15px_rgba(245,158,11,0.55)] border border-amber-400/40 rounded-xl transition duration-150 font-mono text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer self-start sm:self-auto hover:scale-105"
+            type="button"
+          >
+            <Zap size={11} className="animate-bounce" /> Production Boost
+          </button>
+        </div>
+
+        {showExtractorsSec && (
+          <div className="space-y-4">
+          {(Object.keys(RESOURCE_INFO) as ResourceType[]).map((resKey) => {
+            const info = RESOURCE_INFO[resKey];
+            const mines = activePlanet.mines[resKey];
+            const isExpanded = expandedCategory === resKey;
+            
+            // Calc total production
+            const repositoryLimit = Math.round(10000 * Math.pow(500, (activePlanet.buildings.repository.level - 1) / 44));
+            const isOtherMaxed = 
+              activePlanet.resources.plasma >= repositoryLimit &&
+              activePlanet.resources.fuel >= repositoryLimit &&
+              activePlanet.resources.food >= repositoryLimit &&
+              activePlanet.resources.respirant >= repositoryLimit;
+            
+            const totalProd = isOtherMaxed
+              ? (resKey === 'water' ? 84000 : 42000)
+              : mines.reduce((sum, m) => {
+                  const isMineBoosted = m.boostedUntil && Number(m.boostedUntil) > serverTime;
+                  const baseOutput = Math.round((m.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
+                  const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
+                  return sum + output;
+                }, 0);
+            
+            return (
+              <div 
+                key={resKey}
+                className="border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md overflow-hidden transition-all duration-200"
+                id={`mining_cat_${resKey}`}
+              >
+                {/* Accordion Trigger */}
+                <button 
+                  onClick={() => setExpandedCategory(isExpanded ? null : resKey)}
+                  className="w-full p-4 flex items-center justify-between text-left transition hover:bg-white/[0.02]"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className={`p-2.5 rounded-xl border ${info.color} shadow-inner`} title={`${info.name}: ${info.desc}. Click/long-press to open sector pumps list.`}>
+                      <info.icon size={18} title={`${info.name}: ${info.desc}`} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white text-base font-mono">{info.name} Extractors</span>
+                        <span className="text-[10px] text-slate-500 font-mono uppercase bg-white/5 px-1.5 py-0.5 rounded border border-white/5">({mines.length} Pumps)</span>
+                      </div>
+                      <div className="text-xs text-slate-400 font-mono mt-1 flex items-center gap-2">
+                        <TrendingUp size={12} className="text-slate-500" title="Hourly production delta indicator" />
+                        <span className="font-bold text-emerald-400">+{totalProd.toLocaleString()}/hr</span>
+                        {resKey === 'water' && waterConsumption > 0 && (
+                          <span className="text-red-400 font-bold border-l border-[#1E293B] pl-2">(-{Math.round(waterConsumption).toLocaleString()}/hr troops)</span>
+                        )}
+                         {resKey === 'respirant' && waterConsumption > 0 && (
+                          <span className="text-red-400 font-bold border-l border-[#1E293B] pl-2">(-{Math.round(waterConsumption * 0.28).toLocaleString()}/hr troops)</span>
+                        )}
+                        {resKey === 'food' && waterConsumption > 0 && (
+                          <span className="text-red-400 font-bold border-l border-[#1E293B] pl-2">(-{Math.round(waterConsumption * 0.18).toLocaleString()}/hr troops)</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    {isExpanded ? (
+                      <ChevronUp size={18} className="text-red-500" title="Click or long press to hide detail parameters" />
+                    ) : (
+                      <ChevronDown size={18} className="text-emerald-500" title="Click or long press to show detail parameters" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Mines Panel */}
+                {isExpanded && (
+                  <div className="p-4 border-t border-[#1E293B] bg-black/20 space-y-3.5">
+                    
+                    {/* Category-Level Boost Option */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-500/5 p-4 rounded-xl border border-amber-500/15">
+                      <div className="space-y-1">
+                        <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-widest block flex items-center gap-1.5">
+                          <Zap size={12} className="text-amber-400" /> {info.name} Extractor Array Boost
+                        </span>
+                        <p className="text-[10.5px] text-slate-400 leading-normal max-w-xl">
+                          Authorize tactical production acceleration to boost ALL {mines.length} {info.name.toLowerCase()} pumps on <span className="text-slate-200 font-semibold">{activePlanet.name}</span> by <span className="text-amber-400 font-semibold">+14% hourly output</span>.
+                        </p>
+                      </div>
+                      {(() => {
+                        const isCategoryBoosted = mines.some(m => m.boostedUntil && Number(m.boostedUntil) > serverTime);
+                        if (isCategoryBoosted) {
+                          const maxBoostedTime = Math.max(...mines.map(m => m.boostedUntil ? Number(m.boostedUntil) : 0));
+                          return (
+                            <span className="px-3.5 py-2 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs font-mono font-bold flex items-center gap-1.5 animate-pulse select-none shrink-0 self-start sm:self-auto uppercase tracking-wider">
+                              <Zap size={11} className="text-amber-400 animate-bounce" /> ACTIVE: {getTimerString(maxBoostedTime)}
+                            </span>
+                          );
+                        } else {
+                          return (
+                            <button
+                              onClick={() => handleOpenBoostModal(resKey, -1)}
+                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider transition cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.55)] hover:scale-[1.03] shrink-0 self-start sm:self-auto"
+                              type="button"
+                            >
+                              ⚡ OVERDRIVE BOOST EXTRACTOR (🪙 45)
+                            </button>
+                          );
+                        }
+                      })()}
+                    </div>
+
+                    <p className="text-xs text-slate-400 leading-relaxed max-w-2xl">{info.desc}</p>
+                    
+                    <div className="grid grid-cols-1 gap-3">
+                      {mines.map((mine) => {
+                        const targetLevel = mine.level + 1;
+                        const cost = targetLevel * 100;
+                        const isDamaged = mine.health !== undefined && mine.health < 100;
+                        const isMineBoosted = mine.boostedUntil && Number(mine.boostedUntil) > serverTime;
+                        const baseOutput = Math.round((mine.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
+                        const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
+
+                        const mineQueueCount = activePlanet.upgradeQueue?.filter((item: any) => item.type === 'mine' && item.key === resKey && item.mineIndex === mine.index).length || 0;
+                        const activeUpgradeCount = mine.isUpgrading ? 1 : 0;
+                        const currentTotalUpgrades = activeUpgradeCount + mineQueueCount;
+                        const nextMineTargetLvl = mine.level + currentTotalUpgrades + 1;
+                        const nextMineUpgradeTimeMins = nextMineTargetLvl * 1;
+
+                        return (
+                          <div 
+                            key={mine.index}
+                            className="p-4 rounded-xl border border-[#1E293B] bg-[#05070A] flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition duration-150 hover:border-white/10"
+                            id={`mine_${resKey}_${mine.index}`}
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                <span className="font-bold text-sm text-slate-200">Extractor Pump #{mine.index + 1}</span>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 text-cyan-400 border border-[#1E293B]">
+                                  Lv. {mine.level}
+                                </span>
+                                {isDamaged && (
+                                  <span className="px-2 py-0.5 rounded bg-red-950/40 text-red-400 border border-red-900/30 text-[10px] font-mono font-bold animate-pulse">
+                                    ⚠️ DAMAGED: {mine.health}% Health
+                                  </span>
+                                )}
+                                {isMineBoosted && (
+                                  <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/25 text-[10px] font-mono font-bold flex items-center gap-1 animate-pulse" title="Production boost active!">
+                                    <Zap size={10} className="text-amber-400 animate-bounce" /> BOOST ACCELERATED
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 font-mono">
+                                <span>Hourly Output: <span className={isMineBoosted ? "text-amber-400 font-bold" : "text-slate-350"}>{output.toLocaleString()}/hr {isMineBoosted && "⚡ (1.14x)"}</span></span>
+                                {mine.level < maxExtractorLevel && (
+                                  <span className="text-emerald-400 font-bold bg-emerald-950/30 border border-emerald-900/20 px-1.5 py-0.5 rounded text-[10px] flex items-center gap-1.5 select-none" title="Every mine upgrade increases your account population score by 10 points">
+                                    🌾 Pop: +10
+                                  </span>
+                                )}
+                              </div>
+                              {mine.level < maxExtractorLevel && (
+                                isDamaged ? (
+                                  <RestoreCostBar type="mine" upgradeKey={resKey} targetLevel={targetLevel} health={mine.health!} planetResources={localResources} />
+                                ) : (
+                                  <UpgradeCostBar type="mine" upgradeKey={resKey} targetLevel={nextMineTargetLvl} planetResources={localResources} />
+                                )
+                              )}
+                              {(() => {
+                                const specificMineQueue = (activePlanet.upgradeQueue || []).filter(
+                                  (item: any) => item.type === 'mine' && item.key === resKey && item.mineIndex === mine.index
+                                );
+                                if (specificMineQueue.length === 0) return null;
+                                return (
+                                  <div className="mt-2 space-y-1 p-2 bg-slate-950/40 border border-[#1E293B]/60 rounded-lg max-w-sm">
+                                    <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-extrabold font-mono">Queued Upgrades:</div>
+                                    {specificMineQueue.map((q, idx) => (
+                                      <div key={idx} className="text-[10px] text-slate-400 font-mono flex items-center justify-between gap-4">
+                                        <span className="text-slate-450">↳ Upgrade to Level {q.targetLevel}</span>
+                                        <span className="text-amber-400 font-bold">⏳ {q.targetLevel * 1}m</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
+                            {/* Upgrade/Repair panel */}
+                            <div className="font-mono text-xs self-end sm:self-auto">
+                              {mine.isUpgrading ? (
+                                <div className="flex flex-col sm:items-end gap-1.5">
+                                  <div className="flex items-center gap-1.5 text-xs text-amber-400 font-mono" title="Undergoing deep flux compression. Countdown until completion.">
+                                    <Clock size={12} className="animate-spin" title="Spinning dynamic timer indicator" />
+                                    <span>Compressing Flux {getTimerString(mine.upgradeEnd)}</span>
+                                  </div>
+                                  {nextMineTargetLvl <= maxExtractorLevel && (
+                                    <button 
+                                      onClick={() => onUpgradeMine(resKey, mine.index, true)}
+                                      className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[9px] font-bold uppercase flex items-center gap-1.5"
+                                    >
+                                      <span className="text-emerald-400">Queue Upgrade</span>
+                                      <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl}, {nextMineUpgradeTimeMins}m)</span>
+                                    </button>
+                                  )}
+                                </div>
+                              ) : mine.level >= maxExtractorLevel && !isDamaged ? (
+                                <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase bg-slate-900 border border-slate-850 px-2 py-1 rounded">MAX CAP</span>
+                              ) : isDamaged ? (
+                                <button 
+                                  onClick={() => handleRestoreMine(resKey, mine.index)}
+                                  disabled={restoringKeys[`mine-${resKey}-${mine.index}`]}
+                                  className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:shadow-[0_0_12px_rgba(239,68,68,0.25)] text-[10px] uppercase font-bold border border-red-500/35 rounded-xl transition duration-150 cursor-pointer disabled:opacity-50"
+                                >
+                                  {restoringKeys[`mine-${resKey}-${mine.index}`] ? 'Repairing...' : '🛠️ Restore Extractor'}
+                                </button>
+                              ) : isAnyUpgradeInProgress ? (
+                                <button 
+                                  onClick={() => onUpgradeMine(resKey, mine.index, true)}
+                                  className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[10px] font-bold uppercase flex items-center gap-1.5"
+                                >
+                                  <span className="text-emerald-400">Queue Upgrade</span>
+                                  <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl}, {nextMineUpgradeTimeMins}m)</span>
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => onUpgradeMine(resKey, mine.index)}
+                                  className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 border border-cyan-400 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.55)] hover:scale-[1.03]"
+                                >
+                                  ⚡ UPGRADE EXTRACTOR <span className="text-slate-900 font-bold ml-1">({nextMineUpgradeTimeMins}m)</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
         )}
       </div>
 

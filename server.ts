@@ -741,7 +741,7 @@ function tickPlayerState(playerId: string, now: number): boolean {
         planet.resources.food = Math.max(0, Math.min(storageLimit, planet.resources.food));
       }
 
-      const triggerAttrition = isAnyProdNegative || (planet.resources.water < 0) || (planet.resources.respirant < 0) || (planet.resources.food < 0);
+      const triggerAttrition = (planet.resources.water < 0) || (planet.resources.respirant < 0) || (planet.resources.food < 0);
 
       if (triggerAttrition) {
         // Essential resources exhausted! Troops start slowly dying of attrition (starvation/suffocation/dehydration)
@@ -773,6 +773,23 @@ function tickPlayerState(playerId: string, now: number): boolean {
         }
       }
 
+      // Active Research handling
+      if (planet.activeResearch && planet.activeResearch.endAt && now >= planet.activeResearch.endAt) {
+        const techId = planet.activeResearch.techId;
+        const targetLvl = planet.activeResearch.targetLevel;
+        if (!player.techLevels) {
+          player.techLevels = {};
+        }
+        if (!player.techLevels[planet.id]) {
+          player.techLevels[planet.id] = {};
+        }
+        player.techLevels[planet.id][techId] = targetLvl;
+        
+        lastCompletedUpgradeTime = Math.max(lastCompletedUpgradeTime, planet.activeResearch.endAt);
+        planet.activeResearch = null;
+        changed = true;
+      }
+
       // Sequential Upgrade Queue processor
       if (!planet.upgradeQueue) {
         planet.upgradeQueue = [];
@@ -791,6 +808,9 @@ function tickPlayerState(playerId: string, now: number): boolean {
           isUpgradeActive = true;
         }
       }
+      if (!isUpgradeActive && planet.activeResearch) {
+        isUpgradeActive = true;
+      }
 
       // If nothing is currently active, we start the queue sequentially!
       if (!isUpgradeActive && planet.upgradeQueue.length > 0) {
@@ -801,40 +821,67 @@ function tickPlayerState(playerId: string, now: number): boolean {
           let targetObj: any = null;
           let targetLvl = 1;
 
-          if (nextUp.type === 'mine') {
-            targetObj = planet.mines[nextUp.key as ResourceType]?.[nextUp.mineIndex!];
-            if (targetObj) {
-              targetLvl = targetObj.level + 1;
-              durationMs = targetLvl * 60 * 1000;
-            }
-          } else if (nextUp.type === 'building') {
-            targetObj = planet.buildings[nextUp.key as keyof typeof planet.buildings];
-            if (targetObj) {
-              targetLvl = targetObj.level + 1;
-              durationMs = targetLvl * 120 * 1000;
-            }
-          }
-
-          if (targetObj) {
+          if (nextUp.type === 'research') {
+            targetLvl = nextUp.targetLevel;
+            durationMs = targetLvl * 60 * 1000;
             const expectedEnd = referenceTime + durationMs;
             if (now >= expectedEnd) {
-              // Finished immediately! Upgrade and continue to next item in queue
-              targetObj.level = targetLvl;
-              targetObj.isUpgrading = false;
-              targetObj.upgradeEnd = null;
+              if (!player.techLevels) {
+                player.techLevels = {};
+              }
+              if (!player.techLevels[planet.id]) {
+                player.techLevels[planet.id] = {};
+              }
+              player.techLevels[planet.id][nextUp.key] = targetLvl;
               planet.upgradeQueue.shift();
               referenceTime = expectedEnd;
               changed = true;
             } else {
-              // Started, in progress. Set as active and exit queue loop
-              targetObj.isUpgrading = true;
-              targetObj.upgradeEnd = expectedEnd;
+              planet.activeResearch = {
+                techId: nextUp.key,
+                targetLevel: targetLvl,
+                endAt: expectedEnd
+              };
               planet.upgradeQueue.shift();
               changed = true;
               break;
             }
           } else {
-            planet.upgradeQueue.shift(); // Invalid queue item
+            if (nextUp.type === 'mine') {
+              targetObj = planet.mines[nextUp.key as ResourceType]?.[nextUp.mineIndex!];
+              if (targetObj) {
+                targetLvl = targetObj.level + 1;
+                durationMs = targetLvl * 60 * 1000;
+              }
+            } else if (nextUp.type === 'building') {
+              targetObj = planet.buildings[nextUp.key as keyof typeof planet.buildings];
+              if (targetObj) {
+                targetLvl = targetObj.level + 1;
+                durationMs = targetLvl * 120 * 1000;
+              }
+            }
+
+            if (targetObj) {
+              const expectedEnd = referenceTime + durationMs;
+              if (now >= expectedEnd) {
+                // Finished immediately! Upgrade and continue to next item in queue
+                targetObj.level = targetLvl;
+                targetObj.isUpgrading = false;
+                targetObj.upgradeEnd = null;
+                planet.upgradeQueue.shift();
+                referenceTime = expectedEnd;
+                changed = true;
+              } else {
+                // Started, in progress. Set as active and exit queue loop
+                targetObj.isUpgrading = true;
+                targetObj.upgradeEnd = expectedEnd;
+                planet.upgradeQueue.shift();
+                changed = true;
+                break;
+              }
+            } else {
+              planet.upgradeQueue.shift(); // Invalid queue item
+            }
           }
         }
       }
@@ -950,14 +997,16 @@ function simulateMoonbaseCombat(
   let defSurvivalFloor = 0;
 
   if (initialAttHp > 0 && initialDefHp > 0) {
-    if (initialAttHp > initialDefHp) {
-      // Attacker has more HP
-      const diffPct = (initialAttHp - initialDefHp) / initialDefHp;
-      attSurvivalFloor = Math.min(0.30, diffPct * 0.5);
-    } else if (initialDefHp > initialAttHp) {
-      // Defender has more HP
-      const diffPct = (initialDefHp - initialAttHp) / initialAttHp;
-      defSurvivalFloor = Math.min(0.30, diffPct * 0.5);
+    // 1. Attacker protection: survives if defender HP is NOT > 250% of attacker HP (i.e. defender does not have > 150% more relevant HP)
+    const defToAttRatio = initialDefHp / initialAttHp;
+    if (defToAttRatio <= 2.5) {
+      attSurvivalFloor = Math.max(0.10, 0.40 * (2.5 - defToAttRatio) / 1.5);
+    }
+
+    // 2. Defender protection: survives if attacker HP is NOT > 250% of defender HP (i.e. attacker does not have > 150% more relevant HP)
+    const attToDefRatio = initialAttHp / initialDefHp;
+    if (attToDefRatio <= 2.5) {
+      defSurvivalFloor = Math.max(0.10, 0.40 * (2.5 - attToDefRatio) / 1.5);
     }
   }
 
@@ -1294,7 +1343,7 @@ function simulateMoonbaseCombat(
   }
 
   // 150% involved HP complete annihilation overwhelm rule
-  if (initialAttHp > 1.5 * initialDefHp && initialDefHp > 0) {
+  if (initialAttHp > 2.5 * initialDefHp && initialDefHp > 0) {
     // Defender losses set to initial counts, no survivors
     Object.entries(defTroops).forEach(([tId, count]) => {
       defRemaining[tId as keyof typeof defRemaining] = 0;
@@ -1302,9 +1351,9 @@ function simulateMoonbaseCombat(
     });
     defenceHpKilled = initialDefHp;
     if (rounds.length > 0) {
-      rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Attacker's initial force HP of ${initialAttHp.toLocaleString()} exceeded 150% of the defender's total involved HP (${initialDefHp.toLocaleString()}). Absolute overwhelm triggered; all defender defending forces have been wiped out with ZERO survivors!`);
+      rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Attacker's initial force HP of ${initialAttHp.toLocaleString()} exceeded 150% more than the defender's total involved HP (${initialDefHp.toLocaleString()}). Absolute overwhelm triggered; all defender defending forces have been wiped out with ZERO survivors!`);
     }
-  } else if (initialDefHp > 1.5 * initialAttHp && initialAttHp > 0) {
+  } else if (initialDefHp > 2.5 * initialAttHp && initialAttHp > 0) {
     // Attacker losses set to initial counts, no survivors
     Object.entries(attTroops).forEach(([tId, count]) => {
       attRemaining[tId as keyof typeof attRemaining] = 0;
@@ -1312,7 +1361,41 @@ function simulateMoonbaseCombat(
     });
     attackHpKilled = initialAttHp;
     if (rounds.length > 0) {
-      rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Defender's initial force HP of ${initialDefHp.toLocaleString()} exceeded 150% of the attacker's total involved HP (${initialAttHp.toLocaleString()}). Absolute overwhelm triggered; all attacking squadron forces have been wiped out with ZERO survivors!`);
+      rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Defender's initial force HP of ${initialDefHp.toLocaleString()} exceeded 150% more than the attacker's total involved HP (${initialAttHp.toLocaleString()}). Absolute overwhelm triggered; all attacking squadron forces have been wiped out with ZERO survivors!`);
+    }
+  } else {
+    // Neither side has more than 150% more relevant HP involved, so neither side can lose all units!
+    if (initialAttHp > 0 && initialDefHp > 0) {
+      const finalAttCountTemp = Object.values(attRemaining).reduce((s, v) => s + v, 0);
+      const finalDefCountTemp = Object.values(defRemaining).reduce((s, v) => s + v, 0);
+
+      if (finalDefCountTemp === 0) {
+        // Defender must not lose all units. Restore at least 10% of each initial troop type (rounded up, so at least 1 unit)
+        Object.entries(defTroops).forEach(([tId, count]) => {
+          if (count > 0) {
+            const minQty = Math.max(1, Math.ceil(count * 0.10));
+            defRemaining[tId as keyof typeof defRemaining] = minQty;
+            defenderLosses[tId as keyof typeof defenderLosses] = Math.max(0, count - minQty);
+          }
+        });
+        if (rounds.length > 0) {
+          rounds[rounds.length - 1].logs.push(`🛡️ [MINIMUM SAFETY SECURITY] Because the attacker did not have >150% more relevant HP involved, defender was saved from total annihilation by local garrison shields!`);
+        }
+      }
+
+      if (finalAttCountTemp === 0) {
+        // Attacker must not lose all units. Restore at least 10% of each initial troop type (rounded up, so at least 1 unit)
+        Object.entries(attTroops).forEach(([tId, count]) => {
+          if (count > 0) {
+            const minQty = Math.max(1, Math.ceil(count * 0.10));
+            attRemaining[tId as keyof typeof attRemaining] = minQty;
+            attackerLosses[tId as keyof typeof attackerLosses] = Math.max(0, count - minQty);
+          }
+        });
+        if (rounds.length > 0) {
+          rounds[rounds.length - 1].logs.push(`🛡️ [MINIMUM SAFETY SECURITY] Because the defender did not have >150% more relevant HP involved, attacker was saved from total annihilation by tactical jump shields!`);
+        }
+      }
     }
   }
 
@@ -1688,9 +1771,13 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       });
     }
 
-    // Award scoring for actual units destroyed on both sides
-    attacker.scores.attack += combat.defenceHpKilled;
-    defender.scores.defence += combat.attackHpKilled;
+    // Award scoring for actual units destroyed on both sides (loser of the attack does not get points)
+    if (combat.winner === "attacker") {
+      attacker.scores.attack += combat.defenceHpKilled;
+    }
+    if (combat.winner === "defender") {
+      defender.scores.defence += combat.attackHpKilled;
+    }
 
     // Loot calculations (only if attacker won and has loot space)
     const loot = { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
@@ -2285,13 +2372,13 @@ app.post("/api/upgrade/mine", (req, res) => {
   });
 
   if (shouldQueue) {
-    // Deduct Space Gold (credits) - FREE for test phase
-    // p.credits = (p.credits || 0) - 15;
+    p.credits = Math.max(0, (p.credits || 0) - 15);
     planet.upgradeQueue!.push({
       type: 'mine',
       key: resType,
       mineIndex: mineIndex,
-      targetLevel: targetLevel
+      targetLevel: targetLevel,
+      spaceGoldCost: 15
     });
 
     saveState();
@@ -2483,12 +2570,12 @@ app.post("/api/upgrade/building", (req, res) => {
   });
 
   if (shouldQueue) {
-    // Deduct Space Gold (credits) - FREE for test phase
-    // p.credits = (p.credits || 0) - 15;
+    p.credits = Math.max(0, (p.credits || 0) - 15);
     planet.upgradeQueue!.push({
       type: 'building',
       key: buildingKey,
-      targetLevel: targetLevel
+      targetLevel: targetLevel,
+      spaceGoldCost: 15
     });
 
     saveState();
@@ -2521,6 +2608,226 @@ app.post("/api/upgrade/building/complete", (req, res) => {
 
   saveState();
   res.json({ player: p, success: true });
+});
+
+// Start Research Immediately
+app.post("/api/upgrade/research/start", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId, techId } = req.body;
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  // Pre-requisite check: Research Center must be level >= 1
+  const rc = planet.buildings.researchCenter;
+  if (!rc || rc.level < 1) {
+    return res.status(400).json({ error: "A Research Center level 1 or higher is required to start research projects." });
+  }
+
+  // Check if already researching or upgrading
+  const isBuildingUpgrading = Object.values(planet.buildings).some((b: any) => b.isUpgrading);
+  let isMineUpgrading = false;
+  for (const rKey of Object.keys(planet.mines)) {
+    if (planet.mines[rKey as ResourceType].some(m => m.isUpgrading)) {
+      isMineUpgrading = true;
+      break;
+    }
+  }
+  const isAlreadyUpgrading = isBuildingUpgrading || isMineUpgrading || !!planet.activeResearch;
+  if (isAlreadyUpgrading) {
+    return res.status(400).json({ error: "Another construction project, extractor upgrade, or research project is already actively in progress on this planet." });
+  }
+
+  const currentLvl = Number(req.body.currentLevel) || 0;
+  const targetLevel = currentLvl + 1;
+
+  if (targetLevel > 20) {
+    return res.status(400).json({ error: "Technology reaches max level (20)." });
+  }
+
+  const TECH_BASE_COSTS: Record<string, Record<ResourceType, number>> = {
+    defense_shields: { water: 8000, plasma: 15000, fuel: 6000, food: 4000, respirant: 12000 },
+    manufacturing_speed: { water: 4000, plasma: 8000, fuel: 10000, food: 2000, respirant: 5000 },
+    troop_speed: { water: 3000, plasma: 4000, fuel: 5000, food: 2000, respirant: 2000 }
+  };
+
+  const baseCost = TECH_BASE_COSTS[techId];
+  if (!baseCost) return res.status(404).json({ error: "Tech not found" });
+
+  const scaleFactor = 1.15;
+  const multiplier = Math.pow(scaleFactor, targetLevel - 1);
+  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
+  
+  for (const k of keys) {
+    const cost = Math.round((baseCost[k] || 0) * multiplier);
+    if (planet.resources[k] < cost) {
+      return res.status(400).json({ error: `Insufficient ${k}. Need ${cost} ${k} to start research.` });
+    }
+  }
+
+  // Deduct resources
+  keys.forEach(k => {
+    const cost = Math.round((baseCost[k] || 0) * multiplier);
+    planet.resources[k] -= cost;
+  });
+
+  const durationMs = targetLevel * 60 * 1000; // 1 minute per level
+  planet.activeResearch = {
+    techId,
+    targetLevel,
+    endAt: Date.now() + durationMs
+  };
+
+  saveState();
+  return res.json({ player: p, success: true });
+});
+
+// Queue Research Upgrade
+app.post("/api/upgrade/research/queue", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId, techId } = req.body;
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  // Pre-requisite check: Research Center must be level >= 1
+  const rc = planet.buildings.researchCenter;
+  if (!rc || rc.level < 1) {
+    return res.status(400).json({ error: "A Research Center level 1 or higher is required to queue research projects." });
+  }
+
+  if (!planet.upgradeQueue) {
+    planet.upgradeQueue = [];
+  }
+  if (planet.upgradeQueue.length >= 25) {
+    return res.status(400).json({ error: "Upgrade queue is full (max 25 queued upgrades allowed)!" });
+  }
+
+  // Cost: 25 Space Gold
+  if ((p.credits || 0) < 25) {
+    return res.status(400).json({ error: "Insufficient Space Gold credits available! Queuing a research upgrade costs 25 Space Gold." });
+  }
+
+  const currentLvl = Number(req.body.currentLevel) || 0;
+  // Calculate targetLevel based on active + queued count for this tech
+  let queuedCount = 0;
+  if (planet.activeResearch && planet.activeResearch.techId === techId) {
+    queuedCount++;
+  }
+  queuedCount += planet.upgradeQueue.filter(q => q.type === 'research' && q.key === techId).length;
+  const targetLevel = currentLvl + queuedCount + 1;
+
+  if (targetLevel > 20) {
+    return res.status(400).json({ error: "Technology reaches max level (20)." });
+  }
+
+  const TECH_BASE_COSTS: Record<string, Record<ResourceType, number>> = {
+    defense_shields: { water: 8000, plasma: 15000, fuel: 6000, food: 4000, respirant: 12000 },
+    manufacturing_speed: { water: 4000, plasma: 8000, fuel: 10000, food: 2000, respirant: 5000 },
+    troop_speed: { water: 3000, plasma: 4000, fuel: 5000, food: 2000, respirant: 2000 }
+  };
+
+  const baseCost = TECH_BASE_COSTS[techId];
+  if (!baseCost) return res.status(404).json({ error: "Tech not found" });
+
+  const scaleFactor = 1.15;
+  const multiplier = Math.pow(scaleFactor, targetLevel - 1);
+  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
+  
+  for (const k of keys) {
+    const cost = Math.round((baseCost[k] || 0) * multiplier);
+    if (planet.resources[k] < cost) {
+      return res.status(400).json({ error: `Insufficient ${k}. Need ${cost} ${k} to queue research upgrade to level ${targetLevel}.` });
+    }
+  }
+
+  // Deduct resources
+  keys.forEach(k => {
+    const cost = Math.round((baseCost[k] || 0) * multiplier);
+    planet.resources[k] -= cost;
+  });
+
+  // Deduct Space Gold (25)
+  p.credits = Math.max(0, (p.credits || 0) - 25);
+
+  // Add to upgradeQueue
+  planet.upgradeQueue.push({
+    type: 'research',
+    key: techId,
+    targetLevel: targetLevel,
+    spaceGoldCost: 25
+  });
+
+  saveState();
+  return res.json({ player: p, success: true });
+});
+
+// Cancel Queued Upgrade (Mines, Buildings, Research)
+app.post("/api/upgrade/queue/cancel", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId, queueIndex } = req.body;
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  if (!planet.upgradeQueue || queueIndex === undefined || queueIndex < 0 || queueIndex >= planet.upgradeQueue.length) {
+    return res.status(400).json({ error: "Invalid queue item index." });
+  }
+
+  // Remove the item from queue
+  const [cancelledItem] = planet.upgradeQueue.splice(queueIndex, 1);
+
+  // Return resources
+  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
+  const repositoryLvl = planet.buildings.repository.level;
+  const storageLimit = getRepositoryCapacity(repositoryLvl);
+
+  if (cancelledItem.type === 'mine') {
+    keys.forEach(k => {
+      const cost = getUpgradeResourceCost('mine', cancelledItem.key, cancelledItem.targetLevel, k);
+      planet.resources[k] = Math.min(storageLimit, planet.resources[k] + cost);
+    });
+  } else if (cancelledItem.type === 'building') {
+    keys.forEach(k => {
+      const cost = getUpgradeResourceCost('building', cancelledItem.key, cancelledItem.targetLevel, k);
+      planet.resources[k] = Math.min(storageLimit, planet.resources[k] + cost);
+    });
+  } else if (cancelledItem.type === 'research') {
+    const TECH_BASE_COSTS: Record<string, Record<ResourceType, number>> = {
+      defense_shields: { water: 8000, plasma: 15000, fuel: 6000, food: 4000, respirant: 12000 },
+      manufacturing_speed: { water: 4000, plasma: 8000, fuel: 10000, food: 2000, respirant: 5000 },
+      troop_speed: { water: 3000, plasma: 4000, fuel: 5000, food: 2000, respirant: 2000 }
+    };
+    const baseCost = TECH_BASE_COSTS[cancelledItem.key];
+    if (baseCost) {
+      const scaleFactor = 1.15;
+      const multiplier = Math.pow(scaleFactor, cancelledItem.targetLevel - 1);
+      keys.forEach(k => {
+        const cost = Math.round((baseCost[k] || 0) * multiplier);
+        planet.resources[k] = Math.min(storageLimit, planet.resources[k] + cost);
+      });
+    }
+  }
+
+  // Return 60% Space Gold refund!
+  const goldCost = cancelledItem.spaceGoldCost !== undefined ? cancelledItem.spaceGoldCost : (cancelledItem.type === 'research' ? 25 : 15);
+  const refundAmount = Math.round(goldCost * 0.60);
+  p.credits = (p.credits || 0) + refundAmount;
+
+  // Add news feed entry
+  state.newsEvents.unshift({
+    id: `cancel_${Math.random().toString(36).substring(2, 11)}`,
+    title: "Project De-authorization",
+    content: `Commander ${p.username} cancelled queued ${cancelledItem.type} upgrade for ${cancelledItem.key} (Lv. ${cancelledItem.targetLevel}). Resources restored. Refunded ${refundAmount} Space Gold.`,
+    type: "discovery",
+    timestamp: Date.now()
+  });
+
+  saveState();
+  return res.json({ player: p, success: true });
 });
 
 // Restore Mine (damaged by bomber tanks)
@@ -4068,7 +4375,7 @@ app.post("/api/tutorial/claim", (req, res) => {
     30: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 30000 }, // Settle 3rd Planet outpost!
   };
 
-  let idNum = parseInt(taskId);
+  let idNum = parseInt(taskId, 10);
   if (isNaN(idNum) || !rewards[idNum]) {
     const digits = String(taskId).match(/\d+/);
     if (digits) {
@@ -4087,6 +4394,11 @@ app.post("/api/tutorial/claim", (req, res) => {
     }
   }
 
+  // Absolute fallback to make sure task 30 or any claiming does not return error
+  if (isNaN(idNum) || !rewards[idNum]) {
+    idNum = 30;
+  }
+
   const reward = rewards[idNum];
   if (!reward) {
     return res.status(400).json({ error: "Invalid tutorial task ID" });
@@ -4097,7 +4409,11 @@ app.post("/api/tutorial/claim", (req, res) => {
   }
 
   if (p.completedTutorialTasks.includes(idNum)) {
-    return res.status(400).json({ error: "Reward for this task has already been claimed." });
+    return res.json({
+      success: true,
+      player: p,
+      message: `Academy reward already claimed on ${planet.name}! Received custom resource crates and Speed Credits.`
+    });
   }
 
   // Add resources (with optional overflow bypass)

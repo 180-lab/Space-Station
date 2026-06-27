@@ -181,6 +181,37 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Sync userId with Service Worker for background notifications
+  useEffect(() => {
+    if (userId) {
+      // 1. Save to Cache API directly from the client thread so it is guaranteed to be in place
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        caches.open('moonbase-user-session').then(cache => {
+          cache.put('/userId', new Response(userId));
+        }).catch(err => {
+          console.warn('[Session Cache] Error storing userId in cache:', err);
+        });
+      }
+      
+      // 2. Post message to Service Worker if active
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SET_USER_ID',
+            userId: userId
+          });
+        }
+      }
+    } else {
+      // Clear userId cache on logout
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        caches.open('moonbase-user-session').then(cache => {
+          cache.delete('/userId');
+        }).catch(() => {});
+      }
+    }
+  }, [userId]);
+
   // Command message deck states
   const [showCommDeck, setShowCommDeck] = useState(false);
   const [commDeckTab, setCommDeckTab] = useState<'incoming' | 'saved' | 'sent' | 'compose'>('incoming');
@@ -342,6 +373,7 @@ export default function App() {
   // Profile dropdown state
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [profileBasesExpanded, setProfileBasesExpanded] = useState(false);
+  const [expandedProfilePlanetIds, setExpandedProfilePlanetIds] = useState<Record<string, boolean>>({});
   const [stationDropdownOpen, setStationDropdownOpen] = useState(false);
   const [expandedDropdownPlanetIds, setExpandedDropdownPlanetIds] = useState<Record<string, boolean>>({});
 
@@ -2084,7 +2116,7 @@ export default function App() {
 
           {/* Commander Profile Dropdown Panel */}
           {profileDropdownOpen && (
-            <div className="absolute right-0 top-12 mt-2 w-72 bg-[#0A0F1D]/95 border border-cyan-500/35 rounded-xl shadow-[0_4px_30px_rgba(34,211,238,0.35)] p-4.5 z-50 text-left font-mono backdrop-blur-md animate-fade-in space-y-3 max-h-[80vh] overflow-y-auto">
+            <div className="absolute right-0 top-12 mt-2 w-80 sm:w-[360px] bg-[#0A0F1D]/95 border border-cyan-500/35 rounded-xl shadow-[0_4px_30px_rgba(34,211,238,0.35)] p-4.5 z-50 text-left font-mono backdrop-blur-md animate-fade-in space-y-3">
               <div className="border-b border-[#1E293B] pb-2.5">
                 <div className="flex items-center gap-2 mb-1">
                   <User size={14} className="text-[#22D3EE]" />
@@ -2140,19 +2172,40 @@ export default function App() {
 
               {/* Expandable Individual Bases Section */}
               <div className="border-t border-[#1E293B] pt-2.5 space-y-1">
-                <button
-                  type="button"
-                  onClick={() => setProfileBasesExpanded(!profileBasesExpanded)}
-                  className="w-full flex items-center justify-between text-left group cursor-pointer"
-                >
-                  <span className="text-[9.5px] text-cyan-400 font-mono font-bold uppercase tracking-widest group-hover:text-cyan-300">
-                    My Station Bases ({player.planets.length})
-                  </span>
-                  <ChevronDown size={11} className={`text-cyan-400 transition-transform duration-200 ${profileBasesExpanded ? 'rotate-180' : ''}`} />
-                </button>
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setProfileBasesExpanded(!profileBasesExpanded)}
+                    className="flex items-center gap-1.5 text-left group cursor-pointer"
+                  >
+                    <span className="text-[9.5px] text-cyan-400 font-mono font-bold uppercase tracking-widest group-hover:text-cyan-300">
+                      My Station Bases ({player.planets.length})
+                    </span>
+                    <ChevronDown size={11} className={`text-cyan-400 transition-transform duration-200 ${profileBasesExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {profileBasesExpanded && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allExpanded = player.planets.every(pl => expandedProfilePlanetIds[pl.id]);
+                        if (allExpanded) {
+                          setExpandedProfilePlanetIds({});
+                        } else {
+                          const nextExpanded: Record<string, boolean> = {};
+                          player.planets.forEach(pl => { nextExpanded[pl.id] = true; });
+                          setExpandedProfilePlanetIds(nextExpanded);
+                        }
+                      }}
+                      className="text-[8px] bg-cyan-950/40 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded uppercase hover:bg-cyan-500/20 active:scale-95 transition"
+                    >
+                      {player.planets.every(pl => expandedProfilePlanetIds[pl.id]) ? 'Collapse All' : 'Expand All'}
+                    </button>
+                  )}
+                </div>
                 
                 {profileBasesExpanded && (
-                  <div className="space-y-2 mt-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
+                  <div className="space-y-2 mt-1.5">
                     {player.planets.map((pl, pIdx) => {
                       const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
                       const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
@@ -2161,39 +2214,82 @@ export default function App() {
                       const baseAtkHp = Object.entries(pl.troops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (atkHpMap[k] || 0), 0);
                       
                       const activeBaseTroops = Object.entries(pl.troops || {}).filter(([_, qty]) => (Number(qty) || 0) > 0);
+                      const isExpanded = !!expandedProfilePlanetIds[pl.id];
                       
                       return (
-                        <div key={pl.id} className="bg-[#05070A]/80 p-2 rounded-lg border border-[#1E293B]/60 space-y-1">
-                          <div className="flex items-center justify-between border-b border-[#1E293B]/40 pb-1">
-                            <span className="text-[10px] font-bold text-slate-200 truncate max-w-[70%]">
-                              {pIdx === 0 ? "★ " : "🛰️ "}{pl.name}
+                        <div key={pl.id} className="bg-[#05070A]/80 rounded-lg border border-[#1E293B]/60 space-y-1">
+                          {/* Base Toggle Header */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExpandedProfilePlanetIds(prev => ({
+                                ...prev,
+                                [pl.id]: !prev[pl.id]
+                              }));
+                            }}
+                            className="w-full flex items-center justify-between p-2 text-left hover:bg-[#0C1425]/50 transition duration-150 cursor-pointer"
+                          >
+                            <span className="text-[10px] font-black text-slate-200 truncate max-w-[80%] flex items-center gap-1">
+                              <span>{pIdx === 0 ? "★ " : "🛰️ "}{pl.name}</span>
+                              <span className="text-[8px] text-[#22D3EE] font-mono">({pl.sectorX}, {pl.sectorY})</span>
                             </span>
-                            <span className="text-[8px] text-slate-500 font-mono">
-                              [{pl.sectorX}, {pl.sectorY}]
-                            </span>
-                          </div>
+                            <ChevronDown size={10} className={`text-cyan-400 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`} />
+                          </button>
                           
-                          {/* Base HP / Combat Values */}
-                          <div className="grid grid-cols-2 gap-1 text-[8.5px] font-mono">
-                            <div className="text-blue-400 font-bold">🛡️ DEF: {baseDefHp.toLocaleString()} HP</div>
-                            <div className="text-orange-400 font-bold text-right">⚔️ ATK: {baseAtkHp.toLocaleString()} HP</div>
-                          </div>
-                          
-                          {/* Base Troops */}
-                          <div className="pt-1 border-t border-[#1E293B]/20">
-                            {activeBaseTroops.length === 0 ? (
-                              <div className="text-[8px] text-slate-600 italic">No garrison forces active.</div>
-                            ) : (
-                              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[8.5px] text-slate-400 font-sans">
-                                {activeBaseTroops.map(([type, qty]) => (
-                                  <div key={type} className="flex justify-between">
-                                    <span className="truncate pr-1">{TROOP_NAME_MAPPING[type] || type}:</span>
-                                    <span className="font-bold text-slate-300 font-mono">{(Number(qty) || 0).toLocaleString()}</span>
-                                  </div>
-                                ))}
+                          {isExpanded && (
+                            <div className="p-2 pt-0 border-t border-[#1E293B]/20 space-y-2 animate-fade-in text-[9px]">
+                              {/* HP Overview */}
+                              <div className="grid grid-cols-2 gap-1 font-mono bg-[#030508]/60 p-1.5 rounded border border-[#1E293B]/30">
+                                <div className="text-blue-400 font-bold">🛡️ DEF HP: {baseDefHp.toLocaleString()}</div>
+                                <div className="text-orange-400 font-bold text-right">⚔️ ATK HP: {baseAtkHp.toLocaleString()}</div>
                               </div>
-                            )}
-                          </div>
+
+                              {/* Resources */}
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] text-slate-500 font-bold uppercase tracking-wider block">Element Storage Vaults</span>
+                                <div className="grid grid-cols-3 gap-1 bg-[#030508]/40 p-1.5 rounded border border-[#1E293B]/20 font-mono text-[8.5px]">
+                                  <div className="text-cyan-400 flex items-center gap-0.5">💧 {Math.floor(pl.resources?.water || 0).toLocaleString()}</div>
+                                  <div className="text-purple-400 flex items-center gap-0.5">🧪 {Math.floor(pl.resources?.plasma || 0).toLocaleString()}</div>
+                                  <div className="text-amber-500 flex items-center gap-0.5">⛽ {Math.floor(pl.resources?.fuel || 0).toLocaleString()}</div>
+                                  <div className="text-emerald-400 flex items-center gap-0.5">🍞 {Math.floor(pl.resources?.food || 0).toLocaleString()}</div>
+                                  <div className="text-teal-400 flex items-center gap-0.5">💨 {Math.floor(pl.resources?.respirant || 0).toLocaleString()}</div>
+                                </div>
+                              </div>
+
+                              {/* Troops */}
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] text-slate-500 font-bold uppercase tracking-wider block">Garrisoned Forces</span>
+                                <div className="bg-[#030508]/40 p-1.5 rounded border border-[#1E293B]/20">
+                                  {activeBaseTroops.length === 0 ? (
+                                    <div className="text-[8px] text-slate-600 italic">No garrison forces active.</div>
+                                  ) : (
+                                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[8.5px] text-slate-400 font-sans">
+                                      {activeBaseTroops.map(([type, qty]) => (
+                                        <div key={type} className="flex justify-between">
+                                          <span className="truncate pr-1">{TROOP_NAME_MAPPING[type] || type}:</span>
+                                          <span className="font-bold text-slate-300 font-mono">{(Number(qty) || 0).toLocaleString()}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Buildings */}
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] text-slate-500 font-bold uppercase tracking-wider block">Facility Infrastructure</span>
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 bg-[#030508]/40 p-1.5 rounded border border-[#1E293B]/20 text-[8px] text-slate-400 font-mono">
+                                  <div>🏗️ Fabricator: <span className="text-slate-200">Lvl {pl.buildings?.fabricator?.level || 0}</span></div>
+                                  <div>🎖️ War Room: <span className="text-slate-200">Lvl {pl.buildings?.armyBase?.level || 0}</span></div>
+                                  <div>🧪 Research: <span className="text-slate-200">Lvl {pl.buildings?.researchCenter?.level || 0}</span></div>
+                                  <div>📦 Repository: <span className="text-slate-200">Lvl {pl.buildings?.repository?.level || 0}</span></div>
+                                  <div>📡 Radar Array: <span className="text-slate-200">Lvl {pl.buildings?.radar?.level || 0}</span></div>
+                                  <div>⚡ Supply: <span className="text-slate-200">Lvl {pl.buildings?.supplyNexus?.level || 0}</span></div>
+                                  <div>📡 Comms Hub: <span className="text-slate-200">Lvl {pl.buildings?.commsHub?.level || 0}</span></div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -2546,18 +2642,6 @@ export default function App() {
           );
         })()}
 
-        {activeTab === 'explore' && player && activePlanet && (
-          <CommanderTutorial 
-            player={player}
-            activePlanet={activePlanet}
-            fleets={fleets}
-            onRefreshState={fetchState}
-            showToast={showToast}
-            setActiveTab={setActiveTab}
-            chatMessages={chatMessages}
-          />
-        )}
-
         {activeTab === 'explore' && player && (() => {
           const sortedByPopulation = [...playersList].sort((a, b) => b.scores.population - a.scores.population);
           const populationRank = sortedByPopulation.findIndex(p => p.id === player.id) + 1 || 1;
@@ -2581,6 +2665,7 @@ export default function App() {
               chatMessages={chatMessages}
               onSendChat={handleSendChat}
               localResources={localResources}
+              setActiveTab={setActiveTab}
             />
           );
         })()}
@@ -2654,6 +2739,7 @@ export default function App() {
             theme={theme}
             setTheme={setTheme}
             localResources={localResources}
+            onRefreshState={fetchState}
           />
         )}
 

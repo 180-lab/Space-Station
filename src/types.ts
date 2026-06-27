@@ -36,10 +36,11 @@ export interface TrainingQueueItem {
 }
 
 export interface QueuedUpgrade {
-  type: 'mine' | 'building';
+  type: 'mine' | 'building' | 'research';
   key: string;
   mineIndex?: number;
   targetLevel: number;
+  spaceGoldCost?: number;
 }
 
 export interface ColonyPlanet {
@@ -82,6 +83,11 @@ export interface ColonyPlanet {
   trainingQueue: TrainingQueueItem[];
   lastSupplyNexusClaim?: number;
   upgradeQueue?: QueuedUpgrade[];
+  activeResearch?: {
+    techId: string;
+    targetLevel: number;
+    endAt: number;
+  } | null;
 }
 
 export interface PlayerProfile {
@@ -92,6 +98,7 @@ export interface PlayerProfile {
   allianceId: string | null;
   allianceRole: 'commander' | 'leader' | 'officer' | 'member' | 'recruit' | null;
   planets: ColonyPlanet[];
+  techLevels?: Record<string, Record<string, number>>; // planetId -> techId -> level
   scores: {
     population: number; // Mine levels * 10 + Building levels * 30
     attack: number;     // Killed defending HP (only to winning attacker)

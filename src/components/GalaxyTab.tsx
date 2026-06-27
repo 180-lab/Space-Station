@@ -1929,33 +1929,35 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 >
                                   <span>{isRead ? '✉ Mark Unread' : '✉ Mark Read'}</span>
                                 </button>
-                              </div>
 
-                              {/* Target forwarders */}
-                              <div className="flex items-center gap-1">
-                                <span className="text-slate-500 text-[8.5px]">Forward:</span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (onForwardReport) onForwardReport(report, 'global');
-                                  }}
-                                  className="px-1.5 py-0.5 rounded bg-slate-900 border border-white/10 hover:bg-slate-800 text-[9px] text-slate-350 cursor-pointer text-center"
-                                >
-                                  Global
-                                </button>
-                                {player.allianceId && (
+                                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-white/5 bg-slate-900/40 text-[9px] text-slate-400">
+                                  <span>📤 Forward:</span>
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (onForwardReport) onForwardReport(report, 'alliance');
+                                      if (onForwardReport) onForwardReport(report, 'global');
                                     }}
-                                    className="px-1.5 py-0.5 rounded bg-cyan-950/45 border border-cyan-800/30 hover:bg-cyan-900/40 text-[9px] text-cyan-350 cursor-pointer text-center font-bold"
+                                    className="text-cyan-400 hover:text-cyan-300 font-bold ml-1 cursor-pointer"
                                   >
-                                    Alliance
+                                    Global
                                   </button>
-                                )}
+                                  {player.allianceId && (
+                                    <>
+                                      <span className="text-slate-600">|</span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (onForwardReport) onForwardReport(report, 'alliance');
+                                        }}
+                                        className="text-purple-400 hover:text-purple-300 font-bold cursor-pointer"
+                                      >
+                                        Alliance
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
@@ -1981,21 +1983,28 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     const mAtk: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
                                     const attHpValue = Object.entries(report.attackerInitialTroops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (mDef[k] || 10), 0);
                                     const attAtkValue = Object.entries(report.attackerInitialTroops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (mAtk[k] || 10), 0);
+                                    const totalAttInitial = Object.values(report.attackerInitialTroops || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                                    const totalAttLosses = Object.values(report.attackerLosses || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                                    const attLossPercent = totalAttInitial > 0 ? ((totalAttLosses / totalAttInitial) * 100).toFixed(1) : '0.0';
                                     return (
                                       <>
-                                        <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide">
-                                          ATTACKER:{' '}
-                                          <span 
-                                            onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.attackerId)}
-                                            className="underline decoration-dotted cursor-pointer hover:text-red-300"
-                                          >
-                                            {report.attackerName}
+                                        <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide flex items-center justify-between">
+                                          <span>ATTACKER:{' '}
+                                            <span 
+                                              onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.attackerId)}
+                                              className="underline decoration-dotted cursor-pointer hover:text-red-300"
+                                            >
+                                              {report.attackerName}
+                                            </span>
+                                          </span>
+                                          <span className="text-[10px] text-red-400 font-bold bg-red-950/25 px-1.5 py-0.5 rounded border border-red-900/20 font-mono select-none">
+                                            Loss: {attLossPercent}%
                                           </span>
                                         </p>
                                         <p className="text-slate-500 text-[10px] mt-0.5">Origin: [{report.attackerCoords.x}, {report.attackerCoords.y}]</p>
                                         <div className="mt-2 space-y-1">
                                           <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
-                                            <div>Attacker HP (Defense Shields): <span className="text-red-400 font-mono font-extrabold">{attHpValue.toLocaleString()}</span></div>
+
                                             <div>Attacker Attack HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{attAtkValue.toLocaleString()}</span></div>
                                           </div>
                                           <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
@@ -2019,22 +2028,29 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     const mAtk: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
                                     const defHpValue = Object.entries(report.defenderInitialTroops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (mDef[k] || 10), 0);
                                     const defAtkValue = Object.entries(report.defenderInitialTroops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (mAtk[k] || 10), 0);
+                                    const totalDefInitial = Object.values(report.defenderInitialTroops || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                                    const totalDefLosses = Object.values(report.defenderLosses || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                                    const defLossPercent = totalDefInitial > 0 ? ((totalDefLosses / totalDefInitial) * 100).toFixed(1) : '0.0';
                                     return (
                                       <>
-                                        <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide">
-                                          STATION:{' '}
-                                          <span 
-                                            onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
-                                            className="underline decoration-dotted cursor-pointer hover:text-cyan-300"
-                                          >
-                                            {report.defenderName}
+                                        <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide flex items-center justify-between">
+                                          <span>STATION:{' '}
+                                            <span 
+                                              onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
+                                              className="underline decoration-dotted cursor-pointer hover:text-cyan-300"
+                                            >
+                                              {report.defenderName}
+                                            </span>
+                                          </span>
+                                          <span className="text-[10px] text-cyan-400 font-bold bg-cyan-950/25 px-1.5 py-0.5 rounded border border-cyan-900/20 font-mono select-none">
+                                            Loss: {defLossPercent}%
                                           </span>
                                         </p>
                                         <p className="text-slate-500 text-[10px] mt-0.5">Target: [{report.defenderCoords.x}, {report.defenderCoords.y}]</p>
                                         <div className="mt-2 space-y-1">
                                           <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
                                             <div>Defender HP (Defense Shields): <span className="text-cyan-400 font-mono font-extrabold">{defHpValue.toLocaleString()}</span></div>
-                                            <div>Defender Attack HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{defAtkValue.toLocaleString()}</span></div>
+                                            
                                           </div>
                                           <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
                                             {Object.entries(report.defenderInitialTroops).map(([type, qty]) => {

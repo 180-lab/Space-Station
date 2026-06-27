@@ -1830,7 +1830,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
                       {/* Interactive bookmark and forwarding control panel */}
                       <div className="flex flex-wrap items-center justify-between text-[10.5px] border-b border-white/5 pb-2 text-slate-400 gap-1.5">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1857,53 +1857,67 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                           >
                             <span>{isRead ? '✉ Mark Unread' : '✉ Mark Read'}</span>
                           </button>
-                        </div>
 
-                        {/* Forward buttons */}
-                        <div className="flex items-center gap-1">
-                          <span className="text-slate-500 text-[9.5px]">Forward:</span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onForwardReport) onForwardReport(report, 'global');
-                            }}
-                            className="px-2 py-0.5 rounded bg-slate-900 border border-white/10 hover:bg-slate-800 text-[9.5px] font-bold text-slate-300 transition cursor-pointer"
-                          >
-                            Global
-                          </button>
-                          {player.allianceId && (
+                          <div className="flex items-center gap-1.5 px-2 py-1 rounded border border-white/5 bg-slate-900/60 text-[10px] text-slate-400">
+                            <span>📤 Forward:</span>
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (onForwardReport) onForwardReport(report, 'alliance');
+                                if (onForwardReport) onForwardReport(report, 'global');
                               }}
-                              className="px-2 py-0.5 rounded bg-cyan-950/40 border border-cyan-800/30 hover:bg-cyan-900/40 text-[9.5px] font-bold text-cyan-300 transition cursor-pointer"
+                              className="text-cyan-450 hover:text-cyan-300 font-bold cursor-pointer"
                             >
-                              Alliance
+                              Global
                             </button>
-                          )}
+                            {player.allianceId && (
+                              <>
+                                <span className="text-slate-600">|</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onForwardReport) onForwardReport(report, 'alliance');
+                                  }}
+                                  className="text-purple-400 hover:text-purple-300 font-bold cursor-pointer"
+                                >
+                                  Alliance
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      {isExpanded && (
-                        <div className="space-y-3 animate-fade-in text-left">
-                          <div className="grid grid-cols-2 gap-4 text-[11px] leading-relaxed">
-                            <div>
-                              <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide">
-                                ATTACKER:{' '}
-                                <span 
-                                  onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.attackerId)}
-                                  className="underline decoration-dotted cursor-pointer hover:text-red-300 font-bold text-red-400"
-                                >
-                                  {report.attackerName}
-                                </span>
-                              </p>
+                      {isExpanded && (() => {
+                        const totalAttInitial = Object.values(report.attackerInitialTroops || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                        const totalAttLosses = Object.values(report.attackerLosses || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                        const attLossPercent = totalAttInitial > 0 ? ((totalAttLosses / totalAttInitial) * 100).toFixed(1) : '0.0';
+
+                        const totalDefInitial = Object.values(report.defenderInitialTroops || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                        const totalDefLosses = Object.values(report.defenderLosses || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                        const defLossPercent = totalDefInitial > 0 ? ((totalDefLosses / totalDefInitial) * 100).toFixed(1) : '0.0';
+
+                        return (
+                          <div className="space-y-3 animate-fade-in text-left">
+                            <div className="grid grid-cols-2 gap-4 text-[11px] leading-relaxed">
+                              <div>
+                                <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide flex items-center justify-between">
+                                  <span>ATTACKER:{' '}
+                                    <span 
+                                      onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.attackerId)}
+                                      className="underline decoration-dotted cursor-pointer hover:text-red-300 font-bold text-red-400"
+                                    >
+                                      {report.attackerName}
+                                    </span>
+                                  </span>
+                                  <span className="text-[10px] text-red-400 font-bold bg-red-950/25 px-1.5 py-0.5 rounded border border-red-900/20 font-mono select-none">
+                                    Loss: {attLossPercent}%
+                                  </span>
+                                </p>
                               <p className="text-slate-500 text-[10px] mt-0.5">Origin: [{report.attackerCoords.x}, {report.attackerCoords.y}]</p>
                               <div className="mt-2 space-y-1">
                                 <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
-                                  <div>Attacker HP (Defense Shields): <span className="text-red-400 font-mono font-extrabold">{attStats.hp.toLocaleString()}</span></div>
                                   <div>Attacker Attack HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{attStats.atk.toLocaleString()}</span></div>
                                 </div>
                                 <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
@@ -1919,20 +1933,23 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                               </div>
                             </div>
                             <div>
-                              <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide">
-                                STATION:{' '}
-                                <span 
-                                  onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
-                                  className="underline decoration-dotted cursor-pointer hover:text-cyan-300 font-bold text-cyan-400"
-                                >
-                                  {report.defenderName}
+                              <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide flex items-center justify-between">
+                                <span>STATION:{' '}
+                                  <span 
+                                    onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
+                                    className="underline decoration-dotted cursor-pointer hover:text-cyan-300 font-bold text-cyan-400"
+                                  >
+                                    {report.defenderName}
+                                  </span>
+                                </span>
+                                <span className="text-[10px] text-cyan-400 font-bold bg-cyan-950/25 px-1.5 py-0.5 rounded border border-cyan-900/20 font-mono select-none">
+                                  Loss: {defLossPercent}%
                                 </span>
                               </p>
                               <p className="text-slate-500 text-[10px] mt-0.5">Target: [{report.defenderCoords.x}, {report.defenderCoords.y}]</p>
                               <div className="mt-2 space-y-1">
                                 <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
                                   <div>Defender HP (Defense Shields): <span className="text-cyan-400 font-mono font-extrabold">{defStats.hp.toLocaleString()}</span></div>
-                                  <div>Defender Attack HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{defStats.atk.toLocaleString()}</span></div>
                                 </div>
                                 <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
                                   {Object.entries(report.defenderInitialTroops).map(([type, qty]) => {
@@ -2050,12 +2067,13 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                });
-              })()}
-            </div>
+                      );
+                    })()}
+                  </div>
+                );
+              });
+            })()}
+          </div>
 
             <div className="border-t border-[#1E293B] pt-3 flex justify-end">
               <button 

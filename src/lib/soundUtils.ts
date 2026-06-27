@@ -10,7 +10,8 @@ function getAudioContext(): AudioContext {
 
 /**
  * Plays a simple but urgent, high-visibility tactical alarm / alerty sound.
- * Uses a sawtooth wave with oscillation to mimic an emergency station klaxon.
+ * Uses a crisp, urgent triple-chirp sequence with frequency sweeps and modulation
+ * to add intense tactical urgency and instantly alert the player.
  */
 export function playAlertySound() {
   try {
@@ -20,36 +21,40 @@ export function playAlertySound() {
     }
     const now = ctx.currentTime;
 
-    // Dual oscillator oscillating klaxon
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const gainNode = ctx.createGain();
+    const playBeep = (startTime: number) => {
+      const osc = ctx.createOscillator();
+      const oscMod = ctx.createOscillator();
+      const modGain = ctx.createGain();
+      const gainNode = ctx.createGain();
 
-    osc1.type = 'sawtooth';
-    osc1.frequency.setValueAtTime(800, now);
-    osc1.frequency.linearRampToValueAtTime(400, now + 0.15);
-    osc1.frequency.linearRampToValueAtTime(800, now + 0.3);
-    osc1.frequency.linearRampToValueAtTime(400, now + 0.45);
-    osc1.frequency.linearRampToValueAtTime(800, now + 0.6);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(1100, startTime);
+      osc.frequency.exponentialRampToValueAtTime(350, startTime + 0.12);
 
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(805, now);
-    osc2.frequency.linearRampToValueAtTime(405, now + 0.15);
-    osc2.frequency.linearRampToValueAtTime(805, now + 0.3);
-    osc2.frequency.linearRampToValueAtTime(405, now + 0.45);
-    osc2.frequency.linearRampToValueAtTime(805, now + 0.6);
+      oscMod.type = 'sine';
+      oscMod.frequency.setValueAtTime(160, startTime);
+      modGain.gain.setValueAtTime(250, startTime);
 
-    gainNode.gain.setValueAtTime(0.12, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      gainNode.gain.setValueAtTime(0.15, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + 0.12);
 
-    osc1.connect(gainNode);
-    osc2.connect(gainNode);
-    gainNode.connect(ctx.destination);
+      oscMod.connect(modGain);
+      modGain.connect(osc.frequency);
+      
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
 
-    osc1.start(now);
-    osc2.start(now);
-    osc1.stop(now + 0.7);
-    osc2.stop(now + 0.7);
+      oscMod.start(startTime);
+      osc.start(startTime);
+      
+      oscMod.stop(startTime + 0.13);
+      osc.stop(startTime + 0.13);
+    };
+
+    // 3 rapid, urgent, alerty pulses
+    playBeep(now);
+    playBeep(now + 0.15);
+    playBeep(now + 0.30);
   } catch (err) {
     console.warn('[Sound Engine] Failed to play alerty alarm:', err);
   }
