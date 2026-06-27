@@ -193,7 +193,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [leaderboardPage, setLeaderboardPage] = useState(1);
   const [showBottom10, setShowBottom10] = useState(false);
   const [showTop10, setShowTop10] = useState(false);
-  const [showStandings, setShowStandings] = useState(false);
+  const [showStandings, setShowStandings] = useState(true);
   const [showAllianceCmd, setShowAllianceCmd] = useState(false);
   const [showDecFeed, setShowDecFeed] = useState(false);
 
@@ -1187,56 +1187,41 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             {/* Main Leaderboard Table Container */}
             <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#1E293B]/60">
-                <button
-                  type="button"
-                  onClick={() => setShowStandings(!showStandings)}
-                  className="flex items-start text-left gap-1.5 hover:text-white transition duration-150 cursor-pointer"
-                >
-                  <div>
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-1.5 font-mono">
-                      <Trophy size={16} className="text-yellow-500 drop-shadow-[0_0_8px_#fbbf24]" />
-                      GALACTIC STANDINGS
-                      {showStandings ? (
-                        <ChevronUp size={12} className="text-red-500" />
-                      ) : (
-                        <ChevronDown size={12} className="text-emerald-500" />
-                      )}
-                    </h3>
-                  </div>
-                </button>
+                <div className="flex items-center gap-1.5 select-none py-1">
+                  <Trophy size={16} className="text-yellow-500 drop-shadow-[0_0_8px_#fbbf24]" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-[#5bc0be] font-mono">
+                    GALACTIC STANDINGS
+                  </h3>
+                </div>
 
                 {/* Top/Bottom limit toggle options */}
-                {showStandings && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowTop10(!showTop10);
-                        setShowBottom10(false);
-                        setLeaderboardPage(1);
-                      }}
-                      className={`px-3.5 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-xl transition border cursor-pointer font-mono shrink-0 ${showTop10 ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40' : 'bg-slate-950/50 text-slate-400 border-[#1E293B] hover:text-white hover:border-[#334155]'}`}
-                    >
-                      🏆 {showTop10 ? "View All Rankings" : "Check Top 10"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowBottom10(!showBottom10);
-                        setShowTop10(false);
-                        setLeaderboardPage(1);
-                      }}
-                      className={`px-3.5 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-xl transition border cursor-pointer font-mono shrink-0 ${showBottom10 ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-slate-950/50 text-slate-400 border-[#1E293B] hover:text-white hover:border-[#334155]'}`}
-                    >
-                      🚀 {showBottom10 ? "View All Rankings" : "Check Bottom 10"}
-                    </button>
-                  </div>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTop10(!showTop10);
+                      setShowBottom10(false);
+                      setLeaderboardPage(1);
+                    }}
+                    className={`px-3.5 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-xl transition border cursor-pointer font-mono shrink-0 ${showTop10 ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40' : 'bg-slate-950/50 text-slate-400 border-[#1E293B] hover:text-white hover:border-[#334155]'}`}
+                  >
+                    🏆 {showTop10 ? "View All Rankings" : "Check Top 10"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBottom10(!showBottom10);
+                      setShowTop10(false);
+                      setLeaderboardPage(1);
+                    }}
+                    className={`px-3.5 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-xl transition border cursor-pointer font-mono shrink-0 ${showBottom10 ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-slate-950/50 text-slate-400 border-[#1E293B] hover:text-white hover:border-[#334155]'}`}
+                  >
+                    🚀 {showBottom10 ? "View All Rankings" : "Check Bottom 10"}
+                  </button>
+                </div>
               </div>
 
-              {showStandings && (
-                <>
-                  {/* Metric ranking switch selectors */}
+              {/* Metric ranking switch selectors */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 font-mono text-[10px]">
                 {[
                   { key: 'population', label: '🌾 POPULATION STANDING', color: 'border-cyan-500/30' },
@@ -1259,16 +1244,16 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
               </div>
 
               {/* Player list table */}
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
                 <table className="w-full text-left border-collapse text-xs font-mono">
                   <thead>
-                    <tr className="border-b border-[#1E293B] text-slate-500 pb-2">
-                      <th className="py-3 px-2">RANK</th>
-                      <th className="py-3">COMMANDER ID</th>
-                      <th className="py-3 text-right">POPULATION</th>
-                      <th className="py-3 text-right">ATTACK POINTS</th>
-                      <th className="py-3 text-right">DEFENSE POINTS</th>
-                      <th className="py-3 text-right">RESOURCES HAULED</th>
+                    <tr className="border-b border-[#1E293B]/70 text-slate-500 pb-2">
+                      <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">RANK</th>
+                      <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">COMMANDER ID</th>
+                      <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">POPULATION</th>
+                      <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">ATTACK POINTS</th>
+                      <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">DEFENSE POINTS</th>
+                      <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">RESOURCES HAULED</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-900/60 font-medium">
@@ -1281,12 +1266,12 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           key={pl.id} 
                           className={`border-b border-[#1E293B]/60 hover:bg-white/5 transition duration-150 ${isYou ? 'bg-cyan-950/15 text-cyan-300 font-bold border-l-2 border-l-cyan-400 pl-2' : 'text-slate-300'}`}
                         >
-                          <td className="py-3.5 px-2 font-mono font-bold">
+                          <td className="py-3.5 px-4 font-mono font-bold whitespace-nowrap">
                             <span className={globalRankIdx <= 3 ? 'text-yellow-400 font-extrabold' : 'text-slate-500'}>
                               {globalRankIdx <= 3 ? `🏆 #${globalRankIdx}` : `#${globalRankIdx}`}
                             </span>
                           </td>
-                          <td className="py-3.5">
+                          <td className="py-3.5 px-4 whitespace-nowrap">
                             <div className="flex flex-col">
                               <span className="flex items-center gap-1.5 font-bold">
                                 {isYou && <span className="text-yellow-400">★</span>}
@@ -1302,16 +1287,16 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               </span>
                             </div>
                           </td>
-                          <td className={`py-3.5 text-right font-bold ${rankingMetric === 'population' ? 'text-cyan-400' : 'text-slate-400'}`}>
+                          <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'population' ? 'text-cyan-400' : 'text-slate-400'}`}>
                             {(pl.scores?.population || 0).toLocaleString()}
                           </td>
-                          <td className={`py-3.5 text-right font-bold ${rankingMetric === 'attack' ? 'text-red-400' : 'text-slate-400'}`}>
+                          <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'attack' ? 'text-red-400' : 'text-slate-400'}`}>
                             {(pl.scores?.attack || 0).toLocaleString()}
                           </td>
-                          <td className={`py-3.5 text-right font-bold ${rankingMetric === 'defence' ? 'text-blue-400' : 'text-slate-400'}`}>
+                          <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'defence' ? 'text-blue-400' : 'text-slate-400'}`}>
                             {(pl.scores?.defence || 0).toLocaleString()}
                           </td>
-                          <td className={`py-3.5 text-right font-bold ${rankingMetric === 'raiders' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                          <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'raiders' ? 'text-emerald-400' : 'text-slate-400'}`}>
                             {(pl.scores?.raiders || 0).toLocaleString()}
                           </td>
                         </tr>
@@ -1359,8 +1344,6 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 <div className="pt-2 text-center text-cyan-400 text-[10px] uppercase font-bold tracking-widest block py-2 border-t border-[#1E293B]/20 animate-pulse font-mono">
                   🏆 DISPLAYING ELITE STANDINGS SYSTEMWIDE COMMANDERS (TOP 10 ENGAGEMENT SCORES)
                 </div>
-              )}
-                </>
               )}
             </div>
           </div>
