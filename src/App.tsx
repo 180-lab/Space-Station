@@ -118,6 +118,8 @@ export default function App() {
   // Connection error handling
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const consecutiveErrorsRef = useRef(0);
+  const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  const isFirstMessagesLoadRef = useRef(true);
 
   // Google Sign-In & Payments Dialog states
   const [showGoogleDialog, setShowGoogleDialog] = useState(false);
@@ -339,6 +341,7 @@ export default function App() {
 
   // Profile dropdown state
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [profileBasesExpanded, setProfileBasesExpanded] = useState(false);
   const [stationDropdownOpen, setStationDropdownOpen] = useState(false);
   const [expandedDropdownPlanetIds, setExpandedDropdownPlanetIds] = useState<Record<string, boolean>>({});
 
@@ -764,6 +767,40 @@ export default function App() {
 
     lastAttackFleetsRef.current = currentAttackIds;
   }, [fleets, player, serverTime]);
+
+  // Monitor incoming private messages and notify if enabled
+  useEffect(() => {
+    if (!player || !player.commandMessages) return;
+
+    const currentIncomingMessages = player.commandMessages.filter(m => !m.isSent);
+    
+    // On first load, record existing messages to prevent spamming notification toasts for historic chats
+    if (isFirstMessagesLoadRef.current) {
+      currentIncomingMessages.forEach(m => knownMessageIdsRef.current.add(m.id));
+      isFirstMessagesLoadRef.current = false;
+      return;
+    }
+
+    let hasNewUnread = false;
+    let senderName = "Another Commander";
+    
+    currentIncomingMessages.forEach(m => {
+      if (!knownMessageIdsRef.current.has(m.id)) {
+        knownMessageIdsRef.current.add(m.id);
+        if (!m.isRead) {
+          hasNewUnread = true;
+          senderName = m.senderName || senderName;
+        }
+      }
+    });
+
+    if (hasNewUnread) {
+      const commsAlertsEnabled = localStorage.getItem('moonbase_comms_notifications_enabled') !== 'false';
+      if (commsAlertsEnabled) {
+        showToast(`📬 SECURE TRANSMISSION RECEIVED: New message from Commander ${senderName}!`, 'info');
+      }
+    }
+  }, [player?.commandMessages]);
 
   // Fetch full MMO State API
   const fetchState = async () => {
@@ -1992,7 +2029,7 @@ export default function App() {
                             {idx === 0 ? "★ " : "🛰️ "}{pl.name}
                           </span>
                           <span className="text-[9px] text-[#22D3EE] font-mono tracking-wide">
-                            Sector Grid Coordinates: [{pl.sectorX}, {pl.sectorY}]
+                            Location: {pl.sectorX}, {pl.sectorY}
                           </span>
                         </div>
                         {isActive && (
@@ -2099,6 +2136,69 @@ export default function App() {
                     });
                   })()}
                 </div>
+              </div>
+
+              {/* Expandable Individual Bases Section */}
+              <div className="border-t border-[#1E293B] pt-2.5 space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setProfileBasesExpanded(!profileBasesExpanded)}
+                  className="w-full flex items-center justify-between text-left group cursor-pointer"
+                >
+                  <span className="text-[9.5px] text-cyan-400 font-mono font-bold uppercase tracking-widest group-hover:text-cyan-300">
+                    My Station Bases ({player.planets.length})
+                  </span>
+                  <ChevronDown size={11} className={`text-cyan-400 transition-transform duration-200 ${profileBasesExpanded ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {profileBasesExpanded && (
+                  <div className="space-y-2 mt-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
+                    {player.planets.map((pl, pIdx) => {
+                      const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
+                      const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
+                      
+                      const baseDefHp = Object.entries(pl.troops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (defHpMap[k] || 0), 0);
+                      const baseAtkHp = Object.entries(pl.troops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (atkHpMap[k] || 0), 0);
+                      
+                      const activeBaseTroops = Object.entries(pl.troops || {}).filter(([_, qty]) => (Number(qty) || 0) > 0);
+                      
+                      return (
+                        <div key={pl.id} className="bg-[#05070A]/80 p-2 rounded-lg border border-[#1E293B]/60 space-y-1">
+                          <div className="flex items-center justify-between border-b border-[#1E293B]/40 pb-1">
+                            <span className="text-[10px] font-bold text-slate-200 truncate max-w-[70%]">
+                              {pIdx === 0 ? "★ " : "🛰️ "}{pl.name}
+                            </span>
+                            <span className="text-[8px] text-slate-500 font-mono">
+                              [{pl.sectorX}, {pl.sectorY}]
+                            </span>
+                          </div>
+                          
+                          {/* Base HP / Combat Values */}
+                          <div className="grid grid-cols-2 gap-1 text-[8.5px] font-mono">
+                            <div className="text-blue-400 font-bold">🛡️ DEF: {baseDefHp.toLocaleString()} HP</div>
+                            <div className="text-orange-400 font-bold text-right">⚔️ ATK: {baseAtkHp.toLocaleString()} HP</div>
+                          </div>
+                          
+                          {/* Base Troops */}
+                          <div className="pt-1 border-t border-[#1E293B]/20">
+                            {activeBaseTroops.length === 0 ? (
+                              <div className="text-[8px] text-slate-600 italic">No garrison forces active.</div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[8.5px] text-slate-400 font-sans">
+                                {activeBaseTroops.map(([type, qty]) => (
+                                  <div key={type} className="flex justify-between">
+                                    <span className="truncate pr-1">{TROOP_NAME_MAPPING[type] || type}:</span>
+                                    <span className="font-bold text-slate-300 font-mono">{(Number(qty) || 0).toLocaleString()}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Total cumulative HP footer */}

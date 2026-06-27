@@ -217,8 +217,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
   // Sections collapse states
   const [showRadar, setShowRadar] = useState(false);
-  const [showExtractorsSec, setShowExtractorsSec] = useState(false);
-  const [showStructures, setShowStructures] = useState(false);
+  const [showExtractorsSec, setShowExtractorsSec] = useState(true);
+  const [showStructures, setShowStructures] = useState(true);
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(null);
 
   const getRequiredFabricatorLevel = (key: string): number => {
@@ -905,26 +905,17 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
       {/* resource mines category list */}
       <div className="border border-cyan-500/35 bg-[#0C1425]/60 p-4 rounded-2xl mb-8 shadow-[0_0_20px_rgba(34,211,238,0.12)] ring-1 ring-cyan-500/10 hover:shadow-[0_0_25px_rgba(34,211,238,0.22)] transition duration-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-cyan-500/25 pb-3" id="extractors_header">
-          <button
-            onClick={() => setShowExtractorsSec(!showExtractorsSec)}
-            className="flex-1 flex items-center justify-between text-left hover:brightness-110 transition duration-150 cursor-pointer group"
-            type="button"
-          >
+          <div className="flex-1 flex items-center justify-between text-left">
             <div>
               <h3 className="text-xs font-black uppercase tracking-widest text-cyan-300 font-mono flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-200 mr-1.5 animate-pulse border border-cyan-400/40 text-[9.5px]">⚡ COMMAND ACTIVE</span>
                 Resource Extractors (Max Level: {maxExtractorLevel})
-                {showExtractorsSec ? (
-                  <ChevronUp size={14} className="text-cyan-400 group-hover:scale-110 transition" />
-                ) : (
-                  <ChevronDown size={14} className="text-cyan-400 group-hover:scale-110 transition" />
-                )}
               </h3>
               <p className="text-[10px] text-cyan-400/70 font-sans mt-1 leading-relaxed">
                 Maximum extractors level: <strong className="text-white">{maxExtractorLevel}</strong> for this station (Level 25 for Main ★, Level 20 for Secondary ★★, Level 15 for Colonies).
               </p>
             </div>
-          </button>
+          </div>
           <button
             onClick={() => handleOpenBoostModal("all", -1)}
             className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 hover:shadow-[0_0_15px_rgba(245,158,11,0.55)] border border-amber-400/40 rounded-xl transition duration-150 font-mono text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer self-start sm:self-auto hover:scale-105"
@@ -1173,20 +1164,11 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
       {/* base buildings infrastructure */}
       <div className="border border-indigo-500/35 bg-[#0C1425]/60 p-4 rounded-2xl mb-8 shadow-[0_0_20px_rgba(99,102,241,0.12)] ring-1 ring-indigo-500/10 hover:shadow-[0_0_25px_rgba(99,102,241,0.22)] transition duration-300">
-        <button
-          onClick={() => setShowStructures(!showStructures)}
-          className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-indigo-500/25 pb-3 text-left hover:brightness-110 transition duration-150 cursor-pointer group"
-          type="button"
-        >
+        <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-indigo-500/25 pb-3 text-left">
           <div>
             <h3 className="text-xs font-black uppercase tracking-widest text-indigo-350 font-mono flex items-center gap-2">
               <span className="px-2 py-0.5 rounded bg-indigo-500/25 text-indigo-200 mr-1.5 animate-pulse border border-indigo-400/40 text-[9.5px]">🏯 INFRASTRUCTURE</span>
               Established Structures ({constructedBuildings.length})
-              {showStructures ? (
-                <ChevronUp size={14} className="text-indigo-400 group-hover:scale-110 transition inline" />
-              ) : (
-                <ChevronDown size={14} className="text-indigo-400 group-hover:scale-110 transition inline" />
-              )}
             </h3>
             <p className="text-[10px] text-indigo-400/70 font-sans mt-1 leading-relaxed">
               Sovereign base facilities, resource repositories, and control command matrices constructed on this site.
@@ -1195,7 +1177,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
           <span className="text-[10.5px] text-indigo-300 font-mono font-bold bg-indigo-500/20 border border-indigo-500/30 px-2.5 py-1 rounded-xl shrink-0 self-start sm:self-auto">
             ({constructedBuildings.length} Facilities Built)
           </span>
-        </button>
+        </div>
         {showStructures && (
           <div className="space-y-4">
             {constructedBuildings.map(([bKey, val]) => {

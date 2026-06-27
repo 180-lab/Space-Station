@@ -343,7 +343,7 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number, isF
   const createMines = (count: number): MineState[] => {
     return Array.from({ length: count }, (_, i) => ({
       index: i,
-      level: isFirstStation ? 25 : 0,
+      level: isFirstStation ? 25 : 1,
       isUpgrading: false,
       upgradeEnd: null,
       health: 100

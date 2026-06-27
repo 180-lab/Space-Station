@@ -252,6 +252,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     return localStorage.getItem('moonbase_attack_notifications_enabled') !== 'false';
   });
 
+  // Secure Comms warnings toggle
+  const [commsNotificationsEnabled, setCommsNotificationsEnabled] = useState(() => {
+    return localStorage.getItem('moonbase_comms_notifications_enabled') !== 'false';
+  });
+
   // Track state changes to persist
   useEffect(() => {
     localStorage.setItem('moonbase_sound_enabled', String(soundEnabled));
@@ -272,6 +277,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   useEffect(() => {
     localStorage.setItem('moonbase_attack_notifications_enabled', String(attackNotificationsEnabled));
   }, [attackNotificationsEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem('moonbase_comms_notifications_enabled', String(commsNotificationsEnabled));
+  }, [commsNotificationsEnabled]);
 
   const handleResetApp = () => {
     setConfirmModal({
@@ -583,6 +592,29 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     }`}
                   >
                     {attackNotificationsEnabled ? 'ACTIVE' : 'BLOCKED'}
+                  </button>
+                </div>
+
+                {/* Secure Comms Message Notifications */}
+                <div className="flex items-start justify-between gap-4 pt-1">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-200 block uppercase">Secure Comms Message Alerts</span>
+                    <p className="text-[10.5px] text-slate-500 leading-relaxed font-sans">
+                      Shows overlay notices and alerts when new quantum-transceiver messages arrive from other station commanders.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setCommsNotificationsEnabled(!commsNotificationsEnabled);
+                      showToast(`Secure Comms alerts ${!commsNotificationsEnabled ? 'authorized' : 'suppressed'}`, 'info');
+                    }}
+                    className={`py-1.5 px-3 rounded-lg border text-[10px] font-bold uppercase tracking-wider shrink-0 transition ${
+                      commsNotificationsEnabled 
+                        ? 'bg-emerald-950/20 text-emerald-400 border-emerald-500/30' 
+                        : 'bg-slate-950 text-slate-500 border-slate-900'
+                    }`}
+                  >
+                    {commsNotificationsEnabled ? 'ACTIVE' : 'BLOCKED'}
                   </button>
                 </div>
 
