@@ -518,7 +518,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   const armyBaseLevel = activePlanet.buildings.armyBase?.level || 0;
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-1.5 pb-24">
       {/* Overview stats centerpiece */}
       <div className="p-6 rounded-xl border border-[#1E293B] bg-[#0A0F1D]/90 backdrop-blur-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -631,7 +631,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
       {/* SUB-VIEW 1: TROOPS VIEW (See army, stats, division graphs) */}
       {subTab === 'troops' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-1.5 animate-fade-in">
           {/* Integrated Armed Force Tactical Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 bg-[#0A0F1D]/65 border border-[#1E293B] rounded-xl flex items-center gap-3.5" title="Defense Absorption: Defense/shield strength point total absorbing enemy scans and raids.">
@@ -798,7 +798,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
       {/* SUB-VIEW 2: FABRICATE RECRUITING MODULE (Original full control flow) */}
       {subTab === 'fabricate' && (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-1.5 animate-fade-in">
           {/* Active Training Queues Drop Down Box like resources */}
           <div className="border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md overflow-hidden transition-all duration-200 shadow-md">
             {/* Accordion Trigger */}
@@ -1237,7 +1237,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
       {/* SUB-VIEW 3: FLEET COMMAND VIEW */}
       {subTab === 'fleet' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-1.5 animate-fade-in">
           {/* Main Title Banner */}
           <div className="p-5 bg-gradient-to-r from-emerald-950/20 to-teal-950/20 border border-emerald-500/20 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="space-y-1 text-left">

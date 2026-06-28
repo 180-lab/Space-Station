@@ -852,7 +852,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   };
 
   return (
-    <div className="bg-gradient-to-b from-[#0F172A] to-[#020617] border border-cyan-500/20 rounded-2xl shadow-[0_0_20px_rgba(34,211,238,0.05)] overflow-hidden font-mono mb-6 transition-all duration-300">
+    <div className="bg-gradient-to-b from-[#0F172A] to-[#020617] border border-cyan-500/20 rounded-2xl shadow-[0_0_20px_rgba(34,211,238,0.05)] overflow-hidden font-mono transition-all duration-300">
       {/* Header bar */}
       <div 
         onClick={() => setIsCollapsed(!isCollapsed)}

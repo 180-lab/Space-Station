@@ -446,7 +446,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 font-mono animate-fade-in pb-16">
+    <div className="max-w-4xl mx-auto space-y-1.5 font-mono animate-fade-in pb-16">
       {/* Header Banner */}
       <div className="p-6 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
         <div className="space-y-1">
@@ -496,7 +496,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       </div>
 
       {subTab === 'faq' ? (
-        <div className="space-y-4 text-left animate-fade-in">
+        <div className="space-y-1.5 text-left animate-fade-in">
           {/* FAQ database search box and title */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1E293B]/60 pb-3 gap-3">
             <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2">
@@ -592,7 +592,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
             </p>
           </div>
         ) : (
-          <div className="space-y-4 text-left">
+          <div className="space-y-1.5 text-left">
             <div className="flex items-center justify-between border-b border-[#1E293B]/60 pb-3">
               <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2">
                 <Award size={14} /> Technology Research Projects

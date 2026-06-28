@@ -688,7 +688,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
   // Leaderboard formatting helpers
   const rankedState = Object.values(alliances) as Alliance[];  return (
-    <div className="space-y-8 pb-24 font-mono">
+    <div className="space-y-1.5 pb-24 font-mono">
       {/* Visual Navigation Pill Bars as a 2-rowed layout assembly to fit mobile viewports exactly */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-1 bg-[#0A0F1D] p-1.5 rounded-xl border border-[#1E293B] shrink-0 text-[10px] sm:text-xs">
         <button 
@@ -747,7 +747,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             </p>
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-1.5">
           {/* Coordinates Search */}
           <form onSubmit={handleSearchSubmit} className="p-4 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="flex-1 grid grid-cols-2 gap-3 text-xs">
@@ -1149,7 +1149,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         }
 
         return (
-          <div className="space-y-4">
+          <div className="space-y-1.5">
             {/* Always Show Your Rank First */}
             <div className="p-4 bg-gradient-to-r from-cyan-950/45 via-blue-950/20 to-[#0A0F1D]/80 border border-cyan-500/30 rounded-xl flex flex-col xl:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3 self-start xl:self-center">
@@ -1352,7 +1352,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
       {/* SUB TAB 3: ALLIANCE & CHAT */}
       {subTab === 'comms' && (
-        <div className="space-y-6">
+        <div className="space-y-1.5">
           {/* Alliance Command */}
           <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4">
             <div 
@@ -1757,7 +1757,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
       {/* SUB TAB 4: NEWS TICKER & REPORTS */}
       {subTab === 'news' && (
-        <div className="space-y-6">
+        <div className="space-y-1.5">
           {/* Collapsible Drop Down Box 1: Combat Reports */}
           <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4">
             <div 
@@ -2471,7 +2471,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
       )}
 
       {subTab === 'fleets' && (
-        <div className="space-y-6">
+        <div className="space-y-1.5">
           {/* Section 1: Docking Bay / Stationed Troops */}
           <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4 text-left">
             <h3 className="text-sm font-bold uppercase tracking-widest text-[#5bc0be] inline-flex items-center gap-2">

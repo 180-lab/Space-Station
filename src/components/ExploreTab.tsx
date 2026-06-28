@@ -453,7 +453,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   }
 
   return (
-    <div className="space-y-8 pb-24" id="explore-tab-view">
+    <div className="space-y-1.5 pb-24" id="explore-tab-view">
       {/* 1. Station Details Header (with sector command tile text removed as requested) */}
       <div className="relative p-6 bg-gradient-to-b from-[#0F172A] to-black border border-white/5 rounded-xl overflow-hidden flex flex-col">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(34,211,238,0.05)_0%,_transparent_70%)] pointer-events-none"></div>
@@ -996,7 +996,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
       })()}
 
       {/* resource mines category list */}
-      <div className="border border-cyan-500/35 bg-[#0C1425]/60 p-4 rounded-2xl mb-8 shadow-[0_0_20px_rgba(34,211,238,0.12)] ring-1 ring-cyan-500/10 hover:shadow-[0_0_25px_rgba(34,211,238,0.22)] transition duration-300">
+      <div className="border border-cyan-500/35 bg-[#0C1425]/60 p-4 rounded-2xl shadow-[0_0_20px_rgba(34,211,238,0.12)] ring-1 ring-cyan-500/10 hover:shadow-[0_0_25px_rgba(34,211,238,0.22)] transition duration-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-cyan-500/25 pb-3" id="extractors_header">
           <div className="flex-1 flex items-center justify-between text-left">
             <div>
@@ -1256,7 +1256,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
       </div>
 
       {/* base buildings infrastructure */}
-      <div className="border border-indigo-500/35 bg-[#0C1425]/60 p-4 rounded-2xl mb-8 shadow-[0_0_20px_rgba(99,102,241,0.12)] ring-1 ring-indigo-500/10 hover:shadow-[0_0_25px_rgba(99,102,241,0.22)] transition duration-300">
+      <div className="border border-indigo-500/35 bg-[#0C1425]/60 p-4 rounded-2xl shadow-[0_0_20px_rgba(99,102,241,0.12)] ring-1 ring-indigo-500/10 hover:shadow-[0_0_25px_rgba(99,102,241,0.22)] transition duration-300">
         <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-indigo-500/25 pb-3 text-left">
           <div>
             <h3 className="text-xs font-black uppercase tracking-widest text-indigo-350 font-mono flex items-center gap-2">

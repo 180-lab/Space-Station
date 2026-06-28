@@ -414,13 +414,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 font-mono animate-fade-in pb-16 text-left">
+    <div className="max-w-4xl mx-auto space-y-1.5 font-mono animate-fade-in pb-16 text-left">
       {/* Header Banner */}
       <div className="p-4 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-xl flex justify-between items-center shadow-xl">
         <h2 className="text-xs font-black text-white tracking-widest uppercase">TRANSMISSION LINK SETTINGS</h2>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
         
         {/* Core View Preferences (Left Panel) */}
         <div className="p-5 bg-[#0A0F1D] border border-[#1E293B] rounded-2xl space-y-5 shadow-lg flex flex-col justify-start">
@@ -996,7 +996,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </button>
 
         {showFeedbackConsole && (
-          <div className="space-y-6 pt-1">
+          <div className="space-y-1.5 pt-1">
             {/* Conditional Layout: 2 Columns for Admin Banele, 1 Full-Width Column for regular players */}
             {(() => {
               const isBanele = player.googleEmail && player.googleEmail.toLowerCase() === 'banele180@gmail.com';
