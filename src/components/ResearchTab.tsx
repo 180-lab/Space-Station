@@ -30,6 +30,7 @@ interface ResearchTabProps {
   theme?: 'normal' | 'light' | 'dark';
   setTheme?: (val: 'normal' | 'light' | 'dark') => void;
   localResources?: Record<ResourceType, number>;
+  onRefreshState?: () => void;
 }
 
 interface TechDef {
@@ -159,7 +160,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   showToast,
   theme,
   setTheme,
-  localResources
+  localResources,
+  onRefreshState
 }) => {
   const rc = activePlanet.buildings.researchCenter;
   const targetLvl = rc.level + 1;
@@ -209,39 +211,45 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   const [faqSearch, setFaqSearch] = useState('');
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
 
-  // Synchronize state when active planet changes
+  // Synchronize state when active planet changes, player's server-side tech levels, etc.
   useEffect(() => {
     const isFirstPlanet = player.planets[0]?.id === activePlanet.id;
+    let serverTechs: Record<string, number> = {};
+    if (player.techLevels && player.techLevels[activePlanet.id]) {
+      serverTechs = player.techLevels[activePlanet.id];
+    }
+
     try {
       const data = localStorage.getItem(`moonbase_tech_${player.id}_${activePlanet.id}`);
-      if (data) {
-        const parsed = JSON.parse(data);
-        if (parsed.defense_shields === undefined) parsed.defense_shields = isFirstPlanet ? 20 : 0;
-        if (parsed.manufacturing_speed === undefined) parsed.manufacturing_speed = isFirstPlanet ? 20 : 0;
-        if (parsed.troop_speed === undefined) parsed.troop_speed = isFirstPlanet ? 20 : 0;
-        setTechLevels(parsed);
-      } else {
-        setTechLevels({
-          defense_shields: isFirstPlanet ? 20 : 0,
-          manufacturing_speed: isFirstPlanet ? 20 : 0,
-          troop_speed: isFirstPlanet ? 20 : 0
-        });
-      }
+      let localTechs = data ? JSON.parse(data) : {};
+      
+      const mergedTechs = {
+        defense_shields: isFirstPlanet ? 20 : 0,
+        manufacturing_speed: isFirstPlanet ? 20 : 0,
+        troop_speed: isFirstPlanet ? 20 : 0,
+        ...localTechs,
+        ...serverTechs
+      };
+      setTechLevels(mergedTechs);
+      localStorage.setItem(`moonbase_tech_${player.id}_${activePlanet.id}`, JSON.stringify(mergedTechs));
     } catch {
       setTechLevels({
         defense_shields: isFirstPlanet ? 20 : 0,
         manufacturing_speed: isFirstPlanet ? 20 : 0,
-        troop_speed: isFirstPlanet ? 20 : 0
+        troop_speed: isFirstPlanet ? 20 : 0,
+        ...serverTechs
       });
     }
 
-    try {
-      const data = localStorage.getItem(`moonbase_activeres_${player.id}_${activePlanet.id}`);
-      setActiveResearch(data ? JSON.parse(data) : null);
-    } catch {
+    if (activePlanet.activeResearch) {
+      setActiveResearch({
+        techId: activePlanet.activeResearch.techId,
+        endAt: activePlanet.activeResearch.endAt
+      });
+    } else {
       setActiveResearch(null);
     }
-  }, [activePlanet.id, player.id]);
+  }, [activePlanet.id, player.id, player.techLevels, activePlanet.activeResearch]);
 
   useEffect(() => {
     localStorage.setItem(`moonbase_tech_${player.id}_${activePlanet.id}`, JSON.stringify(techLevels));
@@ -265,8 +273,11 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       }));
       setActiveResearch(null);
       showToast(`RESEARCH COMPLETE: ${TECHS.find(t => t.id === techId)?.name} upgraded!`, 'success');
+      if (onRefreshState) {
+        onRefreshState();
+      }
     }
-  }, [serverTime, activeResearch, showToast]);
+  }, [serverTime, activeResearch, showToast, onRefreshState]);
 
   const getTimerString = (endTimestamp: number | null) => {
     if (!endTimestamp) return '';
@@ -291,46 +302,120 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
     return costs;
   };
 
-  const startResearch = (techId: string) => {
+  const startResearch = async (techId: string) => {
     if (activeResearch) {
       showToast('Another quantum research project is currently in progress.', 'error');
       return;
     }
     const tech = TECHS.find(t => t.id === techId)!;
     const maxTechLvl = 20;
-    const currentLvl = techLevels[techId] || 1;
+    const currentLvl = techLevels[techId] || 0;
     if (currentLvl >= maxTechLvl) {
       showToast(`This technology has reached max core level of ${maxTechLvl}!`, 'error');
       return;
     }
-    const cost = getTechCost(tech, currentLvl);
 
-    // Verify resources
-    const resources = localResources || activePlanet.resources;
-    const canAfford = Object.entries(cost).every(([res, amount]) => (resources[res as ResourceType] || 0) >= amount);
+    try {
+      const res = await fetch('/api/upgrade/research/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({
+          planetId: activePlanet.id,
+          techId,
+          currentLevel: currentLvl
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to start research project.', 'error');
+        return;
+      }
 
-    if (!canAfford) {
-      showToast('Insufficient active station fluids to authorize research!', 'error');
+      showToast(`Authorizing telemetry files for ${tech.name} upgrade!`, 'success');
+      localStorage.setItem(`tech_researched_${player.id}`, 'true');
+      localStorage.setItem(`moonbase_activeres_${player.id}`, 'true');
+      if (onRefreshState) onRefreshState();
+    } catch {
+      showToast('Connection error starting research.', 'error');
+    }
+  };
+
+  const queueResearch = async (techId: string) => {
+    const tech = TECHS.find(t => t.id === techId)!;
+    const maxTechLvl = 20;
+    const currentLvl = techLevels[techId] || 0;
+    
+    let queuedCount = 0;
+    if (activePlanet.activeResearch && activePlanet.activeResearch.techId === techId) {
+      queuedCount++;
+    }
+    if (activePlanet.upgradeQueue) {
+      queuedCount += activePlanet.upgradeQueue.filter(q => q.type === 'research' && q.key === techId).length;
+    }
+    const targetLvl = currentLvl + queuedCount + 1;
+
+    if (targetLvl > maxTechLvl) {
+      showToast(`This technology has reached max core level of ${maxTechLvl}!`, 'error');
       return;
     }
 
-    // Deduct resources locally (simulated since tech isn't fully server-side, but standard sync handles base buildings)
-    // To make it look incredibly real, we can trigger active project!
-    Object.entries(cost).forEach(([res, amount]) => {
-      if (localResources) {
-        localResources[res as ResourceType] -= amount;
-      }
-      activePlanet.resources[res as ResourceType] -= amount;
-    });
+    if ((player.credits || 0) < 25) {
+      showToast('Insufficient Space Gold! Queuing research costs 25 Space Gold.', 'error');
+      return;
+    }
 
-    const durationMs = currentLvl * 60 * 1000; // 1 minute per level
-    setActiveResearch({
-      techId,
-      endAt: Date.now() + durationMs
-    });
-    localStorage.setItem(`tech_researched_${player.id}`, 'true');
-    localStorage.setItem(`moonbase_activeres_${player.id}`, 'true');
-    showToast(`Authorizing telemetry files for ${tech.name} upgrade!`, 'success');
+    try {
+      const res = await fetch('/api/upgrade/research/queue', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({
+          planetId: activePlanet.id,
+          techId,
+          currentLevel: currentLvl
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to queue research project.', 'error');
+        return;
+      }
+
+      showToast(`Successfully queued ${tech.name} upgrade to level ${targetLvl}!`, 'success');
+      if (onRefreshState) onRefreshState();
+    } catch {
+      showToast('Connection error queuing research.', 'error');
+    }
+  };
+
+  const cancelQueueItem = async (index: number) => {
+    try {
+      const res = await fetch('/api/upgrade/queue/cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({
+          planetId: activePlanet.id,
+          queueIndex: index
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to cancel queued item.', 'error');
+        return;
+      }
+      showToast('Queued project cancelled. Resources and 60% Space Gold refunded!', 'success');
+      if (onRefreshState) onRefreshState();
+    } catch {
+      showToast('Connection error cancelling project.', 'error');
+    }
   };
 
   const handleCompleteBuildingUpgrade = async () => {
@@ -361,7 +446,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 font-mono animate-fade-in pb-16">
+    <div className="max-w-4xl mx-auto space-y-1.5 font-mono animate-fade-in pb-16">
       {/* Header Banner */}
       <div className="p-6 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
         <div className="space-y-1">
@@ -411,7 +496,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       </div>
 
       {subTab === 'faq' ? (
-        <div className="space-y-4 text-left animate-fade-in">
+        <div className="space-y-1.5 text-left animate-fade-in">
           {/* FAQ database search box and title */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1E293B]/60 pb-3 gap-3">
             <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2">
@@ -507,7 +592,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
             </p>
           </div>
         ) : (
-          <div className="space-y-4 text-left">
+          <div className="space-y-1.5 text-left">
             <div className="flex items-center justify-between border-b border-[#1E293B]/60 pb-3">
               <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2">
                 <Award size={14} /> Technology Research Projects
@@ -519,12 +604,60 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
               )}
             </div>
 
+            {/* Active and Queued Upgrades Dashboard inside Research Tab */}
+            {activePlanet.upgradeQueue && activePlanet.upgradeQueue.length > 0 && (
+              <div className="mb-4 p-4.5 bg-[#0D1527] border border-[#1E293B]/60 rounded-xl space-y-3 shadow-inner">
+                <span className="text-[10px] text-cyan-400 font-mono font-bold uppercase tracking-wider block">
+                  📍 Active Research & Construction Queue Pipeline
+                </span>
+                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  {activePlanet.upgradeQueue.map((q, idx) => {
+                    const costRefund = Math.round((q.spaceGoldCost || (q.type === 'research' ? 25 : 15)) * 0.6);
+                    return (
+                      <div key={idx} className="flex items-center justify-between p-2.5 bg-[#070B16] border border-[#1E293B]/40 rounded-lg">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-xs font-bold text-white bg-slate-800 px-2 py-0.5 rounded-md text-[10px] font-mono">
+                            #{idx + 1}
+                          </span>
+                          <div>
+                            <p className="text-[11px] font-semibold text-slate-200 capitalize">
+                              {q.type} Upgrade: <span className="text-cyan-400 font-mono">{q.key.replace(/_/g, ' ')}</span> (Level {q.targetLevel})
+                            </p>
+                            <p className="text-[9.5px] text-slate-500 font-mono">
+                              Queued with {q.spaceGoldCost || (q.type === 'research' ? 25 : 15)} Space Gold | Refund value: {costRefund} Gold
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => cancelQueueItem(idx)}
+                          className="px-2 py-1 text-[9.5px] font-bold text-red-400 hover:text-red-300 border border-red-500/10 hover:border-red-500/30 bg-red-950/10 rounded cursor-pointer transition font-mono uppercase"
+                        >
+                          Cancel Queue
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {TECHS.map(tech => {
-                const currentLvl = techLevels[tech.id] || 1;
+                const currentLvl = techLevels[tech.id] || 0;
                 const maxLvl = 20;
                 const isMax = currentLvl >= maxLvl;
                 const costs = getTechCost(tech, currentLvl);
+
+                // Calculate next target level taking queue into account
+                let queuedCount = 0;
+                if (activeResearch && activeResearch.techId === tech.id) {
+                  queuedCount++;
+                }
+                if (activePlanet.upgradeQueue) {
+                  queuedCount += activePlanet.upgradeQueue.filter(q => q.type === 'research' && q.key === tech.id).length;
+                }
+                const targetLvl = currentLvl + queuedCount + 1;
 
                 return (
                   <div 
@@ -565,26 +698,48 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
                     )}
 
                     {activeResearch?.techId === tech.id ? (
-                      <div className="py-2 text-center bg-amber-950/30 border border-amber-900/20 rounded-xl text-amber-400 text-[10px] font-bold animate-pulse font-mono uppercase tracking-widest flex items-center justify-center gap-1.5">
-                        <Clock size={11} className="animate-spin" /> Telemetry Processing ({getTimerString(activeResearch.endAt)})
+                      <div className="space-y-2">
+                        <div className="py-2 text-center bg-amber-950/30 border border-amber-900/20 rounded-xl text-amber-400 text-[10px] font-bold animate-pulse font-mono uppercase tracking-widest flex items-center justify-center gap-1.5">
+                          <Clock size={11} className="animate-spin" /> Telemetry Processing ({getTimerString(activeResearch.endAt)})
+                        </div>
+                        {targetLvl <= maxLvl && (
+                          <button
+                            type="button"
+                            onClick={() => queueResearch(tech.id)}
+                            className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/50 text-amber-400 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono transition cursor-pointer flex items-center justify-center gap-1"
+                          >
+                            <span>Queue Level {targetLvl}</span>
+                            <span className="text-[9px] text-amber-500 font-normal">(25 Gold)</span>
+                          </button>
+                        )}
                       </div>
                     ) : isMax ? (
                       <div className="py-2 text-center bg-emerald-950/20 border border-emerald-900/20 text-emerald-400 text-[10px] uppercase font-bold tracking-widest rounded-xl">
                         🏆 MAX EXPERTISE
                       </div>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => startResearch(tech.id)}
-                        disabled={!!activeResearch}
-                        className={`w-full py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono border transition ${
-                          activeResearch 
-                            ? 'border-slate-900 bg-slate-950 text-slate-650 opacity-40 cursor-not-allowed'
-                            : 'border-cyan-500/30 bg-cyan-950/20 text-cyan-400 hover:bg-cyan-950/40 hover:border-cyan-500 cursor-pointer'
-                        }`}
-                      >
-                        Initialize Research
-                      </button>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startResearch(tech.id)}
+                          disabled={!!activeResearch}
+                          className={`w-full py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono border transition ${
+                            activeResearch 
+                              ? 'border-slate-900 bg-slate-950 text-slate-650 opacity-40 cursor-not-allowed'
+                              : 'border-cyan-500/30 bg-cyan-950/20 text-cyan-400 hover:bg-cyan-950/40 hover:border-cyan-500 cursor-pointer'
+                          }`}
+                        >
+                          Initialize Research
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => queueResearch(tech.id)}
+                          className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/50 text-amber-400 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono transition cursor-pointer flex items-center justify-center gap-1"
+                        >
+                          <span>Queue Level {targetLvl}</span>
+                          <span className="text-[9px] text-amber-500 font-normal">(25 Gold)</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 );

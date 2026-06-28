@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ColonyPlanet, PlayerProfile, ResourceType, getUpgradeResourceCost, FleetMission, BuildingState, ChatMessage } from '../types';
+import { CommanderTutorial } from './CommanderTutorial';
 import { 
   Droplet, 
   Flame, 
@@ -112,6 +113,10 @@ interface ExploreTabProps {
   chatMessages: ChatMessage[];
   onSendChat: (channel: 'global' | 'alliance' | 'private', content: string, receiverId?: string) => void;
   localResources?: Record<ResourceType, number>;
+  setActiveTab: (tab: any) => void;
+  showStationsTop?: boolean;
+  setSelectedPlanetId?: (planetId: string) => void;
+  customTasks?: Record<string, any>;
 }
 
 const RESOURCE_INFO: Record<ResourceType, { name: string; color: string; icon: any; desc: string }> = {
@@ -147,7 +152,11 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   onNavigateToLeaderboard,
   chatMessages,
   onSendChat,
-  localResources = activePlanet.resources
+  localResources = activePlanet.resources,
+  setActiveTab,
+  showStationsTop,
+  setSelectedPlanetId,
+  customTasks
 }) => {
   const [expandedCategory, setExpandedCategory] = useState<ResourceType | null>(null);
   const [restoringKeys, setRestoringKeys] = useState<Record<string, boolean>>({});
@@ -217,8 +226,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
   // Sections collapse states
   const [showRadar, setShowRadar] = useState(false);
-  const [showExtractorsSec, setShowExtractorsSec] = useState(false);
-  const [showStructures, setShowStructures] = useState(false);
+  const [showExtractorsSec, setShowExtractorsSec] = useState(true);
+  const [showStructures, setShowStructures] = useState(true);
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(null);
 
   const getRequiredFabricatorLevel = (key: string): number => {
@@ -233,11 +242,13 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   const fabLevel = activePlanet.buildings.fabricator?.level || 0;
 
   const constructedBuildings = Object.entries(activePlanet.buildings).filter(([bKey, val]: [string, any]) => {
-    return val.level > 0 || val.isUpgrading;
+    const isQueued = activePlanet.upgradeQueue?.some((item: any) => item.type === 'building' && item.key === bKey);
+    return val.level > 0 || val.isUpgrading || isQueued;
   });
 
   const unconstructedBuildings = Object.entries(activePlanet.buildings).filter(([bKey, val]: [string, any]) => {
-    return val.level === 0 && !val.isUpgrading;
+    const isQueued = activePlanet.upgradeQueue?.some((item: any) => item.type === 'building' && item.key === bKey);
+    return val.level === 0 && !val.isUpgrading && !isQueued;
   });
 
   const visibleBlueprints = unconstructedBuildings.filter(([bKey]) => {
@@ -442,15 +453,92 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   }
 
   return (
-    <div className="space-y-8 pb-24" id="explore-tab-view">
-      {/* HUD Removed and Synced with App.tsx */}
-      <div className="hidden">
-      <div className="relative z-10 bg-[#0A0F1D]/60 backdrop-blur-sm border border-slate-800/65 rounded-2xl grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-7 p-5 justify-between">
+    <div className="space-y-1.5 pb-24" id="explore-tab-view">
+      {/* 1. Station Details Header (with sector command tile text removed as requested) */}
+      <div className="relative p-6 bg-gradient-to-b from-[#0F172A] to-black border border-white/5 rounded-xl overflow-hidden flex flex-col">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(34,211,238,0.05)_0%,_transparent_70%)] pointer-events-none"></div>
         
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex-1 min-w-0 text-left">
+            {isEditingName ? (
+              <div className="flex items-center gap-2 mt-1 max-w-md">
+                <input
+                  type="text"
+                  maxLength={30}
+                  value={newNameInput}
+                  onChange={(e) => setNewNameInput(e.target.value)}
+                  className="flex-1 px-3 py-1 bg-slate-950 border border-cyan-500/50 hover:border-cyan-500 focus:border-cyan-500 focus:outline-none text-sm text-white font-mono rounded-lg transition"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRenameActiveStation();
+                    if (e.key === 'Escape') {
+                      setIsEditingName(false);
+                      setNewNameInput(activePlanet.name);
+                    }
+                  }}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={handleRenameActiveStation}
+                  className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
+                  title="Save Name"
+                >
+                  <Check size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingName(false);
+                    setNewNameInput(activePlanet.name);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 rounded-lg transition cursor-pointer font-sans"
+                  title="Cancel"
+                >
+                  <span className="text-sm font-semibold select-none font-sans">✕</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 mt-1 group">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">{activePlanet.name}</h2>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingName(true)}
+                  className="p-1 px-2 text-[10px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/30 hover:bg-cyan-950/80 border border-cyan-500/20 hover:border-cyan-500/50 font-bold uppercase rounded-lg transition opacity-60 group-hover:opacity-100 flex items-center gap-1 cursor-pointer"
+                  title="Rename Station Base"
+                >
+                  <Edit2 size={10} /> Rename
+                </button>
+              </div>
+            )}
+            <div className="mt-2 text-xs text-slate-400 flex items-center gap-2 font-mono">
+              <span className={`inline-block w-2.5 h-2.5 rounded-full ${pulseDot} animate-pulse`} />
+              <span>Commander: <span className="text-slate-200 font-bold">{player.username}</span> &bull; {activePlanet.name} &bull; Sector Coord: [{activePlanet.sectorX}, {activePlanet.sectorY}]</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start md:self-auto">
+            {/* Active Sector Alerts indicator block */}
+            <button
+              id="alerts-hud-trigger"
+              onClick={() => setIsAlertsOpen(true)}
+              className={`p-3 border rounded-lg text-left font-mono min-w-[170px] cursor-pointer transition duration-150 hover:brightness-110 active:scale-95 flex flex-col justify-center ${alertsColor}`}
+            >
+              <span className="text-[9px] uppercase tracking-widest font-bold opacity-75">{alertsLabel}</span>
+              <span className="text-[11px] font-black uppercase mt-1 tracking-tight flex items-center gap-1.5 font-mono">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
+                {alertsValue}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Your Resource Count */}
+      <div className="bg-[#0A0F1D]/60 backdrop-blur-sm border border-slate-800/65 rounded-xl grid grid-cols-2 md:grid-cols-5 gap-0 p-0 divide-x divide-y md:divide-y-0 divide-slate-800/40 overflow-hidden">
         {/* Water Stat */}
-        <div className="flex flex-col animate-fade-in text-left" title="Water (H2O): Essential life fluid. Consumed continuously by troops to maintain Space Force strength. Hover/long press for info.">
+        <div className="flex flex-col p-4.5 sm:p-5 animate-fade-in text-left" title="Water (H2O): Essential life fluid. Consumed continuously by troops to maintain Space Force strength.">
           <div className="flex items-center gap-2 mb-1">
-            <Droplet size={12} className="text-cyan-400 animate-pulse" title="Water icon" />
+            <Droplet size={12} className="text-cyan-400 animate-pulse" />
             <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Water (H2O)</span>
           </div>
           <span className="text-base font-mono font-bold text-cyan-400">
@@ -466,9 +554,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
         </div>
 
         {/* Plasma Stat */}
-        <div className="flex flex-col animate-fade-in text-left" title="Plasma: High-energy matter. Essential for building complex spaceship hull grades and hyper-engines. Hover/long press for info.">
+        <div className="flex flex-col p-4.5 sm:p-5 animate-fade-in text-left header-divider-element-left" title="Plasma: High-energy matter. Essential for building complex spaceship hull grades and hyper-engines.">
           <div className="flex items-center gap-2 mb-1">
-            <Zap size={12} className="text-purple-400 animate-pulse" title="Plasma icon" />
+            <Zap size={12} className="text-purple-400 animate-pulse" />
             <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Plasma</span>
           </div>
           <span className="text-base font-mono font-bold text-purple-400">
@@ -484,9 +572,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
         </div>
 
         {/* Fuel Stat */}
-        <div className="flex flex-col animate-fade-in text-left" title="Fuel: Thermonuclear propulsion energy. Required for dispatching fleet traversals across global planetary sectors. Hover/long press for info.">
+        <div className="flex flex-col p-4.5 sm:p-5 animate-fade-in text-left border-t md:border-t-0 border-slate-800/40" title="Fuel: Thermonuclear propulsion energy. Required for dispatching fleet traversals across global planetary sectors.">
           <div className="flex items-center gap-2 mb-1">
-            <Flame size={12} className="text-amber-400 animate-pulse" title="Fuel icon" />
+            <Flame size={12} className="text-amber-400 animate-pulse" />
             <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Fuel</span>
           </div>
           <span className="text-base font-mono font-bold text-amber-400">
@@ -502,9 +590,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
         </div>
 
         {/* Food Stat */}
-        <div className="flex flex-col animate-fade-in text-left" title="Food: Life support proteins. Vital to sustaining personnel during active colonist station operations. Hover/long press for info.">
+        <div className="flex flex-col p-4.5 sm:p-5 animate-fade-in text-left border-t md:border-t-0 border-slate-800/40" title="Food: Life support proteins. Vital to sustaining personnel during active colonist station operations.">
           <div className="flex items-center gap-2 mb-1">
-            <Apple size={12} className="text-emerald-400 animate-pulse" title="Food icon" />
+            <Apple size={12} className="text-emerald-400 animate-pulse" />
             <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Food</span>
           </div>
           <span className="text-base font-mono font-bold text-emerald-400">
@@ -520,9 +608,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
         </div>
 
         {/* Respirant Stat */}
-        <div className="flex flex-col col-span-2 md:col-span-1 animate-fade-in text-left" title="Respirant (O2): Atmospheric gases. Powering life ventilation systems for astronauts and pilots. Hover/long press for info.">
+        <div className="flex flex-col col-span-2 md:col-span-1 p-4.5 sm:p-5 animate-fade-in text-left border-t md:border-t-0 border-slate-800/40" title="Respirant (O2): Atmospheric gases. Powering life ventilation systems for astronauts and pilots.">
           <div className="flex items-center gap-2 mb-1">
-            <Wind size={12} className="text-blue-400 animate-pulse" title="Respirant icon" />
+            <Wind size={12} className="text-blue-400 animate-pulse" />
             <span className="text-[10px] uppercase tracking-widest font-bold text-[#64748b] font-mono">Respirant (O2)</span>
           </div>
           <span className="text-base font-mono font-bold text-blue-400">
@@ -536,9 +624,227 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
             />
           </div>
         </div>
+      </div>
 
-      </div>
-      </div>
+      {isDehydrated && (
+        <div className="p-3 border border-red-900/50 bg-red-950/30 text-red-400 rounded-xl flex items-start gap-2.5 text-xs animate-pulse text-left" title="Critical Alert: High severity base warning">
+          <ShieldAlert size={16} className="shrink-0 mt-0.5 animate-bounce text-red-500" />
+          <div>
+            <p className="font-bold uppercase tracking-widest text-[10px]">CRITICAL NEGATIVE PRODUCTION (ATTRITION PASSIVE)</p>
+            <p className="text-red-300/80 leading-relaxed mt-0.5">Troops are suffering rapid attrition due to negative production! Upgrade resource extractors immediately built with deeper wells or dismiss excess troops.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Real-Time Fleets list (auto-populates if movements) */}
+      {(() => {
+        const outgoingFleets = fleets.filter((f) => f.senderId === player.id);
+        const incomingFleets = fleets.filter(
+          (f) => f.targetId === player.id && f.senderId !== player.id
+        );
+
+        if (outgoingFleets.length === 0 && incomingFleets.length === 0) {
+          return null;
+        }
+
+        return (
+          <div className="border border-[#1E293B] bg-[#0A0F1D]/80 backdrop-blur-md rounded-xl overflow-hidden mt-4">
+            <div className="p-5 border-b border-[#1E293B]/70 bg-black/40 flex items-center justify-between text-left">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
+                <h3 className="text-xs font-bold uppercase tracking-widest text-cyan-400 font-mono">
+                  Real-Time Fleet Radar Transits
+                </h3>
+              </div>
+              <span className="text-[10px] bg-[#05070A] text-slate-400 border border-[#1E293B] px-2.5 py-1 rounded-lg font-bold font-mono">
+                ACTIVE FLIGHTS: {outgoingFleets.length + incomingFleets.length}
+              </span>
+            </div>
+
+            <div className="p-5 bg-black/20 space-y-5">
+              {/* INCOMING RADAR FLARES/ATTACKS */}
+              {incomingFleets.length > 0 && (
+                <div className="space-y-3">
+                  <span className="text-[10px] font-bold tracking-wider text-red-400 uppercase font-mono flex items-center gap-1.5 animate-pulse text-left">
+                    <ShieldAlert size={12} className="text-red-400" />
+                    Warning: Incoming Military Signatures ({incomingFleets.length})
+                  </span>
+                  <div className="space-y-3 font-mono text-xs">
+                    {incomingFleets.map((fleet) => {
+                      const totalDuration = fleet.arrivesAt - fleet.startedAt;
+                      const elapsed = Math.max(0, serverTime - fleet.startedAt);
+                      const progressPercent = totalDuration > 0 ? Math.min(100, (elapsed / totalDuration) * 100) : 0;
+                      const secsRemaining = Math.max(0, Math.ceil((fleet.arrivesAt - serverTime) / 1000));
+
+                      return (
+                        <div key={fleet.id} className="p-4 border border-red-900/35 bg-red-950/10 rounded-xl space-y-3 text-left">
+                          <div className="flex justify-between items-start flex-wrap gap-2">
+                            <div>
+                              <span className={`font-black uppercase tracking-wide px-2 py-0.5 rounded text-[10px] ${fleet.missionType === 'attack' ? 'text-white bg-red-800' : 'text-slate-300 bg-white/5'}`}>
+                                INCOMING {fleet.missionType.toUpperCase()}
+                              </span>
+                              <span className="text-slate-400 font-bold block mt-2 text-[11px]">
+                                SENDER: {fleet.senderName}
+                              </span>
+                              <span className="text-slate-400 block mt-1">
+                                T-Route: [{fleet.senderCoords.x}, {fleet.senderCoords.y}] &rarr; [{fleet.targetCoords.x}, {fleet.targetCoords.y}]
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-red-400 font-black text-xs block">{getTimerString(fleet.arrivesAt)} remaining</span>
+                              <span className="text-slate-500 text-[9px] block">
+                                ({Math.floor(secsRemaining / 3600)}h {Math.floor((secsRemaining % 3600) / 60)}m {secsRemaining % 60}s remaining)
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Troops inside this fleet */}
+                          <div className="flex flex-wrap gap-1.5 text-[10px]">
+                            {Object.entries(fleet.troops).map(([tId, count]) => {
+                              if (!count) return null;
+                              return (
+                                <span key={tId} className="bg-red-950/40 border border-red-900/30 px-1.5 py-0.5 rounded uppercase font-bold text-red-300">
+                                  {tId}: {count}
+                                </span>
+                              );
+                            })}
+                          </div>
+
+                          {/* Visual Flight Bar */}
+                          <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5 relative">
+                            <div 
+                              className="bg-red-500 h-full rounded-full transition-all duration-300"
+                              style={{ width: `${progressPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* OUTGOING TROOPS */}
+              {outgoingFleets.length > 0 && (
+                <div className="space-y-3">
+                  <span className="text-[10px] font-bold tracking-wider text-cyan-400 uppercase font-mono flex items-center gap-1.5 text-left">
+                    Your Dispatched Troops ({outgoingFleets.length})
+                  </span>
+                  <div className="space-y-3 font-mono text-xs">
+                    {outgoingFleets.map((fleet) => {
+                      const totalDuration = fleet.arrivesAt - fleet.startedAt;
+                      const elapsed = Math.max(0, serverTime - fleet.startedAt);
+                      const progressPercent = totalDuration > 0 ? Math.min(100, (elapsed / totalDuration) * 100) : 0;
+                      const secsRemaining = Math.max(0, Math.ceil((fleet.arrivesAt - serverTime) / 1000));
+
+                      return (
+                        <div 
+                          key={fleet.id} 
+                          style={{ cursor: fleet.isWaitingToSettle ? 'pointer' : 'default' }}
+                          onClick={() => {
+                            if (fleet.isWaitingToSettle && onSettle) {
+                              onSettle(fleet.id);
+                            }
+                          }}
+                          className={`p-4 border rounded-xl space-y-3 transition duration-150 text-left ${
+                            fleet.isWaitingToSettle 
+                              ? 'border-emerald-500 bg-emerald-950/25 hover:border-emerald-400 hover:bg-emerald-950/35 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                              : 'border-[#1E293B] bg-[#05070A]/85'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start flex-wrap gap-2">
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`font-black uppercase tracking-wide px-2 py-0.5 rounded text-[10px] ${
+                                  fleet.isWaitingToSettle ? 'text-black bg-emerald-400' :
+                                  fleet.missionType === 'attack' ? 'text-red-400 bg-red-950/25' : 
+                                  fleet.missionType === 'colonize' ? 'text-amber-400 bg-amber-950/25' : 'text-blue-400 bg-blue-950/25'
+                                }`}>
+                                  {fleet.isWaitingToSettle ? 'SETTLEMENT ATTAINED' : `${fleet.missionType.toUpperCase()} DEPLOYMENT`}
+                                </span>
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-white/5 border border-white/5 text-slate-350 uppercase">
+                                  {fleet.isReturning ? 'Returning' : 'Outbound'}
+                                </span>
+                              </div>
+                              <span className="text-slate-400 block mt-2 text-[11px]">
+                                Target Coord: {fleet.targetName} [{fleet.targetCoords.x}, {fleet.targetCoords.y}]
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              {fleet.isWaitingToSettle ? (
+                                <span className="text-emerald-400 font-extrabold text-xs block animate-bounce font-mono">SECURED &bull; READY</span>
+                              ) : (
+                                <>
+                                  <span className="text-cyan-400 font-bold text-xs block">{getTimerString(fleet.arrivesAt)} remaining</span>
+                                  <span className="text-slate-500 text-[9px] block">
+                                    ({Math.floor(secsRemaining / 3600)}h {Math.floor((secsRemaining % 3600) / 60)}m {secsRemaining % 60}s remaining)
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Troops inside this fleet */}
+                          <div className="flex flex-wrap gap-1.5 text-[10px]">
+                            {Object.entries(fleet.troops).map(([tId, count]) => {
+                              if (!count) return null;
+                              return (
+                                <span key={tId} className="bg-[#0A0F1D] border border-[#1E293B] px-1.5 py-0.5 rounded uppercase font-bold text-slate-350 font-mono">
+                                  {tId}: {count}
+                                </span>
+                              );
+                            })}
+                          </div>
+
+                          {/* Flight Bar */}
+                          <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5 relative">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-350 ${
+                                fleet.isWaitingToSettle ? 'bg-emerald-500' :
+                                fleet.isReturning ? 'bg-yellow-500' :
+                                fleet.missionType === 'attack' ? 'bg-red-500' :
+                                fleet.missionType === 'colonize' ? 'bg-amber-500' : 'bg-blue-500'
+                              }`}
+                              style={{ width: `${progressPercent}%` }}
+                            />
+                          </div>
+
+                          {fleet.isWaitingToSettle && (
+                            <div className="pt-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onSettle) onSettle(fleet.id);
+                                }}
+                                className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] transition text-black font-extrabold uppercase tracking-wider text-[11px] rounded-lg animate-pulse"
+                              >
+                                ⚡ CLICK HERE TO SETTLE ON PLANET
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Tasks / Commander Tutorial */}
+      <CommanderTutorial 
+        player={player}
+        activePlanet={activePlanet}
+        fleets={fleets}
+        onRefreshState={onRefreshState || (() => {})}
+        showToast={showToast}
+        setActiveTab={setActiveTab}
+        chatMessages={chatMessages}
+        customTasks={customTasks}
+      />
 
       {/* Interactive Construction Queue Dashboard */}
         {(() => {
@@ -563,21 +869,60 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
           const totalActiveAndQueued = activeUpgrades.length + queueList.length;
           if (totalActiveAndQueued === 0) return null;
 
+          // Calculate total duration remaining of active and queued items
+          let totalTimeMs = 0;
+          const nowMs = Date.now();
+          
+          activeUpgrades.forEach(act => {
+            if (act.upgradeEnd > nowMs) {
+              totalTimeMs += (act.upgradeEnd - nowMs);
+            }
+          });
+          
+          queueList.forEach(q => {
+            const level = q.targetLevel || 1;
+            if (q.type === 'building') {
+              totalTimeMs += level * 120 * 1000;
+            } else {
+              totalTimeMs += level * 60 * 1000;
+            }
+          });
+
+          const formatTotalTime = (ms: number) => {
+            if (ms <= 0) return '0s';
+            const totalSecs = Math.ceil(ms / 1000);
+            const hrs = Math.floor(totalSecs / 3600);
+            const mins = Math.floor((totalSecs % 3600) / 60);
+            const secs = totalSecs % 60;
+            
+            const parts = [];
+            if (hrs > 0) parts.push(`${hrs}h`);
+            if (mins > 0) parts.push(`${mins}m`);
+            if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
+            return parts.join(' ');
+          };
+
           return (
             <div className="relative z-10 mt-4 p-4 border border-cyan-500/25 bg-cyan-950/10 rounded-2xl font-mono text-xs text-slate-350 shadow-inner">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-cyan-400 uppercase tracking-widest font-extrabold flex items-center gap-1.5 animate-pulse">
-                    <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full" />
-                    Station Construction Queue ({queueList.length}/25 queued)
-                  </span>
-                  {activeUpgrades.length > 0 && (
-                    <span className="text-[9px] bg-cyan-500/10 text-cyan-300 px-1.5 py-0.5 rounded font-bold uppercase">
-                      {activeUpgrades.length} Active
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-cyan-500/10 pb-3">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-cyan-400 uppercase tracking-widest font-extrabold flex items-center gap-1.5 animate-pulse">
+                      <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full" />
+                      Station Construction Queue ({queueList.length}/25 queued)
                     </span>
-                  )}
+                    {activeUpgrades.length > 0 && (
+                      <span className="text-[9px] bg-cyan-500/10 text-cyan-300 px-1.5 py-0.5 rounded font-bold uppercase">
+                        {activeUpgrades.length} Active
+                      </span>
+                    )}
+                  </div>
+                  {/* Estimated total duration for all queues to be done */}
+                  <span className="text-[10.5px] text-amber-400 font-extrabold flex items-center gap-1">
+                    ⌛ TOTAL REMAINING TIME: {formatTotalTime(totalTimeMs)}
+                  </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-end sm:self-auto">
                   <span className="text-[9px] text-slate-500 uppercase hidden sm:inline">Sequential Processing</span>
                   <button
                     onClick={() => setIsQueueMinimized(!isQueueMinimized)}
@@ -626,6 +971,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                     const bName = q.type === 'mine'
                       ? `${q.key.toUpperCase()} Extractor #${q.mineIndex! + 1}`
                       : q.key.toUpperCase();
+                    // Each upgrade queue time (1 min per level for mines, 2 min per level for buildings)
+                    const durationMins = q.targetLevel * (q.type === 'building' ? 2 : 1);
                     return (
                       <div key={`queued-${index}`} className="flex items-center justify-between bg-slate-900/30 hover:bg-slate-900/50 border border-slate-800 p-2 px-3 rounded-xl transition">
                         <div className="flex items-center gap-2">
@@ -634,251 +981,34 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                             {q.type === 'mine' ? '⛏️' : '🏗️'} {bName} &rarr; <span className="text-cyan-400 font-extrabold font-mono">Lv. {q.targetLevel}</span>
                           </span>
                         </div>
-                        <span className="text-[9px] text-slate-500 border border-slate-800 px-1.5 py-0.5 rounded uppercase">Pending</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-400 font-bold font-mono">⏳ {durationMins}m</span>
+                          <span className="text-[9px] text-slate-500 border border-slate-800 px-1.5 py-0.5 rounded uppercase">Pending</span>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-              )}
-            </div>
-          );
-        })()}
-
-      {/* TACTICAL METRIC FLIGHT RADAR - INCOMING AND OUTGOING FLEET OBSERVATIONS */}
-      {(() => {
-        const outgoingFleets = fleets.filter((f) => f.senderId === player.id);
-        const incomingFleets = fleets.filter(
-          (f) => f.targetId === player.id && f.senderId !== player.id
-        );
-
-        if (outgoingFleets.length === 0 && incomingFleets.length === 0) {
-          return null;
-        }
-
-        return (
-          <div className="border border-[#1E293B] bg-[#0A0F1D]/80 backdrop-blur-md rounded-xl overflow-hidden">
-            {/* Accordion Trigger Header */}
-            <button
-              onClick={() => setShowRadar(!showRadar)}
-              className="w-full p-5 flex items-center justify-between text-left transition hover:bg-white/[0.02]"
-              type="button"
-            >
-              <div className="flex items-center gap-2">
-                <span className="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
-                <h3 className="text-xs font-bold uppercase tracking-widest text-cyan-400 font-mono flex items-center gap-2">
-                  Tactical Radar
-                </h3>
-              </div>
-              <div className="flex items-center gap-3 font-mono">
-                <span className="text-[10px] bg-[#05070A] text-slate-400 border border-[#1E293B] px-2.5 py-1 rounded-lg font-bold">
-                  ACTIVE FLIGHTS: {outgoingFleets.length + incomingFleets.length}
-                </span>
-                {showRadar ? (
-                  <ChevronUp size={16} className="text-red-500" />
-                ) : (
-                  <ChevronDown size={16} className="text-emerald-500" />
-                )}
-              </div>
-            </button>
-
-            {showRadar && (
-              <div className="p-5 border-t border-[#1E293B] bg-black/20 space-y-5">
-                {/* INCOMING RADAR FLARES/ATTACKS */}
-                {incomingFleets.length > 0 && (
-                  <div className="space-y-3">
-                    <span className="text-[10px] font-bold tracking-wider text-red-400 uppercase font-mono flex items-center gap-1.5 animate-pulse">
-                      <ShieldAlert size={12} className="text-red-450 text-red-400" />
-                      Warning: Incoming Military Signatures ({incomingFleets.length})
-                    </span>
-                    <div className="space-y-3 font-mono text-xs">
-                      {incomingFleets.map((fleet) => {
-                        const totalDuration = fleet.arrivesAt - fleet.startedAt;
-                        const elapsed = Math.max(0, serverTime - fleet.startedAt);
-                        const progressPercent = totalDuration > 0 ? Math.min(100, (elapsed / totalDuration) * 100) : 0;
-                        const secsRemaining = Math.max(0, Math.ceil((fleet.arrivesAt - serverTime) / 1000));
-
-                        return (
-                          <div key={fleet.id} className="p-4 border border-red-900/35 bg-red-950/10 rounded-xl space-y-3">
-                            <div className="flex justify-between items-start flex-wrap gap-2">
-                              <div>
-                                <span className={`font-black uppercase tracking-wide px-2 py-0.5 rounded text-[10px] ${fleet.missionType === 'attack' ? 'text-white bg-red-800' : 'text-slate-300 bg-white/5'}`}>
-                                  INCOMING {fleet.missionType.toUpperCase()}
-                                </span>
-                                <span className="text-slate-400 font-bold block mt-2 text-[11px]">
-                                  SENDER: {fleet.senderName}
-                                </span>
-                                <span className="text-slate-400 block mt-1">
-                                  T-Route: [{fleet.senderCoords.x}, {fleet.senderCoords.y}] &rarr; [{fleet.targetCoords.x}, {fleet.targetCoords.y}]
-                                </span>
-                              </div>
-                              <div className="text-right">
-                                <span className="text-red-400 font-black text-xs block">{getTimerString(fleet.arrivesAt)} remaining</span>
-                                <span className="text-slate-500 text-[9px] block">
-                                  ({Math.floor(secsRemaining / 3600)}h {Math.floor((secsRemaining % 3600) / 60)}m {secsRemaining % 60}s remaining)
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Troops inside this fleet */}
-                            <div className="flex flex-wrap gap-1.5 text-[10px]">
-                              {Object.entries(fleet.troops).map(([tId, count]) => {
-                                if (!count) return null;
-                                return (
-                                  <span key={tId} className="bg-red-950/40 border border-red-900/30 px-1.5 py-0.5 rounded uppercase font-bold text-red-300">
-                                    {tId}: {count}
-                                  </span>
-                                );
-                              })}
-                            </div>
-
-                            {/* Visual Flight Bar */}
-                            <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5 relative">
-                              <div 
-                                className="bg-red-500 h-full rounded-full transition-all duration-300"
-                                style={{ width: `${progressPercent}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* OUTGOING TROOPS */}
-                {outgoingFleets.length > 0 && (
-                  <div className="space-y-3">
-                    <span className="text-[10px] font-bold tracking-wider text-cyan-400 uppercase font-mono">
-                      Your Dispatched Troops ({outgoingFleets.length})
-                    </span>
-                    <div className="space-y-3 font-mono text-xs">
-                      {outgoingFleets.map((fleet) => {
-                        const totalDuration = fleet.arrivesAt - fleet.startedAt;
-                        const elapsed = Math.max(0, serverTime - fleet.startedAt);
-                        const progressPercent = totalDuration > 0 ? Math.min(100, (elapsed / totalDuration) * 100) : 0;
-                        const secsRemaining = Math.max(0, Math.ceil((fleet.arrivesAt - serverTime) / 1000));
-
-                        return (
-                          <div 
-                            key={fleet.id} 
-                            style={{ cursor: fleet.isWaitingToSettle ? 'pointer' : 'default' }}
-                            onClick={() => {
-                              if (fleet.isWaitingToSettle && onSettle) {
-                                onSettle(fleet.id);
-                              }
-                            }}
-                            className={`p-4 border rounded-xl space-y-3 transition duration-150 ${
-                              fleet.isWaitingToSettle 
-                                ? 'border-emerald-500 bg-emerald-950/25 hover:border-emerald-400 hover:bg-emerald-950/35 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
-                                : 'border-[#1E293B] bg-[#05070A]/85'
-                            }`}
-                          >
-                            <div className="flex justify-between items-start flex-wrap gap-2">
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`font-black uppercase tracking-wide px-2 py-0.5 rounded text-[10px] ${
-                                    fleet.isWaitingToSettle ? 'text-black bg-emerald-400' :
-                                    fleet.missionType === 'attack' ? 'text-red-400 bg-red-950/25' : 
-                                    fleet.missionType === 'colonize' ? 'text-amber-400 bg-amber-950/25' : 'text-blue-400 bg-blue-950/25'
-                                  }}`}>
-                                    {fleet.isWaitingToSettle ? 'SETTLEMENT ATTAINED' : `${fleet.missionType.toUpperCase()} DEPLOYMENT`}
-                                  </span>
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-white/5 border border-white/5 text-slate-350 uppercase">
-                                    {fleet.isReturning ? 'Returning' : 'Outbound'}
-                                  </span>
-                                </div>
-                                <span className="text-slate-400 block mt-2 text-[11px]">
-                                  Target Coord: {fleet.targetName} [{fleet.targetCoords.x}, {fleet.targetCoords.y}]
-                                </span>
-                              </div>
-                              <div className="text-right">
-                                {fleet.isWaitingToSettle ? (
-                                  <span className="text-emerald-400 font-extrabold text-xs block animate-bounce">SECURED &bull; READY</span>
-                                ) : (
-                                  <>
-                                    <span className="text-cyan-400 font-bold text-xs block">{getTimerString(fleet.arrivesAt)} remaining</span>
-                                    <span className="text-slate-500 text-[9px] block">
-                                      ({Math.floor(secsRemaining / 3600)}h {Math.floor((secsRemaining % 3600) / 60)}m {secsRemaining % 60}s remaining)
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Troops inside this fleet */}
-                            <div className="flex flex-wrap gap-1.5 text-[10px]">
-                              {Object.entries(fleet.troops).map(([tId, count]) => {
-                                if (!count) return null;
-                                return (
-                                  <span key={tId} className="bg-[#0A0F1D] border border-[#1E293B] px-1.5 py-0.5 rounded uppercase font-bold text-slate-350">
-                                    {tId}: {count}
-                                  </span>
-                                );
-                              })}
-                            </div>
-
-                            {/* Flight Bar */}
-                            <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5 relative">
-                              <div 
-                                className={`h-full rounded-full transition-all duration-350 ${
-                                  fleet.isWaitingToSettle ? 'bg-emerald-500' :
-                                  fleet.isReturning ? 'bg-yellow-500' :
-                                  fleet.missionType === 'attack' ? 'bg-red-500' :
-                                  fleet.missionType === 'colonize' ? 'bg-amber-500' : 'bg-blue-500'
-                                }`}
-                                style={{ width: `${progressPercent}%` }}
-                              />
-                            </div>
-
-                            {fleet.isWaitingToSettle && (
-                              <div className="pt-1">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (onSettle) onSettle(fleet.id);
-                                  }}
-                                  className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] transition text-black font-extrabold uppercase tracking-wider text-[11px] rounded-lg animate-pulse"
-                                >
-                                  ⚡ CLICK HERE TO SETTLE ON PLANET
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
+         
             )}
           </div>
         );
       })()}
 
       {/* resource mines category list */}
-      <div className="border border-cyan-500/35 bg-[#0C1425]/60 p-4 rounded-2xl mb-8 shadow-[0_0_20px_rgba(34,211,238,0.12)] ring-1 ring-cyan-500/10 hover:shadow-[0_0_25px_rgba(34,211,238,0.22)] transition duration-300">
+      <div className="border border-cyan-500/35 bg-[#0C1425]/60 p-4 rounded-2xl shadow-[0_0_20px_rgba(34,211,238,0.12)] ring-1 ring-cyan-500/10 hover:shadow-[0_0_25px_rgba(34,211,238,0.22)] transition duration-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-cyan-500/25 pb-3" id="extractors_header">
-          <button
-            onClick={() => setShowExtractorsSec(!showExtractorsSec)}
-            className="flex-1 flex items-center justify-between text-left hover:brightness-110 transition duration-150 cursor-pointer group"
-            type="button"
-          >
+          <div className="flex-1 flex items-center justify-between text-left">
             <div>
               <h3 className="text-xs font-black uppercase tracking-widest text-cyan-300 font-mono flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-200 mr-1.5 animate-pulse border border-cyan-400/40 text-[9.5px]">⚡ COMMAND ACTIVE</span>
                 Resource Extractors (Max Level: {maxExtractorLevel})
-                {showExtractorsSec ? (
-                  <ChevronUp size={14} className="text-cyan-400 group-hover:scale-110 transition" />
-                ) : (
-                  <ChevronDown size={14} className="text-cyan-400 group-hover:scale-110 transition" />
-                )}
               </h3>
               <p className="text-[10px] text-cyan-400/70 font-sans mt-1 leading-relaxed">
                 Maximum extractors level: <strong className="text-white">{maxExtractorLevel}</strong> for this station (Level 25 for Main ★, Level 20 for Secondary ★★, Level 15 for Colonies).
               </p>
             </div>
-          </button>
+          </div>
           <button
             onClick={() => handleOpenBoostModal("all", -1)}
             className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 hover:shadow-[0_0_15px_rgba(245,158,11,0.55)] border border-amber-400/40 rounded-xl transition duration-150 font-mono text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer self-start sm:self-auto hover:scale-105"
@@ -1004,6 +1134,12 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         const baseOutput = Math.round((mine.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
                         const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
 
+                        const mineQueueCount = activePlanet.upgradeQueue?.filter((item: any) => item.type === 'mine' && item.key === resKey && item.mineIndex === mine.index).length || 0;
+                        const activeUpgradeCount = mine.isUpgrading ? 1 : 0;
+                        const currentTotalUpgrades = activeUpgradeCount + mineQueueCount;
+                        const nextMineTargetLvl = mine.level + currentTotalUpgrades + 1;
+                        const nextMineUpgradeTimeMins = nextMineTargetLvl * 1;
+
                         return (
                           <div 
                             key={mine.index}
@@ -1039,9 +1175,26 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                 isDamaged ? (
                                   <RestoreCostBar type="mine" upgradeKey={resKey} targetLevel={targetLevel} health={mine.health!} planetResources={localResources} />
                                 ) : (
-                                  <UpgradeCostBar type="mine" upgradeKey={resKey} targetLevel={targetLevel} planetResources={localResources} />
+                                  <UpgradeCostBar type="mine" upgradeKey={resKey} targetLevel={nextMineTargetLvl} planetResources={localResources} />
                                 )
                               )}
+                              {(() => {
+                                const specificMineQueue = (activePlanet.upgradeQueue || []).filter(
+                                  (item: any) => item.type === 'mine' && item.key === resKey && item.mineIndex === mine.index
+                                );
+                                if (specificMineQueue.length === 0) return null;
+                                return (
+                                  <div className="mt-2 space-y-1 p-2 bg-slate-950/40 border border-[#1E293B]/60 rounded-lg max-w-sm">
+                                    <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-extrabold font-mono">Queued Upgrades:</div>
+                                    {specificMineQueue.map((q, idx) => (
+                                      <div key={idx} className="text-[10px] text-slate-400 font-mono flex items-center justify-between gap-4">
+                                        <span className="text-slate-450">↳ Upgrade to Level {q.targetLevel}</span>
+                                        <span className="text-amber-400 font-bold">⏳ {q.targetLevel * 1}m</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
                             </div>
 
                             {/* Upgrade/Repair panel */}
@@ -1052,6 +1205,15 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                     <Clock size={12} className="animate-spin" title="Spinning dynamic timer indicator" />
                                     <span>Compressing Flux {getTimerString(mine.upgradeEnd)}</span>
                                   </div>
+                                  {nextMineTargetLvl <= maxExtractorLevel && (
+                                    <button 
+                                      onClick={() => onUpgradeMine(resKey, mine.index, true)}
+                                      className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[9px] font-bold uppercase flex items-center gap-1.5"
+                                    >
+                                      <span className="text-emerald-400">Queue Upgrade</span>
+                                      <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl}, {nextMineUpgradeTimeMins}m)</span>
+                                    </button>
+                                  )}
                                 </div>
                               ) : mine.level >= maxExtractorLevel && !isDamaged ? (
                                 <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase bg-slate-900 border border-slate-850 px-2 py-1 rounded">MAX CAP</span>
@@ -1066,17 +1228,17 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                               ) : isAnyUpgradeInProgress ? (
                                 <button 
                                   onClick={() => onUpgradeMine(resKey, mine.index, true)}
-                                  className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[10px] font-bold uppercase flex items-center gap-1.5"
+                                  className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[10px] font-bold uppercase flex items-center gap-1.5"
                                 >
                                   <span className="text-emerald-400">Queue Upgrade</span>
-                                  <span className="text-amber-400 font-extrabold">(15 SG)</span>
+                                  <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl}, {nextMineUpgradeTimeMins}m)</span>
                                 </button>
                               ) : (
                                 <button 
                                   onClick={() => onUpgradeMine(resKey, mine.index)}
                                   className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 border border-cyan-400 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.55)] hover:scale-[1.03]"
                                 >
-                                  ⚡ UPGRADE EXTRACTOR <span className="text-slate-900 font-bold ml-1">(1min)</span>
+                                  ⚡ UPGRADE EXTRACTOR <span className="text-slate-900 font-bold ml-1">({nextMineUpgradeTimeMins}m)</span>
                                 </button>
                               )}
                             </div>
@@ -1094,21 +1256,12 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
       </div>
 
       {/* base buildings infrastructure */}
-      <div className="border border-indigo-500/35 bg-[#0C1425]/60 p-4 rounded-2xl mb-8 shadow-[0_0_20px_rgba(99,102,241,0.12)] ring-1 ring-indigo-500/10 hover:shadow-[0_0_25px_rgba(99,102,241,0.22)] transition duration-300">
-        <button
-          onClick={() => setShowStructures(!showStructures)}
-          className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-indigo-500/25 pb-3 text-left hover:brightness-110 transition duration-150 cursor-pointer group"
-          type="button"
-        >
+      <div className="border border-indigo-500/35 bg-[#0C1425]/60 p-4 rounded-2xl shadow-[0_0_20px_rgba(99,102,241,0.12)] ring-1 ring-indigo-500/10 hover:shadow-[0_0_25px_rgba(99,102,241,0.22)] transition duration-300">
+        <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-indigo-500/25 pb-3 text-left">
           <div>
             <h3 className="text-xs font-black uppercase tracking-widest text-indigo-350 font-mono flex items-center gap-2">
               <span className="px-2 py-0.5 rounded bg-indigo-500/25 text-indigo-200 mr-1.5 animate-pulse border border-indigo-400/40 text-[9.5px]">🏯 INFRASTRUCTURE</span>
               Established Structures ({constructedBuildings.length})
-              {showStructures ? (
-                <ChevronUp size={14} className="text-indigo-400 group-hover:scale-110 transition inline" />
-              ) : (
-                <ChevronDown size={14} className="text-indigo-400 group-hover:scale-110 transition inline" />
-              )}
             </h3>
             <p className="text-[10px] text-indigo-400/70 font-sans mt-1 leading-relaxed">
               Sovereign base facilities, resource repositories, and control command matrices constructed on this site.
@@ -1117,13 +1270,19 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
           <span className="text-[10.5px] text-indigo-300 font-mono font-bold bg-indigo-500/20 border border-indigo-500/30 px-2.5 py-1 rounded-xl shrink-0 self-start sm:self-auto">
             ({constructedBuildings.length} Facilities Built)
           </span>
-        </button>
+        </div>
         {showStructures && (
           <div className="space-y-4">
             {constructedBuildings.map(([bKey, val]) => {
               const bState = val as any;
               const info = BUILDING_INFO[bKey];
               if (!info) return null;
+
+              const buildingQueueCount = activePlanet.upgradeQueue?.filter((item: any) => item.type === 'building' && item.key === bKey).length || 0;
+              const activeUpgradeCount = bState.isUpgrading ? 1 : 0;
+              const currentTotalUpgrades = activeUpgradeCount + buildingQueueCount;
+              const nextTargetLvl = bState.level + currentTotalUpgrades + 1;
+              const nextUpgradeTimeMins = nextTargetLvl * 2;
 
               const targetLvl = bState.level + 1;
               const cost = targetLvl * 150;
@@ -1352,6 +1511,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                         });
                                         const data = await response.json();
                                         if (response.ok) {
+                                          localStorage.setItem(`moonbase_resources_sent_${player.id}`, 'true');
                                           showToast?.(data.message || 'Resources transmitted successfully via Quantum Cargo link!', 'success');
                                           // Reset fields
                                           setTransferResources({ water: '0', plasma: '0', fuel: '0', food: '0', respirant: '0' });
@@ -1378,11 +1538,28 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
                       {bState.level < bState.maxLevel && (
                         bState.health !== undefined && bState.health < 100 ? (
-                          <RestoreCostBar type="building" upgradeKey={bKey} targetLevel={targetLvl} health={bState.health} planetResources={localResources} />
+                          <RestoreCostBar type="building" upgradeKey={bKey} targetLevel={nextTargetLvl} health={bState.health} planetResources={localResources} />
                         ) : (
-                          <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={targetLvl} planetResources={localResources} />
+                          <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={nextTargetLvl} planetResources={localResources} />
                         )
                       )}
+                      {(() => {
+                        const specificBuildingQueue = (activePlanet.upgradeQueue || []).filter(
+                          (item: any) => item.type === 'building' && item.key === bKey
+                        );
+                        if (specificBuildingQueue.length === 0) return null;
+                        return (
+                          <div className="mt-2 space-y-1 p-2 bg-slate-950/40 border border-[#1E293B]/60 rounded-lg max-w-sm text-left">
+                            <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-extrabold font-mono">Queued Upgrades:</div>
+                            {specificBuildingQueue.map((q, idx) => (
+                              <div key={idx} className="text-[10px] text-slate-400 font-mono flex items-center justify-between gap-4">
+                                <span className="text-slate-450">↳ Upgrade to Level {q.targetLevel}</span>
+                                <span className="text-amber-400 font-bold">⏳ {q.targetLevel * 2}m</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
 
                       <div className="pt-3 border-t border-white/5 flex items-center justify-between gap-2">
                         <span className="text-[10px] text-slate-500 font-mono uppercase font-bold">Actions & Progress Control:</span>
@@ -1392,6 +1569,16 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                               <Clock size={12} className="animate-spin" title="Spinning build progress timer" />
                               <span>{bState.level === 0 ? 'Constructing' : 'Upgrading'} {getTimerString(bState.upgradeEnd)}</span>
                             </div>
+                            {nextTargetLvl <= bState.maxLevel && (
+                              <button 
+                                onClick={() => onUpgradeBuilding(bKey, true)}
+                                className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer"
+                                type="button"
+                              >
+                                <span className="text-emerald-400">Queue Upgrade</span>
+                                <span className="text-amber-400 font-extrabold">(Lv. {nextTargetLvl}, {nextUpgradeTimeMins}m)</span>
+                              </button>
+                            )}
                           </div>
                         ) : isFabricatorRequiredMissing ? (
                           <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-3 py-1.5 rounded" title="Fabricator modular structure at level 1 or higher is required.">
@@ -1415,7 +1602,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                             type="button"
                           >
                             <span className="text-emerald-400">{bState.level === 0 ? 'Queue Construction' : 'Queue Upgrade'}</span>
-                            <span className="text-amber-400 font-extrabold">(15 SG)</span>
+                            <span className="text-amber-400 font-extrabold">(Lv. {nextTargetLvl}, {nextUpgradeTimeMins}m)</span>
                           </button>
                         ) : (
                           <button 

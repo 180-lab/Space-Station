@@ -13,6 +13,7 @@ import {
   CreatedFleet
 } from './types';
 import { sendMobileNotification } from './lib/mobileNotifications';
+import { initializePushNotifications, setupSSEConnection } from './lib/pushNotifications';
 import { playAlertySound, playChilledSound } from './lib/soundUtils';
 import { ExploreTab } from './components/ExploreTab';
 import { ArmyBaseTab } from './components/ArmyBaseTab';
@@ -50,7 +51,8 @@ import {
   Edit2,
   Check,
   Send,
-  Reply
+  Reply,
+  Compass
 } from 'lucide-react';
 
 const TROOP_NAME_MAPPING: Record<string, string> = {
@@ -111,12 +113,14 @@ export default function App() {
   const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('moonbase_userId'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [faction, setFaction] = useState('Solar Alliance');
+  const [faction, setFaction] = useState('Solar Federation');
   const [showSignup, setShowSignup] = useState(true);
 
   // Connection error handling
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const consecutiveErrorsRef = useRef(0);
+  const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  const isFirstMessagesLoadRef = useRef(true);
 
   // Google Sign-In & Payments Dialog states
   const [showGoogleDialog, setShowGoogleDialog] = useState(false);
@@ -166,6 +170,7 @@ export default function App() {
   const [battleReports, setBattleReports] = useState<BattleReport[]>([]);
   const [newsEvents, setNewsEvents] = useState<NewsEvent[]>([]);
   const [serverTime, setServerTime] = useState<number>(Date.now());
+  const [customTasks, setCustomTasks] = useState<Record<string, any>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [viewingPlayerId, setViewingPlayerId] = useState<string | null>(null);
 
@@ -177,6 +182,37 @@ export default function App() {
     }, 3500);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // Sync userId with Service Worker for background notifications
+  useEffect(() => {
+    if (userId) {
+      // 1. Save to Cache API directly from the client thread so it is guaranteed to be in place
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        caches.open('moonbase-user-session').then(cache => {
+          cache.put('/userId', new Response(userId));
+        }).catch(err => {
+          console.warn('[Session Cache] Error storing userId in cache:', err);
+        });
+      }
+      
+      // 2. Post message to Service Worker if active
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SET_USER_ID',
+            userId: userId
+          });
+        }
+      }
+    } else {
+      // Clear userId cache on logout
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        caches.open('moonbase-user-session').then(cache => {
+          cache.delete('/userId');
+        }).catch(() => {});
+      }
+    }
+  }, [userId]);
 
   // Command message deck states
   const [showCommDeck, setShowCommDeck] = useState(false);
@@ -306,6 +342,9 @@ export default function App() {
   const [interactiveTabs, setInteractiveTabs] = useState<boolean>(() => {
     return localStorage.getItem('moonbase_interactive_tabs') === 'true';
   });
+  const [showStationsTop, setShowStationsTop] = useState<boolean>(() => {
+    return localStorage.getItem('moonbase_show_stations_top') === 'true';
+  });
   const [isScrolling, setIsScrolling] = useState(false);
   const [isMobileView, setIsMobileView] = useState(() => {
     return typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
@@ -329,8 +368,14 @@ export default function App() {
     localStorage.setItem('moonbase_interactive_tabs', String(interactiveTabs));
   }, [interactiveTabs]);
 
+  useEffect(() => {
+    localStorage.setItem('moonbase_show_stations_top', String(showStationsTop));
+  }, [showStationsTop]);
+
   // Profile dropdown state
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [profileBasesExpanded, setProfileBasesExpanded] = useState(false);
+  const [expandedProfilePlanetIds, setExpandedProfilePlanetIds] = useState<Record<string, boolean>>({});
   const [stationDropdownOpen, setStationDropdownOpen] = useState(false);
   const [expandedDropdownPlanetIds, setExpandedDropdownPlanetIds] = useState<Record<string, boolean>>({});
 
@@ -507,11 +552,33 @@ export default function App() {
     };
   }, []);
 
-  // Local storage load
+  // Local storage load and Push Notifications Registration
   useEffect(() => {
     if (userId) {
       fetchState();
+      // Initialize Capacitor Push Notifications for native handsets
+      initializePushNotifications(userId);
     }
+  }, [userId]);
+
+  // Real-time active SSE subscription (falls back to native push notification if connection goes silent/breaks)
+  useEffect(() => {
+    if (!userId) return;
+
+    const eventSource = setupSSEConnection(userId, (notification) => {
+      // Show elegant visual toast message
+      showToast(`📬 SECURE TRANSMISSION: ${notification.title} - ${notification.body}`, 'info');
+      
+      // Mirror to local phone alerts
+      sendMobileNotification(notification.title, notification.body);
+      
+      // Play tactical notification chime
+      playAlertySound();
+    });
+
+    return () => {
+      eventSource.close();
+    };
   }, [userId]);
 
   // Unified status poller (triggered every 3 seconds)
@@ -610,6 +677,7 @@ export default function App() {
 
     // Play notification sound if SFX is enabled
     const soundEnabled = localStorage.getItem('moonbase_sound_enabled') !== 'false';
+
     if (soundEnabled) {
       const isAttack = message.toLowerCase().includes('tactical alert') || 
                        message.toLowerCase().includes('intel warning') || 
@@ -618,7 +686,19 @@ export default function App() {
       if (isAttack) {
         playAlertySound();
       } else {
-        playChilledSound();
+        const isCommonMutedAction = 
+          message.toLowerCase().includes('switched') || 
+          message.toLowerCase().includes('rename') || 
+          message.toLowerCase().includes('setting') || 
+          message.toLowerCase().includes('profile') || 
+          message.toLowerCase().includes('clipboard') || 
+          message.toLowerCase().includes('copied');
+        
+        const nonCriticalSoundEnabled = localStorage.getItem('moonbase_non_critical_sound_enabled') === 'true';
+
+        if (!isCommonMutedAction && nonCriticalSoundEnabled) {
+          playChilledSound();
+        }
       }
     }
   };
@@ -730,10 +810,10 @@ export default function App() {
         const attackAlertsEnabled = localStorage.getItem('moonbase_attack_notifications_enabled') !== 'false';
         if (!attackAlertsEnabled) return;
 
-        const isMine = myPlanetIds.includes(f.targetId || '');
+        const isMine = f.targetId === player.id || myPlanetIds.includes(f.targetId || '');
         if (isMine) {
           const targetPlanet = player.planets.find(p => p.id === f.targetId);
-          const pName = targetPlanet ? targetPlanet.name : "Station Core";
+          const pName = targetPlanet ? targetPlanet.name : (f.targetName || "Station Core");
           const message = `Hostile space fleet from Commander ${f.senderName} detected on attack trajectory to your station ${pName}! Arriving in ${Math.round((f.arrivesAt - serverTime) / 1000)} seconds!`;
           showToast(`⚠️ TACTICAL ALERT: ${message}`, 'error');
           sendMobileNotification(`⚠️ TACTICAL ALERT!`, message);
@@ -743,6 +823,40 @@ export default function App() {
 
     lastAttackFleetsRef.current = currentAttackIds;
   }, [fleets, player, serverTime]);
+
+  // Monitor incoming private messages and notify if enabled
+  useEffect(() => {
+    if (!player || !player.commandMessages) return;
+
+    const currentIncomingMessages = player.commandMessages.filter(m => !m.isSent);
+    
+    // On first load, record existing messages to prevent spamming notification toasts for historic chats
+    if (isFirstMessagesLoadRef.current) {
+      currentIncomingMessages.forEach(m => knownMessageIdsRef.current.add(m.id));
+      isFirstMessagesLoadRef.current = false;
+      return;
+    }
+
+    let hasNewUnread = false;
+    let senderName = "Another Commander";
+    
+    currentIncomingMessages.forEach(m => {
+      if (!knownMessageIdsRef.current.has(m.id)) {
+        knownMessageIdsRef.current.add(m.id);
+        if (!m.isRead) {
+          hasNewUnread = true;
+          senderName = m.senderName || senderName;
+        }
+      }
+    });
+
+    if (hasNewUnread) {
+      const commsAlertsEnabled = localStorage.getItem('moonbase_comms_notifications_enabled') !== 'false';
+      if (commsAlertsEnabled) {
+        showToast(`📬 SECURE TRANSMISSION RECEIVED: New message from Commander ${senderName}!`, 'info');
+      }
+    }
+  }, [player?.commandMessages]);
 
   // Fetch full MMO State API
   const fetchState = async () => {
@@ -762,6 +876,7 @@ export default function App() {
         setBattleReports(data.battleReports);
         setNewsEvents(data.newsEvents);
         setServerTime(data.serverTime);
+        setCustomTasks(data.customTasks || {});
         consecutiveErrorsRef.current = 0;
         setConnectionError(null);
       } else {
@@ -1092,6 +1207,9 @@ export default function App() {
           if (data.fleets) {
             setFleets(data.fleets);
           }
+          if (mission.missionType === 'recon') {
+            localStorage.setItem(`moonbase_recon_dispatched_${player.id}`, 'true');
+          }
           showToast(`FLEET DEPLOYED! Mission: ${mission.missionType.toUpperCase()} dispatched.`, 'success');
           setActiveTab('galaxy'); // Swapp tab to allow monitoring of travels!
           const newMission = data.fleets?.find((f: any) => f.createdFleetId === mission.createdFleetId) 
@@ -1168,6 +1286,9 @@ export default function App() {
 
       if (anySuccess) {
         setPlayer(latestPlayer);
+        if (mission.missionType === 'recon') {
+          localStorage.setItem(`moonbase_recon_dispatched_${player.id}`, 'true');
+        }
         showToast(`DISPATCHED MULTIPLE FLEETS! Created ${numFleets} distinct en-route tactical squadrons.`, 'success');
         setActiveTab('galaxy');
       } else {
@@ -1654,7 +1775,7 @@ export default function App() {
                     const sel = e.target.value as 'normal' | 'light' | 'dark';
                     setTheme(sel);
                     localStorage.setItem('moonbase_theme', sel);
-                    setFaction('Solar Alliance');
+                    setFaction('Solar Federation');
                   }}
                   className="w-full px-4 py-3 bg-[#05070A] border border-[#1E293B] text-slate-100 rounded-xl text-sm focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_10px_rgba(34,211,238,0.15)] transition-all duration-200"
                 >
@@ -1929,11 +2050,11 @@ export default function App() {
               id="active-station-selector-btn"
               type="button"
               onClick={() => setStationDropdownOpen(!stationDropdownOpen)}
-              className="bg-[#05070A]/90 hover:bg-[#1E293B]/40 text-cyan-400 hover:text-white text-xs font-bold py-2 px-3 rounded-xl border border-cyan-500/15 focus:border-cyan-500/50 hover:border-cyan-500/40 focus:outline-none cursor-pointer transition flex items-center gap-2 shadow-[0_0_15px_rgba(34,211,238,0.06)] active:scale-95"
+              className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-white text-xs font-black py-2.5 px-4 rounded-xl border border-cyan-400/40 hover:border-cyan-400/60 shadow-[0_0_15px_rgba(34,211,238,0.15)] focus:border-cyan-400/80 focus:outline-none cursor-pointer transition flex items-center gap-2 active:scale-95 tracking-wide uppercase font-mono"
+              title="Open change station selector options"
             >
-              <span className="text-[9px] text-slate-500 tracking-wider">STATION:</span>
-              <span className="truncate max-w-[125px] text-slate-100 font-black tracking-tight">{activePlanet.name}</span>
-              <span className="text-cyan-400 text-[10px] font-bold">[{activePlanet.sectorX}, {activePlanet.sectorY}]</span>
+              <Compass size={13} className="text-cyan-400 animate-pulse" />
+              <span>Change Station</span>
               <ChevronDown size={12} className={`text-cyan-400 transition-transform duration-200 shrink-0 ${stationDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
             
@@ -1945,7 +2066,7 @@ export default function App() {
                   className="absolute left-0 top-11 mt-1 w-64 bg-[#0A0F1D]/98 border border-cyan-500/40 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.85)] p-2 z-50 text-left font-mono backdrop-blur-md animate-fade-in flex flex-col gap-1"
                 >
                   <div className="px-2.5 py-1.5 border-b border-[#1E293B]/45 mb-1">
-                    <span className="text-[8.5px] text-slate-500 font-bold uppercase tracking-widest">Select Tactical Station</span>
+                    <span className="text-[8.5px] text-cyan-400 font-bold uppercase tracking-widest">Change Station Option List</span>
                   </div>
                   {player.planets.map((pl, idx) => {
                     const isActive = pl.id === activePlanet.id;
@@ -1965,7 +2086,7 @@ export default function App() {
                             {idx === 0 ? "★ " : "🛰️ "}{pl.name}
                           </span>
                           <span className="text-[9px] text-[#22D3EE] font-mono tracking-wide">
-                            Sector Grid Coordinates: [{pl.sectorX}, {pl.sectorY}]
+                            Location: {pl.sectorX}, {pl.sectorY}
                           </span>
                         </div>
                         {isActive && (
@@ -1987,72 +2108,30 @@ export default function App() {
               setGalaxyInitialSubTab('ranking');
               setActiveTab('galaxy');
             }}
-            className="flex flex-col items-end font-mono cursor-pointer group hover:opacity-90 transition-all"
+            className="flex flex-col items-end gap-0.5 font-mono cursor-pointer group hover:opacity-90 transition-all text-right"
             title="Click to view Sovereignty Leaderboard rankings"
           >
-            <span className="text-[8px] text-slate-500 uppercase tracking-widest font-bold group-hover:text-cyan-400">Commander Rank</span>
-            <span className="text-[11px] font-black text-cyan-400 group-hover:underline decoration-dotted">
+            <span className="text-[8px] text-slate-500 uppercase tracking-widest font-bold group-hover:text-cyan-400 block leading-none">Commander Rank</span>
+            <span className="text-[11px] font-black text-cyan-400 group-hover:underline decoration-dotted block leading-normal">
               #{myPopulationRankIndex} 🏆
             </span>
           </div>
 
           <button 
             type="button"
-            onClick={() => setShowCommDeck(true)}
-            className="w-10 h-10 border border-cyan-500/40 flex items-center justify-center rounded bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20 active:scale-101 transition-all duration-150 cursor-pointer relative z-50 mr-1"
-            title="Open Secure Command Comm-Messages"
-          >
-            <Mail size={18} className="text-cyan-400" />
-            {(() => {
-              const count = player.commandMessages?.filter(m => !m.isRead).length || 0;
-              if (count > 0) {
-                return (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 font-mono text-[9px] font-black text-white ring-1 ring-[#1E293B] animate-pulse shadow-[0_0_8px_#ef4444]">
-                    {count}
-                  </span>
-                );
-              }
-              return null;
-            })()}
-          </button>
-
-          <button 
-            type="button"
             onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-            className="w-10 h-10 border border-cyan-500/40 flex items-center justify-center rounded bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20 active:scale-95 transition-all duration-150 cursor-pointer relative z-50"
-            title="Open Commander Stations & HP status"
+            className="w-10 h-10 border border-cyan-500/40 flex items-center justify-center rounded bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20 active:scale-95 transition-all duration-150 cursor-pointer relative z-50 mr-1"
+            title="Open Commander Profile Hub"
           >
             <User size={18} className="text-cyan-400" />
             
-            {/* Pulsing indicator to show it's interactive */}
             <span className="absolute -bottom-1 -right-1 flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
             </span>
           </button>
 
-          <button 
-            type="button"
-            onClick={() => {
-              setAppConfirmModal({
-                title: 'CONFIRM SESSION DE-SYNCHRONIZATION',
-                message: 'Are you sure you want to log out of your session? Your current account session reference will be purged from LocalStorage and you will be re-routed to registration.',
-                onConfirm: () => {
-                  localStorage.removeItem('moonbase_userId');
-                  showToast('Commander keys de-synchronized. Reloading terminal...', 'info');
-                  setTimeout(() => {
-                    window.location.reload();
-                  }, 600);
-                }
-              });
-            }}
-            className="w-10 h-10 border border-red-500/30 hover:border-red-500/60 flex items-center justify-center rounded bg-red-950/10 hover:bg-red-950/25 active:scale-95 transition-all duration-150 cursor-pointer text-red-400"
-            title="Log Out & Create/Use a New Username"
-          >
-            <LogOut size={16} />
-          </button>
-
-          {/* Invisible backdrop to support closing the dropdown */}
+          {/* Invisible backdrop to support closing the profile dropdown */}
           {profileDropdownOpen && (
             <div 
               className="fixed inset-0 z-40 bg-transparent cursor-default" 
@@ -2060,92 +2139,26 @@ export default function App() {
             />
           )}
 
-          {/* Commander Stations & HP/troop dropdown card */}
+          {/* Commander Profile Dropdown Panel */}
           {profileDropdownOpen && (
-            <div className="absolute right-0 top-12 mt-2 w-72 bg-[#0A0F1D]/95 border border-cyan-500/35 rounded-xl shadow-[0_4px_30px_rgba(34,211,238,0.35)] p-4.5 z-50 text-left font-mono backdrop-blur-md animate-fade-in space-y-3 max-h-[80vh] overflow-y-auto">
+            <div className="absolute right-0 top-12 mt-2 w-80 sm:w-[360px] bg-[#0A0F1D]/95 border border-cyan-500/35 rounded-xl shadow-[0_4px_30px_rgba(34,211,238,0.35)] p-4.5 z-50 text-left font-mono backdrop-blur-md animate-fade-in space-y-3">
               <div className="border-b border-[#1E293B] pb-2.5">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-[#22D3EE] flex items-center gap-1.5">
-                  🛰️ Commander Stations Hub
-                </h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <User size={14} className="text-[#22D3EE]" />
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-[#22D3EE]">
+                    Commander Profile
+                  </h3>
+                </div>
+                <div className="text-sm font-black text-slate-100 truncate">
+                  {player.username}
+                </div>
                 <p className="text-[9px] text-[#94A3B8] leading-tight font-sans mt-1">
-                  Active tactical deployment & garrison strength overview.
+                  Commanding {player.planets.length} Sovereign Space Stations.
                 </p>
               </div>
 
-              {/* Planets detailed listing */}
-              <div className="space-y-2">
-                {player.planets.map((planet, index) => {
-                  const isPlExpanded = expandedDropdownPlanetIds[planet.id] || false;
-                  
-                  // HP & Firepower mapping details
-                  const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
-                  const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
-                  const troops = planet.troops || {};
-                  
-                  const planetDefHp = Object.entries(troops).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (defHpMap[k] || 0), 0);
-                  const planetAtkHp = Object.entries(troops).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (atkHpMap[k] || 0), 0);
-                  
-                  return (
-                    <div key={planet.id} className="bg-slate-950/50 border border-[#1E293B]/60 rounded-lg overflow-hidden transition hover:border-[#1E293B]">
-                      <button
-                        type="button"
-                        onClick={() => setExpandedDropdownPlanetIds(prev => ({ ...prev, [planet.id]: !isPlExpanded }))}
-                        className="w-full p-2.5 flex items-center justify-between text-left text-xs text-slate-300 font-bold hover:text-cyan-300 transition-colors duration-150 cursor-pointer"
-                      >
-                        <div className="flex flex-col gap-0.5 truncate pr-2">
-                          <span className="truncate text-white font-mono text-[11px]">
-                            {index === 0 ? "★ " : index === 1 ? "★★ " : "🛰️ "}{planet.name}
-                          </span>
-                          <span className="text-[9px] text-slate-500 font-mono tracking-wide">
-                            Sector [{planet.sectorX}, {planet.sectorY}]
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0 font-mono text-[10px]">
-                          <span className="text-blue-400 font-bold" title="Defensive Shields (Defense HP)">
-                            🛡️ {planetDefHp.toLocaleString()}
-                          </span>
-                          <span className="text-slate-600">/</span>
-                          <span className="text-orange-400 font-bold" title="Strike Firepower (Attack HP)">
-                            ⚔️ {planetAtkHp.toLocaleString()}
-                          </span>
-                          <span className="text-[8px] text-slate-500 font-bold ml-1">
-                            {isPlExpanded ? '▲' : '▼'}
-                          </span>
-                        </div>
-                      </button>
-
-                      {/* Expandable Planet troops */}
-                      {isPlExpanded && (
-                        <div className="px-2.5 pb-2.5 pt-1 space-y-2 text-[10.5px] border-t border-[#1E293B]/40 bg-black/40 text-slate-400">
-                          {Object.entries(troops).filter(([_, qty]) => (Number(qty) || 0) > 0).length === 0 ? (
-                            <p className="text-[9.5px] text-slate-500 italic py-1 text-center">Garrison is currently empty.</p>
-                          ) : (
-                            <div className="space-y-1">
-                              {Object.entries(troops).map(([type, qty]) => {
-                                if (!qty) return null;
-                                const uDefHp = defHpMap[type] || 10;
-                                const uAtkHp = atkHpMap[type] || 10;
-                                const quantityNum = Number(qty) || 0;
-                                return (
-                                  <div key={type} className="flex justify-between text-[10px] leading-relaxed">
-                                    <span className="text-slate-400 font-sans">{TROOP_NAME_MAPPING[type] || type}:</span>
-                                    <span className="font-bold text-slate-200 font-mono text-right">
-                                      {quantityNum.toLocaleString()} <span className="text-[8.5px] text-blue-400">({(quantityNum * uDefHp).toLocaleString()} DEF)</span> <span className="text-[8.5px] text-orange-400">({(quantityNum * uAtkHp).toLocaleString()} ATK)</span>
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
               {/* Cumulative forces section */}
-              <div className="pt-2.5 pb-1 border-t border-[#1E293B] space-y-1">
+              <div className="space-y-1">
                 <span className="text-[9.5px] text-cyan-400 font-mono font-bold uppercase tracking-widest block mb-1">CUMULATIVE COMBAT FORCES</span>
                 <div className="space-y-1 bg-[#05070A]/50 p-2 rounded-lg border border-[#1E293B]/40">
                   {(() => {
@@ -2182,6 +2195,133 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Expandable Individual Bases Section */}
+              <div className="border-t border-[#1E293B] pt-2.5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setProfileBasesExpanded(!profileBasesExpanded)}
+                    className="flex items-center gap-1.5 text-left group cursor-pointer"
+                  >
+                    <span className="text-[9.5px] text-cyan-400 font-mono font-bold uppercase tracking-widest group-hover:text-cyan-300">
+                      My Station Bases ({player.planets.length})
+                    </span>
+                    <ChevronDown size={11} className={`text-cyan-400 transition-transform duration-200 ${profileBasesExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {profileBasesExpanded && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allExpanded = player.planets.every(pl => expandedProfilePlanetIds[pl.id]);
+                        if (allExpanded) {
+                          setExpandedProfilePlanetIds({});
+                        } else {
+                          const nextExpanded: Record<string, boolean> = {};
+                          player.planets.forEach(pl => { nextExpanded[pl.id] = true; });
+                          setExpandedProfilePlanetIds(nextExpanded);
+                        }
+                      }}
+                      className="text-[8px] bg-cyan-950/40 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded uppercase hover:bg-cyan-500/20 active:scale-95 transition"
+                    >
+                      {player.planets.every(pl => expandedProfilePlanetIds[pl.id]) ? 'Collapse All' : 'Expand All'}
+                    </button>
+                  )}
+                </div>
+                
+                {profileBasesExpanded && (
+                  <div className="space-y-2 mt-1.5">
+                    {player.planets.map((pl, pIdx) => {
+                      const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
+                      const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
+                      
+                      const baseDefHp = Object.entries(pl.troops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (defHpMap[k] || 0), 0);
+                      const baseAtkHp = Object.entries(pl.troops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (atkHpMap[k] || 0), 0);
+                      
+                      const activeBaseTroops = Object.entries(pl.troops || {}).filter(([_, qty]) => (Number(qty) || 0) > 0);
+                      const isExpanded = !!expandedProfilePlanetIds[pl.id];
+                      
+                      return (
+                        <div key={pl.id} className="bg-[#05070A]/80 rounded-lg border border-[#1E293B]/60 space-y-1">
+                          {/* Base Toggle Header */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExpandedProfilePlanetIds(prev => ({
+                                ...prev,
+                                [pl.id]: !prev[pl.id]
+                              }));
+                            }}
+                            className="w-full flex items-center justify-between p-2 text-left hover:bg-[#0C1425]/50 transition duration-150 cursor-pointer"
+                          >
+                            <span className="text-[10px] font-black text-slate-200 truncate max-w-[80%] flex items-center gap-1">
+                              <span>{pIdx === 0 ? "★ " : "🛰️ "}{pl.name}</span>
+                              <span className="text-[8px] text-[#22D3EE] font-mono">({pl.sectorX}, {pl.sectorY})</span>
+                            </span>
+                            <ChevronDown size={10} className={`text-cyan-400 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`} />
+                          </button>
+                          
+                          {isExpanded && (
+                            <div className="p-2 pt-0 border-t border-[#1E293B]/20 space-y-2 animate-fade-in text-[9px]">
+                              {/* HP Overview */}
+                              <div className="grid grid-cols-2 gap-1 font-mono bg-[#030508]/60 p-1.5 rounded border border-[#1E293B]/30">
+                                <div className="text-blue-400 font-bold">🛡️ DEF HP: {baseDefHp.toLocaleString()}</div>
+                                <div className="text-orange-400 font-bold text-right">⚔️ ATK HP: {baseAtkHp.toLocaleString()}</div>
+                              </div>
+
+                              {/* Resources */}
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] text-slate-500 font-bold uppercase tracking-wider block">Element Storage Vaults</span>
+                                <div className="grid grid-cols-3 gap-1 bg-[#030508]/40 p-1.5 rounded border border-[#1E293B]/20 font-mono text-[8.5px]">
+                                  <div className="text-cyan-400 flex items-center gap-0.5">💧 {Math.floor(pl.resources?.water || 0).toLocaleString()}</div>
+                                  <div className="text-purple-400 flex items-center gap-0.5">🧪 {Math.floor(pl.resources?.plasma || 0).toLocaleString()}</div>
+                                  <div className="text-amber-500 flex items-center gap-0.5">⛽ {Math.floor(pl.resources?.fuel || 0).toLocaleString()}</div>
+                                  <div className="text-emerald-400 flex items-center gap-0.5">🍞 {Math.floor(pl.resources?.food || 0).toLocaleString()}</div>
+                                  <div className="text-teal-400 flex items-center gap-0.5">💨 {Math.floor(pl.resources?.respirant || 0).toLocaleString()}</div>
+                                </div>
+                              </div>
+
+                              {/* Troops */}
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] text-slate-500 font-bold uppercase tracking-wider block">Garrisoned Forces</span>
+                                <div className="bg-[#030508]/40 p-1.5 rounded border border-[#1E293B]/20">
+                                  {activeBaseTroops.length === 0 ? (
+                                    <div className="text-[8px] text-slate-600 italic">No garrison forces active.</div>
+                                  ) : (
+                                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[8.5px] text-slate-400 font-sans">
+                                      {activeBaseTroops.map(([type, qty]) => (
+                                        <div key={type} className="flex justify-between">
+                                          <span className="truncate pr-1">{TROOP_NAME_MAPPING[type] || type}:</span>
+                                          <span className="font-bold text-slate-300 font-mono">{(Number(qty) || 0).toLocaleString()}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Buildings */}
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] text-slate-500 font-bold uppercase tracking-wider block">Facility Infrastructure</span>
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 bg-[#030508]/40 p-1.5 rounded border border-[#1E293B]/20 text-[8px] text-slate-400 font-mono">
+                                  <div>🏗️ Fabricator: <span className="text-slate-200">Lvl {pl.buildings?.fabricator?.level || 0}</span></div>
+                                  <div>🎖️ War Room: <span className="text-slate-200">Lvl {pl.buildings?.armyBase?.level || 0}</span></div>
+                                  <div>🧪 Research: <span className="text-slate-200">Lvl {pl.buildings?.researchCenter?.level || 0}</span></div>
+                                  <div>📦 Repository: <span className="text-slate-200">Lvl {pl.buildings?.repository?.level || 0}</span></div>
+                                  <div>📡 Radar Array: <span className="text-slate-200">Lvl {pl.buildings?.radar?.level || 0}</span></div>
+                                  <div>⚡ Supply: <span className="text-slate-200">Lvl {pl.buildings?.supplyNexus?.level || 0}</span></div>
+                                  <div>📡 Comms Hub: <span className="text-slate-200">Lvl {pl.buildings?.commsHub?.level || 0}</span></div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* Total cumulative HP footer */}
               <div className="pt-2.5 border-t border-[#1E293B] flex flex-col gap-1.5 text-xs text-slate-400 font-mono">
                 <div className="flex items-center justify-between">
@@ -2204,306 +2344,71 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Quick Logout and New Commander activation button */}
-              <div className="pt-2.5 border-t border-[#1E293B]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAppConfirmModal({
-                      title: 'CONFIRM SESSION DE-SYNCHRONIZATION',
-                      message: 'Are you sure you want to log out of your session? Your current account session reference will be purged from LocalStorage and you will be re-routed to registration.',
-                      onConfirm: () => {
-                        localStorage.removeItem('moonbase_userId');
-                        setProfileDropdownOpen(false);
-                        showToast('Commander keys de-synchronized. Reloading terminal...', 'info');
-                        setTimeout(() => {
-                          window.location.reload();
-                        }, 600);
-                      }
-                    });
-                  }}
-                  className="w-full py-2 bg-gradient-to-r from-red-950/40 to-red-900/40 hover:from-red-950/60 hover:to-red-900/60 border border-red-500/30 text-red-400 rounded-lg text-[9.5px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <LogOut size={11} /> Log Out / Register New Name
-                </button>
-              </div>
             </div>
           )}
+
+          <button 
+            type="button"
+            onClick={() => setShowCommDeck(true)}
+            className="w-10 h-10 border border-cyan-500/40 flex items-center justify-center rounded bg-cyan-500/10 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:bg-cyan-500/20 active:scale-101 transition-all duration-150 cursor-pointer relative z-50 mr-1"
+            title="Open Secure Command Comm-Messages"
+          >
+            <Mail size={18} className="text-cyan-400" />
+            {(() => {
+              const count = player.commandMessages?.filter(m => !m.isRead).length || 0;
+              if (count > 0) {
+                return (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 font-mono text-[9px] font-black text-white ring-1 ring-[#1E293B] animate-pulse shadow-[0_0_8px_#ef4444]">
+                    {count}
+                  </span>
+                );
+              }
+              return null;
+            })()}
+          </button>
+
+
         </div>
       </header>
 
+      {/* Persistent Top Stations Dock */}
+      {showStationsTop && player && activePlanet && (
+        <div className="sticky top-20 z-30 bg-[#070B16] border-b border-[#1E293B]/70 shadow-md backdrop-blur-md bg-opacity-95 py-2 px-6 overflow-x-auto scrollbar-none flex items-center gap-3">
+          <div className="flex items-center gap-1.5 shrink-0 border-r border-[#1E293B]/60 pr-3 mr-1">
+            <span className="text-[10px] font-bold text-slate-400 font-mono tracking-widest uppercase">STATIONS</span>
+          </div>
+          <div className="flex items-center gap-2.5 min-w-0">
+            {player.planets.map((pl, idx) => {
+              const isActive = pl.id === activePlanet.id;
+              return (
+                <button
+                  key={pl.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedPlanetId(pl.id);
+                    showToast(`Switched active command site to ${pl.name}`, 'success');
+                  }}
+                  className={`relative px-3.5 py-1.5 rounded-xl border text-left font-mono transition duration-150 cursor-pointer flex items-center gap-2 shrink-0 select-none ${
+                    isActive 
+                      ? 'bg-cyan-500/10 border-cyan-400 text-white shadow-[0_0_12px_rgba(34,211,238,0.15)]' 
+                      : 'bg-[#0E1528]/40 border-[#1E293B] hover:border-slate-700 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span className={`text-[10px] font-bold truncate ${isActive ? 'text-cyan-400 font-black' : 'text-slate-300'}`}>
+                    {pl.name}
+                  </span>
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_6px_#22d3ee] shrink-0 ml-1" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Screen view router container */}
       <main className="max-w-5xl mx-auto px-4 pt-8 pb-24 animate-fade-in animate-duration-500">
-        {activeTab === 'explore' && player && activePlanet && (() => {
-          // Compute dynamic operation alerts:
-          const incomingAttacks = fleets.filter(
-            f => f.targetId === player.id &&
-                 f.missionType === 'attack' &&
-                 !f.isReturning &&
-                 serverTime < f.arrivesAt
-          );
-
-          const movingForces = fleets.filter(
-            f => f.senderId === player.id &&
-                 (serverTime < f.arrivesAt || f.isWaitingToSettle)
-          );
-
-          let alertsColor = 'border-emerald-500/40 text-emerald-400 bg-emerald-950/20';
-          let alertsLabel = 'SECURE';
-          let alertsValue = 'OPTIMAL NO ACTIONS';
-          let pulseDot = 'bg-emerald-500 shadow-[0_0_8px_#10b981]';
-
-          if (incomingAttacks.length > 0) {
-            alertsColor = 'border-red-500 text-red-500 bg-red-950/40 border-2 animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.3)]';
-            alertsLabel = 'RED ALERT';
-            alertsValue = `${incomingAttacks.length} HOSTILE ACTIONS`;
-            pulseDot = 'bg-red-500 shadow-[0_0_10px_#ef4444]';
-          } else if (movingForces.length > 0) {
-            alertsColor = 'border-amber-500 text-amber-500 bg-amber-950/30 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.2)]';
-            alertsLabel = 'ORANGE TRANSIT';
-            alertsValue = `${movingForces.length} TROOPS ACTIVE`;
-            pulseDot = 'bg-amber-500 shadow-[0_0_8px_#f59e0b]';
-          }
-
-          // Hydration / Negative Production Check
-          const getResourceProductionVal = (resKey: 'water' | 'respirant' | 'food') => {
-            const isOtherMaxed = 
-              activePlanet.resources.water >= repositoryLimit &&
-              activePlanet.resources.plasma >= repositoryLimit &&
-              activePlanet.resources.fuel >= repositoryLimit &&
-              activePlanet.resources.food >= repositoryLimit &&
-              activePlanet.resources.respirant >= repositoryLimit;
-              
-            const mList = activePlanet.mines[resKey] || [];
-            if (isOtherMaxed) {
-              return resKey === 'water' ? 84000 : 42000;
-            }
-            return mList.reduce((sum, m) => {
-              const isMineBoosted = m.boostedUntil && Number(m.boostedUntil) > serverTime;
-              const baseOutput = Math.round((m.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
-              const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
-              return sum + output;
-            }, 0);
-          };
-
-          const waterHourly = getResourceProductionVal('water');
-          const respirantHourly = getResourceProductionVal('respirant');
-          const foodHourly = getResourceProductionVal('food');
-
-          let waterCons = 0;
-          const specCosts = { defender: 1.0, attacker: 2.0, tank: 4.0, looter: 3.0, drone: 0.4, settlementShip: 5.0 };
-          Object.entries(activePlanet.troops).forEach(([tId, count]) => {
-            waterCons += (Number(count) || 0) * (specCosts[tId as keyof typeof specCosts] || 0);
-          });
-          const respirantCons = waterCons * 0.28;
-          const foodCons = waterCons * 0.18;
-
-          const isWaterNeg = waterHourly < waterCons;
-          const isRespirantNeg = respirantHourly < respirantCons;
-          const isFoodNeg = foodHourly < foodCons;
-          const isAnyProdNeg = isWaterNeg || isRespirantNeg || isFoodNeg;
-          const isDehydratedStatus = activePlanet.resources.water < 0 || activePlanet.resources.respirant < 0 || activePlanet.resources.food < 0 || isAnyProdNeg;
-
-          return (
-            <div className="space-y-4 mb-6">
-              {/* Main Dynamic Resource Stats HUD Panels */}
-              <div className="bg-[#0A0F1D]/60 backdrop-blur-sm border border-slate-800/65 rounded-xl grid grid-cols-2 md:grid-cols-5 gap-0 p-0 divide-x divide-y md:divide-y-0 divide-slate-800/40 overflow-hidden">
-                {/* Water Stat */}
-                <div className="flex flex-col p-4.5 sm:p-5 animate-fade-in text-left" title="Water (H2O): Essential life fluid. Consumed continuously by troops to maintain Space Force strength.">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Droplet size={12} className="text-cyan-400 animate-pulse" />
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Water (H2O)</span>
-                  </div>
-                  <span className="text-base font-mono font-bold text-cyan-400">
-                    {Math.round(localResources.water).toLocaleString()}{" "}
-                    <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-                  </span>
-                  <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-                    <div 
-                      className="h-full bg-cyan-400 rounded-full shadow-[0_0_6px_#22d3ee] transition-all duration-300"
-                      style={{ width: `${Math.min(100, (localResources.water / repositoryLimit) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Plasma Stat */}
-                <div className="flex flex-col p-4.5 sm:p-5 animate-fade-in text-left header-divider-element-left" title="Plasma: High-energy matter. Essential for building complex spaceship hull grades and hyper-engines.">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap size={12} className="text-purple-400 animate-pulse" />
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Plasma</span>
-                  </div>
-                  <span className="text-base font-mono font-bold text-purple-400">
-                    {Math.round(localResources.plasma).toLocaleString()}{" "}
-                    <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-                  </span>
-                  <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-                    <div 
-                      className="h-full bg-purple-500 rounded-full shadow-[0_0_6px_#a855f7] transition-all duration-300"
-                      style={{ width: `${Math.min(100, (localResources.plasma / repositoryLimit) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Fuel Stat */}
-                <div className="flex flex-col p-4.5 sm:p-5 animate-fade-in text-left border-t md:border-t-0 border-slate-800/40" title="Fuel: Thermonuclear propulsion energy. Required for dispatching fleet traversals across global planetary sectors.">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Flame size={12} className="text-amber-400 animate-pulse" />
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Fuel</span>
-                  </div>
-                  <span className="text-base font-mono font-bold text-amber-400">
-                    {Math.round(localResources.fuel).toLocaleString()}{" "}
-                    <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-                  </span>
-                  <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-                    <div 
-                      className="h-full bg-amber-500 rounded-full shadow-[0_0_6px_#fbbf24] transition-all duration-300"
-                      style={{ width: `${Math.min(100, (localResources.fuel / repositoryLimit) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Food Stat */}
-                <div className="flex flex-col p-4.5 sm:p-5 animate-fade-in text-left border-t md:border-t-0 border-slate-800/40" title="Food: Life support proteins. Vital to sustaining personnel during active colonist station operations.">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Apple size={12} className="text-emerald-400 animate-pulse" />
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Food</span>
-                  </div>
-                  <span className="text-base font-mono font-bold text-emerald-400">
-                    {Math.round(localResources.food).toLocaleString()}{" "}
-                    <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-                  </span>
-                  <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-                    <div 
-                      className="h-full bg-emerald-500 rounded-full shadow-[0_0_6px_#10b981] transition-all duration-300"
-                      style={{ width: `${Math.min(100, (localResources.food / repositoryLimit) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Respirant Stat */}
-                <div className="flex flex-col col-span-2 md:col-span-1 p-4.5 sm:p-5 animate-fade-in text-left border-t md:border-t-0 border-slate-800/40" title="Respirant (O2): Atmospheric gases. Powering life ventilation systems for astronauts and pilots.">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Wind size={12} className="text-blue-400 animate-pulse" />
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-[#64748b] font-mono">Respirant (O2)</span>
-                  </div>
-                  <span className="text-base font-mono font-bold text-blue-400">
-                    {Math.round(localResources.respirant).toLocaleString()}{" "}
-                    <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-                  </span>
-                  <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-                    <div 
-                      className="h-full bg-blue-500 rounded-full shadow-[0_0_6px_#3b82f6] transition-all duration-300"
-                      style={{ width: `${Math.min(100, (localResources.respirant / repositoryLimit) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Station Details Header with Holographic Glow */}
-              <div className="relative p-6 bg-gradient-to-b from-[#0F172A] to-black border border-white/5 rounded-xl overflow-hidden flex flex-col">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(34,211,238,0.05)_0%,_transparent_70%)] pointer-events-none"></div>
-                
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0 text-left">
-                    <span className="text-[10px] font-bold text-cyan-400 tracking-widest uppercase font-mono">SECTOR COMMAND SITE</span>
-                    {isEditingName ? (
-                      <div className="flex items-center gap-2 mt-1 max-w-md">
-                        <input
-                          type="text"
-                          maxLength={30}
-                          value={newNameInput}
-                          onChange={(e) => setNewNameInput(e.target.value)}
-                          className="flex-1 px-3 py-1 bg-slate-955 bg-slate-950 border border-cyan-500/50 hover:border-cyan-500 focus:border-cyan-500 focus:outline-none text-sm text-white font-mono rounded-lg transition"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleRenameActiveStation();
-                            if (e.key === 'Escape') {
-                              setIsEditingName(false);
-                              setNewNameInput(activePlanet.name);
-                            }
-                          }}
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          onClick={handleRenameActiveStation}
-                          className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
-                          title="Save Name"
-                        >
-                          <Check size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsEditingName(false);
-                            setNewNameInput(activePlanet.name);
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 rounded-lg transition cursor-pointer font-sans"
-                          title="Cancel"
-                        >
-                          <span className="text-sm font-semibold select-none font-sans">✕</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 mt-1 group">
-                        <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">{activePlanet.name}</h2>
-                        <button
-                          type="button"
-                          onClick={() => setIsEditingName(true)}
-                          className="p-1 px-2 text-[10px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/30 hover:bg-cyan-950/80 border border-cyan-500/20 hover:border-cyan-500/50 font-bold uppercase rounded-lg transition opacity-60 group-hover:opacity-100 flex items-center gap-1 cursor-pointer"
-                          title="Rename Station Base"
-                        >
-                          <Edit2 size={10} /> Rename
-                        </button>
-                      </div>
-                    )}
-                    <div className="mt-2 text-xs text-slate-400 flex items-center gap-2 font-mono">
-                      <span className={`inline-block w-2.5 h-2.5 rounded-full ${pulseDot} animate-pulse`} />
-                      <span>Commander: <span className="text-slate-200 font-bold">{player.username}</span> &bull; {activePlanet.name} &bull; Sector Coord: [{activePlanet.sectorX}, {activePlanet.sectorY}]</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-start md:self-auto">
-                    {/* Active Sector Alerts indicator block */}
-                    <button
-                      id="alerts-hud-trigger"
-                      onClick={() => setIsAlertsOpen(true)}
-                      className={`p-3 border rounded-lg text-left font-mono min-w-[170px] cursor-pointer transition duration-150 hover:brightness-110 active:scale-95 flex flex-col justify-center ${alertsColor}`}
-                    >
-                      <span className="text-[9px] uppercase tracking-widest font-bold opacity-75">{alertsLabel}</span>
-                      <span className="text-[11px] font-black uppercase mt-1 tracking-tight flex items-center gap-1.5 font-mono">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
-                        {alertsValue}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {isDehydratedStatus && (
-                <div className="p-3 border border-red-900/50 bg-red-950/30 text-red-400 rounded-xl flex items-start gap-2.5 text-xs animate-pulse text-left" title="Critical Alert: High severity base warning">
-                  <ShieldAlert size={16} className="shrink-0 mt-0.5 animate-bounce text-red-500" />
-                  <div>
-                    <p className="font-bold uppercase tracking-widest text-[10px]">CRITICAL NEGATIVE PRODUCTION (ATTRITION PASSIVE)</p>
-                    <p className="text-red-300/80 leading-relaxed mt-0.5">Troops are suffering rapid attrition due to negative production! Upgrade resource extractors immediately built with deeper wells or dismiss excess troops.</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {activeTab === 'explore' && player && activePlanet && (
-          <CommanderTutorial 
-            player={player}
-            activePlanet={activePlanet}
-            fleets={fleets}
-            onRefreshState={fetchState}
-            showToast={showToast}
-            setActiveTab={setActiveTab}
-            chatMessages={chatMessages}
-          />
-        )}
-
         {activeTab === 'explore' && player && (() => {
           const sortedByPopulation = [...playersList].sort((a, b) => b.scores.population - a.scores.population);
           const populationRank = sortedByPopulation.findIndex(p => p.id === player.id) + 1 || 1;
@@ -2527,6 +2432,10 @@ export default function App() {
               chatMessages={chatMessages}
               onSendChat={handleSendChat}
               localResources={localResources}
+              setActiveTab={setActiveTab}
+              showStationsTop={showStationsTop}
+              setSelectedPlanetId={setSelectedPlanetId}
+              customTasks={customTasks}
             />
           );
         })()}
@@ -2600,6 +2509,7 @@ export default function App() {
             theme={theme}
             setTheme={setTheme}
             localResources={localResources}
+            onRefreshState={fetchState}
           />
         )}
 
@@ -2614,6 +2524,8 @@ export default function App() {
             setFontSizeScale={setFontSizeScale}
             interactiveTabs={interactiveTabs}
             setInteractiveTabs={setInteractiveTabs}
+            showStationsTop={showStationsTop}
+            setShowStationsTop={setShowStationsTop}
             showToast={showToast}
             onRefreshState={fetchState}
             onLinkGoogle={handleLinkGoogleAccount}
@@ -2627,6 +2539,7 @@ export default function App() {
               setActiveTab('galaxy');
             }}
             populationRank={myPopulationRankIndex}
+            customTasks={customTasks}
           />
         )}
       </main>
@@ -3056,7 +2969,7 @@ export default function App() {
           <div className="fixed inset-0 bg-[#05070A]/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <div className="w-full max-w-lg bg-[#0A0F1D] border border-cyan-500/20 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.15)] overflow-hidden font-sans relative flex flex-col">
               
-              {/* Header Banner representing player Faction */}
+              {/* Header Banner representing player */}
               <div 
                 className="h-28 relative flex items-end p-5"
                 style={{ backgroundColor: factionColor + '15', borderBottom: `2px solid ${factionColor}` }}
@@ -3077,7 +2990,7 @@ export default function App() {
                       {targetPlayer.username}
                     </h2>
                     <p className="text-[11px] font-mono font-bold tracking-widest uppercase" style={{ color: factionColor }}>
-                      {targetPlayer.faction} Agent
+                      Active Commander
                     </p>
                   </div>
                 </div>
@@ -3375,7 +3288,7 @@ export default function App() {
                       <option value="">-- Choose active Commander --</option>
                       {playersList.filter(p => p.id !== player.id).map(p => (
                         <option key={p.id} value={p.id}>
-                          {p.username} [{p.faction || 'Neutral'}]
+                          {p.username}
                         </option>
                       ))}
                     </select>
@@ -3595,7 +3508,7 @@ export default function App() {
                               <option value="">-- Click to choose Commander --</option>
                               {playersList.filter(p => p.id !== player.id).map(p => (
                                 <option key={p.id} value={p.id}>
-                                  {p.username} [{p.faction || 'Neutral'}]
+                                  {p.username}
                                 </option>
                               ))}
                             </select>

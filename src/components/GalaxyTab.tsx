@@ -193,15 +193,18 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [leaderboardPage, setLeaderboardPage] = useState(1);
   const [showBottom10, setShowBottom10] = useState(false);
   const [showTop10, setShowTop10] = useState(false);
-  const [showStandings, setShowStandings] = useState(false);
+  const [showStandings, setShowStandings] = useState(true);
   const [showAllianceCmd, setShowAllianceCmd] = useState(false);
   const [showDecFeed, setShowDecFeed] = useState(false);
+  const [leaderboardType, setLeaderboardType] = useState<'players' | 'alliances'>('players');
+  const [expandedAllianceId, setExpandedAllianceId] = useState<string | null>(null);
 
   // Scanner State
   const [targetCoords, setTargetCoords] = useState({ x: activePlanet.sectorX, y: activePlanet.sectorY });
   const [searchX, setSearchX] = useState(activePlanet.sectorX.toString());
   const [searchY, setSearchY] = useState(activePlanet.sectorY.toString());
   const [scanResults, setScanResults] = useState<any[]>([]);
+  const [radarFilter, setRadarFilter] = useState<'all' | 'habitable' | 'player'>('all');
   const [expandedTargets, setExpandedTargets] = useState<Record<string, boolean>>({});
   const [radarRadius, setRadarRadius] = useState(1);
   const [isScanning, setIsScanning] = useState(false);
@@ -333,6 +336,18 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [chatInput, setChatInput] = useState('');
   const [activeChatWindow, setActiveChatWindow] = useState<'global' | 'alliance' | null>(null);
 
+  // Prevent background scrolling when a modal or dispatch overlay is active
+  React.useEffect(() => {
+    if (selectedTarget || targetForResources || activeChatWindow) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [selectedTarget, targetForResources, activeChatWindow]);
+
   // Alliance setup panel
   const [allianceName, setAllianceName] = useState('');
   const [allianceTag, setAllianceTag] = useState('');
@@ -342,7 +357,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   // Collapsible States for DEC_LINKS and radar folder
   const [isCombatOpen, setIsCombatOpen] = useState(false);
   const [isIntelOpen, setIsIntelOpen] = useState(false);
-  const [isRadarFolderOpen, setIsRadarFolderOpen] = useState(false);
+  const [isRadarFolderOpen, setIsRadarFolderOpen] = useState(true);
   const [radarPage, setRadarPage] = useState(0);
   const [expandedCombatReports, setExpandedCombatReports] = useState<Record<string, boolean>>({});
   const [expandedIntelReports, setExpandedIntelReports] = useState<Record<string, boolean>>({});
@@ -663,6 +678,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
       if (!res.ok) {
         if (showToast) showToast(data.error || 'Failed to transmit resources.', 'error');
       } else {
+        localStorage.setItem(`moonbase_resources_sent_${player.id}`, 'true');
         if (showToast) showToast('Cargo Portal successfully activated! Resources transmitted.', 'success');
         setTargetForResources(null);
         if (onRefreshState) onRefreshState();
@@ -674,7 +690,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
   // Leaderboard formatting helpers
   const rankedState = Object.values(alliances) as Alliance[];  return (
-    <div className="space-y-8 pb-24 font-mono">
+    <div className="space-y-1.5 pb-24 font-mono">
       {/* Visual Navigation Pill Bars as a 2-rowed layout assembly to fit mobile viewports exactly */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-1 bg-[#0A0F1D] p-1.5 rounded-xl border border-[#1E293B] shrink-0 text-[10px] sm:text-xs">
         <button 
@@ -733,7 +749,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             </p>
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-1.5">
           {/* Coordinates Search */}
           <form onSubmit={handleSearchSubmit} className="p-4 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="flex-1 grid grid-cols-2 gap-3 text-xs">
@@ -833,16 +849,53 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   <span className="text-xs text-cyan-400 bg-cyan-950/30 border border-cyan-800/20 px-2 py-0.5 rounded font-bold">Scope [{targetCoords.x}, {targetCoords.y}]</span>
                 </div>
 
-                {scanResults.length === 0 ? (
-                  <div className="py-12 border border-dashed border-[#1E293B] text-center rounded-xl space-y-3" title="Static scanner feed diagnostics: no active targets found in area">
-                    <Radar size={40} className="mx-auto text-slate-600 animate-pulse text-cyan-500/40" title="Scanning wave telemetry sweep feedback" />
-                    <p className="text-sm font-bold text-slate-350">No active sector signatures detected</p>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">Coordinate index matches might be out of radar scanning bounds. Ready deep scanner upgrade units.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="space-y-4 pr-1">
-                      {scanResults.slice(radarPage * 10, (radarPage + 1) * 10).map((target) => {
+                {/* Radar Segment Filter Buttons */}
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#0A0F1D] border border-[#1E293B] rounded-xl text-[10px] font-mono">
+                  <button
+                    type="button"
+                    onClick={() => { setRadarFilter('all'); setRadarPage(0); }}
+                    className={`py-2 rounded-lg font-bold transition-all ${radarFilter === 'all' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_8px_rgba(34,211,238,0.1)]' : 'text-slate-400 hover:text-white border border-transparent cursor-pointer'}`}
+                  >
+                    ALL ({scanResults.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setRadarFilter('habitable'); setRadarPage(0); }}
+                    className={`py-2 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${radarFilter === 'habitable' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.1)]' : 'text-slate-400 hover:text-white border border-transparent cursor-pointer'}`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                    HABITABLE ({scanResults.filter(t => t.isHabitable).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setRadarFilter('player'); setRadarPage(0); }}
+                    className={`py-2 rounded-lg font-bold transition-all ${radarFilter === 'player' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_8px_rgba(34,211,238,0.1)]' : 'text-slate-400 hover:text-white border border-transparent cursor-pointer'}`}
+                  >
+                    STATIONS ({scanResults.filter(t => !t.isHabitable).length})
+                  </button>
+                </div>
+
+                {(() => {
+                  const filteredResults = scanResults.filter(target => {
+                    if (radarFilter === 'habitable') return !!target.isHabitable;
+                    if (radarFilter === 'player') return !target.isHabitable;
+                    return true;
+                  });
+
+                  if (filteredResults.length === 0) {
+                    return (
+                      <div className="py-12 border border-dashed border-[#1E293B] text-center rounded-xl space-y-3" title="Static scanner feed diagnostics: no active targets found in area">
+                        <Radar size={40} className="mx-auto text-slate-600 animate-pulse text-cyan-500/40" title="Scanning wave telemetry sweep feedback" />
+                        <p className="text-sm font-bold text-slate-350">No matching sector signatures</p>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">No targets match the active radar filter option. Try changing your filters or scan coordinates.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="space-y-4 pr-1">
+                        {filteredResults.slice(radarPage * 10, (radarPage + 1) * 10).map((target) => {
                       const isUserSelf = target.id === player.id;
                       const targetDist = Math.hypot(target.coords.x - activePlanet.sectorX, target.coords.y - activePlanet.sectorY);
                       const spaceMiles = targetDist * 1.917;
@@ -1009,7 +1062,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     </div>
 
                     {/* Pagination Controls */}
-                    {scanResults.length > 10 && (
+                    {filteredResults.length > 10 && (
                       <div className="flex items-center justify-between border-t border-[#1E293B]/60 pt-4 mt-2 font-mono text-xs">
                         <button
                           type="button"
@@ -1022,12 +1075,12 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                         </button>
                         
                         <span className="text-slate-400 font-bold bg-[#05070A] border border-[#1E293B] px-3.5 py-1.5 rounded-xl">
-                          Page <span className="text-cyan-400">{radarPage + 1}</span> of {Math.ceil(scanResults.length / 10)}
+                          Page <span className="text-cyan-400">{radarPage + 1}</span> of {Math.ceil(filteredResults.length / 10)}
                         </span>
 
                         <button
                           type="button"
-                          disabled={(radarPage + 1) * 10 >= scanResults.length}
+                          disabled={(radarPage + 1) * 10 >= filteredResults.length}
                           onClick={() => setRadarPage(prev => prev + 1)}
                           className="px-3.5 py-2 bg-[#0D1527] border border-[#1E293B] text-slate-350 hover:text-cyan-400 hover:bg-[#0F1E36] disabled:opacity-30 disabled:pointer-events-none rounded-xl flex items-center gap-1.5 transition cursor-pointer font-bold"
                         >
@@ -1037,7 +1090,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                       </div>
                     )}
                   </div>
-                )}
+                );
+              })()}
               </div>
             )}
           </div>
@@ -1079,25 +1133,66 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
         const myRankIndex = sortedPlayers.findIndex(p => p.id === player.id) + 1;
 
+        // Alliance calculations
+        const allianceStats = (Object.values(alliances || {}) as Alliance[]).map(all => {
+          const membersWithScores = all.members.map(member => {
+            const pl = activePlayersWithYou.find(p => p.id === member.playerId);
+            return {
+              playerId: member.playerId,
+              username: member.username,
+              role: member.role,
+              scores: pl ? pl.scores : { population: 0, attack: 0, defence: 0, raiders: 0 },
+              faction: pl ? pl.faction : 'Terran',
+              factionColor: pl ? pl.factionColor : '#00bfff'
+            };
+          });
+
+          const combinedScores = membersWithScores.reduce((acc, m) => {
+            acc.population += m.scores.population || 0;
+            acc.attack += m.scores.attack || 0;
+            acc.defence += m.scores.defence || 0;
+            acc.raiders += m.scores.raiders || 0;
+            return acc;
+          }, { population: 0, attack: 0, defence: 0, raiders: 0 });
+
+          return {
+            ...all,
+            membersWithScores,
+            combinedScores
+          };
+        });
+
+        const sortedAlliances = [...allianceStats].sort((a, b) => {
+          const sA = a.combinedScores[rankingMetric];
+          const sB = b.combinedScores[rankingMetric];
+          if (sB !== sA) return sB - sA;
+          return a.name.localeCompare(b.name);
+        });
+
         // Bottom 10 vs normal paging
         const pageSize = 15;
         let displayPlayers: any[] = [];
+        let displayAlliances: any[] = [];
         let totalPages = 1;
 
-        if (showBottom10) {
-          // Bottom 10 players
-          displayPlayers = sortedPlayers.slice(-10);
-        } else if (showTop10) {
-          // Top 10 players
-          displayPlayers = sortedPlayers.slice(0, 10);
+        if (leaderboardType === 'players') {
+          if (showBottom10) {
+            displayPlayers = sortedPlayers.slice(-10);
+          } else if (showTop10) {
+            displayPlayers = sortedPlayers.slice(0, 10);
+          } else {
+            totalPages = Math.ceil(sortedPlayers.length / pageSize);
+            const pageToUse = Math.max(1, Math.min(totalPages, leaderboardPage));
+            displayPlayers = sortedPlayers.slice((pageToUse - 1) * pageSize, pageToUse * pageSize);
+          }
         } else {
-          totalPages = Math.ceil(sortedPlayers.length / pageSize);
+          totalPages = Math.ceil(sortedAlliances.length / pageSize);
           const pageToUse = Math.max(1, Math.min(totalPages, leaderboardPage));
-          displayPlayers = sortedPlayers.slice((pageToUse - 1) * pageSize, pageToUse * pageSize);
+          displayAlliances = sortedAlliances.slice((pageToUse - 1) * pageSize, pageToUse * pageSize);
         }
 
         return (
-          <div className="space-y-4">
+          <div className="space-y-1.5">
             {/* Always Show Your Rank First */}
             <div className="p-4 bg-gradient-to-r from-cyan-950/45 via-blue-950/20 to-[#0A0F1D]/80 border border-cyan-500/30 rounded-xl flex flex-col xl:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3 self-start xl:self-center">
@@ -1107,7 +1202,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 <div>
                   <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest block font-mono">YOUR COSMIC STANDING</span>
                   <p className="text-xs font-mono text-slate-350 font-bold mt-0.5">
-                    ★ <span className="text-white text-sm">{player.username}</span> [{player.faction}]
+                    ★ <span className="text-white text-sm">{player.username}</span>
                   </p>
                 </div>
               </div>
@@ -1135,26 +1230,39 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             {/* Main Leaderboard Table Container */}
             <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#1E293B]/60">
-                <button
-                  type="button"
-                  onClick={() => setShowStandings(!showStandings)}
-                  className="flex items-start text-left gap-1.5 hover:text-white transition duration-150 cursor-pointer"
-                >
-                  <div>
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-1.5 font-mono">
-                      <Trophy size={16} className="text-yellow-500 drop-shadow-[0_0_8px_#fbbf24]" />
-                      GALACTIC STANDINGS
-                      {showStandings ? (
-                        <ChevronUp size={12} className="text-red-500" />
-                      ) : (
-                        <ChevronDown size={12} className="text-emerald-500" />
-                      )}
-                    </h3>
-                  </div>
-                </button>
+                <div className="flex items-center gap-1.5 select-none py-1">
+                  <Trophy size={16} className="text-yellow-500 drop-shadow-[0_0_8px_#fbbf24]" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-[#5bc0be] font-mono">
+                    GALACTIC STANDINGS
+                  </h3>
+                </div>
 
-                {/* Top/Bottom limit toggle options */}
-                {showStandings && (
+                {/* Sub Tab Switcher (Commanders vs Star Alliances) */}
+                <div className="flex bg-[#030508]/60 p-0.5 rounded-xl border border-[#1E293B] shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLeaderboardType('players');
+                      setLeaderboardPage(1);
+                    }}
+                    className={`px-3 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-lg transition cursor-pointer font-mono ${leaderboardType === 'players' ? 'bg-[#5bc0be] text-slate-950 shadow-[0_0_8px_rgba(91,192,190,0.3)]' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    👤 Commanders
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLeaderboardType('alliances');
+                      setLeaderboardPage(1);
+                    }}
+                    className={`px-3 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-lg transition cursor-pointer font-mono ${leaderboardType === 'alliances' ? 'bg-[#5bc0be] text-slate-950 shadow-[0_0_8px_rgba(91,192,190,0.3)]' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    🛡️ Star Alliances
+                  </button>
+                </div>
+
+                {/* Top/Bottom limit toggle options (only show for player rankings) */}
+                {leaderboardType === 'players' && (
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
@@ -1182,10 +1290,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 )}
               </div>
 
-              {showStandings && (
-                <>
-                  {/* Metric ranking switch selectors */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 font-mono text-[10px]">
+              {/* Metric ranking switch selectors */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 font-mono text-[10px]">
                 {[
                   { key: 'population', label: '🌾 POPULATION STANDING', color: 'border-cyan-500/30' },
                   { key: 'attack', label: '⚔️ ATTACK POINTS', color: 'border-red-500/30' },
@@ -1206,75 +1312,212 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 ))}
               </div>
 
-              {/* Player list table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs font-mono">
-                  <thead>
-                    <tr className="border-b border-[#1E293B] text-slate-500 pb-2">
-                      <th className="py-3 px-2">RANK</th>
-                      <th className="py-3">COMMANDER ID</th>
-                      <th className="py-3 text-right">POPULATION</th>
-                      <th className="py-3 text-right">ATTACK POINTS</th>
-                      <th className="py-3 text-right">DEFENSE POINTS</th>
-                      <th className="py-3 text-right">RESOURCES HAULED</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-900/60 font-medium">
-                    {displayPlayers.map((pl) => {
-                      const isYou = pl.id === player.id;
-                      const globalRankIdx = sortedPlayers.findIndex(x => x.id === pl.id) + 1;
+              {/* Player or Alliance list table */}
+              <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+                {leaderboardType === 'players' ? (
+                  <table className="w-full text-left border-collapse text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-[#1E293B]/70 text-slate-500 pb-2">
+                        <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">RANK</th>
+                        <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">COMMANDER ID</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">POPULATION</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">ATTACK POINTS</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">DEFENSE POINTS</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">RESOURCES HAULED</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-900/60 font-medium">
+                      {displayPlayers.map((pl) => {
+                        const isYou = pl.id === player.id;
+                        const globalRankIdx = sortedPlayers.findIndex(x => x.id === pl.id) + 1;
 
-                      return (
-                        <tr 
-                          key={pl.id} 
-                          className={`border-b border-[#1E293B]/60 hover:bg-white/5 transition duration-150 ${isYou ? 'bg-cyan-950/15 text-cyan-300 font-bold border-l-2 border-l-cyan-400 pl-2' : 'text-slate-300'}`}
-                        >
-                          <td className="py-3.5 px-2 font-mono font-bold">
-                            <span className={globalRankIdx <= 3 ? 'text-yellow-400 font-extrabold' : 'text-slate-500'}>
-                              {globalRankIdx <= 3 ? `🏆 #${globalRankIdx}` : `#${globalRankIdx}`}
-                            </span>
-                          </td>
-                          <td className="py-3.5">
-                            <div className="flex flex-col">
-                              <span className="flex items-center gap-1.5 font-bold">
-                                {isYou && <span className="text-yellow-400">★</span>}
-                                <button
-                                  type="button"
-                                  onClick={() => onViewPlayerProfile && onViewPlayerProfile(pl.id)}
-                                  className="font-bold text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer focus:outline-none"
-                                >
-                                  {pl.username}
-                                </button>
-                                {isYou && <span className="text-[10px] text-cyan-500/80 font-normal">(YOU)</span>}
-                                {pl.id.startsWith('ai_') && <span className="text-[9px] tracking-wider text-slate-500 font-semibold">[AI INTELLIGENCE]</span>}
+                        return (
+                          <tr 
+                            key={pl.id} 
+                            className={`border-b border-[#1E293B]/60 hover:bg-white/5 transition duration-150 ${isYou ? 'bg-cyan-950/15 text-cyan-300 font-bold border-l-2 border-l-cyan-400 pl-2' : 'text-slate-300'}`}
+                          >
+                            <td className="py-3.5 px-4 font-mono font-bold whitespace-nowrap">
+                              <span className={globalRankIdx <= 3 ? 'text-yellow-400 font-extrabold' : 'text-slate-500'}>
+                                {globalRankIdx <= 3 ? `🏆 #${globalRankIdx}` : `#${globalRankIdx}`}
                               </span>
-                            </div>
-                          </td>
-                          <td className={`py-3.5 text-right font-bold ${rankingMetric === 'population' ? 'text-cyan-400' : 'text-slate-400'}`}>
-                            {(pl.scores?.population || 0).toLocaleString()}
-                          </td>
-                          <td className={`py-3.5 text-right font-bold ${rankingMetric === 'attack' ? 'text-red-400' : 'text-slate-400'}`}>
-                            {(pl.scores?.attack || 0).toLocaleString()}
-                          </td>
-                          <td className={`py-3.5 text-right font-bold ${rankingMetric === 'defence' ? 'text-blue-400' : 'text-slate-400'}`}>
-                            {(pl.scores?.defence || 0).toLocaleString()}
-                          </td>
-                          <td className={`py-3.5 text-right font-bold ${rankingMetric === 'raiders' ? 'text-emerald-400' : 'text-slate-400'}`}>
-                            {(pl.scores?.raiders || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="flex flex-col">
+                                <span className="flex items-center gap-1.5 font-bold">
+                                  {isYou && <span className="text-yellow-400">★</span>}
+                                  <button
+                                    type="button"
+                                    onClick={() => onViewPlayerProfile && onViewPlayerProfile(pl.id)}
+                                    className="font-bold text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer focus:outline-none"
+                                  >
+                                    {pl.username}
+                                  </button>
+                                  {isYou && <span className="text-[10px] text-cyan-500/80 font-normal">(YOU)</span>}
+                                  {pl.id.startsWith('ai_') && <span className="text-[9px] tracking-wider text-slate-500 font-semibold">[AI INTELLIGENCE]</span>}
+                                </span>
+                              </div>
+                            </td>
+                            <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'population' ? 'text-cyan-400' : 'text-slate-400'}`}>
+                              {(pl.scores?.population || 0).toLocaleString()}
+                            </td>
+                            <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'attack' ? 'text-red-400' : 'text-slate-400'}`}>
+                              {(pl.scores?.attack || 0).toLocaleString()}
+                            </td>
+                            <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'defence' ? 'text-blue-400' : 'text-slate-400'}`}>
+                              {(pl.scores?.defence || 0).toLocaleString()}
+                            </td>
+                            <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'raiders' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                              {(pl.scores?.raiders || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="w-full text-left border-collapse text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-[#1E293B]/70 text-slate-500 pb-2">
+                        <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">RANK</th>
+                        <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">ALLIANCE [TAG]</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">MEMBERS</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">POPULATION</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">ATTACK POINTS</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">DEFENSE POINTS</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">RESOURCES HAULED</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-900/60 font-medium">
+                      {displayAlliances.map((all) => {
+                        const globalRankIdx = sortedAlliances.findIndex(x => x.id === all.id) + 1;
+                        const isExpanded = expandedAllianceId === all.id;
+                        const isYourAlliance = player.allianceId === all.id;
+
+                        return (
+                          <React.Fragment key={all.id}>
+                            <tr 
+                              className={`border-b border-[#1E293B]/60 hover:bg-white/5 transition duration-150 cursor-pointer ${isYourAlliance ? 'bg-[#5bc0be]/10 border-l-2 border-l-[#5bc0be] pl-2' : ''}`}
+                              onClick={() => setExpandedAllianceId(isExpanded ? null : all.id)}
+                            >
+                              <td className="py-3.5 px-4 font-mono font-bold whitespace-nowrap">
+                                <span className={globalRankIdx <= 3 ? 'text-yellow-400 font-extrabold' : 'text-slate-500'}>
+                                  {globalRankIdx <= 3 ? `🏆 #${globalRankIdx}` : `#${globalRankIdx}`}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span 
+                                      className="w-2.5 h-2.5 rounded-full" 
+                                      style={{ backgroundColor: all.bannerColor || '#5bc0be' }}
+                                    />
+                                    <span className="font-bold text-[#5bc0be] hover:text-cyan-300">
+                                      {all.name} <span className="text-slate-500 font-mono">[{all.tag}]</span>
+                                    </span>
+                                    {isYourAlliance && <span className="text-[10px] text-cyan-400 font-mono font-normal ml-1">(YOURS)</span>}
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 font-mono font-normal">
+                                    {isExpanded ? '▲ Collapse' : '▼ Expand Members'}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4 text-right text-slate-300 font-bold font-mono">
+                                {all.members.length}
+                              </td>
+                              <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'population' ? 'text-[#5bc0be]' : 'text-slate-400'}`}>
+                                {all.combinedScores.population.toLocaleString()}
+                              </td>
+                              <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'attack' ? 'text-red-400' : 'text-slate-400'}`}>
+                                {all.combinedScores.attack.toLocaleString()}
+                              </td>
+                              <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'defence' ? 'text-blue-400' : 'text-slate-400'}`}>
+                                {all.combinedScores.defence.toLocaleString()}
+                              </td>
+                              <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'raiders' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                {all.combinedScores.raiders.toLocaleString()}
+                              </td>
+                            </tr>
+
+                            {/* Member list expansion row */}
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan={7} className="p-4 bg-[#05070a]/80 border-b border-[#1E293B]">
+                                  <div className="space-y-3 pl-6 pr-4">
+                                    <div className="flex items-center justify-between border-b border-[#1E293B]/40 pb-1.5">
+                                      <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest font-mono">
+                                        🛡️ {all.name} Alliance Command Roster ({all.members.length} members)
+                                      </h4>
+                                      <span className="text-[10px] text-slate-500 font-mono">Leader: <span className="text-yellow-400 font-bold">{all.leaderName}</span></span>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                      {all.membersWithScores.map((mbr: any) => {
+                                        const isMbrYou = mbr.playerId === player.id;
+                                        return (
+                                          <div 
+                                            key={mbr.playerId}
+                                            className={`p-2.5 rounded-xl border bg-[#080d16]/75 hover:bg-[#0c1322] transition flex flex-col justify-between gap-1.5 ${isMbrYou ? 'border-cyan-500/30' : 'border-[#1E293B]'}`}
+                                          >
+                                            <div className="flex items-center justify-between">
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (onViewPlayerProfile) onViewPlayerProfile(mbr.playerId);
+                                                }}
+                                                className="text-xs font-bold text-cyan-400 hover:text-cyan-300 hover:underline text-left cursor-pointer focus:outline-none"
+                                              >
+                                                {mbr.username} {isMbrYou && <span className="text-[9px] text-cyan-500 font-normal">(YOU)</span>}
+                                              </button>
+                                              <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-md font-mono ${
+                                                mbr.role === 'leader' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                                mbr.role === 'officer' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
+                                                'bg-slate-800 text-slate-400'
+                                              }`}>
+                                                {mbr.role}
+                                              </span>
+                                            </div>
+
+                                            {/* Mini score summary */}
+                                            <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-mono text-slate-450 border-t border-[#1E293B]/30 pt-1.5 mt-0.5">
+                                              <div>
+                                                <span className="text-slate-500">Pop:</span> <span className="text-slate-300 font-semibold">{mbr.scores.population.toLocaleString()}</span>
+                                              </div>
+                                              <div>
+                                                <span className="text-slate-500">Atk:</span> <span className="text-red-400 font-semibold">{mbr.scores.attack.toLocaleString()}</span>
+                                              </div>
+                                              <div>
+                                                <span className="text-slate-500">Def:</span> <span className="text-blue-400 font-semibold">{mbr.scores.defence.toLocaleString()}</span>
+                                              </div>
+                                              <div>
+                                                <span className="text-slate-500">Haul:</span> <span className="text-emerald-400 font-semibold">{mbr.scores.raiders.toLocaleString()}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
 
               {/* Pagination skip page controls */}
-              {!showBottom10 && !showTop10 && totalPages > 1 && (
+              {((leaderboardType === 'players' && !showBottom10 && !showTop10 && totalPages > 1) || 
+                (leaderboardType === 'alliances' && totalPages > 1)) && (
                 <div className="flex items-center justify-between pt-4 border-t border-[#1E293B]/40 font-mono text-xs">
                   <div>
                     <span className="text-slate-500">Page <strong>{leaderboardPage}</strong> of <strong>{totalPages}</strong></span>
-                    <span className="text-slate-600 text-[10px] ml-2 font-bold font-mono">({sortedPlayers.length} space lords)</span>
+                    <span className="text-slate-600 text-[10px] ml-2 font-bold font-mono">
+                      ({leaderboardType === 'players' ? `${sortedPlayers.length} space lords` : `${sortedAlliances.length} stellar alliances`})
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -1297,18 +1540,16 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 </div>
               )}
 
-              {showBottom10 && (
+              {leaderboardType === 'players' && showBottom10 && (
                 <div className="pt-2 text-center text-slate-500 text-[10px] uppercase font-bold tracking-widest block py-2 border-t border-[#1E293B]/20">
                   ⚡ DISPLAYING LOWER-TIER STANDINGS SYSTEMWIDE COMMANDERS (BOTTOM 10 ENGAGEMENT SCORES)
                 </div>
               )}
 
-              {showTop10 && (
+              {leaderboardType === 'players' && showTop10 && (
                 <div className="pt-2 text-center text-cyan-400 text-[10px] uppercase font-bold tracking-widest block py-2 border-t border-[#1E293B]/20 animate-pulse font-mono">
                   🏆 DISPLAYING ELITE STANDINGS SYSTEMWIDE COMMANDERS (TOP 10 ENGAGEMENT SCORES)
                 </div>
-              )}
-                </>
               )}
             </div>
           </div>
@@ -1317,7 +1558,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
       {/* SUB TAB 3: ALLIANCE & CHAT */}
       {subTab === 'comms' && (
-        <div className="space-y-6">
+        <div className="space-y-1.5">
           {/* Alliance Command */}
           <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4">
             <div 
@@ -1722,7 +1963,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
       {/* SUB TAB 4: NEWS TICKER & REPORTS */}
       {subTab === 'news' && (
-        <div className="space-y-6">
+        <div className="space-y-1.5">
           {/* Collapsible Drop Down Box 1: Combat Reports */}
           <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4">
             <div 
@@ -1894,33 +2135,35 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 >
                                   <span>{isRead ? '✉ Mark Unread' : '✉ Mark Read'}</span>
                                 </button>
-                              </div>
 
-                              {/* Target forwarders */}
-                              <div className="flex items-center gap-1">
-                                <span className="text-slate-500 text-[8.5px]">Forward:</span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (onForwardReport) onForwardReport(report, 'global');
-                                  }}
-                                  className="px-1.5 py-0.5 rounded bg-slate-900 border border-white/10 hover:bg-slate-800 text-[9px] text-slate-350 cursor-pointer text-center"
-                                >
-                                  Global
-                                </button>
-                                {player.allianceId && (
+                                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-white/5 bg-slate-900/40 text-[9px] text-slate-400">
+                                  <span>📤 Forward:</span>
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (onForwardReport) onForwardReport(report, 'alliance');
+                                      if (onForwardReport) onForwardReport(report, 'global');
                                     }}
-                                    className="px-1.5 py-0.5 rounded bg-cyan-950/45 border border-cyan-800/30 hover:bg-cyan-900/40 text-[9px] text-cyan-350 cursor-pointer text-center font-bold"
+                                    className="text-cyan-400 hover:text-cyan-300 font-bold ml-1 cursor-pointer"
                                   >
-                                    Alliance
+                                    Global
                                   </button>
-                                )}
+                                  {player.allianceId && (
+                                    <>
+                                      <span className="text-slate-600">|</span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (onForwardReport) onForwardReport(report, 'alliance');
+                                        }}
+                                        className="text-purple-400 hover:text-purple-300 font-bold cursor-pointer"
+                                      >
+                                        Alliance
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
@@ -1946,21 +2189,28 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     const mAtk: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
                                     const attHpValue = Object.entries(report.attackerInitialTroops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (mDef[k] || 10), 0);
                                     const attAtkValue = Object.entries(report.attackerInitialTroops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (mAtk[k] || 10), 0);
+                                    const totalAttInitial = Object.values(report.attackerInitialTroops || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                                    const totalAttLosses = Object.values(report.attackerLosses || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                                    const attLossPercent = totalAttInitial > 0 ? ((totalAttLosses / totalAttInitial) * 100).toFixed(1) : '0.0';
                                     return (
                                       <>
-                                        <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide">
-                                          ATTACKER:{' '}
-                                          <span 
-                                            onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.attackerId)}
-                                            className="underline decoration-dotted cursor-pointer hover:text-red-300"
-                                          >
-                                            {report.attackerName}
+                                        <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide flex items-center justify-between">
+                                          <span>ATTACKER:{' '}
+                                            <span 
+                                              onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.attackerId)}
+                                              className="underline decoration-dotted cursor-pointer hover:text-red-300"
+                                            >
+                                              {report.attackerName}
+                                            </span>
+                                          </span>
+                                          <span className="text-[10px] text-red-400 font-bold bg-red-950/25 px-1.5 py-0.5 rounded border border-red-900/20 font-mono select-none">
+                                            Loss: {attLossPercent}%
                                           </span>
                                         </p>
                                         <p className="text-slate-500 text-[10px] mt-0.5">Origin: [{report.attackerCoords.x}, {report.attackerCoords.y}]</p>
                                         <div className="mt-2 space-y-1">
                                           <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
-                                            <div>Attacker HP (Defense Shields): <span className="text-red-400 font-mono font-extrabold">{attHpValue.toLocaleString()}</span></div>
+
                                             <div>Attacker Attack HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{attAtkValue.toLocaleString()}</span></div>
                                           </div>
                                           <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
@@ -1984,22 +2234,29 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     const mAtk: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
                                     const defHpValue = Object.entries(report.defenderInitialTroops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (mDef[k] || 10), 0);
                                     const defAtkValue = Object.entries(report.defenderInitialTroops || {}).reduce((sum, [k, v]) => sum + (Number(v) || 0) * (mAtk[k] || 10), 0);
+                                    const totalDefInitial = Object.values(report.defenderInitialTroops || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                                    const totalDefLosses = Object.values(report.defenderLosses || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                                    const defLossPercent = totalDefInitial > 0 ? ((totalDefLosses / totalDefInitial) * 100).toFixed(1) : '0.0';
                                     return (
                                       <>
-                                        <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide">
-                                          STATION:{' '}
-                                          <span 
-                                            onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
-                                            className="underline decoration-dotted cursor-pointer hover:text-cyan-300"
-                                          >
-                                            {report.defenderName}
+                                        <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide flex items-center justify-between">
+                                          <span>STATION:{' '}
+                                            <span 
+                                              onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
+                                              className="underline decoration-dotted cursor-pointer hover:text-cyan-300"
+                                            >
+                                              {report.defenderName}
+                                            </span>
+                                          </span>
+                                          <span className="text-[10px] text-cyan-400 font-bold bg-cyan-950/25 px-1.5 py-0.5 rounded border border-cyan-900/20 font-mono select-none">
+                                            Loss: {defLossPercent}%
                                           </span>
                                         </p>
                                         <p className="text-slate-500 text-[10px] mt-0.5">Target: [{report.defenderCoords.x}, {report.defenderCoords.y}]</p>
                                         <div className="mt-2 space-y-1">
                                           <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
                                             <div>Defender HP (Defense Shields): <span className="text-cyan-400 font-mono font-extrabold">{defHpValue.toLocaleString()}</span></div>
-                                            <div>Defender Attack HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{defAtkValue.toLocaleString()}</span></div>
+                                            
                                           </div>
                                           <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
                                             {Object.entries(report.defenderInitialTroops).map(([type, qty]) => {
@@ -2420,7 +2677,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
       )}
 
       {subTab === 'fleets' && (
-        <div className="space-y-6">
+        <div className="space-y-1.5">
           {/* Section 1: Docking Bay / Stationed Troops */}
           <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4 text-left">
             <h3 className="text-sm font-bold uppercase tracking-widest text-[#5bc0be] inline-flex items-center gap-2">
@@ -2590,7 +2847,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           {/* Right Column: Allocate Forces counts */}
                           <div className="space-y-2 text-xs">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Allocate Units:</span>
-                            <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto pr-1">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {Object.entries(planet.troops).map(([tId, count]) => {
                                 const nameLabel = 
                                   tId === 'drone' ? 'Missile Launcher' : 
@@ -2599,25 +2856,39 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   tId === 'tank' ? 'Disrupter' : 
                                   tId === 'attacker' ? 'Assault Drone' : 
                                   tId === 'settlementShip' ? 'Settlement Ship' : tId;
+                                const avail = count as number;
                                 return (
-                                  <div key={tId} className="flex flex-col bg-[#05070A]/80 p-2 rounded-lg border border-[#1E293B]">
-                                    <span className="text-[9px] text-slate-500 font-sans block truncate">{nameLabel}</span>
-                                    <div className="flex items-center justify-between mt-1 gap-1">
+                                  <div key={tId} className="flex items-center justify-between p-1.5 bg-[#05070A]/80 border border-[#1E293B]/40 hover:border-cyan-500/20 rounded-lg transition-colors">
+                                    <div className="min-w-0 pr-1">
+                                      <span className="font-bold text-slate-200 block truncate text-[10.5px]" title={nameLabel}>{nameLabel}</span>
+                                      <span className="text-[8.5px] text-slate-500 font-bold block">In-Hangar: <strong className="text-cyan-400 font-extrabold">{avail}</strong></span>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-1 shrink-0 bg-slate-950/40 p-0.5 rounded-lg border border-[#1E293B]/40">
+                                      <button
+                                        type="button"
+                                        onClick={() => setCustomTroops(prev => ({ ...prev, [tId]: 0 }))}
+                                        className="px-1.5 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] font-bold text-slate-300 rounded"
+                                      >
+                                        Min
+                                      </button>
                                       <input
                                         type="number"
                                         min="0"
-                                        max={count as number}
-                                        value={(customTroops[tId] as number) || 0}
+                                        max={avail}
+                                        value={customTroops[tId] === 0 ? '' : customTroops[tId] || 0}
+                                        placeholder="0"
                                         onChange={(e) => {
-                                          const val = Math.min(count as number, Math.max(0, parseInt(e.target.value, 10) || 0));
+                                          const val = Math.min(avail, Math.max(0, parseInt(e.target.value, 10) || 0));
                                           setCustomTroops(prev => ({ ...prev, [tId]: val }));
                                         }}
-                                        className="bg-transparent border-none text-white text-[11px] font-bold font-mono focus:outline-none w-full"
+                                        className="w-14 text-center bg-[#05070A] border border-[#1E293B]/30 rounded font-mono text-[10px] text-white py-0.5 focus:outline-none focus:border-cyan-500 font-extrabold"
                                       />
                                       <button
                                         type="button"
-                                        onClick={() => setCustomTroops(prev => ({ ...prev, [tId]: count as number }))}
-                                        className="text-[9px] text-cyan-404 text-cyan-400 hover:text-white font-bold"
+                                        disabled={avail === 0}
+                                        onClick={() => setCustomTroops(prev => ({ ...prev, [tId]: avail }))}
+                                        className="px-1.5 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-cyan-400 rounded disabled:opacity-30 font-bold"
                                       >
                                         Max
                                       </button>
@@ -2926,8 +3197,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           : (fleetTroops.tank || 0);
 
         return (
-          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-xl bg-[#090D1A] border border-cyan-500/35 rounded-2xl p-6 font-mono shadow-[0_0_50px_rgba(6,182,212,0.2)] animate-fade-in text-left max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+          <div className="fixed inset-0 bg-[#05070A]/95 backdrop-blur-md z-50 overflow-y-auto p-4 sm:p-6 md:p-8 flex items-center justify-center">
+            <div className="w-full max-w-2xl bg-[#090D1A] border border-cyan-500/35 rounded-2xl p-6 md:p-8 font-mono shadow-[0_0_50px_rgba(6,182,212,0.15)] animate-fade-in text-left my-auto space-y-5 flex flex-col">
               <div className="flex justify-between items-start pb-2.5 border-b border-[#1E293B]/60 shrink-0 mb-4">
                 <div>
                   <span className="text-[9px] font-black text-cyan-300 uppercase tracking-widest bg-cyan-950/25 border border-cyan-500/25 px-2.5 py-1 rounded-lg">FLEET DEPLOYMENT TRANSMISSION</span>
@@ -2984,8 +3255,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 </button>
               </div>
 
-              {/* Scrollable Content Container */}
-              <div className="flex-1 overflow-y-auto pr-1.5 space-y-4">
+              {/* Scrollable Content Container (Overflow disabled, scrolled via fullscreen overlay) */}
+              <div className="space-y-4">
                 
                 {/* RESERVE FLEET DEPLOYMENT OPTION */}
                 {(() => {
@@ -3096,11 +3367,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 </span>
                                 <p className="text-[9px] text-slate-500 mt-0.5">Aval: <strong className="text-cyan-400">{count}</strong></p>
                               </div>
-                              <div className="flex items-center gap-0.5 shrink-0 bg-slate-950/40 p-0.5 rounded-lg border border-[#1E293B]/40">
+                              <div className="flex items-center gap-1 shrink-0 bg-slate-950/40 p-0.5 rounded-lg border border-[#1E293B]/40">
                                 <button 
                                   type="button"
                                   onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: 0 }))}
-                                  className="px-1 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-slate-300 font-mono rounded"
+                                  className="px-1.5 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-slate-300 font-mono rounded font-bold"
                                 >
                                   Min
                                 </button>
@@ -3108,18 +3379,19 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   type="number"
                                   min={0}
                                   max={count}
-                                  value={fleetTroops[tId] || 0}
+                                  value={fleetTroops[tId] === 0 ? '' : fleetTroops[tId]}
+                                  placeholder="0"
                                   onChange={(e) => {
                                     const val = Math.min(count, Math.max(0, parseInt(e.target.value, 10) || 0));
                                     setFleetTroops(prev => ({ ...prev, [tId]: val }));
                                   }}
-                                  className="w-8 text-center bg-[#05070A] border border-[#1E293B]/30 rounded font-mono text-[10px] text-white py-0.5 focus:outline-none focus:border-cyan-500 font-extrabold"
+                                  className="w-14 text-center bg-[#05070A] border border-[#1E293B]/30 rounded font-mono text-[10px] text-white py-0.5 focus:outline-none focus:border-cyan-500 font-extrabold"
                                 />
                                 <button 
                                   type="button"
                                   disabled={count === 0}
                                   onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: count }))}
-                                  className="px-1 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-cyan-400 font-mono rounded disabled:opacity-30"
+                                  className="px-1.5 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-cyan-400 font-mono rounded disabled:opacity-30 font-bold"
                                 >
                                   Max
                                 </button>
@@ -3528,10 +3800,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           </span>
                         ) : (
                           intelReport.commander
-                        )}{' '}
-                        <span className="text-slate-500 bg-white/5 px-1.5 py-0.2 rounded border border-white/5 uppercase ml-1.5 text-[9px]">
-                          {intelReport.faction || 'Neutral Space Alliance'}
-                        </span>
+                        )}
                       </p>
                       {(() => {
                         const targetActive = intelReport.lastActive;

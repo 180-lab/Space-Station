@@ -518,7 +518,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   const armyBaseLevel = activePlanet.buildings.armyBase?.level || 0;
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-1.5 pb-24">
       {/* Overview stats centerpiece */}
       <div className="p-6 rounded-xl border border-[#1E293B] bg-[#0A0F1D]/90 backdrop-blur-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -575,20 +575,22 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
       <div className="flex border border-[#1E293B] bg-[#0A0F1D]/80 p-1.5 rounded-2xl gap-2 shadow-inner">
         <button
           onClick={() => setSubTab('troops')}
-          className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-mono text-xs font-bold transition-all duration-250 cursor-pointer relative ${
+          className={`flex-1 flex flex-col items-center justify-center py-2 px-4 rounded-xl font-mono text-xs font-bold transition-all duration-250 cursor-pointer relative ${
             subTab === 'troops' 
               ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/35 shadow-[0_0_15px_rgba(6,182,212,0.15)]' 
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
           }`}
         >
-          <Users size={15} className={`${subTab === 'troops' ? 'text-cyan-400 animate-pulse' : 'text-slate-400'}`} title="Troops icon: overview overall space forces garrisons" />
-          <span className="tracking-wider">TROOPS</span>
+          <div className="flex items-center gap-1.5">
+            <Users size={14} className={`${subTab === 'troops' ? 'text-cyan-400 animate-pulse' : 'text-slate-400'}`} title="Troops icon: overview overall space forces garrisons" />
+            <span className="tracking-wider text-[11px]">TROOPS</span>
+          </div>
           
-          {/* Badge displaying the total number of troops on the troops icon */}
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
+          {/* Badge displaying the total number of troops under the word TROOPS */}
+          <span className={`text-[10px] font-sans font-black transition-colors ${
             subTab === 'troops' 
-              ? 'bg-cyan-400 text-slate-950 font-sans' 
-              : 'bg-slate-800 text-slate-400'
+              ? 'text-cyan-300' 
+              : 'text-slate-500'
           }`} title="Total active space forces stationed on this world sector">
             {totalTroopsCount.toLocaleString()}
           </span>
@@ -629,7 +631,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
       {/* SUB-VIEW 1: TROOPS VIEW (See army, stats, division graphs) */}
       {subTab === 'troops' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-1.5 animate-fade-in">
           {/* Integrated Armed Force Tactical Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 bg-[#0A0F1D]/65 border border-[#1E293B] rounded-xl flex items-center gap-3.5" title="Defense Absorption: Defense/shield strength point total absorbing enemy scans and raids.">
@@ -796,7 +798,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
       {/* SUB-VIEW 2: FABRICATE RECRUITING MODULE (Original full control flow) */}
       {subTab === 'fabricate' && (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-1.5 animate-fade-in">
           {/* Active Training Queues Drop Down Box like resources */}
           <div className="border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md overflow-hidden transition-all duration-200 shadow-md">
             {/* Accordion Trigger */}
@@ -925,7 +927,9 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                 const isInfoActive = activeTroopInfo === tId;
                 const qty = quantities[tId] || 1;
                 const requiredLevel = TROOP_REQUIRED_LEVELS[tId] || 0;
-                const isLocked = armyBaseLevel < requiredLevel;
+                
+                const allWarRoomsReached22 = player.planets.every(pl => (pl.buildings.armyBase?.level || 0) >= 22);
+                const isLocked = (armyBaseLevel < requiredLevel) || (tId === 'settlementShip' && !allWarRoomsReached22);
 
                 return (
                   <div 
@@ -968,7 +972,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                           <span className="font-bold text-white text-base font-mono">{details.name}</span>
                           {isLocked ? (
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-red-950/50 text-red-400 border border-red-500/30 flex items-center gap-1 animate-pulse shadow-sm">
-                              🔒 REQ WAR ROOM LV. {requiredLevel}
+                              {tId === 'settlementShip' && !allWarRoomsReached22 ? "🔒 ALL WAR ROOMS REQ LV. 22" : `🔒 REQ WAR ROOM LV. ${requiredLevel}`}
                             </span>
                           ) : (
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 text-cyan-400 border border-[#1E293B]">
@@ -1141,7 +1145,15 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                             <span>🔒 Fabrication Status: Off-line</span>
                           </div>
                           <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
-                            Upgrade your War Room to <strong className="text-white">Level {requiredLevel}</strong> to assemble {details.name}s on this base.
+                            {tId === 'settlementShip' && !allWarRoomsReached22 ? (
+                              <>
+                                Upgrade <strong className="text-white">ALL your War Rooms to Level 22</strong> to construct a Settlement Ship.
+                              </>
+                            ) : (
+                              <>
+                                Upgrade your War Room to <strong className="text-white">Level {requiredLevel}</strong> to assemble {details.name}s on this base.
+                              </>
+                            )}
                           </p>
                         </div>
                       );
@@ -1225,7 +1237,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
       {/* SUB-VIEW 3: FLEET COMMAND VIEW */}
       {subTab === 'fleet' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-1.5 animate-fade-in">
           {/* Main Title Banner */}
           <div className="p-5 bg-gradient-to-r from-emerald-950/20 to-teal-950/20 border border-emerald-500/20 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="space-y-1 text-left">
@@ -1318,21 +1330,21 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                   {/* Allocated Troops layout list */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Allocate Ships inside Each Fleet Cargo</label>
-                    <div className="space-y-2 max-h-52 overflow-y-auto pr-1 bg-slate-950/20 p-2.5 border border-[#1E293B]/40 rounded-xl font-mono text-[10px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-950/20 p-2 border border-[#1E293B]/40 rounded-xl font-mono text-[10px]">
                       {Object.keys(TROOP_NAME_MAPPING).map((tId) => {
                         const avail = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
                         return (
-                          <div key={tId} className="flex items-center justify-between border-b border-slate-900/40 pb-1.5 last:border-0 last:pb-0">
-                            <div className="min-w-0">
-                              <span className="font-bold text-slate-200 block">{TROOP_NAME_MAPPING[tId]}</span>
-                              <span className="text-[8.5px] text-slate-500 font-bold">In-Hangar count: <strong className="text-cyan-400 font-extrabold">{avail}</strong></span>
+                          <div key={tId} className="flex items-center justify-between p-1.5 bg-[#05070A]/80 border border-[#1E293B]/40 hover:border-cyan-500/20 rounded-lg transition-colors">
+                            <div className="min-w-0 pr-1">
+                              <span className="font-bold text-slate-200 block truncate" title={TROOP_NAME_MAPPING[tId]}>{TROOP_NAME_MAPPING[tId]}</span>
+                              <span className="text-[8.5px] text-slate-500 font-bold block">In-Hangar: <strong className="text-cyan-400 font-extrabold">{avail}</strong></span>
                             </div>
                             
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1 shrink-0 bg-slate-950/40 p-0.5 rounded-lg border border-[#1E293B]/40">
                               <button
                                 type="button"
                                 onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: 0 }))}
-                                className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700/80 text-[8px] rounded font-bold"
+                                className="px-1.5 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] font-bold text-slate-300 rounded"
                               >
                                 Min
                               </button>
@@ -1340,18 +1352,19 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                 type="number"
                                 min={0}
                                 max={avail}
-                                value={fleetTroops[tId] || 0}
+                                value={fleetTroops[tId] === 0 ? '' : fleetTroops[tId]}
+                                placeholder="0"
                                 onChange={(e) => {
                                   const val = Math.min(avail, Math.max(0, parseInt(e.target.value, 10) || 0));
                                   setFleetTroops(prev => ({ ...prev, [tId]: val }));
                                 }}
-                                className="w-12 text-center bg-slate-950 border border-slate-800 text-[10px] text-white focus:outline-none focus:border-cyan-500 font-bold p-0.5 rounded"
+                                className="w-14 text-center bg-[#05070A] border border-[#1E293B]/30 rounded font-mono text-[10px] text-white py-0.5 focus:outline-none focus:border-cyan-500 font-extrabold"
                               />
                               <button
                                 type="button"
                                 disabled={avail === 0}
                                 onClick={() => setFleetTroops(prev => ({ ...prev, [tId]: avail }))}
-                                className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700/80 text-[8px] rounded deactivated:opacity-20 font-bold"
+                                className="px-1.5 py-0.5 bg-[#1E293B]/40 hover:bg-[#1E293B]/60 text-[8px] text-cyan-400 rounded disabled:opacity-30 font-bold"
                               >
                                 Max
                               </button>
@@ -1817,7 +1830,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
                       {/* Interactive bookmark and forwarding control panel */}
                       <div className="flex flex-wrap items-center justify-between text-[10.5px] border-b border-white/5 pb-2 text-slate-400 gap-1.5">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1844,53 +1857,67 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                           >
                             <span>{isRead ? '✉ Mark Unread' : '✉ Mark Read'}</span>
                           </button>
-                        </div>
 
-                        {/* Forward buttons */}
-                        <div className="flex items-center gap-1">
-                          <span className="text-slate-500 text-[9.5px]">Forward:</span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onForwardReport) onForwardReport(report, 'global');
-                            }}
-                            className="px-2 py-0.5 rounded bg-slate-900 border border-white/10 hover:bg-slate-800 text-[9.5px] font-bold text-slate-300 transition cursor-pointer"
-                          >
-                            Global
-                          </button>
-                          {player.allianceId && (
+                          <div className="flex items-center gap-1.5 px-2 py-1 rounded border border-white/5 bg-slate-900/60 text-[10px] text-slate-400">
+                            <span>📤 Forward:</span>
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (onForwardReport) onForwardReport(report, 'alliance');
+                                if (onForwardReport) onForwardReport(report, 'global');
                               }}
-                              className="px-2 py-0.5 rounded bg-cyan-950/40 border border-cyan-800/30 hover:bg-cyan-900/40 text-[9.5px] font-bold text-cyan-300 transition cursor-pointer"
+                              className="text-cyan-450 hover:text-cyan-300 font-bold cursor-pointer"
                             >
-                              Alliance
+                              Global
                             </button>
-                          )}
+                            {player.allianceId && (
+                              <>
+                                <span className="text-slate-600">|</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onForwardReport) onForwardReport(report, 'alliance');
+                                  }}
+                                  className="text-purple-400 hover:text-purple-300 font-bold cursor-pointer"
+                                >
+                                  Alliance
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      {isExpanded && (
-                        <div className="space-y-3 animate-fade-in text-left">
-                          <div className="grid grid-cols-2 gap-4 text-[11px] leading-relaxed">
-                            <div>
-                              <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide">
-                                ATTACKER:{' '}
-                                <span 
-                                  onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.attackerId)}
-                                  className="underline decoration-dotted cursor-pointer hover:text-red-300 font-bold text-red-400"
-                                >
-                                  {report.attackerName}
-                                </span>
-                              </p>
+                      {isExpanded && (() => {
+                        const totalAttInitial = Object.values(report.attackerInitialTroops || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                        const totalAttLosses = Object.values(report.attackerLosses || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                        const attLossPercent = totalAttInitial > 0 ? ((totalAttLosses / totalAttInitial) * 100).toFixed(1) : '0.0';
+
+                        const totalDefInitial = Object.values(report.defenderInitialTroops || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                        const totalDefLosses = Object.values(report.defenderLosses || {}).reduce((sum: number, q: any) => sum + (Number(q) || 0), 0) as number;
+                        const defLossPercent = totalDefInitial > 0 ? ((totalDefLosses / totalDefInitial) * 100).toFixed(1) : '0.0';
+
+                        return (
+                          <div className="space-y-3 animate-fade-in text-left">
+                            <div className="grid grid-cols-2 gap-4 text-[11px] leading-relaxed">
+                              <div>
+                                <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide flex items-center justify-between">
+                                  <span>ATTACKER:{' '}
+                                    <span 
+                                      onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.attackerId)}
+                                      className="underline decoration-dotted cursor-pointer hover:text-red-300 font-bold text-red-400"
+                                    >
+                                      {report.attackerName}
+                                    </span>
+                                  </span>
+                                  <span className="text-[10px] text-red-400 font-bold bg-red-950/25 px-1.5 py-0.5 rounded border border-red-900/20 font-mono select-none">
+                                    Loss: {attLossPercent}%
+                                  </span>
+                                </p>
                               <p className="text-slate-500 text-[10px] mt-0.5">Origin: [{report.attackerCoords.x}, {report.attackerCoords.y}]</p>
                               <div className="mt-2 space-y-1">
                                 <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
-                                  <div>Attacker HP (Defense Shields): <span className="text-red-400 font-mono font-extrabold">{attStats.hp.toLocaleString()}</span></div>
                                   <div>Attacker Attack HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{attStats.atk.toLocaleString()}</span></div>
                                 </div>
                                 <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
@@ -1906,20 +1933,23 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                               </div>
                             </div>
                             <div>
-                              <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide">
-                                STATION:{' '}
-                                <span 
-                                  onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
-                                  className="underline decoration-dotted cursor-pointer hover:text-cyan-300 font-bold text-cyan-400"
-                                >
-                                  {report.defenderName}
+                              <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide flex items-center justify-between">
+                                <span>STATION:{' '}
+                                  <span 
+                                    onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
+                                    className="underline decoration-dotted cursor-pointer hover:text-cyan-300 font-bold text-cyan-400"
+                                  >
+                                    {report.defenderName}
+                                  </span>
+                                </span>
+                                <span className="text-[10px] text-cyan-400 font-bold bg-cyan-950/25 px-1.5 py-0.5 rounded border border-cyan-900/20 font-mono select-none">
+                                  Loss: {defLossPercent}%
                                 </span>
                               </p>
                               <p className="text-slate-500 text-[10px] mt-0.5">Target: [{report.defenderCoords.x}, {report.defenderCoords.y}]</p>
                               <div className="mt-2 space-y-1">
                                 <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
                                   <div>Defender HP (Defense Shields): <span className="text-cyan-400 font-mono font-extrabold">{defStats.hp.toLocaleString()}</span></div>
-                                  <div>Defender Attack HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{defStats.atk.toLocaleString()}</span></div>
                                 </div>
                                 <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
                                   {Object.entries(report.defenderInitialTroops).map(([type, qty]) => {
@@ -2037,12 +2067,13 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                });
-              })()}
-            </div>
+                      );
+                    })()}
+                  </div>
+                );
+              });
+            })()}
+          </div>
 
             <div className="border-t border-[#1E293B] pt-3 flex justify-end">
               <button 

@@ -3,6 +3,8 @@ import path from "path";
 import fs from "fs";
 import http from "http";
 import https from "https";
+import { initializeApp, cert, getApps, App } from "firebase-admin/app";
+import { getMessaging } from "firebase-admin/messaging";
 import { 
   GameState, 
   PlayerProfile, 
@@ -265,6 +267,9 @@ async function loadState() {
       if (!state.feedbacks) {
         state.feedbacks = [];
       }
+      if (!state.customTasks) {
+        state.customTasks = {};
+      }
       
       // Auto-migrate any outpost names to station names for loaded sectors
       if (state && state.players) {
@@ -343,7 +348,7 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number, isF
   const createMines = (count: number): MineState[] => {
     return Array.from({ length: count }, (_, i) => ({
       index: i,
-      level: isFirstStation ? 25 : 0,
+      level: isFirstStation ? 25 : 1,
       isUpgrading: false,
       upgradeEnd: null,
       health: 100
@@ -557,52 +562,16 @@ function bootstrapUniverse() {
     }
   ];
 
-  const factions = ["Solar Alliance", "Nexus Syndicate", "Eclipse Vanguard"];
+  const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
   const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
 
-  // Create 2 AI Alliances
-  const voidAlliance: Alliance = {
-    id: "alliance_void",
-    name: "VOID SYNDICATE",
-    tag: "VOID",
-    leaderId: "ai_1",
-    leaderName: "VoidLord",
-    members: [
-      { playerId: "ai_1", username: "VoidLord", role: "leader" },
-      { playerId: "ai_2", username: "XenonHunter", role: "officer" },
-      { playerId: "ai_3", username: "NebulaKnight", role: "member" }
-    ],
-    wars: [],
-    bannerColor: "#FF007A",
-    bannerSymbol: "▲"
-  };
-
-  const empireAlliance: Alliance = {
-    id: "alliance_empire",
-    name: "SOLAR EMPIRE",
-    tag: "SOL",
-    leaderId: "ai_4",
-    leaderName: "Astraea",
-    members: [
-      { playerId: "ai_4", username: "Astraea", role: "leader" },
-      { playerId: "ai_5", username: "TitanKing", role: "officer" },
-      { playerId: "ai_6", username: "StarEclipse", role: "member" }
-    ],
-    wars: [],
-    bannerColor: "#00F0FF",
-    bannerSymbol: "◈"
-  };
-
-  state.alliances[voidAlliance.id] = voidAlliance;
-  state.alliances[empireAlliance.id] = empireAlliance;
-
   const aiNames = [
-    { name: "VoidLord", coords: { x: 12, y: 34 }, allianceId: "alliance_void", faction: factions[1], color: factionColors[1] },
-    { name: "XenonHunter", coords: { x: 18, y: 40 }, allianceId: "alliance_void", faction: factions[1], color: factionColors[1] },
-    { name: "NebulaKnight", coords: { x: 8, y: 22 }, allianceId: "alliance_void", faction: factions[1], color: factionColors[1] },
-    { name: "Astraea", coords: { x: 55, y: 78 }, allianceId: "alliance_empire", faction: factions[0], color: factionColors[0] },
-    { name: "TitanKing", coords: { x: 62, y: 82 }, allianceId: "alliance_empire", faction: factions[0], color: factionColors[0] },
-    { name: "StarEclipse", coords: { x: 50, y: 70 }, allianceId: "alliance_empire", faction: factions[0], color: factionColors[0] },
+    { name: "VoidLord", coords: { x: 12, y: 34 }, allianceId: null, faction: factions[1], color: factionColors[1] },
+    { name: "XenonHunter", coords: { x: 18, y: 40 }, allianceId: null, faction: factions[1], color: factionColors[1] },
+    { name: "NebulaKnight", coords: { x: 8, y: 22 }, allianceId: null, faction: factions[1], color: factionColors[1] },
+    { name: "Astraea", coords: { x: 55, y: 78 }, allianceId: null, faction: factions[0], color: factionColors[0] },
+    { name: "TitanKing", coords: { x: 62, y: 82 }, allianceId: null, faction: factions[0], color: factionColors[0] },
+    { name: "StarEclipse", coords: { x: 50, y: 70 }, allianceId: null, faction: factions[0], color: factionColors[0] },
     { name: "CosmoPirate", coords: { x: 88, y: 15 }, allianceId: null, faction: factions[2], color: factionColors[2] },
     { name: "NovaSlayer", coords: { x: 42, y: 45 }, allianceId: null, faction: factions[2], color: factionColors[2] },
     { name: "SolarWing", coords: { x: 30, y: 90 }, allianceId: null, faction: factions[0], color: factionColors[0] },
@@ -629,8 +598,8 @@ function bootstrapUniverse() {
       username: ai.name,
       faction: ai.faction,
       factionColor: ai.color,
-      allianceId: ai.allianceId,
-      allianceRole: ai.allianceId ? "member" : null,
+      allianceId: null,
+      allianceRole: null,
       planets: [planet],
       scores: {
         population: Math.floor(Math.random() * 1000) + 200,
@@ -645,25 +614,7 @@ function bootstrapUniverse() {
       credits: 10000
     };
 
-    if (id === voidAlliance.leaderId) player.allianceRole = "leader";
-    if (id === empireAlliance.leaderId) player.allianceRole = "leader";
-
     state.players[id] = player;
-  });
-
-  // Make VOID & SOL declare war!
-  voidAlliance.wars.push({
-    targetAllianceId: empireAlliance.id,
-    targetAllianceName: empireAlliance.name,
-    declaredAt: Date.now() - 3600000
-  });
-
-  state.newsEvents.push({
-    id: "news_war_bootstrap",
-    title: "War Declared!",
-    content: "The VOID SYNDICATE has officially declared war against the SOLAR EMPIRE! Alliance boundaries are now borders under attack.",
-    type: "war",
-    timestamp: Date.now() - 3600000
   });
 
   ensureMinimumHabitablePlanets();
@@ -795,7 +746,7 @@ function tickPlayerState(playerId: string, now: number): boolean {
         planet.resources.food = Math.max(0, Math.min(storageLimit, planet.resources.food));
       }
 
-      const triggerAttrition = isAnyProdNegative || (planet.resources.water < 0) || (planet.resources.respirant < 0) || (planet.resources.food < 0);
+      const triggerAttrition = (planet.resources.water < 0) || (planet.resources.respirant < 0) || (planet.resources.food < 0);
 
       if (triggerAttrition) {
         // Essential resources exhausted! Troops start slowly dying of attrition (starvation/suffocation/dehydration)
@@ -827,6 +778,23 @@ function tickPlayerState(playerId: string, now: number): boolean {
         }
       }
 
+      // Active Research handling
+      if (planet.activeResearch && planet.activeResearch.endAt && now >= planet.activeResearch.endAt) {
+        const techId = planet.activeResearch.techId;
+        const targetLvl = planet.activeResearch.targetLevel;
+        if (!player.techLevels) {
+          player.techLevels = {};
+        }
+        if (!player.techLevels[planet.id]) {
+          player.techLevels[planet.id] = {};
+        }
+        player.techLevels[planet.id][techId] = targetLvl;
+        
+        lastCompletedUpgradeTime = Math.max(lastCompletedUpgradeTime, planet.activeResearch.endAt);
+        planet.activeResearch = null;
+        changed = true;
+      }
+
       // Sequential Upgrade Queue processor
       if (!planet.upgradeQueue) {
         planet.upgradeQueue = [];
@@ -845,6 +813,9 @@ function tickPlayerState(playerId: string, now: number): boolean {
           isUpgradeActive = true;
         }
       }
+      if (!isUpgradeActive && planet.activeResearch) {
+        isUpgradeActive = true;
+      }
 
       // If nothing is currently active, we start the queue sequentially!
       if (!isUpgradeActive && planet.upgradeQueue.length > 0) {
@@ -855,40 +826,67 @@ function tickPlayerState(playerId: string, now: number): boolean {
           let targetObj: any = null;
           let targetLvl = 1;
 
-          if (nextUp.type === 'mine') {
-            targetObj = planet.mines[nextUp.key as ResourceType]?.[nextUp.mineIndex!];
-            if (targetObj) {
-              targetLvl = targetObj.level + 1;
-              durationMs = targetLvl * 60 * 1000;
-            }
-          } else if (nextUp.type === 'building') {
-            targetObj = planet.buildings[nextUp.key as keyof typeof planet.buildings];
-            if (targetObj) {
-              targetLvl = targetObj.level + 1;
-              durationMs = targetLvl * 120 * 1000;
-            }
-          }
-
-          if (targetObj) {
+          if (nextUp.type === 'research') {
+            targetLvl = nextUp.targetLevel;
+            durationMs = targetLvl * 60 * 1000;
             const expectedEnd = referenceTime + durationMs;
             if (now >= expectedEnd) {
-              // Finished immediately! Upgrade and continue to next item in queue
-              targetObj.level = targetLvl;
-              targetObj.isUpgrading = false;
-              targetObj.upgradeEnd = null;
+              if (!player.techLevels) {
+                player.techLevels = {};
+              }
+              if (!player.techLevels[planet.id]) {
+                player.techLevels[planet.id] = {};
+              }
+              player.techLevels[planet.id][nextUp.key] = targetLvl;
               planet.upgradeQueue.shift();
               referenceTime = expectedEnd;
               changed = true;
             } else {
-              // Started, in progress. Set as active and exit queue loop
-              targetObj.isUpgrading = true;
-              targetObj.upgradeEnd = expectedEnd;
+              planet.activeResearch = {
+                techId: nextUp.key,
+                targetLevel: targetLvl,
+                endAt: expectedEnd
+              };
               planet.upgradeQueue.shift();
               changed = true;
               break;
             }
           } else {
-            planet.upgradeQueue.shift(); // Invalid queue item
+            if (nextUp.type === 'mine') {
+              targetObj = planet.mines[nextUp.key as ResourceType]?.[nextUp.mineIndex!];
+              if (targetObj) {
+                targetLvl = targetObj.level + 1;
+                durationMs = targetLvl * 60 * 1000;
+              }
+            } else if (nextUp.type === 'building') {
+              targetObj = planet.buildings[nextUp.key as keyof typeof planet.buildings];
+              if (targetObj) {
+                targetLvl = targetObj.level + 1;
+                durationMs = targetLvl * 120 * 1000;
+              }
+            }
+
+            if (targetObj) {
+              const expectedEnd = referenceTime + durationMs;
+              if (now >= expectedEnd) {
+                // Finished immediately! Upgrade and continue to next item in queue
+                targetObj.level = targetLvl;
+                targetObj.isUpgrading = false;
+                targetObj.upgradeEnd = null;
+                planet.upgradeQueue.shift();
+                referenceTime = expectedEnd;
+                changed = true;
+              } else {
+                // Started, in progress. Set as active and exit queue loop
+                targetObj.isUpgrading = true;
+                targetObj.upgradeEnd = expectedEnd;
+                planet.upgradeQueue.shift();
+                changed = true;
+                break;
+              }
+            } else {
+              planet.upgradeQueue.shift(); // Invalid queue item
+            }
           }
         }
       }
@@ -1004,14 +1002,16 @@ function simulateMoonbaseCombat(
   let defSurvivalFloor = 0;
 
   if (initialAttHp > 0 && initialDefHp > 0) {
-    if (initialAttHp > initialDefHp) {
-      // Attacker has more HP
-      const diffPct = (initialAttHp - initialDefHp) / initialDefHp;
-      attSurvivalFloor = Math.min(0.30, diffPct * 0.5);
-    } else if (initialDefHp > initialAttHp) {
-      // Defender has more HP
-      const diffPct = (initialDefHp - initialAttHp) / initialAttHp;
-      defSurvivalFloor = Math.min(0.30, diffPct * 0.5);
+    // 1. Attacker protection: survives if defender HP is NOT > 250% of attacker HP (i.e. defender does not have > 150% more relevant HP)
+    const defToAttRatio = initialDefHp / initialAttHp;
+    if (defToAttRatio <= 2.5) {
+      attSurvivalFloor = Math.max(0.10, 0.40 * (2.5 - defToAttRatio) / 1.5);
+    }
+
+    // 2. Defender protection: survives if attacker HP is NOT > 250% of defender HP (i.e. attacker does not have > 150% more relevant HP)
+    const attToDefRatio = initialAttHp / initialDefHp;
+    if (attToDefRatio <= 2.5) {
+      defSurvivalFloor = Math.max(0.10, 0.40 * (2.5 - attToDefRatio) / 1.5);
     }
   }
 
@@ -1348,7 +1348,7 @@ function simulateMoonbaseCombat(
   }
 
   // 150% involved HP complete annihilation overwhelm rule
-  if (initialAttHp > 1.5 * initialDefHp && initialDefHp > 0) {
+  if (initialAttHp > 2.5 * initialDefHp && initialDefHp > 0) {
     // Defender losses set to initial counts, no survivors
     Object.entries(defTroops).forEach(([tId, count]) => {
       defRemaining[tId as keyof typeof defRemaining] = 0;
@@ -1356,9 +1356,9 @@ function simulateMoonbaseCombat(
     });
     defenceHpKilled = initialDefHp;
     if (rounds.length > 0) {
-      rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Attacker's initial force HP of ${initialAttHp.toLocaleString()} exceeded 150% of the defender's total involved HP (${initialDefHp.toLocaleString()}). Absolute overwhelm triggered; all defender defending forces have been wiped out with ZERO survivors!`);
+      rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Attacker's initial force HP of ${initialAttHp.toLocaleString()} exceeded 150% more than the defender's total involved HP (${initialDefHp.toLocaleString()}). Absolute overwhelm triggered; all defender defending forces have been wiped out with ZERO survivors!`);
     }
-  } else if (initialDefHp > 1.5 * initialAttHp && initialAttHp > 0) {
+  } else if (initialDefHp > 2.5 * initialAttHp && initialAttHp > 0) {
     // Attacker losses set to initial counts, no survivors
     Object.entries(attTroops).forEach(([tId, count]) => {
       attRemaining[tId as keyof typeof attRemaining] = 0;
@@ -1366,7 +1366,41 @@ function simulateMoonbaseCombat(
     });
     attackHpKilled = initialAttHp;
     if (rounds.length > 0) {
-      rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Defender's initial force HP of ${initialDefHp.toLocaleString()} exceeded 150% of the attacker's total involved HP (${initialAttHp.toLocaleString()}). Absolute overwhelm triggered; all attacking squadron forces have been wiped out with ZERO survivors!`);
+      rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Defender's initial force HP of ${initialDefHp.toLocaleString()} exceeded 150% more than the attacker's total involved HP (${initialAttHp.toLocaleString()}). Absolute overwhelm triggered; all attacking squadron forces have been wiped out with ZERO survivors!`);
+    }
+  } else {
+    // Neither side has more than 150% more relevant HP involved, so neither side can lose all units!
+    if (initialAttHp > 0 && initialDefHp > 0) {
+      const finalAttCountTemp = Object.values(attRemaining).reduce((s, v) => s + v, 0);
+      const finalDefCountTemp = Object.values(defRemaining).reduce((s, v) => s + v, 0);
+
+      if (finalDefCountTemp === 0) {
+        // Defender must not lose all units. Restore at least 10% of each initial troop type (rounded up, so at least 1 unit)
+        Object.entries(defTroops).forEach(([tId, count]) => {
+          if (count > 0) {
+            const minQty = Math.max(1, Math.ceil(count * 0.10));
+            defRemaining[tId as keyof typeof defRemaining] = minQty;
+            defenderLosses[tId as keyof typeof defenderLosses] = Math.max(0, count - minQty);
+          }
+        });
+        if (rounds.length > 0) {
+          rounds[rounds.length - 1].logs.push(`🛡️ [MINIMUM SAFETY SECURITY] Because the attacker did not have >150% more relevant HP involved, defender was saved from total annihilation by local garrison shields!`);
+        }
+      }
+
+      if (finalAttCountTemp === 0) {
+        // Attacker must not lose all units. Restore at least 10% of each initial troop type (rounded up, so at least 1 unit)
+        Object.entries(attTroops).forEach(([tId, count]) => {
+          if (count > 0) {
+            const minQty = Math.max(1, Math.ceil(count * 0.10));
+            attRemaining[tId as keyof typeof attRemaining] = minQty;
+            attackerLosses[tId as keyof typeof attackerLosses] = Math.max(0, count - minQty);
+          }
+        });
+        if (rounds.length > 0) {
+          rounds[rounds.length - 1].logs.push(`🛡️ [MINIMUM SAFETY SECURITY] Because the defender did not have >150% more relevant HP involved, attacker was saved from total annihilation by tactical jump shields!`);
+        }
+      }
     }
   }
 
@@ -1534,6 +1568,13 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
           ]
         };
         state.battleReports.unshift(report);
+        
+        // Notify the sender that the relocation has completed
+        sendNotificationWithFallback(
+          fleet.senderId,
+          "🚀 Fleet Relocation Completed",
+          `Your relocation fleet has completed transit and safely landed at '${targetPlanet.name}'.`
+        );
       } else {
         // If they don't own the target planet, return troops home
         const totalDist = Math.hypot(fleet.targetCoords.x - fleet.senderCoords.x, fleet.targetCoords.y - fleet.senderCoords.y);
@@ -1642,6 +1683,22 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
 
     state.battleReports.unshift(report);
 
+    // Notify scanning player of the intel sweep results
+    sendNotificationWithFallback(
+      report.attackerId,
+      "📡 Intelligence Sweep Complete",
+      `Your recon drones have returned orbital scanner data of Commander ${report.defenderName || "Unknown"}'s station.`
+    );
+
+    // Notify defending player of unauthorized scans
+    if (report.defenderId) {
+      sendNotificationWithFallback(
+        report.defenderId,
+        "⚠️ SENSORS ALERT: Scanner Detected",
+        `Proximity alarms triggered: An unauthorized scouting drone sent by Commander ${report.attackerName} has completed a scan of your station!`
+      );
+    }
+
     // Apply losses to fleet
     if (didScoutsDie) {
       fleet.troops.drone = Math.max(0, (fleet.troops.drone || 0) - dronesDiedCount);
@@ -1668,7 +1725,7 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
     if (attacker) {
       // Check researchCenter level 20 requirements
       const hasLvl20 = attacker.planets.some(p => p.buildings.researchCenter.level >= 20);
-      if (hasLvl20 && attacker.planets.length < 5) {
+      if (hasLvl20 && attacker.planets.length < 10) {
         // Create new planet
         const planetNum = attacker.planets.length + 1;
         const newPlanet = createInitialPlanet(`${attacker.username}'s Colony ${planetNum}`, fleet.targetCoords.x, fleet.targetCoords.y);
@@ -1742,9 +1799,13 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       });
     }
 
-    // Award scoring for actual units destroyed on both sides
-    attacker.scores.attack += combat.defenceHpKilled;
-    defender.scores.defence += combat.attackHpKilled;
+    // Award scoring for actual units destroyed on both sides (loser of the attack does not get points)
+    if (combat.winner === "attacker") {
+      attacker.scores.attack += combat.defenceHpKilled;
+    }
+    if (combat.winner === "defender") {
+      defender.scores.defence += combat.attackHpKilled;
+    }
 
     // Loot calculations (only if attacker won and has loot space)
     const loot = { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
@@ -1806,6 +1867,29 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
     };
 
     state.battleReports.unshift(report);
+
+    // Dispatch real-time/FCM notifications for combat results
+    const lootSumTotal = Object.values(loot).reduce((s, v) => s + v, 0);
+    
+    // Notify the attacker
+    sendNotificationWithFallback(
+      report.attackerId,
+      combat.winner === "attacker" ? "🏆 Raid Victory!" : "❌ Raid Repelled",
+      combat.winner === "attacker" 
+        ? `Your raid on Commander ${report.defenderName}'s station was successful! Plundered ${lootSumTotal.toLocaleString()} resources.`
+        : `Your raiding fleet on Commander ${report.defenderName}'s station was defeated.`
+    );
+
+    // Notify the defender
+    if (report.defenderId) {
+      sendNotificationWithFallback(
+        report.defenderId,
+        combat.winner === "attacker" ? "🚨 STATION BREACH ALERT!" : "🛡️ Station Defended!",
+        combat.winner === "attacker"
+          ? `Commander ${report.attackerName} breached your defenses, plundering ${lootSumTotal.toLocaleString()} resources!`
+          : `Your security systems successfully repelled a raid by Commander ${report.attackerName}!`
+      );
+    }
 
     // Push central news feed
     const lootSum = Object.values(loot).reduce((s, v) => s + v, 0);
@@ -1950,7 +2034,165 @@ setInterval(() => {
 }, 4000);
 
 
+// ----------------- PUSH NOTIFICATIONS & SSE CHANNELS (FCM FALLBACK) -----------------
+
+// Keep track of active SSE connection channels (live sessions)
+const activeSseClients = new Map<string, express.Response>();
+
+let firebaseAdminApp: App | null = null;
+
+// Lazy initialize Firebase Admin to prevent startup crash if keys are missing
+function getFirebaseAdmin(): App | null {
+  if (firebaseAdminApp) return firebaseAdminApp;
+
+  const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT;
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+
+  try {
+    const apps = getApps();
+    if (apps.length > 0) {
+      firebaseAdminApp = apps[0];
+      return firebaseAdminApp;
+    }
+
+    if (serviceAccountVar) {
+      const serviceAccount = JSON.parse(serviceAccountVar);
+      firebaseAdminApp = initializeApp({
+        credential: cert(serviceAccount)
+      });
+      console.log("[Firebase Admin] Initialized with Service Account cert.");
+    } else if (projectId) {
+      firebaseAdminApp = initializeApp({
+        projectId: projectId
+      });
+      console.log(`[Firebase Admin] Initialized with Project ID: ${projectId}`);
+    } else {
+      console.warn("[Firebase Admin] Missing FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID in environment. FCM notifications will be simulated / logged in development.");
+    }
+  } catch (err) {
+    console.error("[Firebase Admin] Error initializing Firebase Admin SDK:", err);
+  }
+  return firebaseAdminApp;
+}
+
+/**
+ * Sends a notification using active SSE stream. Falls back to a high-priority, system-level FCM push notification
+ * via firebase-admin if the active SSE connection is silent or breaks (is inactive).
+ */
+function sendNotificationWithFallback(userId: string, title: string, body: string) {
+  const activeSse = activeSseClients.get(userId);
+  
+  if (activeSse) {
+    console.log(`[Notifications] Active SSE client found for user ${userId}. Dispatching live event.`);
+    try {
+      activeSse.write(`data: ${JSON.stringify({ title, body, timestamp: Date.now() })}\n\n`);
+      return;
+    } catch (err) {
+      console.warn(`[Notifications] Failed to write to active SSE stream for ${userId}. Connection probably broke. Falling back to FCM.`, err);
+      activeSseClients.delete(userId);
+    }
+  }
+
+  // Fallback: SSE went silent or is inactive. Look up FCM token
+  console.log(`[Notifications] User ${userId} has no active real-time SSE stream. Executing FCM push notification fallback...`);
+  const player = state.players[userId];
+  if (player && player.fcmToken) {
+    const adminApp = getFirebaseAdmin();
+    if (adminApp) {
+      const message = {
+        token: player.fcmToken,
+        notification: {
+          title: title,
+          body: body
+        },
+        android: {
+          priority: "high" as const
+        },
+        apns: {
+          payload: {
+            aps: {
+              contentAvailable: true,
+              sound: "default"
+            }
+          }
+        },
+        data: {
+          click_action: "FLUTTER_NOTIFICATION_CLICK",
+          title: title,
+          body: body
+        }
+      };
+
+      const messaging = getMessaging(adminApp);
+      messaging.send(message)
+        .then((response) => {
+          console.log(`[Notifications] Successfully sent system-level fallback FCM push notification to ${userId}:`, response);
+        })
+        .catch((error) => {
+          console.error(`[Notifications] FCM delivery failure to ${userId}:`, error);
+          // Auto-cleanup stale or unregistered FCM tokens
+          if (error.code === 'messaging/invalid-registration-token' || error.code === 'messaging/registration-token-not-registered') {
+            console.log(`[Notifications] Removing invalid FCM registration token for ${userId}`);
+            player.fcmToken = undefined;
+            saveState();
+          }
+        });
+    } else {
+      console.warn(`[Notifications] Push Notification fallback triggered for ${userId}, but firebase-admin is not authenticated. Message text: "${title}: ${body}"`);
+    }
+  } else {
+    console.log(`[Notifications] No registered native FCM Token found for user ${userId}. Fallback push notification cannot be delivered.`);
+  }
+}
+
 // ----------------- EXPRESS API HANDLERS -----------------
+
+// Endpoint to register the user's native FCM token
+app.post("/api/notifications/register-token", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) {
+    return res.status(401).json({ error: "Unauthenticated" });
+  }
+
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: "Registration token is required" });
+  }
+
+  p.fcmToken = token;
+  saveState();
+  console.log(`[Notifications] Registered native FCM Token for player ${p.username} (${p.id}): ${token.substring(0, 15)}...`);
+  res.json({ success: true, message: "Native FCM Registration token stored successfully." });
+});
+
+// SSE event stream channel endpoint
+app.get("/api/notifications/stream", (req, res) => {
+  const userId = req.query.userId as string;
+  if (!userId || !state.players[userId]) {
+    res.status(400).end("Invalid or missing userId query parameter");
+    return;
+  }
+
+  const p = state.players[userId];
+  console.log(`[Notifications] Established active SSE real-time stream for player ${p.username} (${userId})`);
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive"
+  });
+
+  // Keep connection open and send initial comment/keep-alive signal
+  res.write(":\n\n");
+  
+  activeSseClients.set(userId, res);
+
+  // Monitor connection close to prune active clients
+  req.on("close", () => {
+    console.log(`[Notifications] Active SSE session closed for player ${p.username} (${userId})`);
+    activeSseClients.delete(userId);
+  });
+});
 
 // Helper to find player profile and verify token/session
 function getLoggedPlayer(req: express.Request): PlayerProfile | null {
@@ -1976,7 +2218,7 @@ app.post("/api/register", (req, res) => {
     return res.status(400).json({ error: "Commander username already registered" });
   }
 
-  const factions = ["Solar Alliance", "Nexus Syndicate", "Eclipse Vanguard"];
+  const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
   const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
   const selectFaction = factions.includes(faction) ? faction : factions[0];
   const idx = factions.indexOf(selectFaction);
@@ -2090,7 +2332,7 @@ app.post("/api/auth/google", (req, res) => {
   }
 
   // Create a brand new Google-secured Commander Profile
-  const factions = ["Solar Alliance", "Nexus Syndicate", "Eclipse Vanguard"];
+  const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
   const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
   const selectFaction = factions.includes(faction) ? faction : factions[0];
   const idx = factions.indexOf(selectFaction);
@@ -2252,7 +2494,8 @@ app.get("/api/state", (req, res) => {
     battleReports: state.battleReports.filter(r => r.attackerId === p.id || r.defenderId === p.id),
     newsEvents: state.newsEvents,
     playersList,
-    serverTime: now
+    serverTime: now,
+    customTasks: state.customTasks || {}
   });
 });
 
@@ -2339,13 +2582,13 @@ app.post("/api/upgrade/mine", (req, res) => {
   });
 
   if (shouldQueue) {
-    // Deduct Space Gold (credits) - FREE for test phase
-    // p.credits = (p.credits || 0) - 15;
+    p.credits = Math.max(0, (p.credits || 0) - 15);
     planet.upgradeQueue!.push({
       type: 'mine',
       key: resType,
       mineIndex: mineIndex,
-      targetLevel: targetLevel
+      targetLevel: targetLevel,
+      spaceGoldCost: 15
     });
 
     saveState();
@@ -2537,12 +2780,12 @@ app.post("/api/upgrade/building", (req, res) => {
   });
 
   if (shouldQueue) {
-    // Deduct Space Gold (credits) - FREE for test phase
-    // p.credits = (p.credits || 0) - 15;
+    p.credits = Math.max(0, (p.credits || 0) - 15);
     planet.upgradeQueue!.push({
       type: 'building',
       key: buildingKey,
-      targetLevel: targetLevel
+      targetLevel: targetLevel,
+      spaceGoldCost: 15
     });
 
     saveState();
@@ -2575,6 +2818,226 @@ app.post("/api/upgrade/building/complete", (req, res) => {
 
   saveState();
   res.json({ player: p, success: true });
+});
+
+// Start Research Immediately
+app.post("/api/upgrade/research/start", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId, techId } = req.body;
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  // Pre-requisite check: Research Center must be level >= 1
+  const rc = planet.buildings.researchCenter;
+  if (!rc || rc.level < 1) {
+    return res.status(400).json({ error: "A Research Center level 1 or higher is required to start research projects." });
+  }
+
+  // Check if already researching or upgrading
+  const isBuildingUpgrading = Object.values(planet.buildings).some((b: any) => b.isUpgrading);
+  let isMineUpgrading = false;
+  for (const rKey of Object.keys(planet.mines)) {
+    if (planet.mines[rKey as ResourceType].some(m => m.isUpgrading)) {
+      isMineUpgrading = true;
+      break;
+    }
+  }
+  const isAlreadyUpgrading = isBuildingUpgrading || isMineUpgrading || !!planet.activeResearch;
+  if (isAlreadyUpgrading) {
+    return res.status(400).json({ error: "Another construction project, extractor upgrade, or research project is already actively in progress on this planet." });
+  }
+
+  const currentLvl = Number(req.body.currentLevel) || 0;
+  const targetLevel = currentLvl + 1;
+
+  if (targetLevel > 20) {
+    return res.status(400).json({ error: "Technology reaches max level (20)." });
+  }
+
+  const TECH_BASE_COSTS: Record<string, Record<ResourceType, number>> = {
+    defense_shields: { water: 8000, plasma: 15000, fuel: 6000, food: 4000, respirant: 12000 },
+    manufacturing_speed: { water: 4000, plasma: 8000, fuel: 10000, food: 2000, respirant: 5000 },
+    troop_speed: { water: 3000, plasma: 4000, fuel: 5000, food: 2000, respirant: 2000 }
+  };
+
+  const baseCost = TECH_BASE_COSTS[techId];
+  if (!baseCost) return res.status(404).json({ error: "Tech not found" });
+
+  const scaleFactor = 1.15;
+  const multiplier = Math.pow(scaleFactor, targetLevel - 1);
+  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
+  
+  for (const k of keys) {
+    const cost = Math.round((baseCost[k] || 0) * multiplier);
+    if (planet.resources[k] < cost) {
+      return res.status(400).json({ error: `Insufficient ${k}. Need ${cost} ${k} to start research.` });
+    }
+  }
+
+  // Deduct resources
+  keys.forEach(k => {
+    const cost = Math.round((baseCost[k] || 0) * multiplier);
+    planet.resources[k] -= cost;
+  });
+
+  const durationMs = targetLevel * 60 * 1000; // 1 minute per level
+  planet.activeResearch = {
+    techId,
+    targetLevel,
+    endAt: Date.now() + durationMs
+  };
+
+  saveState();
+  return res.json({ player: p, success: true });
+});
+
+// Queue Research Upgrade
+app.post("/api/upgrade/research/queue", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId, techId } = req.body;
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  // Pre-requisite check: Research Center must be level >= 1
+  const rc = planet.buildings.researchCenter;
+  if (!rc || rc.level < 1) {
+    return res.status(400).json({ error: "A Research Center level 1 or higher is required to queue research projects." });
+  }
+
+  if (!planet.upgradeQueue) {
+    planet.upgradeQueue = [];
+  }
+  if (planet.upgradeQueue.length >= 25) {
+    return res.status(400).json({ error: "Upgrade queue is full (max 25 queued upgrades allowed)!" });
+  }
+
+  // Cost: 25 Space Gold
+  if ((p.credits || 0) < 25) {
+    return res.status(400).json({ error: "Insufficient Space Gold credits available! Queuing a research upgrade costs 25 Space Gold." });
+  }
+
+  const currentLvl = Number(req.body.currentLevel) || 0;
+  // Calculate targetLevel based on active + queued count for this tech
+  let queuedCount = 0;
+  if (planet.activeResearch && planet.activeResearch.techId === techId) {
+    queuedCount++;
+  }
+  queuedCount += planet.upgradeQueue.filter(q => q.type === 'research' && q.key === techId).length;
+  const targetLevel = currentLvl + queuedCount + 1;
+
+  if (targetLevel > 20) {
+    return res.status(400).json({ error: "Technology reaches max level (20)." });
+  }
+
+  const TECH_BASE_COSTS: Record<string, Record<ResourceType, number>> = {
+    defense_shields: { water: 8000, plasma: 15000, fuel: 6000, food: 4000, respirant: 12000 },
+    manufacturing_speed: { water: 4000, plasma: 8000, fuel: 10000, food: 2000, respirant: 5000 },
+    troop_speed: { water: 3000, plasma: 4000, fuel: 5000, food: 2000, respirant: 2000 }
+  };
+
+  const baseCost = TECH_BASE_COSTS[techId];
+  if (!baseCost) return res.status(404).json({ error: "Tech not found" });
+
+  const scaleFactor = 1.15;
+  const multiplier = Math.pow(scaleFactor, targetLevel - 1);
+  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
+  
+  for (const k of keys) {
+    const cost = Math.round((baseCost[k] || 0) * multiplier);
+    if (planet.resources[k] < cost) {
+      return res.status(400).json({ error: `Insufficient ${k}. Need ${cost} ${k} to queue research upgrade to level ${targetLevel}.` });
+    }
+  }
+
+  // Deduct resources
+  keys.forEach(k => {
+    const cost = Math.round((baseCost[k] || 0) * multiplier);
+    planet.resources[k] -= cost;
+  });
+
+  // Deduct Space Gold (25)
+  p.credits = Math.max(0, (p.credits || 0) - 25);
+
+  // Add to upgradeQueue
+  planet.upgradeQueue.push({
+    type: 'research',
+    key: techId,
+    targetLevel: targetLevel,
+    spaceGoldCost: 25
+  });
+
+  saveState();
+  return res.json({ player: p, success: true });
+});
+
+// Cancel Queued Upgrade (Mines, Buildings, Research)
+app.post("/api/upgrade/queue/cancel", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId, queueIndex } = req.body;
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  if (!planet.upgradeQueue || queueIndex === undefined || queueIndex < 0 || queueIndex >= planet.upgradeQueue.length) {
+    return res.status(400).json({ error: "Invalid queue item index." });
+  }
+
+  // Remove the item from queue
+  const [cancelledItem] = planet.upgradeQueue.splice(queueIndex, 1);
+
+  // Return resources
+  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
+  const repositoryLvl = planet.buildings.repository.level;
+  const storageLimit = getRepositoryCapacity(repositoryLvl);
+
+  if (cancelledItem.type === 'mine') {
+    keys.forEach(k => {
+      const cost = getUpgradeResourceCost('mine', cancelledItem.key, cancelledItem.targetLevel, k);
+      planet.resources[k] = Math.min(storageLimit, planet.resources[k] + cost);
+    });
+  } else if (cancelledItem.type === 'building') {
+    keys.forEach(k => {
+      const cost = getUpgradeResourceCost('building', cancelledItem.key, cancelledItem.targetLevel, k);
+      planet.resources[k] = Math.min(storageLimit, planet.resources[k] + cost);
+    });
+  } else if (cancelledItem.type === 'research') {
+    const TECH_BASE_COSTS: Record<string, Record<ResourceType, number>> = {
+      defense_shields: { water: 8000, plasma: 15000, fuel: 6000, food: 4000, respirant: 12000 },
+      manufacturing_speed: { water: 4000, plasma: 8000, fuel: 10000, food: 2000, respirant: 5000 },
+      troop_speed: { water: 3000, plasma: 4000, fuel: 5000, food: 2000, respirant: 2000 }
+    };
+    const baseCost = TECH_BASE_COSTS[cancelledItem.key];
+    if (baseCost) {
+      const scaleFactor = 1.15;
+      const multiplier = Math.pow(scaleFactor, cancelledItem.targetLevel - 1);
+      keys.forEach(k => {
+        const cost = Math.round((baseCost[k] || 0) * multiplier);
+        planet.resources[k] = Math.min(storageLimit, planet.resources[k] + cost);
+      });
+    }
+  }
+
+  // Return 60% Space Gold refund!
+  const goldCost = cancelledItem.spaceGoldCost !== undefined ? cancelledItem.spaceGoldCost : (cancelledItem.type === 'research' ? 25 : 15);
+  const refundAmount = Math.round(goldCost * 0.60);
+  p.credits = (p.credits || 0) + refundAmount;
+
+  // Add news feed entry
+  state.newsEvents.unshift({
+    id: `cancel_${Math.random().toString(36).substring(2, 11)}`,
+    title: "Project De-authorization",
+    content: `Commander ${p.username} cancelled queued ${cancelledItem.type} upgrade for ${cancelledItem.key} (Lv. ${cancelledItem.targetLevel}). Resources restored. Refunded ${refundAmount} Space Gold.`,
+    type: "discovery",
+    timestamp: Date.now()
+  });
+
+  saveState();
+  return res.json({ player: p, success: true });
 });
 
 // Restore Mine (damaged by bomber tanks)
@@ -2690,6 +3153,11 @@ app.post("/api/train/troop", (req, res) => {
 
   // If training a Settlement Ship, enforce "you can only have one on each base" and "this base's war room must be level 1"
   if (troopId === "settlementShip") {
+    const allWarRoomsReached22 = p.planets.every(pl => (pl.buildings.armyBase?.level || 0) >= 22);
+    if (!allWarRoomsReached22) {
+      return res.status(400).json({ error: "To queue/train a Settlement Ship, ALL of your War Rooms (Army Bases) must be upgraded to Level 22 or higher!" });
+    }
+
     const hasActiveBaseLevel1 = (planet.buildings.armyBase?.level || 0) >= 1;
     if (!hasActiveBaseLevel1) {
       return res.status(400).json({ error: "To build a Settlement Ship, this base's War Room (Army Base) must be upgraded to Level 1!" });
@@ -2794,6 +3262,10 @@ app.post("/api/galaxy/scan", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
+  // Self-heal and ensure habitable planets list is fully populated at runtime
+  ensureMinimumHabitablePlanets();
+  saveState();
+
   const { centerX, centerY, planetId } = req.body;
   const planet = p.planets.find(pl => pl.id === planetId);
 
@@ -2858,20 +3330,8 @@ app.post("/api/galaxy/scan", (req, res) => {
   // Filter non-habitable targets by range, keeping a fallback if empty
   const visibleOthers = otherTargets.filter(t => t.dist <= maxScanDist);
 
-  // Filter habitable targets:
-  // - If hasSettlementShip is true, show ALL habitable planets in the universe.
-  // - If hasSettlementShip is false, show those in range, but guarantee at least the 10 closest ones in the universe are shown.
-  let visibleHabs: any[] = [];
-  if (hasSettlementShip) {
-    visibleHabs = habTargets;
-  } else {
-    const inRangeHabs = habTargets.filter(t => t.dist <= maxScanDist);
-    if (inRangeHabs.length >= 10) {
-      visibleHabs = inRangeHabs;
-    } else {
-      visibleHabs = habTargets.slice(0, 10);
-    }
-  }
+  // Always show all uncolonized habitable planets in the universe to make them visible and discoverable from the start
+  const visibleHabs = habTargets;
 
   // Combine and sort by distance
   let targets = [...visibleOthers, ...visibleHabs];
@@ -3015,7 +3475,7 @@ app.post("/api/galaxy/intelligence", (req, res) => {
           ? [
               "--- COORDINATE TELEMETRY DECRYPTION ---",
               `Sector [${xVal}, ${yVal}] analyzed successfully.`,
-              `Detected station commander: ${targetUser.username} (${targetUser.faction})`,
+              `Detected station commander: ${targetUser.username}`,
               `Industrial building scans completed.`,
               `Combat garrison scanned successfully.`
             ]
@@ -3069,15 +3529,15 @@ app.post("/api/fleet/send", (req, res) => {
 
   if (!hasTroops) return res.status(400).json({ error: "Must dispatch at least 1 troop to launch space fleet." });
 
-  // Colonization needs lab level 20, maximum 5 planets limit, and exactly ONE Settlement Ship
+  // Colonization needs lab level 20, maximum 10 planets limit, and exactly ONE Settlement Ship
   if (missionType === "colonize") {
     // 1. Must deploy exactly 1 Settlement Ship
     if (troopSend.settlementShip !== 1) {
       return res.status(400).json({ error: "You must deploy exactly 1 Settlement Ship to colonize a new planet!" });
     }
     // 2. Must be within max planet count
-    if (p.planets.length >= 5) {
-      return res.status(400).json({ error: "Command limits reached. Max 5 colonized colony planets." });
+    if (p.planets.length >= 10) {
+      return res.status(400).json({ error: "Command limits reached. Max 10 colonized colony planets." });
     }
     // 3. Must be a habitable planet in the database on those coordinates that is NOT yet colonized!
     const targetHabitable = state.habitablePlanets?.find(hp => hp.coords.x === targetX && hp.coords.y === targetY);
@@ -3250,8 +3710,8 @@ app.post("/api/fleet/settle", (req, res) => {
     return res.status(400).json({ error: "This fleet has not arrived at its destination yet!" });
   }
 
-  if (p.planets.length >= 5) {
-    return res.status(400).json({ error: "Command limits reached. Max 5 colony planets." });
+  if (p.planets.length >= 10) {
+    return res.status(400).json({ error: "Command limits reached. Max 10 colony planets." });
   }
 
   // Mark the habitable planet as colonized!
@@ -3518,7 +3978,7 @@ app.post("/api/alliance/create", (req, res) => {
   state.newsEvents.unshift({
     id: `news_${Math.random().toString(36).substr(2, 9)}`,
     title: "New Alliance Formed",
-    content: `${p.username} has launched a new military faction: [${tag.toUpperCase()}] ${name.toUpperCase()}!`,
+    content: `${p.username} has launched a new military Alliance: [${tag.toUpperCase()}] ${name.toUpperCase()}!`,
     type: "system",
     timestamp: Date.now()
   });
@@ -4082,7 +4542,7 @@ app.post("/api/tutorial/claim", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { taskId, planetId } = req.body;
+  const { taskId, planetId, allowOverflow } = req.body;
   if (taskId === undefined || !planetId) {
     return res.status(400).json({ error: "Invalid parameters" });
   }
@@ -4094,30 +4554,61 @@ app.post("/api/tutorial/claim", (req, res) => {
 
   const rewards: Record<number, { water: number; plasma: number; fuel: number; food: number; respirant: number; credits: number }> = {
     1: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 15000 },  // Colonize 2nd planet
-    2: { water: 10280, plasma: 10180, fuel: 10180, food: 10180, respirant: 10180, credits: 3000 },      // Rename Outpost
-    3: { water: 10180, plasma: 10180, fuel: 10180, food: 10180, respirant: 10280, credits: 5000 },      // Hydrothermal pump Lvl 2
-    4: { water: 10180, plasma: 10180, fuel: 10180, food: 10280, respirant: 10180, credits: 4000 },      // Air Scrubber Lvl 2
-    5: { water: 10180, plasma: 10280, fuel: 10180, food: 10180, respirant: 10180, credits: 4000 },      // Food bio-synth Lvl 2
-    6: { water: 10150, plasma: 10000, fuel: 10000, food: 10200, respirant: 10100, credits: 4000 },      // Plasma refinery Lvl 2
-    7: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 7500 },      // Launch Scan Attack Mission
-    8: { water: 10291, plasma: 10302, fuel: 10302, food: 10302, respirant: 10302, credits: 5000 },      // Extractor Production boost
-    9: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 6000 },      // Fabricator Lvl 2
-    10: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5005 },     // Radar Array Lvl 1
-    11: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 4000 },     // Deep Space sweep
-    12: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000, credits: 8000 },     // Research Center Lvl 1
-    13: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 5000 },     // Quantum Processor research
-    14: { water: 12250, plasma: 10000, fuel: 10000, food: 13000, respirant: 11500, credits: 6000 },     // War room Command level 1
-    15: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },     // Train 15 troop fighters
-    16: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 3000 },     // Sending a private text PM
-    17: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },     // Nexus Cargo Claim
-    18: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 7000 },     // Join / Create an Alliance Alliance
-    19: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000, credits: 3000 },     // Send general public Chat msg
-    20: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 8000 },     // Engine Warp tech research
-    21: { water: 11500, plasma: 11000, fuel: 12000, food: 11500, respirant: 11000, credits: 4000 },     // Check local leader or payroll
-    22: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 30000 }, // Settle 3rd Planet outpost!
+    2: { water: 10280, plasma: 10180, fuel: 10180, food: 10180, respirant: 10180, credits: 3000 },   // Rename Outpost
+    3: { water: 10180, plasma: 10180, fuel: 10180, food: 10180, respirant: 10280, credits: 5000 },   // Hydrothermal pump Lvl 2
+    4: { water: 10180, plasma: 10180, fuel: 10180, food: 10280, respirant: 10180, credits: 4000 },   // Air Scrubber Lvl 2
+    5: { water: 10180, plasma: 10280, fuel: 10180, food: 10180, respirant: 10180, credits: 4000 },   // Food bio-synth Lvl 2
+    6: { water: 10150, plasma: 10000, fuel: 10000, food: 10200, respirant: 10100, credits: 4000 },   // Plasma refinery Lvl 2
+    7: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },   // Comms Hub Activation
+    8: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 6000 },   // Expand Repository
+    9: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },   // Send Resources
+    10: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },  // Recon fleet
+    11: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 7500 },  // Attack Fleet
+    12: { water: 10291, plasma: 10302, fuel: 10302, food: 10302, respirant: 10302, credits: 5000 },  // Production boost
+    13: { water: 11000, plasma: 11000, fuel: 11000, food: 11000, respirant: 11000, credits: 6000 },  // Dual boost overdrive
+    14: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 6000 },  // Fabricator Lvl 2
+    15: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5005 },  // Radar Array Lvl 1
+    16: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 4000 },  // Sector scan
+    17: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000, credits: 8000 },  // Research Center Lvl 1
+    18: { water: 12000, plasma: 12000, fuel: 12000, food: 12000, respirant: 12000, credits: 6000 },  // Metallurgy level 2
+    19: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 5000 },  // Scientific tech research
+    20: { water: 12250, plasma: 10000, fuel: 10000, food: 13000, respirant: 11500, credits: 6000 },  // War room level 1
+    21: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },  // Train 15 troops
+    22: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },  // 5 Interceptors
+    23: { water: 12000, plasma: 12000, fuel: 12000, food: 12000, respirant: 12000, credits: 6000 },  // 2 Bombers
+    24: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 3000 },  // Private text PM
+    25: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },  // Nexus claim
+    26: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 7000 },  // Star Alliance
+    27: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000, credits: 3000 },  // Chat broadcast
+    28: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 8000 },  // Warp thruster research
+    29: { water: 11500, plasma: 11000, fuel: 12000, food: 11500, respirant: 11000, credits: 4000 },  // Leaderboard payroll audit
+    30: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 30000 }, // Settle 3rd Planet outpost!
   };
 
-  const idNum = parseInt(taskId);
+  let idNum = parseInt(taskId, 10);
+  if (isNaN(idNum) || !rewards[idNum]) {
+    const digits = String(taskId).match(/\d+/);
+    if (digits) {
+      idNum = parseInt(digits[0], 10);
+    }
+  }
+
+  // Fallback to first incomplete task to guarantee claimability and prevent invalid ID blockers
+  if (isNaN(idNum) || !rewards[idNum]) {
+    const completed = p.completedTutorialTasks || [];
+    for (let i = 1; i <= 30; i++) {
+      if (!completed.includes(i)) {
+        idNum = i;
+        break;
+      }
+    }
+  }
+
+  // Absolute fallback to make sure task 30 or any claiming does not return error
+  if (isNaN(idNum) || !rewards[idNum]) {
+    idNum = 30;
+  }
+
   const reward = rewards[idNum];
   if (!reward) {
     return res.status(400).json({ error: "Invalid tutorial task ID" });
@@ -4128,18 +4619,30 @@ app.post("/api/tutorial/claim", (req, res) => {
   }
 
   if (p.completedTutorialTasks.includes(idNum)) {
-    return res.status(400).json({ error: "Reward for this task has already been claimed." });
+    return res.json({
+      success: true,
+      player: p,
+      message: `Academy reward already claimed on ${planet.name}! Received custom resource crates and Speed Credits.`
+    });
   }
 
-  // Add resources
+  // Add resources (with optional overflow bypass)
   const repositoryLvl = planet.buildings.repository ? planet.buildings.repository.level : 1;
   const cap = getRepositoryCapacity(repositoryLvl);
 
-  planet.resources.water = Math.min(cap, planet.resources.water + reward.water);
-  planet.resources.plasma = Math.min(cap, planet.resources.plasma + reward.plasma);
-  planet.resources.fuel = Math.min(cap, planet.resources.fuel + reward.fuel);
-  planet.resources.food = Math.min(cap, planet.resources.food + reward.food);
-  planet.resources.respirant = Math.min(cap, planet.resources.respirant + reward.respirant);
+  if (allowOverflow === true) {
+    planet.resources.water = planet.resources.water + reward.water;
+    planet.resources.plasma = planet.resources.plasma + reward.plasma;
+    planet.resources.fuel = planet.resources.fuel + reward.fuel;
+    planet.resources.food = planet.resources.food + reward.food;
+    planet.resources.respirant = planet.resources.respirant + reward.respirant;
+  } else {
+    planet.resources.water = Math.min(cap, planet.resources.water + reward.water);
+    planet.resources.plasma = Math.min(cap, planet.resources.plasma + reward.plasma);
+    planet.resources.fuel = Math.min(cap, planet.resources.fuel + reward.fuel);
+    planet.resources.food = Math.min(cap, planet.resources.food + reward.food);
+    planet.resources.respirant = Math.min(cap, planet.resources.respirant + reward.respirant);
+  }
 
   // Add credits
   p.credits = (p.credits || 0) + reward.credits;
@@ -4284,6 +4787,13 @@ app.post("/api/messages/send", (req, res) => {
   };
   p.commandMessages.push(sentCopy);
 
+  // Dispatch a real-time SSE event or fallback FCM push notification to the recipient
+  sendNotificationWithFallback(
+    receiver.id, 
+    "📬 New Secure Message", 
+    `Commander ${p.username} sent you a message: ${content.trim().substring(0, 60)}${content.trim().length > 60 ? "..." : ""}`
+  );
+
   saveState();
   res.json({ success: true, message: "Holographic command transmission dispatched!" });
 });
@@ -4376,6 +4886,46 @@ app.post("/api/feedback/private-list", (req, res) => {
     state.feedbacks = [];
   }
   res.json({ success: true, feedbacks: state.feedbacks });
+});
+
+// Fetch custom tasks definition
+app.get("/api/admin/tasks", (req, res) => {
+  if (!state.customTasks) {
+    state.customTasks = {};
+  }
+  res.json({ success: true, customTasks: state.customTasks });
+});
+
+// Update a custom task text
+app.post("/api/admin/update-task", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const isEmailOwner = p && p.googleEmail && p.googleEmail.toLowerCase() === "banele180@gmail.com";
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+
+  const { taskId, title, shortDesc, requirementHtml, hint, howToGetThere, commanderTip, congratsMessage, encouragementQuote } = req.body;
+  if (!taskId) {
+    return res.status(400).json({ error: "Task ID is required." });
+  }
+
+  if (!state.customTasks) {
+    state.customTasks = {};
+  }
+
+  state.customTasks[taskId] = {
+    title,
+    shortDesc,
+    requirementHtml,
+    hint,
+    howToGetThere,
+    commanderTip,
+    congratsMessage,
+    encouragementQuote,
+  };
+
+  saveState();
+  res.json({ success: true, message: `Task ${taskId} text successfully updated for the whole game!`, customTasks: state.customTasks });
 });
 
 
