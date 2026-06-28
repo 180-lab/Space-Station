@@ -196,6 +196,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [showStandings, setShowStandings] = useState(true);
   const [showAllianceCmd, setShowAllianceCmd] = useState(false);
   const [showDecFeed, setShowDecFeed] = useState(false);
+  const [leaderboardType, setLeaderboardType] = useState<'players' | 'alliances'>('players');
+  const [expandedAllianceId, setExpandedAllianceId] = useState<string | null>(null);
 
   // Scanner State
   const [targetCoords, setTargetCoords] = useState({ x: activePlanet.sectorX, y: activePlanet.sectorY });
@@ -1131,21 +1133,62 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
         const myRankIndex = sortedPlayers.findIndex(p => p.id === player.id) + 1;
 
+        // Alliance calculations
+        const allianceStats = (Object.values(alliances || {}) as Alliance[]).map(all => {
+          const membersWithScores = all.members.map(member => {
+            const pl = activePlayersWithYou.find(p => p.id === member.playerId);
+            return {
+              playerId: member.playerId,
+              username: member.username,
+              role: member.role,
+              scores: pl ? pl.scores : { population: 0, attack: 0, defence: 0, raiders: 0 },
+              faction: pl ? pl.faction : 'Terran',
+              factionColor: pl ? pl.factionColor : '#00bfff'
+            };
+          });
+
+          const combinedScores = membersWithScores.reduce((acc, m) => {
+            acc.population += m.scores.population || 0;
+            acc.attack += m.scores.attack || 0;
+            acc.defence += m.scores.defence || 0;
+            acc.raiders += m.scores.raiders || 0;
+            return acc;
+          }, { population: 0, attack: 0, defence: 0, raiders: 0 });
+
+          return {
+            ...all,
+            membersWithScores,
+            combinedScores
+          };
+        });
+
+        const sortedAlliances = [...allianceStats].sort((a, b) => {
+          const sA = a.combinedScores[rankingMetric];
+          const sB = b.combinedScores[rankingMetric];
+          if (sB !== sA) return sB - sA;
+          return a.name.localeCompare(b.name);
+        });
+
         // Bottom 10 vs normal paging
         const pageSize = 15;
         let displayPlayers: any[] = [];
+        let displayAlliances: any[] = [];
         let totalPages = 1;
 
-        if (showBottom10) {
-          // Bottom 10 players
-          displayPlayers = sortedPlayers.slice(-10);
-        } else if (showTop10) {
-          // Top 10 players
-          displayPlayers = sortedPlayers.slice(0, 10);
+        if (leaderboardType === 'players') {
+          if (showBottom10) {
+            displayPlayers = sortedPlayers.slice(-10);
+          } else if (showTop10) {
+            displayPlayers = sortedPlayers.slice(0, 10);
+          } else {
+            totalPages = Math.ceil(sortedPlayers.length / pageSize);
+            const pageToUse = Math.max(1, Math.min(totalPages, leaderboardPage));
+            displayPlayers = sortedPlayers.slice((pageToUse - 1) * pageSize, pageToUse * pageSize);
+          }
         } else {
-          totalPages = Math.ceil(sortedPlayers.length / pageSize);
+          totalPages = Math.ceil(sortedAlliances.length / pageSize);
           const pageToUse = Math.max(1, Math.min(totalPages, leaderboardPage));
-          displayPlayers = sortedPlayers.slice((pageToUse - 1) * pageSize, pageToUse * pageSize);
+          displayAlliances = sortedAlliances.slice((pageToUse - 1) * pageSize, pageToUse * pageSize);
         }
 
         return (
@@ -1194,35 +1237,61 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   </h3>
                 </div>
 
-                {/* Top/Bottom limit toggle options */}
-                <div className="flex flex-wrap items-center gap-2">
+                {/* Sub Tab Switcher (Commanders vs Star Alliances) */}
+                <div className="flex bg-[#030508]/60 p-0.5 rounded-xl border border-[#1E293B] shrink-0">
                   <button
                     type="button"
                     onClick={() => {
-                      setShowTop10(!showTop10);
-                      setShowBottom10(false);
+                      setLeaderboardType('players');
                       setLeaderboardPage(1);
                     }}
-                    className={`px-3.5 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-xl transition border cursor-pointer font-mono shrink-0 ${showTop10 ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40' : 'bg-slate-950/50 text-slate-400 border-[#1E293B] hover:text-white hover:border-[#334155]'}`}
+                    className={`px-3 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-lg transition cursor-pointer font-mono ${leaderboardType === 'players' ? 'bg-[#5bc0be] text-slate-950 shadow-[0_0_8px_rgba(91,192,190,0.3)]' : 'text-slate-400 hover:text-white'}`}
                   >
-                    🏆 {showTop10 ? "View All Rankings" : "Check Top 10"}
+                    👤 Commanders
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      setShowBottom10(!showBottom10);
-                      setShowTop10(false);
+                      setLeaderboardType('alliances');
                       setLeaderboardPage(1);
                     }}
-                    className={`px-3.5 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-xl transition border cursor-pointer font-mono shrink-0 ${showBottom10 ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-slate-950/50 text-slate-400 border-[#1E293B] hover:text-white hover:border-[#334155]'}`}
+                    className={`px-3 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-lg transition cursor-pointer font-mono ${leaderboardType === 'alliances' ? 'bg-[#5bc0be] text-slate-950 shadow-[0_0_8px_rgba(91,192,190,0.3)]' : 'text-slate-400 hover:text-white'}`}
                   >
-                    🚀 {showBottom10 ? "View All Rankings" : "Check Bottom 10"}
+                    🛡️ Star Alliances
                   </button>
                 </div>
+
+                {/* Top/Bottom limit toggle options (only show for player rankings) */}
+                {leaderboardType === 'players' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowTop10(!showTop10);
+                        setShowBottom10(false);
+                        setLeaderboardPage(1);
+                      }}
+                      className={`px-3.5 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-xl transition border cursor-pointer font-mono shrink-0 ${showTop10 ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40' : 'bg-slate-950/50 text-slate-400 border-[#1E293B] hover:text-white hover:border-[#334155]'}`}
+                    >
+                      🏆 {showTop10 ? "View All Rankings" : "Check Top 10"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowBottom10(!showBottom10);
+                        setShowTop10(false);
+                        setLeaderboardPage(1);
+                      }}
+                      className={`px-3.5 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-xl transition border cursor-pointer font-mono shrink-0 ${showBottom10 ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-slate-950/50 text-slate-400 border-[#1E293B] hover:text-white hover:border-[#334155]'}`}
+                    >
+                      🚀 {showBottom10 ? "View All Rankings" : "Check Bottom 10"}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Metric ranking switch selectors */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 font-mono text-[10px]">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 font-mono text-[10px]">
                 {[
                   { key: 'population', label: '🌾 POPULATION STANDING', color: 'border-cyan-500/30' },
                   { key: 'attack', label: '⚔️ ATTACK POINTS', color: 'border-red-500/30' },
@@ -1243,75 +1312,212 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 ))}
               </div>
 
-              {/* Player list table */}
+              {/* Player or Alliance list table */}
               <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
-                <table className="w-full text-left border-collapse text-xs font-mono">
-                  <thead>
-                    <tr className="border-b border-[#1E293B]/70 text-slate-500 pb-2">
-                      <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">RANK</th>
-                      <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">COMMANDER ID</th>
-                      <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">POPULATION</th>
-                      <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">ATTACK POINTS</th>
-                      <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">DEFENSE POINTS</th>
-                      <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">RESOURCES HAULED</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-900/60 font-medium">
-                    {displayPlayers.map((pl) => {
-                      const isYou = pl.id === player.id;
-                      const globalRankIdx = sortedPlayers.findIndex(x => x.id === pl.id) + 1;
+                {leaderboardType === 'players' ? (
+                  <table className="w-full text-left border-collapse text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-[#1E293B]/70 text-slate-500 pb-2">
+                        <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">RANK</th>
+                        <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">COMMANDER ID</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">POPULATION</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">ATTACK POINTS</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">DEFENSE POINTS</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">RESOURCES HAULED</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-900/60 font-medium">
+                      {displayPlayers.map((pl) => {
+                        const isYou = pl.id === player.id;
+                        const globalRankIdx = sortedPlayers.findIndex(x => x.id === pl.id) + 1;
 
-                      return (
-                        <tr 
-                          key={pl.id} 
-                          className={`border-b border-[#1E293B]/60 hover:bg-white/5 transition duration-150 ${isYou ? 'bg-cyan-950/15 text-cyan-300 font-bold border-l-2 border-l-cyan-400 pl-2' : 'text-slate-300'}`}
-                        >
-                          <td className="py-3.5 px-4 font-mono font-bold whitespace-nowrap">
-                            <span className={globalRankIdx <= 3 ? 'text-yellow-400 font-extrabold' : 'text-slate-500'}>
-                              {globalRankIdx <= 3 ? `🏆 #${globalRankIdx}` : `#${globalRankIdx}`}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <div className="flex flex-col">
-                              <span className="flex items-center gap-1.5 font-bold">
-                                {isYou && <span className="text-yellow-400">★</span>}
-                                <button
-                                  type="button"
-                                  onClick={() => onViewPlayerProfile && onViewPlayerProfile(pl.id)}
-                                  className="font-bold text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer focus:outline-none"
-                                >
-                                  {pl.username}
-                                </button>
-                                {isYou && <span className="text-[10px] text-cyan-500/80 font-normal">(YOU)</span>}
-                                {pl.id.startsWith('ai_') && <span className="text-[9px] tracking-wider text-slate-500 font-semibold">[AI INTELLIGENCE]</span>}
+                        return (
+                          <tr 
+                            key={pl.id} 
+                            className={`border-b border-[#1E293B]/60 hover:bg-white/5 transition duration-150 ${isYou ? 'bg-cyan-950/15 text-cyan-300 font-bold border-l-2 border-l-cyan-400 pl-2' : 'text-slate-300'}`}
+                          >
+                            <td className="py-3.5 px-4 font-mono font-bold whitespace-nowrap">
+                              <span className={globalRankIdx <= 3 ? 'text-yellow-400 font-extrabold' : 'text-slate-500'}>
+                                {globalRankIdx <= 3 ? `🏆 #${globalRankIdx}` : `#${globalRankIdx}`}
                               </span>
-                            </div>
-                          </td>
-                          <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'population' ? 'text-cyan-400' : 'text-slate-400'}`}>
-                            {(pl.scores?.population || 0).toLocaleString()}
-                          </td>
-                          <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'attack' ? 'text-red-400' : 'text-slate-400'}`}>
-                            {(pl.scores?.attack || 0).toLocaleString()}
-                          </td>
-                          <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'defence' ? 'text-blue-400' : 'text-slate-400'}`}>
-                            {(pl.scores?.defence || 0).toLocaleString()}
-                          </td>
-                          <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'raiders' ? 'text-emerald-400' : 'text-slate-400'}`}>
-                            {(pl.scores?.raiders || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="flex flex-col">
+                                <span className="flex items-center gap-1.5 font-bold">
+                                  {isYou && <span className="text-yellow-400">★</span>}
+                                  <button
+                                    type="button"
+                                    onClick={() => onViewPlayerProfile && onViewPlayerProfile(pl.id)}
+                                    className="font-bold text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer focus:outline-none"
+                                  >
+                                    {pl.username}
+                                  </button>
+                                  {isYou && <span className="text-[10px] text-cyan-500/80 font-normal">(YOU)</span>}
+                                  {pl.id.startsWith('ai_') && <span className="text-[9px] tracking-wider text-slate-500 font-semibold">[AI INTELLIGENCE]</span>}
+                                </span>
+                              </div>
+                            </td>
+                            <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'population' ? 'text-cyan-400' : 'text-slate-400'}`}>
+                              {(pl.scores?.population || 0).toLocaleString()}
+                            </td>
+                            <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'attack' ? 'text-red-400' : 'text-slate-400'}`}>
+                              {(pl.scores?.attack || 0).toLocaleString()}
+                            </td>
+                            <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'defence' ? 'text-blue-400' : 'text-slate-400'}`}>
+                              {(pl.scores?.defence || 0).toLocaleString()}
+                            </td>
+                            <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'raiders' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                              {(pl.scores?.raiders || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="w-full text-left border-collapse text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-[#1E293B]/70 text-slate-500 pb-2">
+                        <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">RANK</th>
+                        <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">ALLIANCE [TAG]</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">MEMBERS</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">POPULATION</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">ATTACK POINTS</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">DEFENSE POINTS</th>
+                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">RESOURCES HAULED</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-900/60 font-medium">
+                      {displayAlliances.map((all) => {
+                        const globalRankIdx = sortedAlliances.findIndex(x => x.id === all.id) + 1;
+                        const isExpanded = expandedAllianceId === all.id;
+                        const isYourAlliance = player.allianceId === all.id;
+
+                        return (
+                          <React.Fragment key={all.id}>
+                            <tr 
+                              className={`border-b border-[#1E293B]/60 hover:bg-white/5 transition duration-150 cursor-pointer ${isYourAlliance ? 'bg-[#5bc0be]/10 border-l-2 border-l-[#5bc0be] pl-2' : ''}`}
+                              onClick={() => setExpandedAllianceId(isExpanded ? null : all.id)}
+                            >
+                              <td className="py-3.5 px-4 font-mono font-bold whitespace-nowrap">
+                                <span className={globalRankIdx <= 3 ? 'text-yellow-400 font-extrabold' : 'text-slate-500'}>
+                                  {globalRankIdx <= 3 ? `🏆 #${globalRankIdx}` : `#${globalRankIdx}`}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span 
+                                      className="w-2.5 h-2.5 rounded-full" 
+                                      style={{ backgroundColor: all.bannerColor || '#5bc0be' }}
+                                    />
+                                    <span className="font-bold text-[#5bc0be] hover:text-cyan-300">
+                                      {all.name} <span className="text-slate-500 font-mono">[{all.tag}]</span>
+                                    </span>
+                                    {isYourAlliance && <span className="text-[10px] text-cyan-400 font-mono font-normal ml-1">(YOURS)</span>}
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 font-mono font-normal">
+                                    {isExpanded ? '▲ Collapse' : '▼ Expand Members'}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4 text-right text-slate-300 font-bold font-mono">
+                                {all.members.length}
+                              </td>
+                              <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'population' ? 'text-[#5bc0be]' : 'text-slate-400'}`}>
+                                {all.combinedScores.population.toLocaleString()}
+                              </td>
+                              <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'attack' ? 'text-red-400' : 'text-slate-400'}`}>
+                                {all.combinedScores.attack.toLocaleString()}
+                              </td>
+                              <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'defence' ? 'text-blue-400' : 'text-slate-400'}`}>
+                                {all.combinedScores.defence.toLocaleString()}
+                              </td>
+                              <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'raiders' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                {all.combinedScores.raiders.toLocaleString()}
+                              </td>
+                            </tr>
+
+                            {/* Member list expansion row */}
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan={7} className="p-4 bg-[#05070a]/80 border-b border-[#1E293B]">
+                                  <div className="space-y-3 pl-6 pr-4">
+                                    <div className="flex items-center justify-between border-b border-[#1E293B]/40 pb-1.5">
+                                      <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest font-mono">
+                                        🛡️ {all.name} Alliance Command Roster ({all.members.length} members)
+                                      </h4>
+                                      <span className="text-[10px] text-slate-500 font-mono">Leader: <span className="text-yellow-400 font-bold">{all.leaderName}</span></span>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                      {all.membersWithScores.map((mbr: any) => {
+                                        const isMbrYou = mbr.playerId === player.id;
+                                        return (
+                                          <div 
+                                            key={mbr.playerId}
+                                            className={`p-2.5 rounded-xl border bg-[#080d16]/75 hover:bg-[#0c1322] transition flex flex-col justify-between gap-1.5 ${isMbrYou ? 'border-cyan-500/30' : 'border-[#1E293B]'}`}
+                                          >
+                                            <div className="flex items-center justify-between">
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (onViewPlayerProfile) onViewPlayerProfile(mbr.playerId);
+                                                }}
+                                                className="text-xs font-bold text-cyan-400 hover:text-cyan-300 hover:underline text-left cursor-pointer focus:outline-none"
+                                              >
+                                                {mbr.username} {isMbrYou && <span className="text-[9px] text-cyan-500 font-normal">(YOU)</span>}
+                                              </button>
+                                              <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-md font-mono ${
+                                                mbr.role === 'leader' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                                mbr.role === 'officer' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
+                                                'bg-slate-800 text-slate-400'
+                                              }`}>
+                                                {mbr.role}
+                                              </span>
+                                            </div>
+
+                                            {/* Mini score summary */}
+                                            <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-mono text-slate-450 border-t border-[#1E293B]/30 pt-1.5 mt-0.5">
+                                              <div>
+                                                <span className="text-slate-500">Pop:</span> <span className="text-slate-300 font-semibold">{mbr.scores.population.toLocaleString()}</span>
+                                              </div>
+                                              <div>
+                                                <span className="text-slate-500">Atk:</span> <span className="text-red-400 font-semibold">{mbr.scores.attack.toLocaleString()}</span>
+                                              </div>
+                                              <div>
+                                                <span className="text-slate-500">Def:</span> <span className="text-blue-400 font-semibold">{mbr.scores.defence.toLocaleString()}</span>
+                                              </div>
+                                              <div>
+                                                <span className="text-slate-500">Haul:</span> <span className="text-emerald-400 font-semibold">{mbr.scores.raiders.toLocaleString()}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
 
               {/* Pagination skip page controls */}
-              {!showBottom10 && !showTop10 && totalPages > 1 && (
+              {((leaderboardType === 'players' && !showBottom10 && !showTop10 && totalPages > 1) || 
+                (leaderboardType === 'alliances' && totalPages > 1)) && (
                 <div className="flex items-center justify-between pt-4 border-t border-[#1E293B]/40 font-mono text-xs">
                   <div>
                     <span className="text-slate-500">Page <strong>{leaderboardPage}</strong> of <strong>{totalPages}</strong></span>
-                    <span className="text-slate-600 text-[10px] ml-2 font-bold font-mono">({sortedPlayers.length} space lords)</span>
+                    <span className="text-slate-600 text-[10px] ml-2 font-bold font-mono">
+                      ({leaderboardType === 'players' ? `${sortedPlayers.length} space lords` : `${sortedAlliances.length} stellar alliances`})
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -1334,13 +1540,13 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 </div>
               )}
 
-              {showBottom10 && (
+              {leaderboardType === 'players' && showBottom10 && (
                 <div className="pt-2 text-center text-slate-500 text-[10px] uppercase font-bold tracking-widest block py-2 border-t border-[#1E293B]/20">
                   ⚡ DISPLAYING LOWER-TIER STANDINGS SYSTEMWIDE COMMANDERS (BOTTOM 10 ENGAGEMENT SCORES)
                 </div>
               )}
 
-              {showTop10 && (
+              {leaderboardType === 'players' && showTop10 && (
                 <div className="pt-2 text-center text-cyan-400 text-[10px] uppercase font-bold tracking-widest block py-2 border-t border-[#1E293B]/20 animate-pulse font-mono">
                   🏆 DISPLAYING ELITE STANDINGS SYSTEMWIDE COMMANDERS (TOP 10 ENGAGEMENT SCORES)
                 </div>
