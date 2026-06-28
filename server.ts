@@ -3,6 +3,8 @@ import path from "path";
 import fs from "fs";
 import http from "http";
 import https from "https";
+import { initializeApp, cert, getApps, App } from "firebase-admin/app";
+import { getMessaging } from "firebase-admin/messaging";
 import { 
   GameState, 
   PlayerProfile, 
@@ -1566,6 +1568,13 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
           ]
         };
         state.battleReports.unshift(report);
+        
+        // Notify the sender that the relocation has completed
+        sendNotificationWithFallback(
+          fleet.senderId,
+          "🚀 Fleet Relocation Completed",
+          `Your relocation fleet has completed transit and safely landed at '${targetPlanet.name}'.`
+        );
       } else {
         // If they don't own the target planet, return troops home
         const totalDist = Math.hypot(fleet.targetCoords.x - fleet.senderCoords.x, fleet.targetCoords.y - fleet.senderCoords.y);
@@ -1673,6 +1682,22 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
     ];
 
     state.battleReports.unshift(report);
+
+    // Notify scanning player of the intel sweep results
+    sendNotificationWithFallback(
+      report.attackerId,
+      "📡 Intelligence Sweep Complete",
+      `Your recon drones have returned orbital scanner data of Commander ${report.defenderName || "Unknown"}'s station.`
+    );
+
+    // Notify defending player of unauthorized scans
+    if (report.defenderId) {
+      sendNotificationWithFallback(
+        report.defenderId,
+        "⚠️ SENSORS ALERT: Scanner Detected",
+        `Proximity alarms triggered: An unauthorized scouting drone sent by Commander ${report.attackerName} has completed a scan of your station!`
+      );
+    }
 
     // Apply losses to fleet
     if (didScoutsDie) {
@@ -1843,6 +1868,29 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
 
     state.battleReports.unshift(report);
 
+    // Dispatch real-time/FCM notifications for combat results
+    const lootSumTotal = Object.values(loot).reduce((s, v) => s + v, 0);
+    
+    // Notify the attacker
+    sendNotificationWithFallback(
+      report.attackerId,
+      combat.winner === "attacker" ? "🏆 Raid Victory!" : "❌ Raid Repelled",
+      combat.winner === "attacker" 
+        ? `Your raid on Commander ${report.defenderName}'s station was successful! Plundered ${lootSumTotal.toLocaleString()} resources.`
+        : `Your raiding fleet on Commander ${report.defenderName}'s station was defeated.`
+    );
+
+    // Notify the defender
+    if (report.defenderId) {
+      sendNotificationWithFallback(
+        report.defenderId,
+        combat.winner === "attacker" ? "🚨 STATION BREACH ALERT!" : "🛡️ Station Defended!",
+        combat.winner === "attacker"
+          ? `Commander ${report.attackerName} breached your defenses, plundering ${lootSumTotal.toLocaleString()} resources!`
+          : `Your security systems successfully repelled a raid by Commander ${report.attackerName}!`
+      );
+    }
+
     // Push central news feed
     const lootSum = Object.values(loot).reduce((s, v) => s + v, 0);
     const destructionDetails = buildingDamageReports.length > 0 
@@ -1986,7 +2034,165 @@ setInterval(() => {
 }, 4000);
 
 
+// ----------------- PUSH NOTIFICATIONS & SSE CHANNELS (FCM FALLBACK) -----------------
+
+// Keep track of active SSE connection channels (live sessions)
+const activeSseClients = new Map<string, express.Response>();
+
+let firebaseAdminApp: App | null = null;
+
+// Lazy initialize Firebase Admin to prevent startup crash if keys are missing
+function getFirebaseAdmin(): App | null {
+  if (firebaseAdminApp) return firebaseAdminApp;
+
+  const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT;
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+
+  try {
+    const apps = getApps();
+    if (apps.length > 0) {
+      firebaseAdminApp = apps[0];
+      return firebaseAdminApp;
+    }
+
+    if (serviceAccountVar) {
+      const serviceAccount = JSON.parse(serviceAccountVar);
+      firebaseAdminApp = initializeApp({
+        credential: cert(serviceAccount)
+      });
+      console.log("[Firebase Admin] Initialized with Service Account cert.");
+    } else if (projectId) {
+      firebaseAdminApp = initializeApp({
+        projectId: projectId
+      });
+      console.log(`[Firebase Admin] Initialized with Project ID: ${projectId}`);
+    } else {
+      console.warn("[Firebase Admin] Missing FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID in environment. FCM notifications will be simulated / logged in development.");
+    }
+  } catch (err) {
+    console.error("[Firebase Admin] Error initializing Firebase Admin SDK:", err);
+  }
+  return firebaseAdminApp;
+}
+
+/**
+ * Sends a notification using active SSE stream. Falls back to a high-priority, system-level FCM push notification
+ * via firebase-admin if the active SSE connection is silent or breaks (is inactive).
+ */
+function sendNotificationWithFallback(userId: string, title: string, body: string) {
+  const activeSse = activeSseClients.get(userId);
+  
+  if (activeSse) {
+    console.log(`[Notifications] Active SSE client found for user ${userId}. Dispatching live event.`);
+    try {
+      activeSse.write(`data: ${JSON.stringify({ title, body, timestamp: Date.now() })}\n\n`);
+      return;
+    } catch (err) {
+      console.warn(`[Notifications] Failed to write to active SSE stream for ${userId}. Connection probably broke. Falling back to FCM.`, err);
+      activeSseClients.delete(userId);
+    }
+  }
+
+  // Fallback: SSE went silent or is inactive. Look up FCM token
+  console.log(`[Notifications] User ${userId} has no active real-time SSE stream. Executing FCM push notification fallback...`);
+  const player = state.players[userId];
+  if (player && player.fcmToken) {
+    const adminApp = getFirebaseAdmin();
+    if (adminApp) {
+      const message = {
+        token: player.fcmToken,
+        notification: {
+          title: title,
+          body: body
+        },
+        android: {
+          priority: "high" as const
+        },
+        apns: {
+          payload: {
+            aps: {
+              contentAvailable: true,
+              sound: "default"
+            }
+          }
+        },
+        data: {
+          click_action: "FLUTTER_NOTIFICATION_CLICK",
+          title: title,
+          body: body
+        }
+      };
+
+      const messaging = getMessaging(adminApp);
+      messaging.send(message)
+        .then((response) => {
+          console.log(`[Notifications] Successfully sent system-level fallback FCM push notification to ${userId}:`, response);
+        })
+        .catch((error) => {
+          console.error(`[Notifications] FCM delivery failure to ${userId}:`, error);
+          // Auto-cleanup stale or unregistered FCM tokens
+          if (error.code === 'messaging/invalid-registration-token' || error.code === 'messaging/registration-token-not-registered') {
+            console.log(`[Notifications] Removing invalid FCM registration token for ${userId}`);
+            player.fcmToken = undefined;
+            saveState();
+          }
+        });
+    } else {
+      console.warn(`[Notifications] Push Notification fallback triggered for ${userId}, but firebase-admin is not authenticated. Message text: "${title}: ${body}"`);
+    }
+  } else {
+    console.log(`[Notifications] No registered native FCM Token found for user ${userId}. Fallback push notification cannot be delivered.`);
+  }
+}
+
 // ----------------- EXPRESS API HANDLERS -----------------
+
+// Endpoint to register the user's native FCM token
+app.post("/api/notifications/register-token", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) {
+    return res.status(401).json({ error: "Unauthenticated" });
+  }
+
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: "Registration token is required" });
+  }
+
+  p.fcmToken = token;
+  saveState();
+  console.log(`[Notifications] Registered native FCM Token for player ${p.username} (${p.id}): ${token.substring(0, 15)}...`);
+  res.json({ success: true, message: "Native FCM Registration token stored successfully." });
+});
+
+// SSE event stream channel endpoint
+app.get("/api/notifications/stream", (req, res) => {
+  const userId = req.query.userId as string;
+  if (!userId || !state.players[userId]) {
+    res.status(400).end("Invalid or missing userId query parameter");
+    return;
+  }
+
+  const p = state.players[userId];
+  console.log(`[Notifications] Established active SSE real-time stream for player ${p.username} (${userId})`);
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive"
+  });
+
+  // Keep connection open and send initial comment/keep-alive signal
+  res.write(":\n\n");
+  
+  activeSseClients.set(userId, res);
+
+  // Monitor connection close to prune active clients
+  req.on("close", () => {
+    console.log(`[Notifications] Active SSE session closed for player ${p.username} (${userId})`);
+    activeSseClients.delete(userId);
+  });
+});
 
 // Helper to find player profile and verify token/session
 function getLoggedPlayer(req: express.Request): PlayerProfile | null {
@@ -4580,6 +4786,13 @@ app.post("/api/messages/send", (req, res) => {
     isRead: true // Sender has already read their own sent message
   };
   p.commandMessages.push(sentCopy);
+
+  // Dispatch a real-time SSE event or fallback FCM push notification to the recipient
+  sendNotificationWithFallback(
+    receiver.id, 
+    "📬 New Secure Message", 
+    `Commander ${p.username} sent you a message: ${content.trim().substring(0, 60)}${content.trim().length > 60 ? "..." : ""}`
+  );
 
   saveState();
   res.json({ success: true, message: "Holographic command transmission dispatched!" });

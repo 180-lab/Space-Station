@@ -115,6 +115,7 @@ export interface PlayerProfile {
   password?: string;
   lastActive?: number;
   commandMessages?: CommandMessage[];
+  fcmToken?: string;
 }
 
 export interface CommandMessage {

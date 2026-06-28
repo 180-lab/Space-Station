@@ -13,6 +13,7 @@ import {
   CreatedFleet
 } from './types';
 import { sendMobileNotification } from './lib/mobileNotifications';
+import { initializePushNotifications, setupSSEConnection } from './lib/pushNotifications';
 import { playAlertySound, playChilledSound } from './lib/soundUtils';
 import { ExploreTab } from './components/ExploreTab';
 import { ArmyBaseTab } from './components/ArmyBaseTab';
@@ -551,11 +552,33 @@ export default function App() {
     };
   }, []);
 
-  // Local storage load
+  // Local storage load and Push Notifications Registration
   useEffect(() => {
     if (userId) {
       fetchState();
+      // Initialize Capacitor Push Notifications for native handsets
+      initializePushNotifications(userId);
     }
+  }, [userId]);
+
+  // Real-time active SSE subscription (falls back to native push notification if connection goes silent/breaks)
+  useEffect(() => {
+    if (!userId) return;
+
+    const eventSource = setupSSEConnection(userId, (notification) => {
+      // Show elegant visual toast message
+      showToast(`📬 SECURE TRANSMISSION: ${notification.title} - ${notification.body}`, 'info');
+      
+      // Mirror to local phone alerts
+      sendMobileNotification(notification.title, notification.body);
+      
+      // Play tactical notification chime
+      playAlertySound();
+    });
+
+    return () => {
+      eventSource.close();
+    };
   }, [userId]);
 
   // Unified status poller (triggered every 3 seconds)
