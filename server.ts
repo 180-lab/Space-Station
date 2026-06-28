@@ -1725,7 +1725,7 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
     if (attacker) {
       // Check researchCenter level 20 requirements
       const hasLvl20 = attacker.planets.some(p => p.buildings.researchCenter.level >= 20);
-      if (hasLvl20 && attacker.planets.length < 5) {
+      if (hasLvl20 && attacker.planets.length < 10) {
         // Create new planet
         const planetNum = attacker.planets.length + 1;
         const newPlanet = createInitialPlanet(`${attacker.username}'s Colony ${planetNum}`, fleet.targetCoords.x, fleet.targetCoords.y);
@@ -3529,15 +3529,15 @@ app.post("/api/fleet/send", (req, res) => {
 
   if (!hasTroops) return res.status(400).json({ error: "Must dispatch at least 1 troop to launch space fleet." });
 
-  // Colonization needs lab level 20, maximum 5 planets limit, and exactly ONE Settlement Ship
+  // Colonization needs lab level 20, maximum 10 planets limit, and exactly ONE Settlement Ship
   if (missionType === "colonize") {
     // 1. Must deploy exactly 1 Settlement Ship
     if (troopSend.settlementShip !== 1) {
       return res.status(400).json({ error: "You must deploy exactly 1 Settlement Ship to colonize a new planet!" });
     }
     // 2. Must be within max planet count
-    if (p.planets.length >= 5) {
-      return res.status(400).json({ error: "Command limits reached. Max 5 colonized colony planets." });
+    if (p.planets.length >= 10) {
+      return res.status(400).json({ error: "Command limits reached. Max 10 colonized colony planets." });
     }
     // 3. Must be a habitable planet in the database on those coordinates that is NOT yet colonized!
     const targetHabitable = state.habitablePlanets?.find(hp => hp.coords.x === targetX && hp.coords.y === targetY);
@@ -3710,8 +3710,8 @@ app.post("/api/fleet/settle", (req, res) => {
     return res.status(400).json({ error: "This fleet has not arrived at its destination yet!" });
   }
 
-  if (p.planets.length >= 5) {
-    return res.status(400).json({ error: "Command limits reached. Max 5 colony planets." });
+  if (p.planets.length >= 10) {
+    return res.status(400).json({ error: "Command limits reached. Max 10 colony planets." });
   }
 
   // Mark the habitable planet as colonized!

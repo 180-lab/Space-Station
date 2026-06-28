@@ -932,7 +932,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 Rename Active Colony Bases
               </label>
               <p className="text-[10.5px] text-slate-500 leading-relaxed mt-0.5">
-                Renames any coordinates station base you have colonized. Your empire spans up to 5 strategic sectors.
+                Renames any coordinates station base you have colonized. Your empire spans up to 10 strategic sectors.
               </p>
             </div>
             
