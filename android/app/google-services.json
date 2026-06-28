@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "40626426948",
+    "project_id": "space-station-498022",
+    "storage_bucket": "space-station-498022.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:40626426948:android:44ecdc5efa591c32efd811",
+        "android_client_info": {
+          "package_name": "com.galactose.tacticalgame"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "40626426948-e8t8qvnf9voo96ceud23kkn5pgufvfm9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBshty2uK5hpWfNdHM6Deh4P81sDAd1hz8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "40626426948-e8t8qvnf9voo96ceud23kkn5pgufvfm9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
