@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlayerProfile } from '../types';
 import { requestNotificationPermission, sendMobileNotification } from '../lib/mobileNotifications';
+import { DEFAULT_TUTORIAL_TASKS } from './CommanderTutorial';
 import { 
   Settings, 
   Eye, 
@@ -42,6 +43,7 @@ interface SettingsTabProps {
   onOpenPayments?: () => void;
   onNavigateToLeaderboard?: () => void;
   populationRank?: number;
+  customTasks?: Record<string, any>;
 }
 
 const COSMETIC_SKINS = [
@@ -68,7 +70,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onLinkGoogle,
   onOpenPayments,
   onNavigateToLeaderboard,
-  populationRank
+  populationRank,
+  customTasks = {}
 }) => {
   // Rename commander name and base colony names state
   const [commanderName, setCommanderName] = useState(player.username);
@@ -90,6 +93,73 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [privateFeedbacks, setPrivateFeedbacks] = useState<any[]>([]);
   const [loadingPrivateFeedbacks, setLoadingPrivateFeedbacks] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+
+  // Admin Task Editor States
+  const [selectedTaskId, setSelectedTaskId] = useState<number>(1);
+  const [taskTitleInput, setTaskTitleInput] = useState('');
+  const [taskShortDescInput, setTaskShortDescInput] = useState('');
+  const [taskReqHtmlInput, setTaskReqHtmlInput] = useState('');
+  const [taskHintInput, setTaskHintInput] = useState('');
+  const [taskHowToGetThereInput, setTaskHowToGetThereInput] = useState('');
+  const [taskCommanderTipInput, setTaskCommanderTipInput] = useState('');
+  const [taskCongratsMessageInput, setTaskCongratsMessageInput] = useState('');
+  const [taskEncouragementQuoteInput, setTaskEncouragementQuoteInput] = useState('');
+  const [updatingTask, setUpdatingTask] = useState(false);
+
+  // Sync inputs when selected task changes
+  useEffect(() => {
+    // Look up default task
+    const defTask = (DEFAULT_TUTORIAL_TASKS || []).find(t => t.id === selectedTaskId);
+    // Look up custom override from server state
+    const custom = customTasks?.[selectedTaskId] || customTasks?.[String(selectedTaskId)];
+
+    setTaskTitleInput(custom?.title ?? defTask?.title ?? '');
+    setTaskShortDescInput(custom?.shortDesc ?? defTask?.shortDesc ?? '');
+    setTaskReqHtmlInput(custom?.requirementHtml ?? defTask?.requirementHtml ?? '');
+    setTaskHintInput(custom?.hint ?? defTask?.hint ?? '');
+    setTaskHowToGetThereInput(custom?.howToGetThere ?? defTask?.howToGetThere ?? '');
+    setTaskCommanderTipInput(custom?.commanderTip ?? defTask?.commanderTip ?? '');
+    setTaskCongratsMessageInput(custom?.congratsMessage ?? defTask?.congratsMessage ?? '');
+    setTaskEncouragementQuoteInput(custom?.encouragementQuote ?? defTask?.encouragementQuote ?? '');
+  }, [selectedTaskId, customTasks]);
+
+  const handleUpdateTaskText = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpdatingTask(true);
+    try {
+      const res = await fetch('/api/admin/update-task', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id,
+        },
+        body: JSON.stringify({
+          taskId: selectedTaskId,
+          title: taskTitleInput,
+          shortDesc: taskShortDescInput,
+          requirementHtml: taskReqHtmlInput,
+          hint: taskHintInput,
+          howToGetThere: taskHowToGetThereInput,
+          commanderTip: taskCommanderTipInput,
+          congratsMessage: taskCongratsMessageInput,
+          encouragementQuote: taskEncouragementQuoteInput,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message || 'Task text successfully updated for the whole game!', 'success');
+        if (onRefreshState) {
+          onRefreshState();
+        }
+      } else {
+        showToast(data.error || 'Failed to update task revisions.', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Error transmitting task update.', 'error');
+    } finally {
+      setUpdatingTask(false);
+    }
+  };
 
   // Send suggestion handler
   const handleSendFeedback = async (e: React.FormEvent) => {
@@ -1048,6 +1118,152 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             ))
                           )}
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Admin Tutorial Task Editor Block */}
+                    <div className="border-t border-[#1E293B]/40 pt-6 space-y-4">
+                      <div className="bg-slate-900/40 border border-[#1E293B]/60 rounded-2xl p-4 sm:p-5 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#1E293B]/30">
+                          <div>
+                            <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-1.5 font-mono">
+                              🛡️ ADMIN TUTORIAL QUEST ROADMAP MANAGER
+                            </h4>
+                            <p className="text-[10.5px] text-slate-400 mt-0.5 leading-relaxed font-sans">
+                              Select any task below to instantly override its text globally for all players.
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-[10px] text-slate-400 font-mono uppercase whitespace-nowrap">SWITCH TASK:</label>
+                            <select
+                              value={selectedTaskId}
+                              onChange={(e) => setSelectedTaskId(Number(e.target.value))}
+                              className="px-3 py-1.5 bg-slate-950 border border-[#1E293B] focus:border-emerald-500 text-xs text-slate-200 font-sans rounded-xl focus:outline-none max-w-xs transition"
+                            >
+                              {Array.from({ length: 30 }, (_, i) => i + 1).map((id) => {
+                                const defT = (DEFAULT_TUTORIAL_TASKS || []).find(t => t.id === id);
+                                const customT = customTasks?.[id] || customTasks?.[String(id)];
+                                const label = customT?.title || defT?.title || `Task ${id}`;
+                                return (
+                                  <option key={id} value={id}>
+                                    Task {id}: {label.replace(/🚀|👑|🛠️|🔬|📡|🎖️|🛰️|🌌/g, '').slice(0, 45).trim()}...
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                        </div>
+
+                        <form onSubmit={handleUpdateTaskText} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Left Column Fields */}
+                          <div className="space-y-3.5">
+                            <div>
+                              <label className="text-[10px] text-slate-400 font-mono uppercase block mb-1">Quest Title (Displayed on roadmap & banner):</label>
+                              <input
+                                type="text"
+                                value={taskTitleInput}
+                                onChange={(e) => setTaskTitleInput(e.target.value)}
+                                className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] focus:border-emerald-500/60 focus:outline-none text-xs text-slate-200 rounded-xl transition animate-fade-in"
+                                placeholder="Enter quest title..."
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] text-slate-400 font-mono uppercase block mb-1">Requirement (HTML, displayed as checklist detail):</label>
+                              <textarea
+                                value={taskReqHtmlInput}
+                                onChange={(e) => setTaskReqHtmlInput(e.target.value)}
+                                rows={2}
+                                className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] focus:border-emerald-500/60 focus:outline-none text-xs text-slate-200 rounded-xl font-mono transition animate-fade-in"
+                                placeholder="e.g. Build <strong>at least 1 Fabricator</strong>."
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] text-slate-400 font-mono uppercase block mb-1">Short Description:</label>
+                              <textarea
+                                value={taskShortDescInput}
+                                onChange={(e) => setTaskShortDescInput(e.target.value)}
+                                rows={2}
+                                className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] focus:border-emerald-500/60 focus:outline-none text-xs text-slate-200 rounded-xl transition animate-fade-in"
+                                placeholder="Short task overview description..."
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] text-slate-400 font-mono uppercase block mb-1">Quest Hint (Detail dropdown helper):</label>
+                              <textarea
+                                value={taskHintInput}
+                                onChange={(e) => setTaskHintInput(e.target.value)}
+                                rows={3}
+                                className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] focus:border-emerald-500/60 focus:outline-none text-xs text-slate-200 rounded-xl transition animate-fade-in"
+                                placeholder="Enter hints or step-by-step guidance..."
+                              />
+                            </div>
+                          </div>
+
+                          {/* Right Column Fields */}
+                          <div className="space-y-3.5 flex flex-col justify-between">
+                            <div className="space-y-3.5">
+                              <div>
+                                <label className="text-[10px] text-slate-400 font-mono uppercase block mb-1">"How to Get There" Step-by-Step Guidance (HTML):</label>
+                                <textarea
+                                  value={taskHowToGetThereInput}
+                                  onChange={(e) => setTaskHowToGetThereInput(e.target.value)}
+                                  rows={2}
+                                  className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] focus:border-emerald-500/60 focus:outline-none text-xs text-slate-200 rounded-xl font-mono transition animate-fade-in"
+                                  placeholder="HTML formatting supported..."
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] text-slate-400 font-mono uppercase block mb-1">Commander's Professional Tip:</label>
+                                <input
+                                  type="text"
+                                  value={taskCommanderTipInput}
+                                  onChange={(e) => setTaskCommanderTipInput(e.target.value)}
+                                  className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] focus:border-emerald-500/60 focus:outline-none text-xs text-slate-200 rounded-xl transition animate-fade-in"
+                                  placeholder="Tip to display in italics..."
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] text-slate-400 font-mono uppercase block mb-1">Congrats Message (Upon claiming reward):</label>
+                                <input
+                                  type="text"
+                                  value={taskCongratsMessageInput}
+                                  onChange={(e) => setTaskCongratsMessageInput(e.target.value)}
+                                  className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] focus:border-emerald-500/60 focus:outline-none text-xs text-slate-200 rounded-xl transition animate-fade-in"
+                                  placeholder="Congratulatory message..."
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] text-slate-400 font-mono uppercase block mb-1">Encouragement Quote (Inspirational sign-off):</label>
+                                <input
+                                  type="text"
+                                  value={taskEncouragementQuoteInput}
+                                  onChange={(e) => setTaskEncouragementQuoteInput(e.target.value)}
+                                  className="w-full px-3 py-2 bg-slate-950 border border-[#1E293B] focus:border-emerald-500/60 focus:outline-none text-xs text-slate-200 rounded-xl transition animate-fade-in"
+                                  placeholder="Encouraging sign-off..."
+                                />
+                              </div>
+                            </div>
+
+                            <div className="pt-2">
+                              <button
+                                type="submit"
+                                disabled={updatingTask}
+                                className="w-full py-2 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-500/50 text-emerald-300 font-bold text-[10px] uppercase font-mono tracking-wider rounded-xl transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                              >
+                                <RefreshCw size={11} className={updatingTask ? 'animate-spin' : ''} />
+                                <span>{updatingTask ? 'SAVING OVERRIDES...' : 'Save Quest Override'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </form>
                       </div>
                     </div>
                   </div>

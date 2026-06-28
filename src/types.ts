@@ -281,6 +281,7 @@ export interface GameState {
   newsEvents: NewsEvent[];
   habitablePlanets?: HabitablePlanet[];
   feedbacks?: SuggestionFeedback[];
+  customTasks?: Record<string, any>;
 }
 
 export interface HabitablePlanet {

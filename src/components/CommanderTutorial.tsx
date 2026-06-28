@@ -10,9 +10,10 @@ interface CommanderTutorialProps {
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
   setActiveTab: (tab: 'explore' | 'army' | 'galaxy' | 'research' | 'settings') => void;
   chatMessages?: any[];
+  customTasks?: Record<string, any>;
 }
 
-interface TutorialTask {
+export interface TutorialTask {
   id: number;
   title: string;
   shortDesc: string;
@@ -29,6 +30,8 @@ interface TutorialTask {
   };
 }
 
+export let DEFAULT_TUTORIAL_TASKS: TutorialTask[] = [];
+
 export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   player,
   activePlanet,
@@ -37,6 +40,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   showToast,
   setActiveTab,
   chatMessages = [],
+  customTasks = {},
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isHowToOpen, setIsHowToOpen] = useState(false);
@@ -71,7 +75,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   const siloCapacity = Math.round(10000 * Math.pow(500, (repositoryLevel - 1) / 44));
 
   // Tutorial Quest definitions (total 30 progressive tasks with customized step-by-step instructions)
-  const tasks: TutorialTask[] = [
+  const rawTasks: TutorialTask[] = [
     {
       id: 1,
       title: '🚀 Voyage of Discovery: Colonize your 2nd Station',
@@ -555,6 +559,28 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     },
   ];
 
+  const tasks: TutorialTask[] = rawTasks.map(t => {
+    const custom = customTasks?.[t.id] || customTasks?.[String(t.id)];
+    if (custom) {
+      return {
+        ...t,
+        title: custom.title || t.title,
+        shortDesc: custom.shortDesc || t.shortDesc,
+        requirementHtml: custom.requirementHtml || t.requirementHtml,
+        hint: custom.hint || t.hint,
+        howToGetThere: custom.howToGetThere || t.howToGetThere,
+        commanderTip: custom.commanderTip || t.commanderTip,
+        congratsMessage: custom.congratsMessage || t.congratsMessage,
+        encouragementQuote: custom.encouragementQuote || t.encouragementQuote,
+      };
+    }
+    return t;
+  });
+
+  if (DEFAULT_TUTORIAL_TASKS.length === 0 && rawTasks.length > 0) {
+    DEFAULT_TUTORIAL_TASKS = rawTasks;
+  }
+
   // Tasks must be done on the player's latest planet (the last one in the planets array) and not any earlier planet
   const checkTargetPlanet = player.planets[player.planets.length - 1] || activePlanet;
 
@@ -675,17 +701,21 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       case 20:
         return (checkTargetPlanet.buildings.armyBase?.level || 0) >= 1;
       case 21:
-        const totalCombatSquads =
-          (checkTargetPlanet.troops?.defender || 0) +
-          (checkTargetPlanet.troops?.attacker || 0) +
-          (checkTargetPlanet.troops?.tank || 0) +
-          (checkTargetPlanet.troops?.looter || 0) +
-          (checkTargetPlanet.troops?.drone || 0);
+        const totalCombatSquads = (player.planets || []).reduce((sum, pl) => {
+          const t = pl.troops || {};
+          return sum + (t.defender || 0) + (t.attacker || 0) + (t.tank || 0) + (t.looter || 0) + (t.drone || 0);
+        }, 0) || (
+          (activePlanet.troops?.defender || 0) +
+          (activePlanet.troops?.attacker || 0) +
+          (activePlanet.troops?.tank || 0) +
+          (activePlanet.troops?.looter || 0) +
+          (activePlanet.troops?.drone || 0)
+        );
         return totalCombatSquads >= 15;
       case 22:
-        return (checkTargetPlanet.troops?.defender || 0) >= 5;
+        return (player.planets || []).some(pl => (pl.troops?.defender || 0) >= 5) || (activePlanet.troops?.defender || 0) >= 5;
       case 23:
-        return (checkTargetPlanet.troops?.attacker || 0) >= 2;
+        return (player.planets || []).some(pl => (pl.troops?.attacker || 0) >= 2) || (activePlanet.troops?.attacker || 0) >= 2;
       case 24:
         const sentMsgLog =
           (player.commandMessages && player.commandMessages.some((m) => m.senderId === player.id)) ||

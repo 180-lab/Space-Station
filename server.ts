@@ -265,6 +265,9 @@ async function loadState() {
       if (!state.feedbacks) {
         state.feedbacks = [];
       }
+      if (!state.customTasks) {
+        state.customTasks = {};
+      }
       
       // Auto-migrate any outpost names to station names for loaded sectors
       if (state && state.players) {
@@ -2285,7 +2288,8 @@ app.get("/api/state", (req, res) => {
     battleReports: state.battleReports.filter(r => r.attackerId === p.id || r.defenderId === p.id),
     newsEvents: state.newsEvents,
     playersList,
-    serverTime: now
+    serverTime: now,
+    customTasks: state.customTasks || {}
   });
 });
 
@@ -4669,6 +4673,46 @@ app.post("/api/feedback/private-list", (req, res) => {
     state.feedbacks = [];
   }
   res.json({ success: true, feedbacks: state.feedbacks });
+});
+
+// Fetch custom tasks definition
+app.get("/api/admin/tasks", (req, res) => {
+  if (!state.customTasks) {
+    state.customTasks = {};
+  }
+  res.json({ success: true, customTasks: state.customTasks });
+});
+
+// Update a custom task text
+app.post("/api/admin/update-task", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const isEmailOwner = p && p.googleEmail && p.googleEmail.toLowerCase() === "banele180@gmail.com";
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+
+  const { taskId, title, shortDesc, requirementHtml, hint, howToGetThere, commanderTip, congratsMessage, encouragementQuote } = req.body;
+  if (!taskId) {
+    return res.status(400).json({ error: "Task ID is required." });
+  }
+
+  if (!state.customTasks) {
+    state.customTasks = {};
+  }
+
+  state.customTasks[taskId] = {
+    title,
+    shortDesc,
+    requirementHtml,
+    hint,
+    howToGetThere,
+    commanderTip,
+    congratsMessage,
+    encouragementQuote,
+  };
+
+  saveState();
+  res.json({ success: true, message: `Task ${taskId} text successfully updated for the whole game!`, customTasks: state.customTasks });
 });
 
 

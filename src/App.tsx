@@ -169,6 +169,7 @@ export default function App() {
   const [battleReports, setBattleReports] = useState<BattleReport[]>([]);
   const [newsEvents, setNewsEvents] = useState<NewsEvent[]>([]);
   const [serverTime, setServerTime] = useState<number>(Date.now());
+  const [customTasks, setCustomTasks] = useState<Record<string, any>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [viewingPlayerId, setViewingPlayerId] = useState<string | null>(null);
 
@@ -852,6 +853,7 @@ export default function App() {
         setBattleReports(data.battleReports);
         setNewsEvents(data.newsEvents);
         setServerTime(data.serverTime);
+        setCustomTasks(data.customTasks || {});
         consecutiveErrorsRef.current = 0;
         setConnectionError(null);
       } else {
@@ -2384,264 +2386,6 @@ export default function App() {
 
       {/* Screen view router container */}
       <main className="max-w-5xl mx-auto px-4 pt-8 pb-24 animate-fade-in animate-duration-500">
-        {activeTab === 'explore' && player && activePlanet && (() => {
-          // Compute dynamic operation alerts:
-          const incomingAttacks = fleets.filter(
-            f => f.targetId === player.id &&
-                 f.missionType === 'attack' &&
-                 !f.isReturning &&
-                 serverTime < f.arrivesAt
-          );
-
-          const movingForces = fleets.filter(
-            f => f.senderId === player.id &&
-                 (serverTime < f.arrivesAt || f.isWaitingToSettle)
-          );
-
-          let alertsColor = 'border-emerald-500/40 text-emerald-400 bg-emerald-950/20';
-          let alertsLabel = 'SECURE';
-          let alertsValue = 'OPTIMAL NO ACTIONS';
-          let pulseDot = 'bg-emerald-500 shadow-[0_0_8px_#10b981]';
-
-          if (incomingAttacks.length > 0) {
-            alertsColor = 'border-red-500 text-red-500 bg-red-950/40 border-2 animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.3)]';
-            alertsLabel = 'RED ALERT';
-            alertsValue = `${incomingAttacks.length} HOSTILE ACTIONS`;
-            pulseDot = 'bg-red-500 shadow-[0_0_10px_#ef4444]';
-          } else if (movingForces.length > 0) {
-            alertsColor = 'border-amber-500 text-amber-500 bg-amber-950/30 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.2)]';
-            alertsLabel = 'ORANGE TRANSIT';
-            alertsValue = `${movingForces.length} TROOPS ACTIVE`;
-            pulseDot = 'bg-amber-500 shadow-[0_0_8px_#f59e0b]';
-          }
-
-          // Hydration / Negative Production Check
-          const getResourceProductionVal = (resKey: 'water' | 'respirant' | 'food') => {
-            const isOtherMaxed = 
-              activePlanet.resources.water >= repositoryLimit &&
-              activePlanet.resources.plasma >= repositoryLimit &&
-              activePlanet.resources.fuel >= repositoryLimit &&
-              activePlanet.resources.food >= repositoryLimit &&
-              activePlanet.resources.respirant >= repositoryLimit;
-              
-            const mList = activePlanet.mines[resKey] || [];
-            if (isOtherMaxed) {
-              return resKey === 'water' ? 84000 : 42000;
-            }
-            return mList.reduce((sum, m) => {
-              const isMineBoosted = m.boostedUntil && Number(m.boostedUntil) > serverTime;
-              const baseOutput = Math.round((m.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
-              const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
-              return sum + output;
-            }, 0);
-          };
-
-          const waterHourly = getResourceProductionVal('water');
-          const respirantHourly = getResourceProductionVal('respirant');
-          const foodHourly = getResourceProductionVal('food');
-
-          let waterCons = 0;
-          const specCosts = { defender: 1.0, attacker: 2.0, tank: 4.0, looter: 3.0, drone: 0.4, settlementShip: 5.0 };
-          Object.entries(activePlanet.troops).forEach(([tId, count]) => {
-            waterCons += (Number(count) || 0) * (specCosts[tId as keyof typeof specCosts] || 0);
-          });
-          const respirantCons = waterCons * 0.28;
-          const foodCons = waterCons * 0.18;
-
-          const isWaterNeg = waterHourly < waterCons;
-          const isRespirantNeg = respirantHourly < respirantCons;
-          const isFoodNeg = foodHourly < foodCons;
-          const isAnyProdNeg = isWaterNeg || isRespirantNeg || isFoodNeg;
-          const isDehydratedStatus = activePlanet.resources.water < 0 || activePlanet.resources.respirant < 0 || activePlanet.resources.food < 0 || isAnyProdNeg;
-
-          return (
-            <div className="space-y-4 mb-6">
-              {/* Main Dynamic Resource Stats HUD Panels */}
-              <div className="bg-[#0A0F1D]/60 backdrop-blur-sm border border-slate-800/65 rounded-xl grid grid-cols-2 md:grid-cols-5 gap-0 p-0 divide-x divide-y md:divide-y-0 divide-slate-800/40 overflow-hidden">
-                {/* Water Stat */}
-                <div className="flex flex-col p-4.5 sm:p-5 animate-fade-in text-left" title="Water (H2O): Essential life fluid. Consumed continuously by troops to maintain Space Force strength.">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Droplet size={12} className="text-cyan-400 animate-pulse" />
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Water (H2O)</span>
-                  </div>
-                  <span className="text-base font-mono font-bold text-cyan-400">
-                    {Math.round(localResources.water).toLocaleString()}{" "}
-                    <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-                  </span>
-                  <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-                    <div 
-                      className="h-full bg-cyan-400 rounded-full shadow-[0_0_6px_#22d3ee] transition-all duration-300"
-                      style={{ width: `${Math.min(100, (localResources.water / repositoryLimit) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Plasma Stat */}
-                <div className="flex flex-col p-4.5 sm:p-5 animate-fade-in text-left header-divider-element-left" title="Plasma: High-energy matter. Essential for building complex spaceship hull grades and hyper-engines.">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap size={12} className="text-purple-400 animate-pulse" />
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Plasma</span>
-                  </div>
-                  <span className="text-base font-mono font-bold text-purple-400">
-                    {Math.round(localResources.plasma).toLocaleString()}{" "}
-                    <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-                  </span>
-                  <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-                    <div 
-                      className="h-full bg-purple-500 rounded-full shadow-[0_0_6px_#a855f7] transition-all duration-300"
-                      style={{ width: `${Math.min(100, (localResources.plasma / repositoryLimit) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Fuel Stat */}
-                <div className="flex flex-col p-4.5 sm:p-5 animate-fade-in text-left border-t md:border-t-0 border-slate-800/40" title="Fuel: Thermonuclear propulsion energy. Required for dispatching fleet traversals across global planetary sectors.">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Flame size={12} className="text-amber-400 animate-pulse" />
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Fuel</span>
-                  </div>
-                  <span className="text-base font-mono font-bold text-amber-400">
-                    {Math.round(localResources.fuel).toLocaleString()}{" "}
-                    <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-                  </span>
-                  <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-                    <div 
-                      className="h-full bg-amber-500 rounded-full shadow-[0_0_6px_#fbbf24] transition-all duration-300"
-                      style={{ width: `${Math.min(100, (localResources.fuel / repositoryLimit) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Food Stat */}
-                <div className="flex flex-col p-4.5 sm:p-5 animate-fade-in text-left border-t md:border-t-0 border-slate-800/40" title="Food: Life support proteins. Vital to sustaining personnel during active colonist station operations.">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Apple size={12} className="text-emerald-400 animate-pulse" />
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">Food</span>
-                  </div>
-                  <span className="text-base font-mono font-bold text-emerald-400">
-                    {Math.round(localResources.food).toLocaleString()}{" "}
-                    <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-                  </span>
-                  <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-                    <div 
-                      className="h-full bg-emerald-500 rounded-full shadow-[0_0_6px_#10b981] transition-all duration-300"
-                      style={{ width: `${Math.min(100, (localResources.food / repositoryLimit) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Respirant Stat */}
-                <div className="flex flex-col col-span-2 md:col-span-1 p-4.5 sm:p-5 animate-fade-in text-left border-t md:border-t-0 border-slate-800/40" title="Respirant (O2): Atmospheric gases. Powering life ventilation systems for astronauts and pilots.">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Wind size={12} className="text-blue-400 animate-pulse" />
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-[#64748b] font-mono">Respirant (O2)</span>
-                  </div>
-                  <span className="text-base font-mono font-bold text-blue-400">
-                    {Math.round(localResources.respirant).toLocaleString()}{" "}
-                    <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{(repositoryLimit/1000).toFixed(0)}k</span></span>
-                  </span>
-                  <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-                    <div 
-                      className="h-full bg-blue-500 rounded-full shadow-[0_0_6px_#3b82f6] transition-all duration-300"
-                      style={{ width: `${Math.min(100, (localResources.respirant / repositoryLimit) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Station Details Header with Holographic Glow */}
-              <div className="relative p-6 bg-gradient-to-b from-[#0F172A] to-black border border-white/5 rounded-xl overflow-hidden flex flex-col">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(34,211,238,0.05)_0%,_transparent_70%)] pointer-events-none"></div>
-                
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0 text-left">
-                    <span className="text-[10px] font-bold text-cyan-400 tracking-widest uppercase font-mono">SECTOR COMMAND SITE</span>
-                    {isEditingName ? (
-                      <div className="flex items-center gap-2 mt-1 max-w-md">
-                        <input
-                          type="text"
-                          maxLength={30}
-                          value={newNameInput}
-                          onChange={(e) => setNewNameInput(e.target.value)}
-                          className="flex-1 px-3 py-1 bg-slate-955 bg-slate-950 border border-cyan-500/50 hover:border-cyan-500 focus:border-cyan-500 focus:outline-none text-sm text-white font-mono rounded-lg transition"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleRenameActiveStation();
-                            if (e.key === 'Escape') {
-                              setIsEditingName(false);
-                              setNewNameInput(activePlanet.name);
-                            }
-                          }}
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          onClick={handleRenameActiveStation}
-                          className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
-                          title="Save Name"
-                        >
-                          <Check size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsEditingName(false);
-                            setNewNameInput(activePlanet.name);
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 rounded-lg transition cursor-pointer font-sans"
-                          title="Cancel"
-                        >
-                          <span className="text-sm font-semibold select-none font-sans">✕</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 mt-1 group">
-                        <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">{activePlanet.name}</h2>
-                        <button
-                          type="button"
-                          onClick={() => setIsEditingName(true)}
-                          className="p-1 px-2 text-[10px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/30 hover:bg-cyan-950/80 border border-cyan-500/20 hover:border-cyan-500/50 font-bold uppercase rounded-lg transition opacity-60 group-hover:opacity-100 flex items-center gap-1 cursor-pointer"
-                          title="Rename Station Base"
-                        >
-                          <Edit2 size={10} /> Rename
-                        </button>
-                      </div>
-                    )}
-                    <div className="mt-2 text-xs text-slate-400 flex items-center gap-2 font-mono">
-                      <span className={`inline-block w-2.5 h-2.5 rounded-full ${pulseDot} animate-pulse`} />
-                      <span>Commander: <span className="text-slate-200 font-bold">{player.username}</span> &bull; {activePlanet.name} &bull; Sector Coord: [{activePlanet.sectorX}, {activePlanet.sectorY}]</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-start md:self-auto">
-                    {/* Active Sector Alerts indicator block */}
-                    <button
-                      id="alerts-hud-trigger"
-                      onClick={() => setIsAlertsOpen(true)}
-                      className={`p-3 border rounded-lg text-left font-mono min-w-[170px] cursor-pointer transition duration-150 hover:brightness-110 active:scale-95 flex flex-col justify-center ${alertsColor}`}
-                    >
-                      <span className="text-[9px] uppercase tracking-widest font-bold opacity-75">{alertsLabel}</span>
-                      <span className="text-[11px] font-black uppercase mt-1 tracking-tight flex items-center gap-1.5 font-mono">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
-                        {alertsValue}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {isDehydratedStatus && (
-                <div className="p-3 border border-red-900/50 bg-red-950/30 text-red-400 rounded-xl flex items-start gap-2.5 text-xs animate-pulse text-left" title="Critical Alert: High severity base warning">
-                  <ShieldAlert size={16} className="shrink-0 mt-0.5 animate-bounce text-red-500" />
-                  <div>
-                    <p className="font-bold uppercase tracking-widest text-[10px]">CRITICAL NEGATIVE PRODUCTION (ATTRITION PASSIVE)</p>
-                    <p className="text-red-300/80 leading-relaxed mt-0.5">Troops are suffering rapid attrition due to negative production! Upgrade resource extractors immediately built with deeper wells or dismiss excess troops.</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
         {activeTab === 'explore' && player && (() => {
           const sortedByPopulation = [...playersList].sort((a, b) => b.scores.population - a.scores.population);
           const populationRank = sortedByPopulation.findIndex(p => p.id === player.id) + 1 || 1;
@@ -2666,6 +2410,9 @@ export default function App() {
               onSendChat={handleSendChat}
               localResources={localResources}
               setActiveTab={setActiveTab}
+              showStationsTop={showStationsTop}
+              setSelectedPlanetId={setSelectedPlanetId}
+              customTasks={customTasks}
             />
           );
         })()}
@@ -2769,6 +2516,7 @@ export default function App() {
               setActiveTab('galaxy');
             }}
             populationRank={myPopulationRankIndex}
+            customTasks={customTasks}
           />
         )}
       </main>
