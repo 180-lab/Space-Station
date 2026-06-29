@@ -2966,8 +2966,14 @@ export default function App() {
         const targetAlliance = targetPlayer.allianceId ? alliances[targetPlayer.allianceId] : null;
 
         return (
-          <div className="fixed inset-0 bg-[#05070A]/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-lg bg-[#0A0F1D] border border-cyan-500/20 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.15)] overflow-hidden font-sans relative flex flex-col">
+          <div 
+            className="fixed inset-0 bg-[#05070A]/90 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
+            onClick={() => setViewingPlayerId(null)}
+          >
+            <div 
+              className="w-full max-w-lg bg-[#0A0F1D] border border-cyan-500/20 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.15)] overflow-hidden font-sans relative flex flex-col my-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
               
               {/* Header Banner representing player */}
               <div 
@@ -2998,7 +3004,7 @@ export default function App() {
                 <button 
                   type="button"
                   onClick={() => setViewingPlayerId(null)}
-                  className="absolute top-4 right-4 text-slate-400 hover:text-white bg-[#05070A] hover:bg-slate-900 border border-[#1E293B] w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition"
+                  className="absolute top-4 right-4 z-20 text-slate-400 hover:text-white bg-[#05070A] hover:bg-slate-900 border border-[#1E293B] w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition font-bold text-base"
                 >
                   &times;
                 </button>

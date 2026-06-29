@@ -1257,7 +1257,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     }}
                     className={`px-3 py-1.5 font-bold text-[10px] uppercase tracking-widest rounded-lg transition cursor-pointer font-mono ${leaderboardType === 'alliances' ? 'bg-[#5bc0be] text-slate-950 shadow-[0_0_8px_rgba(91,192,190,0.3)]' : 'text-slate-400 hover:text-white'}`}
                   >
-                    🛡️ Star Alliances
+                    🛡️ Galactic Alliances
                   </button>
                 </div>
 
@@ -1516,7 +1516,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   <div>
                     <span className="text-slate-500">Page <strong>{leaderboardPage}</strong> of <strong>{totalPages}</strong></span>
                     <span className="text-slate-600 text-[10px] ml-2 font-bold font-mono">
-                      ({leaderboardType === 'players' ? `${sortedPlayers.length} space lords` : `${sortedAlliances.length} stellar alliances`})
+                      ({leaderboardType === 'players' ? `${sortedPlayers.length} space lords` : `${sortedAlliances.length} galactic alliances`})
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
