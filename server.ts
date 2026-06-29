@@ -52,6 +52,34 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+// Anti-speed-hack and security validation layer
+const lastRequestTime: Record<string, number> = {};
+
+app.use("/api", (req, res, next) => {
+  if (req.method === "POST" || req.method === "PUT" || req.method === "DELETE") {
+    const path = req.path.toLowerCase();
+    if (path.includes("/login") || path.includes("/register") || path.includes("/auth/google") || path.includes("/notifications/register-token")) {
+      return next();
+    }
+
+    const userId = req.headers["x-user-id"] as string;
+    if (userId) {
+      const now = Date.now();
+      const key = `${userId}:${path}`;
+      const lastTime = lastRequestTime[key] || 0;
+      if (now - lastTime < 150) {
+        console.warn(`[Anti-Speed-Hack] Blocking rapid request from user ${userId} on ${path} (${now - lastTime}ms interval)`);
+        return res.status(429).json({ 
+          error: "Quantum anti-speed-hack mechanism active: Request rate exceeds safety parameters. Action blocked.",
+          success: false 
+        });
+      }
+      lastRequestTime[key] = now;
+    }
+  }
+  next();
+});
+
 // Persistent state file
 const STATE_FILE = path.join(process.cwd(), "galaxy_state.json");
 
@@ -3267,6 +3295,8 @@ app.post("/api/galaxy/scan", (req, res) => {
   saveState();
 
   const { centerX, centerY, planetId } = req.body;
+  const cx = parseInt(String(centerX || 0), 10);
+  const cy = parseInt(String(centerY || 0), 10);
   const planet = p.planets.find(pl => pl.id === planetId);
 
   // Scan radius depends on Radar Level
@@ -3278,7 +3308,7 @@ app.post("/api/galaxy/scan", (req, res) => {
   
   Object.values(state.players).forEach(player => {
     player.planets.forEach(pl => {
-      const dist = Math.hypot(pl.sectorX - centerX, pl.sectorY - centerY);
+      const dist = Math.hypot(pl.sectorX - cx, pl.sectorY - cy);
       allTargets.push({
         id: player.id,
         username: player.username,
@@ -3301,7 +3331,7 @@ app.post("/api/galaxy/scan", (req, res) => {
   if (state.habitablePlanets) {
     state.habitablePlanets.forEach(hp => {
       if (hp.isColonized) return; // Ignore if already colonized by a player
-      const dist = Math.hypot(hp.coords.x - centerX, hp.coords.y - centerY);
+      const dist = Math.hypot(hp.coords.x - cx, hp.coords.y - cy);
       allTargets.push({
         id: "habitable",
         username: "Uncharted Sector",
@@ -4722,17 +4752,30 @@ app.post("/api/buy-credits", (req, res) => {
     return res.status(400).json({ error: "Invalid credit request amount." });
   }
 
+  // Strict Server-Authoritative payment package configuration
+  const validTiers = [
+    { amount: 1500, label: "Bronze Cargo Carrier" },
+    { amount: 6000, label: "Commander's Tactical Cache" },
+    { amount: 25000, label: "Supreme Emperor's Core Vault" }
+  ];
+
+  const matchedTier = validTiers.find(t => t.amount === amount && t.label === tierLabel);
+  if (!matchedTier) {
+    console.warn(`[Security Blocked] Unverified credit tier purchase attempted by user ${p.id}: amount=${amount}, label=${tierLabel}`);
+    return res.status(400).json({ error: "Purchase verification failed: unauthorized credit tier allocation attempt blocked." });
+  }
+
   if (p.credits === undefined) {
     p.credits = 1250;
   }
 
-  p.credits += amount;
+  p.credits += matchedTier.amount;
 
   // Add customized news feed entry for immersion
   state.newsEvents.unshift({
     id: `credit_${Math.random().toString(36).substr(2, 9)}`,
     title: "Galactic Funding Secured",
-    content: `Commander ${p.username} authorized security transmission of +${amount.toLocaleString()} Galactic Credits under [${tierLabel || 'Premium Gateway'}].`,
+    content: `Commander ${p.username} authorized security transmission of +${matchedTier.amount.toLocaleString()} Galactic Credits under [${matchedTier.label}].`,
     type: "discovery",
     timestamp: Date.now()
   });
