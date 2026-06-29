@@ -1,0 +1,31 @@
+==================================================================
+SPACE STATION COMMANDER - DEPLOYMENT BLUEPRINT & HISTORY
+==================================================================
+[Context] React Vite Frontend + Node.js (server.ts) Backend. 
+[Local Path] C:\Users\hp\Downloads\space-station-commander
+[Server IP] 102.133.160.133 (Ubuntu VM hosted on Azure)
+[SSH Key Path] C:\Users\hp\Downloads\SpaceStationServer.pem
+[Process Runner] PM2 (Process name: "space-universe")
+
+AUTOMATED ACTIONS PIPELINES CONFIGURED:
+1. Web/Server: GitHub Actions ("Automatic Azure Deployment") hooks 
+   on 'git push origin main'. It auto-logs into Azure via SSH, runs 
+   the compiler, and restarts PM2.
+2. Mobile APK: GitHub Actions ("Build APK") builds the Android assets 
+   in the cloud. Accessible via the browser 'Actions' tab under 'Artifacts'.
+
+==================================================================
+OPERATIONAL COMMAND CHAT SHEET
+==================================================================
+1. ONE-LINE QUICK LOCAL PUSH (Run from any CMD root):
+cd C:\Users\hp\Downloads\space-station-commander && git add . && set /p msg="Enter Update Name: " && git commit -m "%msg%" && git push -f origin main
+
+2. LOW-MEMORY DEEP REBUILD & WIPE (Fixes server RAM freezes):
+ssh -i C:\Users\hp\Downloads\SpaceStationServer.pem azureuser@102.133.160.133 "cd SpaceStationGame && pm2 stop space-universe && rm -rf dist && echo '{\"players\":{},\"alliances\":{},\"chatMessages\":[],\"fleets\":[],\"battleReports\":[],\"newsEvents\":[]}' > galaxy_state.json && NODE_OPTIONS=\"--max-old-space-size=1024\" npm run build && pm2 start dist/server.cjs --name \"space-universe\" --update-env && pm2 save"
+
+3. SAFE HARDWARE REBOOT (Zero data loss, auto-reloads game):
+ssh -i C:\Users\hp\Downloads\SpaceStationServer.pem azureuser@102.133.160.133 "sudo reboot"
+
+4. MANUAL SERVER PROFILE DATABASE RESET:
+ssh -i C:\Users\hp\Downloads\SpaceStationServer.pem azureuser@102.133.160.133 "cd SpaceStationGame && echo '{\"players\":{},\"alliances\":{},\"chatMessages\":[],\"fleets\":[],\"battleReports\":[],\"newsEvents\":[]}' > galaxy_state.json && pm2 restart space-universe"
+==================================================================
