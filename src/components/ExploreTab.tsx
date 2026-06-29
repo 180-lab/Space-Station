@@ -163,6 +163,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   const [isQueueMinimized, setIsQueueMinimized] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
+  const [chatPage, setChatPage] = useState(0);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   
   const [isEditingName, setIsEditingName] = useState(false);
@@ -1717,49 +1718,61 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
         <div className="pt-2">
           <button 
             type="button"
-            onClick={() => setIsChatOpen(true)}
+            onClick={() => {
+              setIsChatOpen(true);
+              setChatPage(0);
+            }}
             className="px-6 py-3 bg-cyan-950/20 hover:bg-cyan-500/10 text-cyan-400 hover:text-cyan-300 border border-cyan-500/25 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 mx-auto"
           >
             <MessageSquare size={13} />
-            Open Global System Chat
+            Open Global Chat
           </button>
         </div>
       </div>
 
       {/* GLOBAL CHAT MODAL OVERLAY */}
-      {isChatOpen && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 font-mono">
-          <div className="w-full max-w-2xl bg-[#070B13] border border-cyan-500/30 rounded-2xl p-6 flex flex-col h-[550px] shadow-[0_0_50px_rgba(6,182,212,0.15)]">
-            {/* Header */}
-            <div className="flex justify-between items-center pb-3 border-b border-[#1E293B] mb-4">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg">
-                  SECURE NET TRANSCEIVER WINDOW — GLOBAL SYSTEM
-                </span>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setIsChatOpen(false)}
-                className="text-slate-400 hover:text-white font-sans text-2xl cursor-pointer p-1"
-                title="Disconnect channel link"
-              >
-                &times;
-              </button>
-            </div>
+      {isChatOpen && (() => {
+        const globalMessages = chatMessages ? [...chatMessages].filter(msg => msg.channel === 'global').reverse() : [];
+        const messagesPerPage = 15;
+        const totalPages = Math.max(1, Math.ceil(globalMessages.length / messagesPerPage));
+        
+        // Safety check to ensure page doesn't overflow if messages size decreases
+        const currentPage = Math.min(chatPage, totalPages - 1);
+        
+        const startIndex = currentPage * messagesPerPage;
+        const endIndex = startIndex + messagesPerPage;
+        const paginatedMessages = globalMessages.slice(startIndex, endIndex);
 
-            {/* Chat list */}
-            <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 text-xs text-left">
-              {!chatMessages || chatMessages.filter(msg => msg.channel === 'global').length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-600 py-10 space-y-2">
-                  <MessageSquare size={32} className="opacity-30" />
-                  <p className="text-xs">No active transmissions decoded on this wavelength.</p>
+        return (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 font-mono">
+            <div className="w-full max-w-2xl bg-[#070B13] border border-cyan-500/30 rounded-2xl p-4 sm:p-6 flex flex-col h-[90vh] md:h-[650px] max-h-[95vh] shadow-[0_0_50px_rgba(6,182,212,0.15)]">
+              {/* Header */}
+              <div className="flex justify-between items-center pb-3 border-b border-[#1E293B] mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg">
+                    SECURE NET TRANSCEIVER WINDOW — GLOBAL CHAT
+                  </span>
                 </div>
-              ) : (
-                [...chatMessages]
-                  .filter(msg => msg.channel === 'global')
-                  .reverse()
-                  .map((msg) => (
+                <button 
+                  type="button"
+                  onClick={() => setIsChatOpen(false)}
+                  className="text-slate-400 hover:text-white font-sans text-2xl cursor-pointer p-1"
+                  title="Disconnect channel link"
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Chat list */}
+              <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 text-xs text-left mb-4">
+                {paginatedMessages.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-slate-600 py-10 space-y-2">
+                    <MessageSquare size={32} className="opacity-30" />
+                    <p className="text-xs">No active transmissions decoded on this wavelength.</p>
+                  </div>
+                ) : (
+                  paginatedMessages.map((msg) => (
                     <div key={msg.id} className="p-3 border border-slate-900 rounded-xl bg-[#05070A]/60 hover:bg-[#05070A]/95 transition duration-150 leading-snug">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-slate-600 text-[10px]">[{new Date(msg.timestamp).toLocaleTimeString()}]</span>
@@ -1778,38 +1791,65 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                       <p className="text-slate-355 mt-1 pl-2 border-l border-cyan-500/40 text-slate-300">{msg.content}</p>
                     </div>
                   ))
-              )}
-            </div>
+                )}
+              </div>
 
-            {/* Chat entry form */}
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!chatInput.trim()) return;
-                onSendChat('global', chatInput.trim());
-                setChatInput('');
-              }} 
-              className="mt-4 flex gap-2.5"
-            >
-              <input 
-                type="text" 
-                placeholder="Transmit across sector wavelengths..."
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                autoFocus
-                className="flex-1 px-4 py-3 bg-[#05070A] border border-[#1E293B] text-white rounded-xl text-xs focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]"
-              />
-              <button 
-                type="submit"
-                className="px-5 py-3 bg-cyan-500/10 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/20 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center transition cursor-pointer shrink-0"
-                title="Send secure communication transmission"
+              {/* Pagination controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between py-2.5 px-1 border-t border-[#1E293B] text-[11px] text-slate-400 mb-2">
+                  <button
+                    type="button"
+                    disabled={currentPage === 0}
+                    onClick={() => setChatPage(prev => Math.max(0, prev - 1))}
+                    className="px-3 py-1.5 bg-[#05070A] hover:bg-slate-900 border border-[#1E293B] hover:border-cyan-500/30 disabled:opacity-30 disabled:hover:border-[#1E293B] disabled:hover:bg-slate-950 rounded-lg text-cyan-400 transition cursor-pointer font-bold uppercase tracking-wider disabled:cursor-not-allowed"
+                  >
+                    &larr; Prev
+                  </button>
+                  <span className="font-semibold text-slate-300">
+                    Page {currentPage + 1} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={currentPage >= totalPages - 1}
+                    onClick={() => setChatPage(prev => Math.min(totalPages - 1, prev + 1))}
+                    className="px-3 py-1.5 bg-[#05070A] hover:bg-slate-900 border border-[#1E293B] hover:border-cyan-500/30 disabled:opacity-30 disabled:hover:border-[#1E293B] disabled:hover:bg-slate-950 rounded-lg text-cyan-400 transition cursor-pointer font-bold uppercase tracking-wider disabled:cursor-not-allowed"
+                  >
+                    Next &rarr;
+                  </button>
+                </div>
+              )}
+
+              {/* Chat entry form */}
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!chatInput.trim()) return;
+                  onSendChat('global', chatInput.trim());
+                  setChatInput('');
+                  setChatPage(0); // reset page to 0 when a message is sent so they see their message!
+                }} 
+                className="mt-2 flex gap-2.5"
               >
-                <Send size={13} />
-              </button>
-            </form>
+                <input 
+                  type="text" 
+                  placeholder="Transmit across sector wavelengths..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  autoFocus
+                  className="flex-1 px-4 py-3 bg-[#05070A] border border-[#1E293B] text-white rounded-xl text-xs focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]"
+                />
+                <button 
+                  type="submit"
+                  className="px-5 py-3 bg-cyan-500/10 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/20 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center transition cursor-pointer shrink-0"
+                  title="Send secure communication transmission"
+                >
+                  <Send size={13} />
+                </button>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Tactical Alerts Modal Overlay */}
       {isAlertsOpen && (

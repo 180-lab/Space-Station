@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { sendMobileNotification } from './mobileNotifications';
 
 /**
@@ -20,6 +21,31 @@ export const initializePushNotifications = async (userId: string) => {
   }
 
   try {
+    const platform = Capacitor.getPlatform();
+    
+    // First, request display permissions using LocalNotifications.
+    // LocalNotifications is 100% safe, does not require Firebase or google-services.json, and will not crash the APK on permission prompt.
+    let localPerm = await LocalNotifications.checkPermissions();
+    if (localPerm.display !== 'granted') {
+      localPerm = await LocalNotifications.requestPermissions();
+    }
+
+    if (localPerm.display !== 'granted') {
+      console.warn('[PushNotifications] Local notification permission denied by handset user.');
+      return;
+    }
+
+    // Checking if FCM Push is explicitly configured (e.g. by setting enable_fcm_push to 'true' in localStorage).
+    // If running on Android without custom FCM configurations, calling PushNotifications.register()
+    // will result in a fatal JVM exception ("Default FirebaseApp is not initialized") and immediately crash the app.
+    const isFcmExplicitlyEnabled = typeof window !== 'undefined' && localStorage.getItem('enable_fcm_push') === 'true';
+
+    if (platform === 'android' && !isFcmExplicitlyEnabled) {
+      console.log('[PushNotifications] Safe bypass activated: skipped FCM registration on Android to prevent app crashes. Real-time notifications will seamlessly deliver via active SSE channel.');
+      return;
+    }
+
+    // Safe to proceed with Firebase Cloud Messaging registration on iOS or when FCM configuration is present
     let permStatus = await PushNotifications.checkPermissions();
     
     if (permStatus.receive !== 'granted') {
