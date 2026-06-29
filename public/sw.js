@@ -15,14 +15,9 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Passive fetch handler allowing full online multiplayer network socket and fetch transparency
-// Bypasses non-GET methods and /api/ requests to prevent body loss bugs on modern WebView/Chrome
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
-    return;
-  }
-  event.respondWith(fetch(event.request));
-});
+// Passive fetch handler removed to prevent iframe "Failed to fetch" security blocks in sandboxed environments like AI Studio preview.
+// Modern browsers block Service Worker subresource fetching inside secure, cross-origin iframes.
+
 
 // Listen for messages from the client
 self.addEventListener('message', (event) => {

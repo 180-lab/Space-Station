@@ -50,6 +50,7 @@ interface ArmyBaseTabProps {
   onMarkRead?: (reportId: string) => void;
   onMarkUnread?: (reportId: string) => void;
   onToggleSave?: (reportId: string) => void;
+  onMarkAllRead?: () => void;
   onForwardReport?: (report: BattleReport, channel: 'global' | 'alliance') => void;
   fleets?: any[];
   onSendFleet?: (mission: {
@@ -157,6 +158,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   savedReports = {},
   onMarkRead,
   onMarkUnread,
+  onMarkAllRead,
   onToggleSave,
   onForwardReport,
   fleets = [],
@@ -182,7 +184,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   const [activeImageZoomTitle, setActiveImageZoomTitle] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'troops' | 'fabricate' | 'fleet'>('troops');
   const [showReportsModal, setShowReportsModal] = useState(false);
-  const [savedCombatLogsFilter, setSavedCombatLogsFilter] = useState(false);
+  const [combatLogsFilter, setCombatLogsFilter] = useState<'all' | 'saved' | 'unread'>('all');
   const [expandedReportRounds, setExpandedReportRounds] = useState<Record<string, number>>({});
   const [expandedReports, setExpandedReports] = useState<Record<string, boolean>>({});
   const [lastViewedReportTime, setLastViewedReportTime] = useState<number>(0);
@@ -1699,43 +1701,72 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                 <ShieldAlert size={18} className="text-red-400 animate-pulse" />
                 <h3 className="text-base font-bold text-white uppercase tracking-wider">Planetary Attack Reports</h3>
               </div>
-              <button 
-                onClick={() => setShowReportsModal(false)}
-                className="text-slate-400 hover:text-white font-sans text-xl cursor-pointer p-1"
-              >
-                &times;
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onMarkAllRead) onMarkAllRead();
+                    // Mark all locally as seen
+                    const updatedSeen = { ...seenReports };
+                    battleReports.forEach(r => {
+                      updatedSeen[r.id] = true;
+                    });
+                    setSeenReports(updatedSeen);
+                    localStorage.setItem('moonbase_seen_reports', JSON.stringify(updatedSeen));
+                  }}
+                  className="py-1 px-2.5 bg-cyan-500/15 hover:bg-cyan-500/35 text-cyan-400 border border-cyan-500/30 hover:border-cyan-500/50 font-bold rounded-lg transition-all text-[10px] uppercase tracking-wider cursor-pointer font-mono"
+                >
+                  ✓ Mark All Read
+                </button>
+                <button 
+                  onClick={() => setShowReportsModal(false)}
+                  className="text-slate-400 hover:text-white font-sans text-xl cursor-pointer p-1"
+                >
+                  &times;
+                </button>
+              </div>
             </div>
 
-            {/* Save/All custom bookmark filter category bar */}
+            {/* Save/All/Unread custom bookmark filter category bar */}
             <div className="flex gap-2 pb-1 text-xs">
               <button
                 type="button"
-                onClick={() => setSavedCombatLogsFilter(false)}
-                className={`flex-1 py-1.5 px-3 font-bold rounded-lg transition-colors border cursor-pointer ${!savedCombatLogsFilter ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/45 shadow-[0_0_10px_rgba(34,211,238,0.15)]' : 'bg-[#05070A] text-slate-400 border-[#1E293B] hover:text-slate-200'}`}
+                onClick={() => setCombatLogsFilter('all')}
+                className={`flex-1 py-1.5 px-3 font-bold rounded-lg transition-colors border cursor-pointer ${combatLogsFilter === 'all' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/45 shadow-[0_0_10px_rgba(34,211,238,0.15)]' : 'bg-[#05070A] text-slate-400 border-[#1E293B] hover:text-slate-200'}`}
               >
-                📝 ALL SHIFT REPORTS ({battleReports.length})
+                📝 ALL ({battleReports.length})
               </button>
               <button
                 type="button"
-                onClick={() => setSavedCombatLogsFilter(true)}
-                className={`flex-1 py-1.5 px-3 font-bold rounded-lg transition-colors border cursor-pointer ${savedCombatLogsFilter ? 'bg-amber-500/20 text-amber-300 border-amber-500/45 shadow-[0_0_10px_rgba(245,158,11,0.15)]' : 'bg-[#05070A] text-slate-400 border-[#1E293B] hover:text-slate-200'}`}
+                onClick={() => setCombatLogsFilter('unread')}
+                className={`flex-1 py-1.5 px-3 font-bold rounded-lg transition-colors border cursor-pointer ${combatLogsFilter === 'unread' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/45 shadow-[0_0_10px_rgba(34,211,238,0.15)]' : 'bg-[#05070A] text-slate-400 border-[#1E293B] hover:text-slate-200'}`}
               >
-                ⭐ SAVED TARGETS ({battleReports.filter(r => savedReports[r.id]).length})
+                🔵 UNREAD ({battleReports.filter(r => !readReports[r.id]).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCombatLogsFilter('saved')}
+                className={`flex-1 py-1.5 px-3 font-bold rounded-lg transition-colors border cursor-pointer ${combatLogsFilter === 'saved' ? 'bg-amber-500/20 text-amber-300 border-amber-500/45 shadow-[0_0_10px_rgba(245,158,11,0.15)]' : 'bg-[#05070A] text-slate-400 border-[#1E293B] hover:text-slate-200'}`}
+              >
+                ⭐ SAVED ({battleReports.filter(r => savedReports[r.id]).length})
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-4 pr-1">
               {(() => {
-                const filteredReports = savedCombatLogsFilter 
-                  ? battleReports.filter(r => savedReports[r.id]) 
+                const filteredReports = combatLogsFilter === 'saved'
+                  ? battleReports.filter(r => savedReports[r.id])
+                  : combatLogsFilter === 'unread'
+                  ? battleReports.filter(r => !readReports[r.id])
                   : battleReports;
 
                 if (filteredReports.length === 0) {
                   return (
                     <div className="py-12 text-center rounded-xl border border-dashed border-[#1E293B]">
                       <p className="text-xs text-slate-500">
-                        {savedCombatLogsFilter ? "No saved reports match your parameters." : "No military engagements logged in this session."}
+                        {combatLogsFilter === 'saved' ? "No saved reports match your parameters." :
+                         combatLogsFilter === 'unread' ? "No unread reports." :
+                         "No military engagements logged in this session."}
                       </p>
                     </div>
                   );

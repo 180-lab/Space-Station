@@ -420,6 +420,17 @@ export default function App() {
     });
   };
 
+  const markAllReportsRead = () => {
+    setReadReports(prev => {
+      const updated = { ...prev };
+      battleReports.forEach(r => {
+        updated[r.id] = true;
+      });
+      localStorage.setItem('moonbase_read_reports', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const markReportUnread = (reportId: string) => {
     setReadReports(prev => {
       const updated = { ...prev, [reportId]: false };
@@ -2451,6 +2462,7 @@ export default function App() {
             savedReports={savedReports}
             onMarkRead={markReportRead}
             onMarkUnread={markReportUnread}
+            onMarkAllRead={markAllReportsRead}
             onToggleSave={toggleSaveReport}
             onForwardReport={handleForwardReport}
             fleets={fleets}
@@ -2488,6 +2500,7 @@ export default function App() {
             savedReports={savedReports}
             onMarkRead={markReportRead}
             onMarkUnread={markReportUnread}
+            onMarkAllRead={markAllReportsRead}
             onToggleSave={toggleSaveReport}
             onForwardReport={handleForwardReport}
             onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}

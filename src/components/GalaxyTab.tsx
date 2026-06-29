@@ -62,6 +62,7 @@ interface GalaxyTabProps {
   savedReports?: Record<string, boolean>;
   onMarkRead?: (reportId: string) => void;
   onMarkUnread?: (reportId: string) => void;
+  onMarkAllRead?: () => void;
   onToggleSave?: (reportId: string) => void;
   onForwardReport?: (report: BattleReport, channel: 'global' | 'alliance') => void;
   onViewPlayerProfile?: (playerId: string) => void;
@@ -150,6 +151,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   savedReports = {},
   onMarkRead,
   onMarkUnread,
+  onMarkAllRead,
   onToggleSave,
   onForwardReport,
   onViewPlayerProfile,
@@ -365,7 +367,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [intelPopupExpandedMines, setIntelPopupExpandedMines] = useState<Record<string, boolean>>({});
   const [expandedReportBuildings, setExpandedReportBuildings] = useState<Record<string, boolean>>({});
   const [expandedReportMines, setExpandedReportMines] = useState<Record<string, boolean>>({});
-  const [combatCategoryFilter, setCombatCategoryFilter] = useState<'all' | 'attack' | 'defense' | 'saved'>('all');
+  const [combatCategoryFilter, setCombatCategoryFilter] = useState<'all' | 'attack' | 'defense' | 'saved' | 'unread'>('all');
   const [expandedReportRounds, setExpandedReportRounds] = useState<Record<string, number>>({});
 
   // Scanner execution
@@ -1963,19 +1965,31 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
       {/* SUB TAB 4: NEWS TICKER & REPORTS */}
       {subTab === 'news' && (
-        <div className="space-y-1.5">
+        <div className="space-y-3">
           {/* Collapsible Drop Down Box 1: Combat Reports */}
           <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4">
             <div 
-              onClick={() => setIsCombatOpen(!isCombatOpen)}
-              className="flex items-center justify-between cursor-pointer hover:bg-slate-800/20 p-2 rounded-lg transition"
+              className="flex items-center justify-between p-2 rounded-lg gap-4 flex-wrap sm:flex-nowrap"
             >
-              <h3 className="text-sm font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2 font-mono" title="Secure sector combat encounter history and archives logs">
-                <ShieldAlert size={16} title="Battle alert logs warning status" /> Military Combat Reports ({battleReports.filter(r => r.isRecon !== true).length})
-              </h3>
-              <div className="flex items-center gap-1">
+              <div 
+                onClick={() => setIsCombatOpen(!isCombatOpen)}
+                className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/20 p-1.5 rounded-lg transition flex-1"
+              >
+                <h3 className="text-sm font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2 font-mono" title="Secure sector combat encounter history and archives logs">
+                  <ShieldAlert size={16} title="Battle alert logs warning status" /> Military Combat Reports ({battleReports.filter(r => r.isRecon !== true).length})
+                </h3>
                 {isCombatOpen ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
               </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onMarkAllRead) onMarkAllRead();
+                }}
+                className="py-1 px-3 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-400 border border-cyan-500/30 hover:border-cyan-500/50 font-mono font-bold rounded-lg transition-all text-[11px] uppercase tracking-wider cursor-pointer"
+              >
+                ✓ Mark All Read
+              </button>
             </div>
 
             {isCombatOpen && (
@@ -1983,35 +1997,54 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 {(() => {
                   const filtered = battleReports.filter(r => r.isRecon !== true);
                   return (
-                    /* Category filters (Separating Attacks and Defenses) */
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[9.5px] pb-1">
+                    /* Category filters (Separating Attacks and Defenses) and local action button */
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-2 border-b border-white/5">
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-[9.5px] w-full md:w-auto flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setCombatCategoryFilter('all')}
+                          className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'all' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
+                        >
+                          📝 ALL ({filtered.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCombatCategoryFilter('attack')}
+                          className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'attack' ? 'bg-sky-500/20 text-sky-300 border-sky-500/40' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
+                        >
+                          ⚔️ ATTACKS ({filtered.filter(r => r.attackerId === player.id).length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCombatCategoryFilter('defense')}
+                          className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'defense' ? 'bg-rose-500/20 text-rose-350 border-rose-500/40' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
+                        >
+                          🛡️ DEFENSES ({filtered.filter(r => r.defenderId === player.id).length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCombatCategoryFilter('saved')}
+                          className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'saved' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
+                        >
+                          ⭐ SAVED ({filtered.filter(r => savedReports[r.id]).length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCombatCategoryFilter('unread')}
+                          className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'unread' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/45 shadow-[0_0_8px_rgba(34,211,238,0.15)]' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
+                        >
+                          🔵 UNREAD ({filtered.filter(r => !readReports[r.id]).length})
+                        </button>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => setCombatCategoryFilter('all')}
-                        className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'all' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onMarkAllRead) onMarkAllRead();
+                        }}
+                        className="py-1 px-2.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold rounded-lg transition-all text-[9.5px] uppercase tracking-wider shrink-0 cursor-pointer font-mono"
                       >
-                        📝 ALL ({filtered.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCombatCategoryFilter('attack')}
-                        className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'attack' ? 'bg-sky-500/20 text-sky-300 border-sky-500/40' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
-                      >
-                        ⚔️ ATTACKS ({filtered.filter(r => r.attackerId === player.id).length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCombatCategoryFilter('defense')}
-                        className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'defense' ? 'bg-rose-500/20 text-rose-350 border-rose-500/40' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
-                      >
-                        🛡️ DEFENSES ({filtered.filter(r => r.defenderId === player.id).length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCombatCategoryFilter('saved')}
-                        className={`py-1 px-1.5 font-bold rounded-lg transition-colors border cursor-pointer text-center ${combatCategoryFilter === 'saved' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-slate-950 text-slate-400 border-white/5 hover:text-slate-200'}`}
-                      >
-                        ⭐ SAVED ({filtered.filter(r => savedReports[r.id]).length})
+                        ✓ Mark Combat Read
                       </button>
                     </div>
                   );
@@ -2026,6 +2059,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     resultList = filtered.filter(r => r.attackerId === player.id);
                   } else if (combatCategoryFilter === 'defense') {
                     resultList = filtered.filter(r => r.defenderId === player.id);
+                  } else if (combatCategoryFilter === 'unread') {
+                    resultList = filtered.filter(r => !readReports[r.id]);
                   }
 
                   if (resultList.length === 0) {
@@ -2035,6 +2070,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           {combatCategoryFilter === 'saved' ? "No saved entries match your filters." : 
                            combatCategoryFilter === 'attack' ? "No offensive attack vectors logged." :
                            combatCategoryFilter === 'defense' ? "No defensive combat encounters logged." :
+                           combatCategoryFilter === 'unread' ? "No unread combat reports." :
                            "No military battle engagements logged."}
                         </p>
                       </div>
@@ -2405,18 +2441,41 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   </div>
                 ) : (
                   <div className="space-y-4 font-mono text-xs">
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onMarkAllRead) onMarkAllRead();
+                        }}
+                        className="py-1 px-2.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold rounded-lg transition-all text-[9.5px] uppercase tracking-wider cursor-pointer font-mono"
+                      >
+                        ✓ Mark All Intelligence Read
+                      </button>
+                    </div>
+
                     {battleReports.filter(r => r.isRecon === true).map((report) => {
                       const isExpanded = expandedIntelReports[report.id] || false;
                       const parsedTime = new Date(report.timestamp).toLocaleDateString();
+                      const isRead = readReports[report.id] || false;
 
                       return (
-                        <div key={report.id} className="p-3 border border-[#1E293B] bg-[#05070A] rounded-xl space-y-2">
+                        <div key={report.id} className={`p-3 border rounded-xl space-y-2 transition-colors ${!isRead ? 'border-cyan-500/25 bg-[#061224]/50' : 'border-[#1E293B] bg-[#05070A]'}`}>
                           <div 
-                            onClick={() => setExpandedIntelReports(prev => ({ ...prev, [report.id]: !isExpanded }))}
+                            onClick={() => {
+                              const nextExpanded = !isExpanded;
+                              setExpandedIntelReports(prev => ({ ...prev, [report.id]: nextExpanded }));
+                              if (nextExpanded && onMarkRead) {
+                                onMarkRead(report.id);
+                              }
+                            }}
                             className="flex items-center justify-between cursor-pointer hover:bg-slate-900/40 p-1.5 rounded-lg transition"
                           >
                             <div className="flex flex-col gap-1 pr-4 text-left">
-                              <span className="text-[11px] font-bold text-slate-200">
+                              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5 flex-wrap">
+                                {!isRead && (
+                                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0 shadow-[0_0_5px_#22d3ee]" />
+                                )}
                                 🛰️ Scout Recon Scan of{' '}
                                 <span 
                                   onClick={(e) => {
