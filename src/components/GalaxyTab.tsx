@@ -3694,6 +3694,103 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     : 'ALLOCATE TROOPS FROM DOCKING BAY ABOVE')}
                 </button>
 
+                {selectedReserveFleetId === 'manual' && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      let totalInFleet = 0;
+                      Object.values(fleetTroops).forEach(qty => { totalInFleet += Number(qty) || 0; });
+                      if (totalInFleet === 0) {
+                        alert("Must allocate at least 1 spacecraft to create a reserve fleet!");
+                        return;
+                      }
+
+                      const changes: Record<string, number> = {};
+                      let isInsufficient = false;
+                      let missingInfo = '';
+
+                      for (const [tId, val] of Object.entries(fleetTroops)) {
+                        const fleetQty = Number(val) || 0;
+                        if (fleetQty > 0) {
+                          const available = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
+                          if (available < fleetQty) {
+                            isInsufficient = true;
+                            missingInfo = `${tId} (Need: ${fleetQty}, Have: ${available})`;
+                            break;
+                          }
+                          changes[tId] = -fleetQty;
+                        }
+                      }
+
+                      if (isInsufficient) {
+                        alert(`Insufficient ships on Space Station: ${missingInfo}`);
+                        return;
+                      }
+
+                      try {
+                        const res = await fetch('/api/troops/adjust', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'x-user-id': player.id
+                          },
+                          body: JSON.stringify({
+                            planetId: activePlanet.id,
+                            troopChanges: changes
+                          })
+                        });
+                        const data = await safeParseJson(res);
+                        if (res.ok && data.player) {
+                          if (onUpdatePlayer) {
+                            onUpdatePlayer(data.player);
+                          }
+
+                          const newFleet: CreatedFleet = {
+                            id: `fleet_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+                            name: `Docked Squadron ${createdFleets.length + 1}`,
+                            subsidiary: 'Station Defense Force',
+                            troops: { ...fleetTroops } as any,
+                            planetId: activePlanet.id
+                          };
+
+                          if (setCreatedFleets) {
+                            setCreatedFleets(prev => [...prev, newFleet]);
+                          }
+
+                          // Reset troop counts in form
+                          setFleetTroops({
+                            defender: 0,
+                            attacker: 0,
+                            tank: 0,
+                            looter: 0,
+                            drone: 0,
+                            settlementShip: 0
+                          });
+
+                          if (showToast) {
+                            showToast(`Successfully created ${newFleet.name}! It will stay on the station until given a mission.`, 'success');
+                          } else {
+                            alert(`Successfully created ${newFleet.name}! It will stay on the station until given a mission.`);
+                          }
+                        } else {
+                          alert(data.error || 'Failed to adjust space station garrison troops');
+                        }
+                      } catch (err) {
+                        alert('Network failure creating reserve fleet');
+                      }
+                    }}
+                    disabled={!isMissionReady}
+                    className={`px-4 py-3 border text-[10px] tracking-wider uppercase font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      isMissionReady
+                        ? 'border-[#10B981] text-[#10B981] hover:bg-[#10B981]/10 hover:text-emerald-300 active:scale-[0.98]'
+                        : 'border-slate-800 text-slate-500 cursor-not-allowed opacity-50'
+                    }`}
+                    title="Deduct these ships and save them as a docked reserve fleet on this station"
+                  >
+                    📥 CREATE DOCKED FLEET
+                  </button>
+                )}
+
                 {selectedTarget.id !== player.id && selectedTarget.id !== 'habitable' && (
                   <button
                     type="button"

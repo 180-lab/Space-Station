@@ -721,28 +721,28 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </div>
 
               {/* Account and maintenance action cards */}
-              <div className="pt-4 border-t border-[#1E293B]/60 space-y-3.5">
-                <h4 className="text-[10px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <AlertTriangle size={12} /> RESTRICTED MAINTENANCE CODES
-                </h4>
+              {player.googleEmail && player.googleEmail.toLowerCase() === 'banele180@gmail.com' && (
+                <div className="pt-4 border-t border-[#1E293B]/60 space-y-3.5">
+                  <h4 className="text-[10px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <AlertTriangle size={12} /> RESTRICTED MAINTENANCE CODES
+                  </h4>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={handleResetApp}
-                    className="py-2.5 px-3 bg-red-950/10 hover:bg-red-950/20 border border-red-500/25 text-red-400 rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <RotateCcw size={12} /> Clear Cache
-                  </button>
-                  
-                  <button
-                    onClick={handleLogoutClick}
-                    className="py-2.5 px-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <LogOut size={12} /> Log Out
-                  </button>
-                </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={handleResetApp}
+                      className="py-2.5 px-3 bg-red-950/10 hover:bg-red-950/20 border border-red-500/25 text-red-400 rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <RotateCcw size={12} /> Clear Cache
+                    </button>
+                    
+                    <button
+                      onClick={handleLogoutClick}
+                      className="py-2.5 px-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <LogOut size={12} /> Log Out
+                    </button>
+                  </div>
 
-                {player.googleEmail && player.googleEmail.toLowerCase() === 'banele180@gmail.com' && (
                   <button
                     onClick={handleResetServerState}
                     disabled={resettingServer}
@@ -752,8 +752,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     <RefreshCw size={12} className={resettingServer ? 'animate-spin' : ''} /> 
                     {resettingServer ? 'Executing reset override...' : '☢️ Force Reset Game Server'}
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </>
           )}
 

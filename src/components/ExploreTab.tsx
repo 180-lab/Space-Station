@@ -1765,7 +1765,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
               </div>
 
               {/* Chat list */}
-              <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 text-xs text-left mb-4">
+              <div className="flex-1 overflow-hidden pr-1 space-y-2.5 text-xs text-left mb-4">
                 {paginatedMessages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-slate-600 py-10 space-y-2">
                     <MessageSquare size={32} className="opacity-30" />
