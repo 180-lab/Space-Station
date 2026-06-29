@@ -825,7 +825,16 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
         setIsHowToOpen(false); // reset expandable accordion
         onRefreshState();
       } else {
-        showToast(data.error || 'Failed to claim reward.', 'error');
+        let errMsg = data.error || 'Failed to claim reward.';
+        if (errMsg.toLowerCase().includes('invalid tutorial task id')) {
+          const hasCustomBackend = typeof window !== 'undefined' && !!localStorage.getItem('space_station_backend_url');
+          if (hasCustomBackend) {
+            errMsg += ' (Diagnostic: You are pointing to a custom backend via localStorage. Please click "Reset Terminal Config" on the connection banner, or clear custom gateway in your browser to sync with the latest server update.)';
+          } else {
+            errMsg += ' (Diagnostic: Please refresh your browser or check sync status under Settings.)';
+          }
+        }
+        showToast(errMsg, 'error');
       }
     } catch (err) {
       showToast('Quantum network latency detected. Try again.', 'error');

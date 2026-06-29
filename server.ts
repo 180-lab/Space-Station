@@ -4615,13 +4615,20 @@ app.post("/api/tutorial/claim", (req, res) => {
     30: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 30000 }, // Settle 3rd Planet outpost!
   };
 
-  let idNum = parseInt(taskId, 10);
+  let rawId = taskId;
+  if (rawId && typeof rawId === "object") {
+    rawId = rawId.id || rawId.taskId || rawId.task || JSON.stringify(rawId);
+  }
+
+  let idNum = parseInt(String(rawId), 10);
   if (isNaN(idNum) || !rewards[idNum]) {
-    const digits = String(taskId).match(/\d+/);
+    const digits = String(rawId).match(/\d+/);
     if (digits) {
       idNum = parseInt(digits[0], 10);
     }
   }
+
+  console.log(`[Tutorial Claim] Raw taskId:`, taskId, `Parsed idNum:`, idNum);
 
   // Fallback to first incomplete task to guarantee claimability and prevent invalid ID blockers
   if (isNaN(idNum) || !rewards[idNum]) {
