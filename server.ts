@@ -1,4 +1,5 @@
 import express from "express";
+import { exec } from "child_process";
 import path from "path";
 import fs from "fs";
 import http from "http";
@@ -4976,6 +4977,39 @@ app.post("/api/admin/update-task", (req, res) => {
 
   saveState();
   res.json({ success: true, message: `Task ${taskId} text successfully updated for the whole game!`, customTasks: state.customTasks });
+});
+
+
+// PM2 Hidden Emergency Reload Route
+app.post("/api/admin/pm2-flush", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const isEmailOwner = p && p.googleEmail && p.googleEmail.toLowerCase() === "banele180@gmail.com";
+  
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+
+  console.log("[PM2 EMERGENCY RELOAD] Received command from authorized admin. Executing 'pm2 restart all --update-env'...");
+  
+  exec("pm2 restart all --update-env", (error, stdout, stderr) => {
+    if (error) {
+      console.error(`[PM2 EMERGENCY RELOAD ERROR] ${error.message}`);
+      return res.status(500).json({ 
+        success: false, 
+        error: "PM2 execution failed", 
+        details: error.message,
+        stderr: stderr 
+      });
+    }
+    
+    console.log(`[PM2 EMERGENCY RELOAD SUCCESS] stdout: ${stdout}`);
+    res.json({ 
+      success: true, 
+      message: "Emergency programmatic reload completed. All PM2 processes restarted with updated environment variables.",
+      stdout: stdout,
+      stderr: stderr
+    });
+  });
 });
 
 
