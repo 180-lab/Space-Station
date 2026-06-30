@@ -5038,4 +5038,3 @@ async function startServer() {
 startServer().catch(err => {
   console.error("CRITICAL: Failed to start server:", err);
 });
-// Server Wakeup Ping 
