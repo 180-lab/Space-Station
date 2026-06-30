@@ -207,8 +207,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999985.76184,
-            "respirant": 4999977.851751111
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
             "defender": 12333,
@@ -220,7 +220,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1782764940470
+          "_lastTick": 1782783448157
         }
       ],
       "scores": {
@@ -393,7 +393,7 @@
           },
           "buildings": {
             "fabricator": {
-              "level": 11,
+              "level": 10,
               "maxLevel": 10,
               "isUpgrading": false,
               "upgradeEnd": null,
@@ -446,8 +446,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999985.699,
-            "respirant": 4999977.754
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
             "defender": 12348,
@@ -459,11 +459,11 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1782764940470
+          "_lastTick": 1782783448157
         }
       ],
       "scores": {
-        "population": 9540,
+        "population": 9510,
         "attack": 12477,
         "defence": 15335,
         "raiders": 193472
@@ -639,7 +639,7 @@
               "health": 100
             },
             "commsHub": {
-              "level": 6,
+              "level": 5,
               "maxLevel": 5,
               "isUpgrading": false,
               "upgradeEnd": null,
@@ -685,26 +685,26 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999985.72976,
-            "respirant": 4999977.801848889
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
-            "defender": 12345,
-            "attacker": 27738,
+            "defender": 12330,
+            "attacker": 27673,
             "tank": 103,
-            "looter": 1025,
+            "looter": 1024,
             "drone": 108,
             "settlementShip": 0
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1782764940470
+          "_lastTick": 1782783448157
         }
       ],
       "scores": {
-        "population": 9540,
+        "population": 9510,
         "attack": 10323,
-        "defence": 21589,
+        "defence": 22738,
         "raiders": 536097
       },
       "achievements": [
@@ -924,26 +924,26 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999991.3736,
-            "respirant": 4999986.581155555
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
-            "defender": 8498,
-            "attacker": 15947,
-            "tank": 62,
-            "looter": 816,
-            "drone": 110,
+            "defender": 8499,
+            "attacker": 15919,
+            "tank": 65,
+            "looter": 825,
+            "drone": 111,
             "settlementShip": 0
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1782764940470
+          "_lastTick": 1782783448157
         }
       ],
       "scores": {
         "population": 9510,
         "attack": 9872,
-        "defence": 167251,
+        "defence": 168400,
         "raiders": 292797
       },
       "achievements": [
@@ -1160,11 +1160,11 @@
             }
           },
           "resources": {
-            "water": 4994619.737776667,
-            "plasma": 4986418.968987489,
-            "fuel": 4986418.968987489,
-            "food": 4986418.968987489,
-            "respirant": 4986418.968987489
+            "water": 5000000,
+            "plasma": 5000000,
+            "fuel": 5000000,
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
             "defender": 0,
@@ -1176,7 +1176,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1782764940470
+          "_lastTick": 1782783448157
         }
       ],
       "scores": {
@@ -1402,20 +1402,20 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999985.8242,
-            "respirant": 4999977.948755556
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
-            "defender": 12295,
-            "attacker": 27598,
-            "tank": 96,
-            "looter": 988,
-            "drone": 100,
+            "defender": 12310,
+            "attacker": 27623,
+            "tank": 99,
+            "looter": 998,
+            "drone": 101,
             "settlementShip": 0
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1782764940470
+          "_lastTick": 1782783448157
         }
       ],
       "scores": {
@@ -1641,8 +1641,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999985.81008,
-            "respirant": 4999977.926791111
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
             "defender": 12300,
@@ -1654,7 +1654,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1782764940470
+          "_lastTick": 1782783448157
         }
       ],
       "scores": {
@@ -1880,8 +1880,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999985.74876,
-            "respirant": 4999977.831404445
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
             "defender": 12340,
@@ -1893,7 +1893,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1782764940470
+          "_lastTick": 1782783448157
         }
       ],
       "scores": {
@@ -2119,8 +2119,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999985.9126,
-            "respirant": 4999978.086266667
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
             "defender": 12236,
@@ -2132,7 +2132,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1782764940470
+          "_lastTick": 1782783448157
         }
       ],
       "scores": {
@@ -2312,7 +2312,7 @@
               "health": 100
             },
             "commsHub": {
-              "level": 6,
+              "level": 5,
               "maxLevel": 5,
               "isUpgrading": false,
               "upgradeEnd": null,
@@ -2358,12 +2358,12 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999985.97624,
-            "respirant": 4999978.185262222
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
-            "defender": 12211,
-            "attacker": 27219,
+            "defender": 12197,
+            "attacker": 27153,
             "tank": 102,
             "looter": 1007,
             "drone": 102,
@@ -2371,13 +2371,13 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1782764940470
+          "_lastTick": 1782783448157
         }
       ],
       "scores": {
-        "population": 9540,
+        "population": 9510,
         "attack": 11278,
-        "defence": 28469,
+        "defence": 29618,
         "raiders": 524319
       },
       "achievements": [
@@ -2611,8 +2611,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999985.371,
-            "respirant": 4999977.243777778
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
             "defender": 12500,
@@ -2623,7 +2623,7 @@
             "settlementShip": 1
           },
           "trainingQueue": [],
-          "_lastTick": 1782764940470,
+          "_lastTick": 1782783448157,
           "upgradeQueue": []
         }
       ],
@@ -2866,8 +2866,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999998.4466328,
-            "respirant": 4999997.583651022
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
             "defender": 1715,
@@ -2878,7 +2878,7 @@
             "settlementShip": 0
           },
           "trainingQueue": [],
-          "_lastTick": 1782764943533,
+          "_lastTick": 1782783448157,
           "upgradeQueue": []
         },
         {
@@ -3092,7 +3092,7 @@
             "settlementShip": 0
           },
           "trainingQueue": [],
-          "_lastTick": 1782764943533,
+          "_lastTick": 1782783448157,
           "upgradeQueue": []
         }
       ],
@@ -3989,52 +3989,18 @@
   ],
   "fleets": [
     {
-      "id": "fleet_8ezliw93y",
-      "senderId": "ai_6",
-      "senderName": "StarEclipse",
+      "id": "fleet_gx9zedq7r",
+      "senderId": "ai_5",
+      "senderName": "TitanKing",
       "senderCoords": {
-        "x": 50,
-        "y": 70
-      },
-      "targetId": "ai_5",
-      "targetName": "TitanKing",
-      "targetCoords": {
         "x": 62,
         "y": 82
       },
-      "missionType": "attack",
-      "troops": {
-        "defender": 15,
-        "attacker": 25,
-        "tank": 3,
-        "looter": 10,
-        "drone": 1,
-        "settlementShip": 0
-      },
-      "startedAt": 1782764667573,
-      "arrivesAt": 1782764958497,
-      "isReturning": true,
-      "lootCarried": {
-        "water": 5841,
-        "plasma": 5839,
-        "fuel": 5839,
-        "food": 5839,
-        "respirant": 5839
-      }
-    },
-    {
-      "id": "fleet_zamnst7oi",
-      "senderId": "ai_3",
-      "senderName": "NebulaKnight",
-      "senderCoords": {
-        "x": 8,
-        "y": 22
-      },
-      "targetId": "ai_10",
-      "targetName": "Stardust",
+      "targetId": "ai_2",
+      "targetName": "XenonHunter",
       "targetCoords": {
-        "x": 75,
-        "y": 25
+        "x": 18,
+        "y": 40
       },
       "missionType": "recon",
       "troops": {
@@ -4045,23 +4011,23 @@
         "drone": 0,
         "settlementShip": 0
       },
-      "startedAt": 1782764931502,
-      "arrivesAt": 1782765161446,
+      "startedAt": 1782783396147,
+      "arrivesAt": 1782783604699,
       "isReturning": true
     },
     {
-      "id": "fleet_z2wy2mrmj",
-      "senderId": "ai_4",
-      "senderName": "Astraea",
+      "id": "fleet_nie6n2e3d",
+      "senderId": "ai_7",
+      "senderName": "CosmoPirate",
       "senderCoords": {
-        "x": 55,
-        "y": 78
+        "x": 88,
+        "y": 15
       },
-      "targetId": "ai_5",
-      "targetName": "TitanKing",
+      "targetId": "ai_1",
+      "targetName": "VoidLord",
       "targetCoords": {
-        "x": 62,
-        "y": 82
+        "x": 12,
+        "y": 34
       },
       "missionType": "attack",
       "troops": {
@@ -4072,19 +4038,811 @@
         "drone": 1,
         "settlementShip": 0
       },
-      "startedAt": 1782764928468,
-      "arrivesAt": 1782765066678,
-      "isReturning": true,
-      "lootCarried": {
-        "water": 5847,
-        "plasma": 5838,
-        "fuel": 5838,
-        "food": 5838,
-        "respirant": 5838
-      }
+      "startedAt": 1782783404147,
+      "arrivesAt": 1782783521656,
+      "isReturning": false
     }
   ],
   "battleReports": [
+    {
+      "id": "battle_4k41h1l9z",
+      "timestamp": 1782783448157,
+      "attackerId": "ai_5",
+      "attackerName": "TitanKing",
+      "attackerAlliance": "SOL",
+      "defenderId": "ai_3",
+      "defenderName": "NebulaKnight",
+      "defenderAlliance": "VOID",
+      "attackerCoords": {
+        "x": 62,
+        "y": 82
+      },
+      "defenderCoords": {
+        "x": 8,
+        "y": 22
+      },
+      "attackerInitialTroops": {
+        "defender": 15,
+        "attacker": 25,
+        "tank": 3,
+        "looter": 10,
+        "drone": 1,
+        "settlementShip": 0
+      },
+      "attackerLosses": {
+        "defender": 15,
+        "attacker": 25,
+        "tank": 3,
+        "looter": 10,
+        "drone": 1,
+        "settlementShip": 0
+      },
+      "defenderInitialTroops": {
+        "defender": 12345,
+        "attacker": 27738,
+        "tank": 103,
+        "looter": 1025,
+        "drone": 108,
+        "settlementShip": 0
+      },
+      "defenderLosses": {
+        "defender": 15,
+        "attacker": 65,
+        "tank": 0,
+        "looter": 1,
+        "drone": 0,
+        "settlementShip": 0
+      },
+      "winner": "defender",
+      "resourcesStolen": {
+        "water": 0,
+        "plasma": 0,
+        "fuel": 0,
+        "food": 0,
+        "respirant": 0
+      },
+      "attackHpKilled": 1149,
+      "defenceHpKilled": 1162,
+      "battleRounds": [
+        {
+          "round": 1,
+          "logs": [
+            "--- COMBAT CYCLE 1 INITIATED ---",
+            "Attackers throw 1,166 megawatt laser channels into target coordinates.",
+            "Defenders are being attacked under siege. Their offensive HP does not count; only their defense HP (489,427 total DEF) is channeled into 452,808 retaliatory counter-firepower.",
+            "Attacker casualties: 15 Interceptor, 25 Assault Drone, 3 Disrupter, 10 Matter Extractor, 1 Missile Launcher.",
+            "Defender casualties: 17 Interceptor, 80 Assault Drone, 1 Matter Extractor.",
+            "=== BATTLEFIELD ORBIT RECOVERY REPORT ===",
+            "[Nano-Salvage Array] Planetary defense rigs gathered scrap, reconstructing: 2 Interceptor, 15 Assault Drone for the Defender.",
+            "[Tactical Medical Bay] Offside carrier teams salvaged and re-launched: 2 Interceptor, 2 Assault Drone for the Attacker.",
+            "💥 [TACTICAL OVERWHELM] Defender's initial force HP of 557,272 exceeded 150% more than the attacker's total involved HP (1,149). Absolute overwhelm triggered; all attacking squadron forces have been wiped out with ZERO survivors!"
+          ],
+          "attackerRemaining": {
+            "defender": 0,
+            "attacker": 0,
+            "tank": 0,
+            "looter": 0,
+            "drone": 0,
+            "settlementShip": 0
+          },
+          "defenderRemaining": {
+            "defender": 12328,
+            "attacker": 27658,
+            "tank": 103,
+            "looter": 1024,
+            "drone": 108,
+            "settlementShip": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "battle_g6v72dwox",
+      "timestamp": 1782783444155,
+      "attackerId": "ai_5",
+      "attackerName": "TitanKing",
+      "attackerAlliance": "SOL",
+      "defenderId": "ai_10",
+      "defenderName": "Stardust",
+      "attackerCoords": {
+        "x": 62,
+        "y": 82
+      },
+      "defenderCoords": {
+        "x": 75,
+        "y": 25
+      },
+      "attackerInitialTroops": {
+        "defender": 15,
+        "attacker": 25,
+        "tank": 3,
+        "looter": 10,
+        "drone": 1,
+        "settlementShip": 0
+      },
+      "attackerLosses": {
+        "defender": 15,
+        "attacker": 25,
+        "tank": 3,
+        "looter": 10,
+        "drone": 1,
+        "settlementShip": 0
+      },
+      "defenderInitialTroops": {
+        "defender": 12211,
+        "attacker": 27219,
+        "tank": 102,
+        "looter": 1007,
+        "drone": 102,
+        "settlementShip": 0
+      },
+      "defenderLosses": {
+        "defender": 14,
+        "attacker": 66,
+        "tank": 0,
+        "looter": 0,
+        "drone": 0,
+        "settlementShip": 0
+      },
+      "winner": "defender",
+      "resourcesStolen": {
+        "water": 0,
+        "plasma": 0,
+        "fuel": 0,
+        "food": 0,
+        "respirant": 0
+      },
+      "attackHpKilled": 1149,
+      "defenceHpKilled": 1192,
+      "battleRounds": [
+        {
+          "round": 1,
+          "logs": [
+            "--- COMBAT CYCLE 1 INITIATED ---",
+            "Attackers throw 1,193 megawatt laser channels into target coordinates.",
+            "Defenders are being attacked under siege. Their offensive HP does not count; only their defense HP (481,547 total DEF) is channeled into 538,694 retaliatory counter-firepower.",
+            "Attacker casualties: 15 Interceptor, 25 Assault Drone, 3 Disrupter, 10 Matter Extractor, 1 Missile Launcher.",
+            "Defender casualties: 17 Interceptor, 83 Assault Drone, 1 Matter Extractor.",
+            "=== BATTLEFIELD ORBIT RECOVERY REPORT ===",
+            "[Nano-Salvage Array] Planetary defense rigs gathered scrap, reconstructing: 3 Interceptor, 17 Assault Drone, 1 Matter Extractor for the Defender.",
+            "[Tactical Medical Bay] Offside carrier teams salvaged and re-launched: 2 Interceptor, 1 Assault Drone for the Attacker.",
+            "💥 [TACTICAL OVERWHELM] Defender's initial force HP of 548,344 exceeded 150% more than the attacker's total involved HP (1,149). Absolute overwhelm triggered; all attacking squadron forces have been wiped out with ZERO survivors!"
+          ],
+          "attackerRemaining": {
+            "defender": 0,
+            "attacker": 0,
+            "tank": 0,
+            "looter": 0,
+            "drone": 0,
+            "settlementShip": 0
+          },
+          "defenderRemaining": {
+            "defender": 12194,
+            "attacker": 27136,
+            "tank": 102,
+            "looter": 1006,
+            "drone": 102,
+            "settlementShip": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "battle_bxss2bwu5",
+      "timestamp": 1782783396147,
+      "attackerId": "ai_5",
+      "attackerName": "TitanKing",
+      "defenderId": "ai_2",
+      "defenderName": "XenonHunter",
+      "isRecon": true,
+      "attackerCoords": {
+        "x": 62,
+        "y": 82
+      },
+      "defenderCoords": {
+        "x": 18,
+        "y": 40
+      },
+      "attackerInitialTroops": {
+        "defender": 0,
+        "attacker": 0,
+        "tank": 0,
+        "looter": 0,
+        "drone": 5,
+        "settlementShip": 0
+      },
+      "attackerLosses": {
+        "defender": 0,
+        "attacker": 0,
+        "tank": 0,
+        "looter": 0,
+        "drone": 5
+      },
+      "defenderInitialTroops": {
+        "defender": 12348,
+        "attacker": 27873,
+        "tank": 98,
+        "looter": 993,
+        "drone": 100,
+        "settlementShip": 0
+      },
+      "defenderLosses": {
+        "defender": 0,
+        "attacker": 0,
+        "tank": 0,
+        "looter": 0,
+        "drone": 0
+      },
+      "winner": "defender",
+      "resourcesStolen": {
+        "water": 0,
+        "plasma": 0,
+        "fuel": 0,
+        "food": 0,
+        "respirant": 0
+      },
+      "attackHpKilled": 0,
+      "defenceHpKilled": 0,
+      "buildings": {
+        "commsHub": 5,
+        "radar": 15,
+        "repository": 45,
+        "researchCenter": 20,
+        "armyBase": 22,
+        "supplyNexus": 50
+      },
+      "mines": {
+        "water": [
+          25,
+          25,
+          25,
+          25,
+          25,
+          25
+        ],
+        "plasma": [
+          25,
+          25,
+          25
+        ],
+        "fuel": [
+          25,
+          25,
+          25
+        ],
+        "food": [
+          25,
+          25,
+          25
+        ],
+        "respirant": [
+          25,
+          25,
+          25
+        ]
+      },
+      "resources": {
+        "water": 5000000,
+        "plasma": 5000000,
+        "fuel": 5000000,
+        "food": 4940776.211508223,
+        "respirant": 4904015.3182044225
+      },
+      "battleRounds": [
+        {
+          "round": 1,
+          "logs": [
+            "--- SATELLITE INTERCEPT ENCOUNTER ---",
+            "Hostile garrison detected: 489,583 defending HP.",
+            "Scout group attack rating: 600 attack HP.",
+            "Orbit guards identified scout telemetry and initiated railguards.",
+            "Our missile launcher group (5 unit(s)) was completely destroyed because our scouting attack power was less than hostiles' defending HP.",
+            "Full tactical satellite telemetry was successfully beamed to moonbase before demolition."
+          ],
+          "attackerRemaining": {
+            "defender": 0,
+            "attacker": 0,
+            "tank": 0,
+            "looter": 0,
+            "drone": 0,
+            "settlementShip": 0
+          },
+          "defenderRemaining": {
+            "defender": 12348,
+            "attacker": 27873,
+            "tank": 98,
+            "looter": 993,
+            "drone": 100,
+            "settlementShip": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "battle_qbq8q84p2",
+      "timestamp": 1782783236115,
+      "attackerId": "ai_6",
+      "attackerName": "StarEclipse",
+      "defenderId": "ai_10",
+      "defenderName": "Stardust",
+      "isRecon": true,
+      "attackerCoords": {
+        "x": 50,
+        "y": 70
+      },
+      "defenderCoords": {
+        "x": 75,
+        "y": 25
+      },
+      "attackerInitialTroops": {
+        "defender": 0,
+        "attacker": 0,
+        "tank": 0,
+        "looter": 0,
+        "drone": 5,
+        "settlementShip": 0
+      },
+      "attackerLosses": {
+        "defender": 0,
+        "attacker": 0,
+        "tank": 0,
+        "looter": 0,
+        "drone": 5
+      },
+      "defenderInitialTroops": {
+        "defender": 12211,
+        "attacker": 27219,
+        "tank": 102,
+        "looter": 1007,
+        "drone": 102,
+        "settlementShip": 0
+      },
+      "defenderLosses": {
+        "defender": 0,
+        "attacker": 0,
+        "tank": 0,
+        "looter": 0,
+        "drone": 0
+      },
+      "winner": "defender",
+      "resourcesStolen": {
+        "water": 0,
+        "plasma": 0,
+        "fuel": 0,
+        "food": 0,
+        "respirant": 0
+      },
+      "attackHpKilled": 0,
+      "defenceHpKilled": 0,
+      "buildings": {
+        "commsHub": 5,
+        "radar": 15,
+        "repository": 45,
+        "researchCenter": 20,
+        "armyBase": 22,
+        "supplyNexus": 50
+      },
+      "mines": {
+        "water": [
+          25,
+          25,
+          25,
+          25,
+          25,
+          25
+        ],
+        "plasma": [
+          25,
+          25,
+          25
+        ],
+        "fuel": [
+          25,
+          25,
+          25
+        ],
+        "food": [
+          25,
+          25,
+          25
+        ],
+        "respirant": [
+          25,
+          25,
+          25
+        ]
+      },
+      "resources": {
+        "water": 5000000,
+        "plasma": 5000000,
+        "fuel": 5000000,
+        "food": 4942059.008508752,
+        "respirant": 4906010.780205286
+      },
+      "battleRounds": [
+        {
+          "round": 1,
+          "logs": [
+            "--- SATELLITE INTERCEPT ENCOUNTER ---",
+            "Hostile garrison detected: 481,547 defending HP.",
+            "Scout group attack rating: 600 attack HP.",
+            "Orbit guards identified scout telemetry and initiated railguards.",
+            "Our missile launcher group (5 unit(s)) was completely destroyed because our scouting attack power was less than hostiles' defending HP.",
+            "Full tactical satellite telemetry was successfully beamed to moonbase before demolition."
+          ],
+          "attackerRemaining": {
+            "defender": 0,
+            "attacker": 0,
+            "tank": 0,
+            "looter": 0,
+            "drone": 0,
+            "settlementShip": 0
+          },
+          "defenderRemaining": {
+            "defender": 12211,
+            "attacker": 27219,
+            "tank": 102,
+            "looter": 1007,
+            "drone": 102,
+            "settlementShip": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "battle_dygtcm7f1",
+      "timestamp": 1782783204109,
+      "attackerId": "ai_2",
+      "attackerName": "XenonHunter",
+      "attackerAlliance": "VOID",
+      "defenderId": "ai_4",
+      "defenderName": "Astraea",
+      "defenderAlliance": "SOL",
+      "attackerCoords": {
+        "x": 18,
+        "y": 40
+      },
+      "defenderCoords": {
+        "x": 55,
+        "y": 78
+      },
+      "attackerInitialTroops": {
+        "defender": 15,
+        "attacker": 25,
+        "tank": 3,
+        "looter": 10,
+        "drone": 1,
+        "settlementShip": 0
+      },
+      "attackerLosses": {
+        "defender": 15,
+        "attacker": 25,
+        "tank": 3,
+        "looter": 10,
+        "drone": 1,
+        "settlementShip": 0
+      },
+      "defenderInitialTroops": {
+        "defender": 8513,
+        "attacker": 15972,
+        "tank": 65,
+        "looter": 826,
+        "drone": 111,
+        "settlementShip": 0
+      },
+      "defenderLosses": {
+        "defender": 14,
+        "attacker": 53,
+        "tank": 0,
+        "looter": 1,
+        "drone": 0,
+        "settlementShip": 0
+      },
+      "winner": "defender",
+      "resourcesStolen": {
+        "water": 0,
+        "plasma": 0,
+        "fuel": 0,
+        "food": 0,
+        "respirant": 0
+      },
+      "attackHpKilled": 1149,
+      "defenceHpKilled": 1119,
+      "battleRounds": [
+        {
+          "round": 1,
+          "logs": [
+            "--- COMBAT CYCLE 1 INITIATED ---",
+            "Attackers throw 981 megawatt laser channels into target coordinates.",
+            "Defenders are being attacked under siege. Their offensive HP does not count; only their defense HP (313,931 total DEF) is channeled into 276,525 retaliatory counter-firepower.",
+            "Attacker casualties: 15 Interceptor, 25 Assault Drone, 3 Disrupter, 10 Matter Extractor, 1 Missile Launcher.",
+            "Defender casualties: 16 Interceptor, 64 Assault Drone, 1 Matter Extractor, 1 Missile Launcher.",
+            "=== BATTLEFIELD ORBIT RECOVERY REPORT ===",
+            "[Nano-Salvage Array] Planetary defense rigs gathered scrap, reconstructing: 2 Interceptor, 11 Assault Drone, 1 Missile Launcher for the Defender.",
+            "[Tactical Medical Bay] Offside carrier teams salvaged and re-launched: 2 Interceptor, 7 Assault Drone for the Attacker.",
+            "💥 [TACTICAL OVERWHELM] Defender's initial force HP of 358,331 exceeded 150% more than the attacker's total involved HP (1,149). Absolute overwhelm triggered; all attacking squadron forces have been wiped out with ZERO survivors!"
+          ],
+          "attackerRemaining": {
+            "defender": 0,
+            "attacker": 0,
+            "tank": 0,
+            "looter": 0,
+            "drone": 0,
+            "settlementShip": 0
+          },
+          "defenderRemaining": {
+            "defender": 8497,
+            "attacker": 15908,
+            "tank": 65,
+            "looter": 825,
+            "drone": 110,
+            "settlementShip": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "battle_pzi8x694g",
+      "timestamp": 1782783196108,
+      "attackerId": "ai_9",
+      "attackerName": "SolarWing",
+      "defenderId": "ai_2",
+      "defenderName": "XenonHunter",
+      "isRecon": true,
+      "attackerCoords": {
+        "x": 30,
+        "y": 90
+      },
+      "defenderCoords": {
+        "x": 18,
+        "y": 40
+      },
+      "attackerInitialTroops": {
+        "defender": 0,
+        "attacker": 0,
+        "tank": 0,
+        "looter": 0,
+        "drone": 5,
+        "settlementShip": 0
+      },
+      "attackerLosses": {
+        "defender": 0,
+        "attacker": 0,
+        "tank": 0,
+        "looter": 0,
+        "drone": 5
+      },
+      "defenderInitialTroops": {
+        "defender": 12348,
+        "attacker": 27873,
+        "tank": 98,
+        "looter": 993,
+        "drone": 100,
+        "settlementShip": 0
+      },
+      "defenderLosses": {
+        "defender": 0,
+        "attacker": 0,
+        "tank": 0,
+        "looter": 0,
+        "drone": 0
+      },
+      "winner": "defender",
+      "resourcesStolen": {
+        "water": 0,
+        "plasma": 0,
+        "fuel": 0,
+        "food": 0,
+        "respirant": 0
+      },
+      "attackHpKilled": 0,
+      "defenceHpKilled": 0,
+      "buildings": {
+        "commsHub": 5,
+        "radar": 15,
+        "repository": 45,
+        "researchCenter": 20,
+        "armyBase": 22,
+        "supplyNexus": 50
+      },
+      "mines": {
+        "water": [
+          25,
+          25,
+          25,
+          25,
+          25,
+          25
+        ],
+        "plasma": [
+          25,
+          25,
+          25
+        ],
+        "fuel": [
+          25,
+          25,
+          25
+        ],
+        "food": [
+          25,
+          25,
+          25
+        ],
+        "respirant": [
+          25,
+          25,
+          25
+        ]
+      },
+      "resources": {
+        "water": 5000000,
+        "plasma": 5000000,
+        "fuel": 5000000,
+        "food": 4940776.211508223,
+        "respirant": 4904015.3182044225
+      },
+      "battleRounds": [
+        {
+          "round": 1,
+          "logs": [
+            "--- SATELLITE INTERCEPT ENCOUNTER ---",
+            "Hostile garrison detected: 489,583 defending HP.",
+            "Scout group attack rating: 600 attack HP.",
+            "Orbit guards identified scout telemetry and initiated railguards.",
+            "Our missile launcher group (5 unit(s)) was completely destroyed because our scouting attack power was less than hostiles' defending HP.",
+            "Full tactical satellite telemetry was successfully beamed to moonbase before demolition."
+          ],
+          "attackerRemaining": {
+            "defender": 0,
+            "attacker": 0,
+            "tank": 0,
+            "looter": 0,
+            "drone": 0,
+            "settlementShip": 0
+          },
+          "defenderRemaining": {
+            "defender": 12348,
+            "attacker": 27873,
+            "tank": 98,
+            "looter": 993,
+            "drone": 100,
+            "settlementShip": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "battle_7bl2f8sl3",
+      "timestamp": 1782783024077,
+      "attackerId": "ai_9",
+      "attackerName": "SolarWing",
+      "defenderId": "ai_6",
+      "defenderName": "StarEclipse",
+      "isRecon": true,
+      "attackerCoords": {
+        "x": 30,
+        "y": 90
+      },
+      "defenderCoords": {
+        "x": 50,
+        "y": 70
+      },
+      "attackerInitialTroops": {
+        "defender": 0,
+        "attacker": 0,
+        "tank": 0,
+        "looter": 0,
+        "drone": 5,
+        "settlementShip": 0
+      },
+      "attackerLosses": {
+        "defender": 0,
+        "attacker": 0,
+        "tank": 0,
+        "looter": 0,
+        "drone": 5
+      },
+      "defenderInitialTroops": {
+        "defender": 12310,
+        "attacker": 27623,
+        "tank": 99,
+        "looter": 998,
+        "drone": 101,
+        "settlementShip": 0
+      },
+      "defenderLosses": {
+        "defender": 0,
+        "attacker": 0,
+        "tank": 0,
+        "looter": 0,
+        "drone": 0
+      },
+      "winner": "defender",
+      "resourcesStolen": {
+        "water": 0,
+        "plasma": 0,
+        "fuel": 0,
+        "food": 0,
+        "respirant": 0
+      },
+      "attackHpKilled": 0,
+      "defenceHpKilled": 0,
+      "buildings": {
+        "commsHub": 5,
+        "radar": 15,
+        "repository": 45,
+        "researchCenter": 20,
+        "armyBase": 22,
+        "supplyNexus": 50
+      },
+      "mines": {
+        "water": [
+          25,
+          25,
+          25,
+          25,
+          25,
+          25
+        ],
+        "plasma": [
+          25,
+          25,
+          25
+        ],
+        "fuel": [
+          25,
+          25,
+          25
+        ],
+        "food": [
+          25,
+          25,
+          25
+        ],
+        "respirant": [
+          25,
+          25,
+          25
+        ]
+      },
+      "resources": {
+        "water": 5000000,
+        "plasma": 5000000,
+        "fuel": 5000000,
+        "food": 4947191.279499132,
+        "respirant": 4910750.423968082
+      },
+      "battleRounds": [
+        {
+          "round": 1,
+          "logs": [
+            "--- SATELLITE INTERCEPT ENCOUNTER ---",
+            "Hostile garrison detected: 486,794 defending HP.",
+            "Scout group attack rating: 600 attack HP.",
+            "Orbit guards identified scout telemetry and initiated railguards.",
+            "Our missile launcher group (5 unit(s)) was completely destroyed because our scouting attack power was less than hostiles' defending HP.",
+            "Full tactical satellite telemetry was successfully beamed to moonbase before demolition."
+          ],
+          "attackerRemaining": {
+            "defender": 0,
+            "attacker": 0,
+            "tank": 0,
+            "looter": 0,
+            "drone": 0,
+            "settlementShip": 0
+          },
+          "defenderRemaining": {
+            "defender": 12310,
+            "attacker": 27623,
+            "tank": 99,
+            "looter": 998,
+            "drone": 101,
+            "settlementShip": 0
+          }
+        }
+      ]
+    },
     {
       "id": "battle_qja49lqyh",
       "timestamp": 1782764931502,
@@ -40713,6 +41471,27 @@
   ],
   "newsEvents": [
     {
+      "id": "news_cavjzewog",
+      "title": "Raid Defended!",
+      "content": "NebulaKnight repelled a brutal fleet raid sent by TitanKing!",
+      "type": "raid",
+      "timestamp": 1782783448157
+    },
+    {
+      "id": "news_x24digjms",
+      "title": "Raid Defended!",
+      "content": "Stardust repelled a brutal fleet raid sent by TitanKing!",
+      "type": "raid",
+      "timestamp": 1782783444155
+    },
+    {
+      "id": "news_haoiyr20q",
+      "title": "Raid Defended!",
+      "content": "Astraea repelled a brutal fleet raid sent by XenonHunter!",
+      "type": "raid",
+      "timestamp": 1782783204109
+    },
+    {
       "id": "news_pmndkw8d7",
       "title": "Base Raided!",
       "content": "Astraea successfully raided TitanKing at [62, 82] taking 29,199 resources damaging defenses by 1 levels.",
@@ -41040,27 +41819,6 @@
       "content": "VoidLord repelled a brutal fleet raid sent by CosmoPirate!",
       "type": "raid",
       "timestamp": 1782757821777
-    },
-    {
-      "id": "news_cufgeypdm",
-      "title": "Base Raided!",
-      "content": "VoidLord successfully raided TitanKing at [62, 82] taking 29,200 resources damaging defenses by 1 levels.",
-      "type": "raid",
-      "timestamp": 1782757586854
-    },
-    {
-      "id": "news_xghloa8j6",
-      "title": "Raid Defended!",
-      "content": "SolarWing repelled a brutal fleet raid sent by XenonHunter!",
-      "type": "raid",
-      "timestamp": 1782757230786
-    },
-    {
-      "id": "news_j3umhkl91",
-      "title": "Raid Defended!",
-      "content": "XenonHunter repelled a brutal fleet raid sent by NebulaKnight!",
-      "type": "raid",
-      "timestamp": 1782757197833
     }
   ],
   "habitablePlanets": [

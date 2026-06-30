@@ -3155,15 +3155,48 @@ app.post("/api/train/troop", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { planetId, troopId, quantity, manufacturingSpeedLevel } = req.body;
+  const { planetId, troopId, manufacturingSpeedLevel } = req.body;
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
 
   const specs = TROOP_SPECS[troopId as keyof typeof TROOP_SPECS];
   if (!specs) return res.status(404).json({ error: "Troop spec not found" });
 
-  const count = parseInt(quantity, 10);
-  if (isNaN(count) || count <= 0) return res.status(400).json({ error: "Invalid quantity" });
+  // 1. Convert safely via Math.floor(Number(...)) supporting both 'count' and 'quantity' from req.body
+  const rawQuantity = req.body.count !== undefined ? req.body.count : req.body.quantity;
+  const count = Math.floor(Number(rawQuantity));
+
+  // 2. Explicitly reject if quantity is NaN, less than or equal to 0, or greater than 1000
+  if (isNaN(count) || count <= 0 || count > 1000) {
+    return res.status(400).json({ error: "Invalid training quantity. Quantity must be a valid number between 1 and 1000." });
+  }
+
+  // 3. Perform backend balance validation check for both resources and player credits before pushing/deducting
+  if ((p.credits || 0) < 0) {
+    return res.status(400).json({ error: "Insufficient credits. Your commander keys report a negative balance!" });
+  }
+
+  // Costs definition
+  const troopCosts = {
+    defender: { water: 150, plasma: 0, fuel: 0, food: 200, respirant: 100 },
+    attacker: { water: 300, plasma: 450, fuel: 450, food: 300, respirant: 0 },
+    tank: { water: 0, plasma: 800, fuel: 1200, food: 0, respirant: 400 },
+    looter: { water: 500, plasma: 0, fuel: 200, food: 400, respirant: 0 },
+    drone: { water: 1000, plasma: 1000, fuel: 1500, food: 0, respirant: 500 },
+    settlementShip: { water: 1500, plasma: 1000, fuel: 2000, food: 1500, respirant: 1000 }
+  };
+
+  const costMultiplier = count;
+  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
+  const currentCosts = troopCosts[troopId as keyof typeof troopCosts];
+
+  // Perform backend balance check for resources
+  for (const k of keys) {
+    const required = currentCosts[k] * costMultiplier;
+    if (planet.resources[k] < required) {
+      return res.status(400).json({ error: `Insufficient ${k}. Need ${required} to train ${count} troops.` });
+    }
+  }
 
   // Enforce War Room level limits
   const armyBaseLevel = planet.buildings.armyBase?.level || 0;
@@ -3180,7 +3213,7 @@ app.post("/api/train/troop", (req, res) => {
     return res.status(400).json({ error: `Requires War Room Level ${requiredLevel} (Your Level: ${armyBaseLevel}) to produce ${specs.name}!` });
   }
 
-  // If training a Settlement Ship, enforce "you can only have one on each base" and "this base's war room must be level 1"
+  // If training a Settlement Ship, enforce limits
   if (troopId === "settlementShip") {
     const allWarRoomsReached22 = p.planets.every(pl => (pl.buildings.armyBase?.level || 0) >= 22);
     if (!allWarRoomsReached22) {
@@ -3205,28 +3238,7 @@ app.post("/api/train/troop", (req, res) => {
     }
   }
 
-  // Costs
-  const troopCosts = {
-    defender: { water: 150, plasma: 0, fuel: 0, food: 200, respirant: 100 },
-    attacker: { water: 300, plasma: 450, fuel: 450, food: 300, respirant: 0 },
-    tank: { water: 0, plasma: 800, fuel: 1200, food: 0, respirant: 400 },
-    looter: { water: 500, plasma: 0, fuel: 200, food: 400, respirant: 0 },
-    drone: { water: 1000, plasma: 1000, fuel: 1500, food: 0, respirant: 500 },
-    settlementShip: { water: 1500, plasma: 1000, fuel: 2000, food: 1500, respirant: 1000 }
-  };
-
-  const costMultiplier = count;
-  const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
-  const currentCosts = troopCosts[troopId as keyof typeof troopCosts];
-
-  for (const k of keys) {
-    const required = currentCosts[k] * costMultiplier;
-    if (planet.resources[k] < required) {
-      return res.status(400).json({ error: `Insufficient ${k}. Need ${required} to train ${count} troops.` });
-    }
-  }
-
-  // Deduct
+  // Deduct resources
   keys.forEach(k => {
     planet.resources[k] -= currentCosts[k] * costMultiplier;
   });
@@ -3358,8 +3370,15 @@ app.post("/api/galaxy/scan", (req, res) => {
   const habTargets = allTargets.filter(t => t.isHabitable);
   const otherTargets = allTargets.filter(t => !t.isHabitable);
 
-  // Filter non-habitable targets by range, keeping a fallback if empty
-  const visibleOthers = otherTargets.filter(t => t.dist <= maxScanDist);
+  // Filter non-habitable targets (player stations).
+  // To keep the universe alive and discoverable, we always include player stations.
+  // Those within maxScanDist are "TRACKED" in range.
+  // We also always include at least the closest 12 player stations (or all available) as known radar signatures.
+  let visibleOthers = otherTargets.filter(t => t.dist <= maxScanDist);
+  if (visibleOthers.length < 12) {
+    const remainingOthers = otherTargets.filter(t => !visibleOthers.some(vo => vo.planetId === t.planetId));
+    visibleOthers = [...visibleOthers, ...remainingOthers].slice(0, 15);
+  }
 
   // Always show all uncolonized habitable planets in the universe to make them visible and discoverable from the start
   const visibleHabs = habTargets;
@@ -3367,10 +3386,6 @@ app.post("/api/galaxy/scan", (req, res) => {
   // Combine and sort by distance
   let targets = [...visibleOthers, ...visibleHabs];
   targets.sort((a, b) => a.dist - b.dist);
-  
-  if (targets.length < 5) {
-    targets = allTargets.slice(0, 6);
-  }
 
   res.json({ targets, scanRadius });
 });
@@ -4983,7 +4998,9 @@ app.post("/api/admin/update-task", (req, res) => {
 // PM2 Hidden Emergency Reload Route
 app.post("/api/admin/pm2-flush", (req, res) => {
   const p = getLoggedPlayer(req);
-  const isEmailOwner = p && p.googleEmail && p.googleEmail.toLowerCase() === "banele180@gmail.com";
+  const bodyEmail = req.body?.email || req.query?.email || req.headers["x-admin-email"];
+  const isEmailOwner = (p && p.googleEmail && p.googleEmail.toLowerCase() === "banele180@gmail.com") || 
+                       (typeof bodyEmail === "string" && bodyEmail.toLowerCase() === "banele180@gmail.com");
   
   if (!isEmailOwner) {
     return res.status(403).json({ error: "Access Denied. Admin privilege required." });

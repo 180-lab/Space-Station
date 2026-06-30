@@ -324,9 +324,9 @@ export default function App() {
 
   // Set initial selected planet or sync when planets lists scale
   useEffect(() => {
-    if (player && player.planets.length > 0) {
+    if (player && player.planets && player.planets.length > 0) {
       if (!selectedPlanetId || !player.planets.some(pl => pl.id === selectedPlanetId)) {
-        setSelectedPlanetId(player.planets[0].id);
+        setSelectedPlanetId(player.planets[0]?.id || null);
       }
     }
   }, [player]);
@@ -1998,8 +1998,10 @@ export default function App() {
   }
 
   // Loaded active interface
-  const activePlanet = player.planets.find(pl => pl.id === selectedPlanetId) || player.planets[0];
-  const repositoryLimit = Math.round(10000 * Math.pow(500, (activePlanet.buildings.repository.level - 1) / 44));
+  const activePlanet = player?.planets?.find(pl => pl.id === selectedPlanetId) || player?.planets?.[0];
+  const repositoryLimit = activePlanet?.buildings?.repository
+    ? Math.round(10000 * Math.pow(500, (activePlanet.buildings.repository.level - 1) / 44))
+    : 10000;
 
   return (
     <div className={`min-h-screen max-w-full overflow-x-hidden font-sans bg-[#05070A] text-slate-350 selection:bg-cyan-500/25 pb-24 theme-${theme}`}>
