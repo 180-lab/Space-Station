@@ -25,7 +25,7 @@ import { getUpgradeResourceCost } from "./src/gameUtils";
 
 const app = express();
 const PORT = process.env.NODE_ENV === "production" ? (process.env.PORT ? parseInt(process.env.PORT) : 3000) : 3000;
-// ==========================================
+
 // ==========================================
 // 🛡️ SECURITY & PARSING MIDDLEWARE
 // ==========================================
@@ -64,11 +64,8 @@ app.use((req, res, next) => {
   
   next();
 });
-  
-  next();
-});
-// Auto-heal incoming proxy subpaths (e.g. /7/api/state -> /api/state) to prevent SPA fallback issues
-app.use((req, res, next) => {
+
+// Everything below this point remains untouched (your routing / game logic)
   const match = req.url.match(/\/api(\/|$)/);
   if (match && match.index !== undefined && match.index > 0) {
     const rewritten = req.url.substring(match.index);
