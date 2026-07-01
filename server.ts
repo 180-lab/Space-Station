@@ -2084,13 +2084,12 @@ setInterval(() => {
   // Tick moving fleets
   tickFleets(now);
 
-  // Background sandbox stimulation (every ~45 seconds)
+// Background sandbox stimulation (every ~45 seconds)
   if (Math.random() < 0.3) {
     runAISimulatedActivity(now);
   }
 
 }, 4000);
-
 
 // ----------------- PUSH NOTIFICATIONS & SSE CHANNELS (FCM FALLBACK) -----------------
 
@@ -2138,6 +2137,11 @@ function getFirebaseAdmin(): App | null {
  * via firebase-admin if the active SSE connection is silent or breaks (is inactive).
  */
 function sendNotificationWithFallback(userId: string, title: string, body: string) {
+  // 🤖 Bypass all notifications for AI / simulated bot accounts instantly
+  if (userId && userId.startsWith('ai_')) {
+    return;
+  }
+
   const activeSse = activeSseClients.get(userId);
   
   if (activeSse) {
