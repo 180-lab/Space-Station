@@ -24,7 +24,29 @@ import { getUpgradeResourceCost } from "./src/gameUtils";
 
 const app = express();
 const PORT = process.env.NODE_ENV === "production" ? (process.env.PORT ? parseInt(process.env.PORT) : 3000) : 3000;
+// ==========================================
+// 🛡️ SECURITY & PARSING MIDDLEWARE
+// ==========================================
 
+// Parse incoming JSON body data so we can read req.body
+app.use(express.json());
+
+// Quantum Anti-Speed-Hack Shield & Global Request Logger
+app.use((req, res, next) => {
+  const timestamp = new Date().toLocaleTimeString();
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  
+  // Log every incoming game connection right into your PM2 stream
+  console.log(`[${timestamp}] 🚀 ${req.method} ${req.url} | IP: ${ip}`);
+  
+  if (req.body && Object.keys(req.body).length > 0) {
+    // If you pass a playerId in your requests, this tags it visually in the logs
+    const activePlayer = req.body.playerId ? `Player: ${req.body.playerId}` : 'No Payload ID';
+    console.log(`    ↳ Data context: ${activePlayer}`);
+  }
+  
+  next();
+});
 // Auto-heal incoming proxy subpaths (e.g. /7/api/state -> /api/state) to prevent SPA fallback issues
 app.use((req, res, next) => {
   const match = req.url.match(/\/api(\/|$)/);
