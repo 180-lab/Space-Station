@@ -2021,9 +2021,15 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                           })()}
 
                           {/* Resources stolen details */}
-                          {report.winner === 'attacker' && (
-                            <div className="p-3 bg-emerald-950/5 border border-emerald-900/20 text-emerald-305 text-emerald-400 rounded-lg">
-                              <p className="font-bold text-[10px] text-emerald-400 uppercase tracking-wider mb-2">LOOT SALVAGED (CARGO CORES):</p>
+                          {report.winner === 'attacker' && (() => {
+                            const totalStolen = Object.values(report.resourcesStolen || {}).reduce<number>((sum, val: any) => sum + (val || 0), 0);
+                            const raidPoints = totalStolen / 1000;
+                            return (
+                              <div className="p-3 bg-emerald-950/5 border border-emerald-900/20 text-emerald-305 text-emerald-400 rounded-lg space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <p className="font-bold text-[10px] text-emerald-400 uppercase tracking-wider">LOOT SALVAGED (CARGO CORES):</p>
+                                  <span className="font-mono text-[10px] font-extrabold text-amber-400">⚡ +{raidPoints.toLocaleString()} Raided Points</span>
+                                </div>
                               <div className="grid grid-cols-5 gap-1.5 text-center font-bold text-[9px] text-emerald-450">
                                 <div className="bg-[#05070A] p-1 rounded border border-white/5">W: {report.resourcesStolen.water.toLocaleString()}</div>
                                 <div className="bg-[#05070A] p-1 rounded border border-white/5">P: {report.resourcesStolen.plasma.toLocaleString()}</div>
@@ -2032,7 +2038,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                 <div className="bg-[#05070A] p-1 rounded border border-white/5">R: {report.resourcesStolen.respirant.toLocaleString()}</div>
                               </div>
                             </div>
-                          )}
+                          );
+                        })()}
 
                           {/* Collateral damage report */}
                           {report.buildingDamage && report.buildingDamage.length > 0 && (

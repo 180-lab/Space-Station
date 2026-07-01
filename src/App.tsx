@@ -137,20 +137,18 @@ export default function App() {
   });
 
   const addDeviceGoogleAccount = (email: string, name: string) => {
-    setDeviceGoogleAccounts(prev => {
-      const exists = prev.some(acc => acc.email.toLowerCase() === email.toLowerCase());
-      if (exists) return prev;
-      const updated = [...prev, { email, name }];
+    setDeviceGoogleAccounts(() => {
+      // Strictly enforce exactly 1 account maximum on this device!
+      const updated = [{ email, name }];
       localStorage.setItem('moonbase_device_google_accounts', JSON.stringify(updated));
       return updated;
     });
   };
 
   const removeDeviceGoogleAccount = (email: string) => {
-    setDeviceGoogleAccounts(prev => {
-      const updated = prev.filter(acc => acc.email.toLowerCase() !== email.toLowerCase());
-      localStorage.setItem('moonbase_device_google_accounts', JSON.stringify(updated));
-      return updated;
+    setDeviceGoogleAccounts(() => {
+      localStorage.removeItem('moonbase_device_google_accounts');
+      return [];
     });
   };
 
@@ -1922,7 +1920,14 @@ export default function App() {
           {/* Branded Google Login button */}
           <button 
             type="button"
-            onClick={() => setShowGoogleDialog(true)}
+            onClick={async () => {
+              if (deviceGoogleAccounts && deviceGoogleAccounts.length > 0) {
+                // INSTANTLY automatic connect to the single saved Google account on the device!
+                await handleGoogleSignIn(deviceGoogleAccounts[0].email, deviceGoogleAccounts[0].name);
+              } else {
+                setShowGoogleDialog(true);
+              }
+            }}
             className="w-full py-3 px-4 bg-white hover:bg-slate-100 text-[#1F2937] font-bold text-xs tracking-wider uppercase rounded-xl flex items-center justify-center gap-3 active:scale-[0.98] transition duration-150 cursor-pointer shadow-md"
           >
             <svg className="w-4 h-4 text-rose-500" viewBox="0 0 24 24" fill="currentColor">
@@ -1953,8 +1958,8 @@ export default function App() {
                 <span className="font-semibold text-sm text-gray-700">Google Credentials</span>
               </div>
 
-              <h2 className="text-xl font-bold text-gray-900 text-center">Choose Google Account</h2>
-              <p className="text-xs text-gray-500 text-center mt-1 mb-6">to continue to Space Station</p>
+              <h2 className="text-xl font-bold text-gray-900 text-center">Sync Google Account</h2>
+              <p className="text-xs text-gray-500 text-center mt-1 mb-6">to bind with Space Station device instance</p>
 
               {/* Accounts list */}
               <div className="w-full space-y-2.5">
@@ -1974,15 +1979,20 @@ export default function App() {
                       }}
                       className="mt-3.5 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold font-mono text-[11px] uppercase tracking-wider hover:bg-slate-800 transition cursor-pointer"
                     >
-                      + ADD GOOGLE ACCOUNT
+                      + SYNC NATIVE EMAIL
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                    {deviceGoogleAccounts.map((acc) => (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center mb-2">
+                      <p className="text-[11px] text-amber-700 font-semibold leading-relaxed">
+                        ⚠️ <strong>Device Bound Constraint</strong>: Only 1 Google account can be associated with this device instance. To switch accounts, you must clear your game/app cache manually.
+                      </p>
+                    </div>
+                    {deviceGoogleAccounts.slice(0, 1).map((acc) => (
                       <div 
                         key={acc.email}
-                        className="group w-full p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 flex items-center justify-between gap-2 transition"
+                        className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 flex items-center justify-between gap-2"
                       >
                         <button 
                           type="button"
@@ -1997,18 +2007,6 @@ export default function App() {
                             <div className="text-[10px] text-gray-500 truncate">{acc.email}</div>
                           </div>
                         </button>
-                        
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeDeviceGoogleAccount(acc.email);
-                          }}
-                          className="p-1 text-gray-300 hover:text-red-500 rounded hover:bg-gray-100 transition duration-150"
-                          title="Remove from this device"
-                        >
-                          ✕
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -2016,23 +2014,6 @@ export default function App() {
 
                 {/* Custom input or cancel options */}
                 <div className="pt-3 border-t border-gray-100 flex justify-between w-full">
-                  {deviceGoogleAccounts.length > 0 && (
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        const customEmail = window.prompt("Please enter your custom Google account email:");
-                        if (customEmail && customEmail.includes("@")) {
-                          const customName = window.prompt("Please choose your Commander name for this Google Account:", customEmail.split("@")[0]);
-                          handleGoogleSignIn(customEmail, customName || undefined);
-                        } else if (customEmail) {
-                          window.alert("Invalid email format!");
-                        }
-                      }} 
-                      className="text-xs text-cyan-600 font-bold hover:underline"
-                    >
-                      Use another account
-                    </button>
-                  )}
                   <button 
                     type="button"
                     onClick={() => setShowGoogleDialog(false)}

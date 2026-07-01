@@ -26,14 +26,7 @@ import { getUpgradeResourceCost } from "./src/gameUtils";
 const app = express();
 const PORT = process.env.NODE_ENV === "production" ? (process.env.PORT ? parseInt(process.env.PORT) : 3000) : 3000;
 
-// ==========================================
-// 🛡️ SECURITY & PARSING MIDDLEWARE
-// ==========================================
-
-// Parse incoming JSON body data so we can read req.body
-app.use(express.json());
-
-// Proxy Subpath Auto-Healer (e.g., /7/api/state -> /api/state)
+// Auto-heal incoming proxy subpaths (e.g. /7/api/state -> /api/state) to prevent SPA fallback issues
 app.use((req, res, next) => {
   const match = req.url.match(/\/api(\/|$)/);
   if (match && match.index !== undefined && match.index > 0) {
@@ -59,30 +52,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Quantum Anti-Speed-Hack Shield & Filtered Global Request Logger
-app.use((req, res, next) => {
-  // Define background endpoints and pre-flights to ignore entirely
-  const backgroundNoise = ['/api/state', '/api/health', '/api/state/', '/api/health/'];
-  
-  if (backgroundNoise.includes(req.url) || req.method === 'OPTIONS') {
-    return next();
-  }
+app.use(express.json());
 
-  const timestamp = new Date().toLocaleTimeString();
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  
-  // Log only meaningful gameplay actions right into your PM2 stream
-  console.log(`[${timestamp}] 🚀 ${req.method} ${req.url} | IP: ${ip}`);
-  
-  if (req.body && Object.keys(req.body).length > 0) {
-    const activePlayer = req.body.playerId ? `Player: ${req.body.playerId}` : 'No Payload ID';
-    console.log(`    ↳ Data context: ${activePlayer}`);
-  }
-  
-  next();
-});
-
-// Anti-speed-hack and security validation data store
+// Anti-speed-hack and security validation layer
 const lastRequestTime: Record<string, number> = {};
 
 app.use("/api", (req, res, next) => {
@@ -172,6 +144,94 @@ function saveState() {
     fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), "utf8");
   } catch (err) {
     console.error("Failed to save state", err);
+  }
+}
+
+// Topping up AI players to maintain a full universe
+function ensureAIsCount(count: number, s: GameState) {
+  if (!s.players) s.players = {};
+  const existingAIs = Object.values(s.players).filter(p => p.id.startsWith("ai_"));
+  const needToAdd = count - existingAIs.length;
+  if (needToAdd <= 0) return;
+
+  console.log(`Topping up AI players from ${existingAIs.length} to ${count}...`);
+
+  const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
+  const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
+
+  const prefixes = ["Nebula", "Star", "Void", "Quantum", "Cosmo", "Solar", "Nova", "Titan", "Xenon", "Galaxy", "Eclipse", "Astro", "Alpha", "Omega", "Hyper", "Cyber", "Orion", "Shadow", "Vector", "Spectral", "Iron", "Steel", "Dark", "Light", "Proton"];
+  const suffixes = ["Lord", "Hunter", "Knight", "Slayer", "Warden", "Reaper", "Vanguard", "Centurion", "Raider", "Specter", "Shade", "Emperor", "Gladiator", "Pilot", "Drifter", "Pioneer", "Enforcer", "Sentinel", "Cruiser", "Stalker", "Corsair", "Rebel", "Phantom", "Ranger", "Sovereign"];
+
+  const usedNames = new Set(Object.values(s.players).map(p => p.username.toLowerCase()));
+
+  let added = 0;
+  let idx = 1;
+  while (added < needToAdd) {
+    while (s.players[`ai_${idx}`]) {
+      idx++;
+    }
+    const id = `ai_${idx}`;
+
+    let name = "";
+    let attempts = 0;
+    do {
+      const pref = prefixes[Math.floor(Math.random() * prefixes.length)];
+      const suff = suffixes[Math.floor(Math.random() * suffixes.length)];
+      name = `${pref}${suff}`;
+      attempts++;
+    } while (usedNames.has(name.toLowerCase()) && attempts < 100);
+
+    if (attempts >= 100) {
+      name = `AI_Commander_${idx}`;
+    }
+
+    usedNames.add(name.toLowerCase());
+
+    const factionIdx = Math.floor(Math.random() * factions.length);
+    const x = Math.floor(Math.random() * 91) + 5;
+    const y = Math.floor(Math.random() * 91) + 5;
+    const planet = createInitialPlanet(`${name}'s Station`, x, y);
+
+    // Highly producing extractors
+    const randomLvl = () => Math.floor(Math.random() * 11) + 15; // levels 15 to 25
+    for (const key of Object.keys(planet.mines)) {
+      planet.mines[key as ResourceType].forEach(m => m.level = randomLvl());
+    }
+
+    // High infrastructure
+    planet.buildings.commsHub.level = Math.floor(Math.random() * 10) + 10;
+    planet.buildings.researchCenter.level = Math.floor(Math.random() * 12) + 15;
+    planet.buildings.radar.level = Math.floor(Math.random() * 8) + 10;
+    planet.buildings.repository.level = Math.floor(Math.random() * 11) + 30; // levels 30 to 40
+
+    // Highly stocked starting resources
+    for (const resKey of Object.keys(planet.resources)) {
+      planet.resources[resKey as ResourceType] = Math.floor(Math.random() * 300000) + 100000;
+    }
+
+    const player: PlayerProfile = {
+      id,
+      username: name,
+      faction: factions[factionIdx],
+      factionColor: factionColors[factionIdx],
+      allianceId: null,
+      allianceRole: null,
+      planets: [planet],
+      scores: {
+        population: Math.floor(Math.random() * 1000) + 200,
+        attack: Math.floor(Math.random() * 8000),
+        defence: Math.floor(Math.random() * 6000),
+        raiders: Math.floor(Math.random() * 500)
+      },
+      achievements: ["First Mine", "Fleet Commander"],
+      skinId: "default",
+      bannerId: "default",
+      lastDailyRewardClaim: Date.now() - 86400000,
+      credits: 10000
+    };
+
+    s.players[id] = player;
+    added++;
   }
 }
 
@@ -314,6 +374,8 @@ function normalizeState(s: GameState) {
       }
     });
   });
+
+  ensureAIsCount(50, s);
 }
 
 // Load state helper
@@ -623,32 +685,51 @@ function bootstrapUniverse() {
   const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
   const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
 
-  const aiNames = [
-    { name: "VoidLord", coords: { x: 12, y: 34 }, allianceId: null, faction: factions[1], color: factionColors[1] },
-    { name: "XenonHunter", coords: { x: 18, y: 40 }, allianceId: null, faction: factions[1], color: factionColors[1] },
-    { name: "NebulaKnight", coords: { x: 8, y: 22 }, allianceId: null, faction: factions[1], color: factionColors[1] },
-    { name: "Astraea", coords: { x: 55, y: 78 }, allianceId: null, faction: factions[0], color: factionColors[0] },
-    { name: "TitanKing", coords: { x: 62, y: 82 }, allianceId: null, faction: factions[0], color: factionColors[0] },
-    { name: "StarEclipse", coords: { x: 50, y: 70 }, allianceId: null, faction: factions[0], color: factionColors[0] },
-    { name: "CosmoPirate", coords: { x: 88, y: 15 }, allianceId: null, faction: factions[2], color: factionColors[2] },
-    { name: "NovaSlayer", coords: { x: 42, y: 45 }, allianceId: null, faction: factions[2], color: factionColors[2] },
-    { name: "SolarWing", coords: { x: 30, y: 90 }, allianceId: null, faction: factions[0], color: factionColors[0] },
-    { name: "Stardust", coords: { x: 75, y: 25 }, allianceId: null, faction: factions[1], color: factionColors[1] }
-  ];
+  const prefixes = ["Nebula", "Star", "Void", "Quantum", "Cosmo", "Solar", "Nova", "Titan", "Xenon", "Galaxy", "Eclipse", "Astro", "Alpha", "Omega", "Hyper", "Cyber", "Orion", "Shadow", "Vector", "Spectral", "Iron", "Steel", "Dark", "Light", "Proton"];
+  const suffixes = ["Lord", "Hunter", "Knight", "Slayer", "Warden", "Reaper", "Vanguard", "Centurion", "Raider", "Specter", "Shade", "Emperor", "Gladiator", "Pilot", "Drifter", "Pioneer", "Enforcer", "Sentinel", "Cruiser", "Stalker", "Corsair", "Rebel", "Phantom", "Ranger", "Sovereign"];
+
+  const aiNames: { name: string; coords: { x: number; y: number }; allianceId: string | null; faction: string; color: string }[] = [];
+  const usedNames = new Set<string>();
+
+  while (aiNames.length < 50) {
+    const pref = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const suff = suffixes[Math.floor(Math.random() * suffixes.length)];
+    const name = `${pref}${suff}`;
+    if (!usedNames.has(name)) {
+      usedNames.add(name);
+      const factionIdx = Math.floor(Math.random() * factions.length);
+      const x = Math.floor(Math.random() * 91) + 5;
+      const y = Math.floor(Math.random() * 91) + 5;
+      aiNames.push({
+        name,
+        coords: { x, y },
+        allianceId: null,
+        faction: factions[factionIdx],
+        color: factionColors[factionIdx]
+      });
+    }
+  }
 
   aiNames.forEach((ai, idx) => {
     const id = `ai_${idx + 1}`;
     const planet = createInitialPlanet(`${ai.name}'s Station`, ai.coords.x, ai.coords.y);
     
-    // Give AI slightly buffed mine levels so player can raid them
-    const randomLvl = () => Math.floor(Math.random() * 8) + 2;
+    // Give AI highly-producing extractors (levels 15 to 25)
+    const randomLvl = () => Math.floor(Math.random() * 11) + 15;
     for (const key of Object.keys(planet.mines)) {
       planet.mines[key as ResourceType].forEach(m => m.level = randomLvl());
     }
-    planet.buildings.commsHub.level = Math.floor(Math.random() * 10) + 1;
-    planet.buildings.researchCenter.level = Math.floor(Math.random() * 12) + 1;
-    planet.buildings.radar.level = Math.floor(Math.random() * 8) + 1;
-    planet.buildings.repository.level = Math.floor(Math.random() * 15) + 1;
+    
+    // Highly capable infrastructure so their resources don't cap early
+    planet.buildings.commsHub.level = Math.floor(Math.random() * 10) + 10;
+    planet.buildings.researchCenter.level = Math.floor(Math.random() * 12) + 15;
+    planet.buildings.radar.level = Math.floor(Math.random() * 8) + 10;
+    planet.buildings.repository.level = Math.floor(Math.random() * 11) + 30; // levels 30 to 40
+
+    // High resource starting balances (100k - 400k of each resource)
+    for (const resKey of Object.keys(planet.resources)) {
+      planet.resources[resKey as ResourceType] = Math.floor(Math.random() * 300000) + 100000;
+    }
 
     // Simulate different scores
     const player: PlayerProfile = {
@@ -2084,12 +2165,13 @@ setInterval(() => {
   // Tick moving fleets
   tickFleets(now);
 
-// Background sandbox stimulation (every ~45 seconds)
+  // Background sandbox stimulation (every ~45 seconds)
   if (Math.random() < 0.3) {
     runAISimulatedActivity(now);
   }
 
 }, 4000);
+
 
 // ----------------- PUSH NOTIFICATIONS & SSE CHANNELS (FCM FALLBACK) -----------------
 
@@ -2137,11 +2219,6 @@ function getFirebaseAdmin(): App | null {
  * via firebase-admin if the active SSE connection is silent or breaks (is inactive).
  */
 function sendNotificationWithFallback(userId: string, title: string, body: string) {
-  // 🤖 Bypass all notifications for AI / simulated bot accounts instantly
-  if (userId && userId.startsWith('ai_')) {
-    return;
-  }
-
   const activeSse = activeSseClients.get(userId);
   
   if (activeSse) {
