@@ -31,6 +31,7 @@ interface ResearchTabProps {
   setTheme?: (val: 'normal' | 'light' | 'dark') => void;
   localResources?: Record<ResourceType, number>;
   onRefreshState?: () => void;
+  isUpgrading?: boolean;
 }
 
 interface TechDef {
@@ -161,7 +162,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   theme,
   setTheme,
   localResources,
-  onRefreshState
+  onRefreshState,
+  isUpgrading = false
 }) => {
   const rc = activePlanet.buildings.researchCenter;
   const targetLvl = rc.level + 1;
@@ -210,6 +212,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   const [subTab, setSubTab] = useState<'tech' | 'faq'>('tech');
   const [faqSearch, setFaqSearch] = useState('');
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
+  const [isResearching, setIsResearching] = useState(false);
 
   // Synchronize state when active planet changes, player's server-side tech levels, etc.
   useEffect(() => {
@@ -303,6 +306,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   };
 
   const startResearch = async (techId: string) => {
+    if (isResearching || isUpgrading) return;
     if (activeResearch) {
       showToast('Another quantum research project is currently in progress.', 'error');
       return;
@@ -315,6 +319,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       return;
     }
 
+    setIsResearching(true);
     try {
       const res = await fetch('/api/upgrade/research/start', {
         method: 'POST',
@@ -340,10 +345,13 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       if (onRefreshState) onRefreshState();
     } catch {
       showToast('Connection error starting research.', 'error');
+    } finally {
+      setIsResearching(false);
     }
   };
 
   const queueResearch = async (techId: string) => {
+    if (isResearching || isUpgrading) return;
     const tech = TECHS.find(t => t.id === techId)!;
     const maxTechLvl = 20;
     const currentLvl = techLevels[techId] || 0;
@@ -367,33 +375,44 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       return;
     }
 
-    try {
-      const res = await fetch('/api/upgrade/research/queue', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': player.id
-        },
-        body: JSON.stringify({
-          planetId: activePlanet.id,
-          techId,
-          currentLevel: currentLvl
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.error || 'Failed to queue research project.', 'error');
-        return;
-      }
+    setConfirmModal({
+      title: 'CONFIRM SPACE GOLD TRANSACTION',
+      message: `Are you sure you want to spend 25 Space Gold to queue the research of "${tech.name}" to level ${targetLvl}?`,
+      onConfirm: async () => {
+        setIsResearching(true);
+        try {
+          const res = await fetch('/api/upgrade/research/queue', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': player.id
+            },
+            body: JSON.stringify({
+              planetId: activePlanet.id,
+              techId,
+              currentLevel: currentLvl
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            showToast(data.error || 'Failed to queue research project.', 'error');
+            return;
+          }
 
-      showToast(`Successfully queued ${tech.name} upgrade to level ${targetLvl}!`, 'success');
-      if (onRefreshState) onRefreshState();
-    } catch {
-      showToast('Connection error queuing research.', 'error');
-    }
+          showToast(`Successfully queued ${tech.name} upgrade to level ${targetLvl}!`, 'success');
+          if (onRefreshState) onRefreshState();
+        } catch {
+          showToast('Connection error queuing research.', 'error');
+        } finally {
+          setIsResearching(false);
+        }
+      }
+    });
   };
 
   const cancelQueueItem = async (index: number) => {
+    if (isResearching || isUpgrading) return;
+    setIsResearching(true);
     try {
       const res = await fetch('/api/upgrade/queue/cancel', {
         method: 'POST',
@@ -415,10 +434,14 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       if (onRefreshState) onRefreshState();
     } catch {
       showToast('Connection error cancelling project.', 'error');
+    } finally {
+      setIsResearching(false);
     }
   };
 
   const handleCompleteBuildingUpgrade = async () => {
+    if (isResearching || isUpgrading) return;
+    setIsResearching(true);
     try {
       const res = await fetch('/api/upgrade/building/complete', {
         method: 'POST',
@@ -434,6 +457,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       }
     } catch {
       showToast('Connection error completing project.', 'error');
+    } finally {
+      setIsResearching(false);
     }
   };
 
@@ -706,7 +731,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
                           <button
                             type="button"
                             onClick={() => queueResearch(tech.id)}
-                            className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/50 text-amber-400 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono transition cursor-pointer flex items-center justify-center gap-1"
+                            disabled={isResearching || isUpgrading}
+                            className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/50 text-amber-400 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono transition cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
                           >
                             <span>Queue Level {targetLvl}</span>
                             <span className="text-[9px] text-amber-500 font-normal">(25 Gold)</span>
@@ -722,9 +748,9 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
                         <button
                           type="button"
                           onClick={() => startResearch(tech.id)}
-                          disabled={!!activeResearch}
+                          disabled={!!activeResearch || isResearching || isUpgrading}
                           className={`w-full py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono border transition ${
-                            activeResearch 
+                            (activeResearch || isResearching || isUpgrading)
                               ? 'border-slate-900 bg-slate-950 text-slate-650 opacity-40 cursor-not-allowed'
                               : 'border-cyan-500/30 bg-cyan-950/20 text-cyan-400 hover:bg-cyan-950/40 hover:border-cyan-500 cursor-pointer'
                           }`}
@@ -734,7 +760,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
                         <button
                           type="button"
                           onClick={() => queueResearch(tech.id)}
-                          className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/50 text-amber-400 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono transition cursor-pointer flex items-center justify-center gap-1"
+                          disabled={isResearching || isUpgrading}
+                          className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/50 text-amber-400 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono transition cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
                         >
                           <span>Queue Level {targetLvl}</span>
                           <span className="text-[9px] text-amber-500 font-normal">(25 Gold)</span>
@@ -770,8 +797,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       </div>
       {confirmModal && (
         <div id="research-confirm-modal-overlay" className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#0D1527] border border-red-500/30 rounded-2xl p-6 flex flex-col space-y-4 shadow-2xl relative text-left">
-            <h3 className="text-sm font-extrabold text-red-400 font-mono tracking-wider flex items-center gap-2">
+          <div className={`w-full max-w-md bg-[#0D1527] border ${confirmModal.title.includes('GOLD') ? 'border-amber-500/30' : 'border-red-500/30'} rounded-2xl p-6 flex flex-col space-y-4 shadow-2xl relative text-left`}>
+            <h3 className={`text-sm font-extrabold ${confirmModal.title.includes('GOLD') ? 'text-amber-400' : 'text-red-400'} font-mono tracking-wider flex items-center gap-2`}>
               <AlertTriangle size={16} /> {confirmModal.title}
             </h3>
             <p className="text-xs text-slate-300 font-sans leading-relaxed">
@@ -792,7 +819,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
                   setConfirmModal(null);
                   cb();
                 }}
-                className="px-4 py-2 bg-red-950/40 hover:bg-red-950 border border-red-500/40 text-red-400 rounded-lg text-xs font-mono font-bold transition cursor-pointer"
+                className={`px-4 py-2 ${confirmModal.title.includes('GOLD') ? 'bg-amber-950/40 hover:bg-amber-950 border border-amber-500/40 text-amber-400' : 'bg-red-950/40 hover:bg-red-950 border border-red-500/40 text-red-400'} rounded-lg text-xs font-mono font-bold transition cursor-pointer`}
               >
                 CONFIRM ACTION
               </button>

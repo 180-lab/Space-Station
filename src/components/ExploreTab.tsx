@@ -18,7 +18,8 @@ import {
   Check,
   MessageSquare,
   Send,
-  Radio
+  Radio,
+  AlertTriangle
 } from 'lucide-react';
 
 const UpgradeCostBar: React.FC<{ 
@@ -117,6 +118,7 @@ interface ExploreTabProps {
   showStationsTop?: boolean;
   setSelectedPlanetId?: (planetId: string) => void;
   customTasks?: Record<string, any>;
+  isUpgrading?: boolean;
 }
 
 const RESOURCE_INFO: Record<ResourceType, { name: string; color: string; icon: any; desc: string }> = {
@@ -156,9 +158,11 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   setActiveTab,
   showStationsTop,
   setSelectedPlanetId,
-  customTasks
+  customTasks,
+  isUpgrading = false
 }) => {
   const [expandedCategory, setExpandedCategory] = useState<ResourceType | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [restoringKeys, setRestoringKeys] = useState<Record<string, boolean>>({});
   const [isQueueMinimized, setIsQueueMinimized] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -272,36 +276,46 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   };
 
   const handleBoostExtractor = async () => {
-    setIsBoosting(true);
-    try {
-      const res = await fetch('/api/extractor/boost', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': player.id
-        },
-        body: JSON.stringify({
-          planetId: activePlanet.id,
-          resourceType: boostTargetType,
-          mineIndex: boostMineIndex,
-          durationDays: boostDuration
-        })
-      });
+    const cost = (boostTargetType === "all")
+      ? (boostDuration === 1 ? 160 : boostDuration === 7 ? 1049 : 3999)
+      : (boostDuration === 1 ? 45 : boostDuration === 7 ? 265 : 999);
 
-      const data = await res.json();
-      if (res.ok) {
-        localStorage.setItem(`moonbase_boosted_${player.id}`, 'true');
-        showToast?.('Extractor Production Boost activated successfully!', 'success');
-        setShowBoostModal(false);
-        if (onRefreshState) onRefreshState();
-      } else {
-        showToast?.(data.error || 'Failed to activate boost.', 'error');
+    setConfirmModal({
+      title: 'CONFIRM SPACE GOLD TRANSACTION',
+      message: `Are you sure you want to spend ${cost} Space Gold to deploy this extractor production boost?`,
+      onConfirm: async () => {
+        setIsBoosting(true);
+        try {
+          const res = await fetch('/api/extractor/boost', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': player.id
+            },
+            body: JSON.stringify({
+              planetId: activePlanet.id,
+              resourceType: boostTargetType,
+              mineIndex: boostMineIndex,
+              durationDays: boostDuration
+            })
+          });
+
+          const data = await res.json();
+          if (res.ok) {
+            localStorage.setItem(`moonbase_boosted_${player.id}`, 'true');
+            showToast?.('Extractor Production Boost activated successfully!', 'success');
+            setShowBoostModal(false);
+            if (onRefreshState) onRefreshState();
+          } else {
+            showToast?.(data.error || 'Failed to activate boost.', 'error');
+          }
+        } catch (err) {
+          showToast?.('Verify network connection with terminal gateway.', 'error');
+        } finally {
+          setIsBoosting(false);
+        }
       }
-    } catch (err) {
-      showToast?.('Verify network connection with terminal gateway.', 'error');
-    } finally {
-      setIsBoosting(false);
-    }
+    });
   };
 
   const handleRestoreMine = async (resType: ResourceType, index: number) => {
@@ -1209,7 +1223,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                   {nextMineTargetLvl <= maxExtractorLevel && (
                                     <button 
                                       onClick={() => onUpgradeMine(resKey, mine.index, true)}
-                                      className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[9px] font-bold uppercase flex items-center gap-1.5"
+                                      disabled={isUpgrading}
+                                      className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[9px] font-bold uppercase flex items-center gap-1.5 disabled:opacity-50"
                                     >
                                       <span className="text-emerald-400">Queue Upgrade</span>
                                       <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl}, {nextMineUpgradeTimeMins}m)</span>
@@ -1229,7 +1244,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                               ) : isAnyUpgradeInProgress ? (
                                 <button 
                                   onClick={() => onUpgradeMine(resKey, mine.index, true)}
-                                  className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[10px] font-bold uppercase flex items-center gap-1.5"
+                                  disabled={isUpgrading}
+                                  className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[10px] font-bold uppercase flex items-center gap-1.5 disabled:opacity-50"
                                 >
                                   <span className="text-emerald-400">Queue Upgrade</span>
                                   <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl}, {nextMineUpgradeTimeMins}m)</span>
@@ -1237,7 +1253,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                               ) : (
                                 <button 
                                   onClick={() => onUpgradeMine(resKey, mine.index)}
-                                  className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 border border-cyan-400 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.55)] hover:scale-[1.03]"
+                                  disabled={isUpgrading}
+                                  className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 border border-cyan-400 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.55)] hover:scale-[1.03] disabled:opacity-50 disabled:pointer-events-none"
                                 >
                                   ⚡ UPGRADE EXTRACTOR <span className="text-slate-900 font-bold ml-1">({nextMineUpgradeTimeMins}m)</span>
                                 </button>
@@ -1573,7 +1590,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                             {nextTargetLvl <= bState.maxLevel && (
                               <button 
                                 onClick={() => onUpgradeBuilding(bKey, true)}
-                                className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer"
+                                disabled={isUpgrading}
+                                className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                                 type="button"
                               >
                                 <span className="text-emerald-400">Queue Upgrade</span>
@@ -1599,7 +1617,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         ) : isAnyUpgradeInProgress ? (
                           <button 
                             onClick={() => onUpgradeBuilding(bKey, true)}
-                            className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer"
+                            disabled={isUpgrading}
+                            className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                             type="button"
                           >
                             <span className="text-emerald-400">{bState.level === 0 ? 'Queue Construction' : 'Queue Upgrade'}</span>
@@ -1608,7 +1627,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         ) : (
                           <button 
                             onClick={() => onUpgradeBuilding(bKey)}
-                            className="px-4 py-2 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 hover:shadow-[0_0_12px_rgba(236,72,153,0.25)] border border-pink-500/35 rounded-xl transition duration-150 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 cursor-pointer"
+                            disabled={isUpgrading}
+                            className="px-4 py-2 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 hover:shadow-[0_0_12px_rgba(236,72,153,0.25)] border border-pink-500/35 rounded-xl transition duration-150 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 cursor-pointer disabled:opacity-50"
                             type="button"
                           >
                             <span>{bState.level === 0 ? 'Construct' : 'Upgrade'}</span>
@@ -1677,7 +1697,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                           {isAnyUpgradeInProgress ? (
                             <button 
                               onClick={() => onUpgradeBuilding(bKey, true)}
-                              className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/35 rounded-lg transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer"
+                              disabled={isUpgrading}
+                              className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/35 rounded-lg transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                               type="button"
                             >
                               <span className="text-emerald-400">Queue Construction</span>
@@ -1686,7 +1707,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                           ) : (
                             <button 
                               onClick={() => onUpgradeBuilding(bKey)}
-                              className="px-4 py-2 bg-pink-500/15 text-pink-400 hover:bg-pink-500/25 border border-pink-500/35 rounded-lg transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1 cursor-pointer"
+                              disabled={isUpgrading}
+                              className="px-4 py-2 bg-pink-500/15 text-pink-400 hover:bg-pink-500/25 border border-pink-500/35 rounded-lg transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1 cursor-pointer disabled:opacity-50"
                               type="button"
                             >
                               <span>Construct</span>
@@ -2155,6 +2177,38 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
               })()}
             </div>
 
+          </div>
+        </div>
+      )}
+      {confirmModal && (
+        <div id="explore-confirm-modal-overlay" className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#0D1527] border border-amber-500/30 rounded-2xl p-6 flex flex-col space-y-4 shadow-2xl relative text-left animate-in fade-in zoom-in-95 duration-150">
+            <h3 className="text-sm font-extrabold text-amber-400 font-mono tracking-wider flex items-center gap-2">
+              <AlertTriangle size={16} /> {confirmModal.title}
+            </h3>
+            <p className="text-xs text-slate-300 font-sans leading-relaxed">
+              {confirmModal.message}
+            </p>
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 hover:bg-slate-900 border border-slate-800 text-slate-400 rounded-lg text-xs font-mono transition cursor-pointer"
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const cb = confirmModal.onConfirm;
+                  setConfirmModal(null);
+                  cb();
+                }}
+                className="px-4 py-2 bg-amber-950/40 hover:bg-amber-950 border border-amber-500/40 text-amber-400 rounded-lg text-xs font-mono font-bold transition cursor-pointer"
+              >
+                CONFIRM TRANSACTION
+              </button>
+            </div>
           </div>
         </div>
       )}

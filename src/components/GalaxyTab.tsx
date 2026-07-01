@@ -26,7 +26,8 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle
 } from 'lucide-react';
 
 interface GalaxyTabProps {
@@ -71,6 +72,7 @@ interface GalaxyTabProps {
   onUpdatePlayer?: (player: PlayerProfile) => void;
   defaultSubTab?: 'scanner' | 'ranking' | 'comms' | 'news' | 'fleets';
   localResources?: Record<string, number>;
+  isUpgrading?: boolean;
 }
 
 async function safeParseJson(res: Response): Promise<any> {
@@ -159,7 +161,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   setCreatedFleets,
   onUpdatePlayer,
   defaultSubTab,
-  localResources
+  localResources,
+  isUpgrading = false
 }) => {
   // Sub-tabs
   const [subTab, setSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>(defaultSubTab || 'scanner');
@@ -275,34 +278,46 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [intelReport, setIntelReport] = useState<any | null>(null);
   const [isFetchingIntel, setIsFetchingIntel] = useState(false);
   const [intelError, setIntelError] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const fetchIntelReport = async (tx: number, ty: number) => {
-    setIsFetchingIntel(true);
-    setIntelError(null);
-    setIntelReport(null); // Clear previous reports
-    try {
-      const res = await fetch('/api/galaxy/intelligence', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': player.id
-        },
-        body: JSON.stringify({ targetX: tx, targetY: ty })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setIntelReport(data.report);
-        if (onRefreshState) {
-          onRefreshState(); // refresh player gold balance in navbar
-        }
-      } else {
-        setIntelError(data.error || "Failed to decrypt local sector coordinates.");
-      }
-    } catch (err) {
-      setIntelError("Signal distortion. Could not receive intelligence packet.");
-    } finally {
-      setIsFetchingIntel(false);
+    if ((player.credits || 0) < 50) {
+      if (showToast) showToast("Insufficient Space Gold. Gathering intelligence report requires 50 Space Gold.", "error");
+      return;
     }
+
+    setConfirmModal({
+      title: 'CONFIRM SPACE GOLD TRANSACTION',
+      message: `Are you sure you want to spend 50 Space Gold to scan the sector [${tx}, ${ty}] and acquire an Intel Report?`,
+      onConfirm: async () => {
+        setIsFetchingIntel(true);
+        setIntelError(null);
+        setIntelReport(null); // Clear previous reports
+        try {
+          const res = await fetch('/api/galaxy/intelligence', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': player.id
+            },
+            body: JSON.stringify({ targetX: tx, targetY: ty })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            setIntelReport(data.report);
+            if (onRefreshState) {
+              onRefreshState(); // refresh player gold balance in navbar
+            }
+          } else {
+            setIntelError(data.error || "Failed to decrypt local sector coordinates.");
+          }
+        } catch (err) {
+          setIntelError("Signal distortion. Could not receive intelligence packet.");
+        } finally {
+          setIsFetchingIntel(false);
+        }
+      }
+    });
   };
 
   // Auto-scan on mount when planet context changes
@@ -433,6 +448,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
   // Dispatch launch
   const handleLaunchFleet = async () => {
+    if (isUpgrading) return;
     if (!selectedTarget) return;
 
     if (selectedReserveFleetId !== 'manual') {
@@ -3024,7 +3040,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               setActionPlanetId(null);
                               setActionType(null);
                             }}
-                            className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-black tracking-widest text-[11px] uppercase rounded-xl transition duration-150 hover:brightness-110 active:scale-[0.99] cursor-pointer shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+                            disabled={isUpgrading}
+                            className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-black tracking-widest text-[11px] uppercase rounded-xl transition duration-150 hover:brightness-110 active:scale-[0.99] cursor-pointer shadow-[0_0_12px_rgba(16,185,129,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             🚀 CONFIRM & DISPATCH Tactical {customNumFleets > 1 ? `${customNumFleets} Fleets` : 'Fleet'} Units
                           </button>
@@ -3681,9 +3698,9 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
               <div className="flex flex-col sm:flex-row gap-3">
                 <button 
                   onClick={handleLaunchFleet}
-                  disabled={!isMissionReady || isLaunchingReserve}
+                  disabled={!isMissionReady || isLaunchingReserve || isUpgrading}
                   className={`flex-1 px-5 py-3 text-[10px] uppercase font-black tracking-widest text-[#05070A] rounded-xl flex items-center justify-center gap-2 transition-all duration-155 ${
-                    isMissionReady && !isLaunchingReserve
+                    isMissionReady && !isLaunchingReserve && !isUpgrading
                       ? 'bg-gradient-to-r from-cyan-400 to-indigo-500 hover:brightness-110 active:scale-[0.98] cursor-pointer shadow-[0_0_20px_rgba(34,211,238,0.3)] font-bold'
                       : 'bg-slate-800 border border-slate-900 text-slate-500 cursor-not-allowed opacity-60'
                   }`}
@@ -4921,6 +4938,38 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           </div>
         </div>
       ); })()}
+      {confirmModal && (
+        <div id="galaxy-confirm-modal-overlay" className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#0D1527] border border-amber-500/30 rounded-2xl p-6 flex flex-col space-y-4 shadow-2xl relative text-left animate-in fade-in zoom-in-95 duration-150">
+            <h3 className="text-sm font-extrabold text-amber-400 font-mono tracking-wider flex items-center gap-2">
+              <AlertTriangle size={16} /> {confirmModal.title}
+            </h3>
+            <p className="text-xs text-slate-300 font-sans leading-relaxed">
+              {confirmModal.message}
+            </p>
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 hover:bg-slate-900 border border-slate-800 text-slate-400 rounded-lg text-xs font-mono transition cursor-pointer"
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const cb = confirmModal.onConfirm;
+                  setConfirmModal(null);
+                  cb();
+                }}
+                className="px-4 py-2 bg-amber-950/40 hover:bg-amber-950 border border-amber-500/40 text-amber-400 rounded-lg text-xs font-mono font-bold transition cursor-pointer"
+              >
+                CONFIRM TRANSACTION
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -6,6 +6,7 @@ import http from "http";
 import https from "https";
 import { initializeApp, cert, getApps, App } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
+import { getAuth } from "firebase-admin/auth";
 import { 
   GameState, 
   PlayerProfile, 
@@ -2075,7 +2076,7 @@ function getFirebaseAdmin(): App | null {
   if (firebaseAdminApp) return firebaseAdminApp;
 
   const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT;
-  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const projectId = process.env.FIREBASE_PROJECT_ID || "space-station-498022";
 
   try {
     const apps = getApps();
@@ -2334,102 +2335,98 @@ app.post("/api/login", (req, res) => {
 });
 
 // Google Authentication secure endpoint
-app.post("/api/auth/google", (req, res) => {
-  const { email, username, faction } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: "Google credentials authorization failed. Email is required." });
+app.post("/api/auth/google", async (req, res) => {
+  const { idToken } = req.body;
+  if (!idToken) {
+    return res.status(400).json({ error: "Google credentials authorization failed. ID Token is required." });
   }
 
-  // Look up existing commander by registered Google email
-  let player = Object.values(state.players).find(p => p.googleEmail?.toLowerCase() === email.toLowerCase());
-
-  if (player) {
-    return res.json({ player, isNew: false });
-  }
-
-  // Check if a player with this exact username already exists to link them
-  if (username) {
-    player = Object.values(state.players).find(p => p.username.toLowerCase() === username.toLowerCase());
-    if (player) {
-      player.googleEmail = email;
-      if (!player.achievements.includes("Google Verified Commander")) {
-        player.achievements.push("Google Verified Commander");
-      }
-      saveState();
-      return res.json({ player, isNew: false, linked: true });
+  try {
+    const adminApp = getFirebaseAdmin();
+    if (!adminApp) {
+      return res.status(500).json({ error: "Firebase Admin SDK could not be initialized." });
     }
+
+    const admin = {
+      auth: () => getAuth(adminApp)
+    };
+
+    // Verify token against project space-station-498022
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    
+    // Extract uid, email, and name
+    const { uid, email, name } = decodedToken;
+
+    // Check if player with that uid exists
+    const player = state.players[uid];
+
+    if (player) {
+      return res.json({ player, isNew: false });
+    }
+
+    // Initialize new baseline profile
+    const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
+    const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
+    const selectFaction = factions[0];
+    const selectColor = factionColors[0];
+
+    const defaultUsername = name || (email ? email.split("@")[0] : `Commander_${uid.substring(0, 5)}`);
+
+    const newPlayer: PlayerProfile = {
+      id: uid,
+      username: defaultUsername,
+      faction: selectFaction,
+      factionColor: selectColor,
+      allianceId: null,
+      allianceRole: null,
+      planets: [], // Empty planets array as requested
+      scores: {
+        population: 0,
+        attack: 0,
+        defence: 0,
+        raiders: 0
+      },
+      achievements: ["Google Verified Commander"],
+      skinId: "default",
+      bannerId: "default",
+      lastDailyRewardClaim: Date.now(),
+      credits: 10000,
+      googleEmail: email
+    };
+
+    state.players[uid] = newPlayer;
+
+    // Log discovery
+    state.newsEvents.unshift({
+      id: `news_${Math.random().toString(36).substr(2, 9)}`,
+      title: "Google Commander Registered",
+      content: `Commander ${defaultUsername} synced via secure quantum keys!`,
+      type: "discovery",
+      timestamp: Date.now()
+    });
+
+    // Welcome message in global chat
+    state.chatMessages.push({
+      id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
+      channel: "global",
+      senderId: "system",
+      senderName: "CENTRAL COMMAND",
+      senderFaction: "System",
+      senderFactionColor: "#7F8C8D",
+      allianceTag: "SYS",
+      receiverId: null,
+      content: `Google Secure sync approved. Welcome Commander ${defaultUsername} to active space duty!`,
+      timestamp: Date.now()
+    });
+
+    // Save database to disk
+    saveState();
+
+    return res.json({ player: newPlayer, isNew: true });
+  } catch (err: any) {
+    console.error("[Google Auth Error]", err);
+    return res.status(401).json({ error: `Google login verification failed: ${err.message}` });
   }
-
-  // Create a brand new Google-secured Commander Profile
-  const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
-  const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
-  const selectFaction = factions.includes(faction) ? faction : factions[0];
-  const idx = factions.indexOf(selectFaction);
-  const selectColor = factionColors[idx];
-
-  const id = `google_${Math.random().toString(36).substr(2, 9)}`;
-  const startX = Math.floor(Math.random() * 90) + 5;
-  const startY = Math.floor(Math.random() * 90) + 5;
-
-  const defaultUsername = username || email.split("@")[0];
-  const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY, true);
-  
-  // Set reasonable starting resources
-  planet.resources.water = 5000000;
-  planet.resources.plasma = 5000000;
-  planet.resources.fuel = 5000000;
-  planet.resources.food = 5000000;
-  planet.resources.respirant = 5000000;
-
-  const newPlayer: PlayerProfile = {
-    id,
-    username: defaultUsername,
-    faction: selectFaction,
-    factionColor: selectColor,
-    allianceId: null,
-    allianceRole: null,
-    planets: [planet],
-    scores: {
-      population: 7500,
-      attack: 0,
-      defence: 0,
-      raiders: 0
-    },
-    achievements: ["First Mine Started", "Google Verified Commander"],
-    skinId: "default",
-    bannerId: "default",
-    lastDailyRewardClaim: Date.now(),
-    credits: 10000,
-    googleEmail: email
-  };
-
-  state.players[id] = newPlayer;
-
-  // Global news
-  state.newsEvents.unshift({
-    id: `news_${Math.random().toString(36).substr(2, 9)}`,
-    title: "Google Commander Registered",
-    content: `Commander ${defaultUsername} synced via Google keys and established command in Sector [${startX}, ${startY}]!`,
-    type: "discovery",
-    timestamp: Date.now()
-  });
-
-  // Chat greeting
-  state.chatMessages.push({
-    id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
-    channel: "global",
-    senderId: "system",
-    senderName: "CENTRAL COMMAND",
-    senderFaction: "System",
-    senderFactionColor: "#7F8C8D",
-    allianceTag: "SYS",
-    receiverId: null,
-    content: `Google Secure sync approved. Welcome Commander ${defaultUsername} to active space duty!`,
-    timestamp: Date.now()
-  });
-
-  saveState();
-  res.json({ player: newPlayer, isNew: true });
 });
 
 // Link Google Account endpoint for logged in commanders
