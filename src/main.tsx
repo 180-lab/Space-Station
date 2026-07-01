@@ -3,6 +3,25 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
+// Unregister any stale or background service workers to prevent iframe security and network fetch errors in AI Studio
+try {
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister().then((unregistered) => {
+          if (unregistered) {
+            console.log('[Service Worker] Cleaned up stale service worker registration:', registration.scope);
+          }
+        });
+      }
+    }).catch((err) => {
+      console.warn('[Service Worker] Cleanup error:', err);
+    });
+  }
+} catch (e) {
+  console.warn('[Service Worker] Cleanup bypassed:', e);
+}
+
 // Central Gateway URL Interceptor logic
 try {
   const isCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor;

@@ -1472,7 +1472,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                               type="number"
                                               min="0"
                                               max={maxVal}
-                                              value={transferResources[resKey] || '0'}
+                                              value={transferResources[resKey] === '0' || transferResources[resKey] === '' ? '' : transferResources[resKey]}
+                                              placeholder="0"
                                               onChange={(e) => {
                                                 const v = Math.min(maxVal, Math.max(0, parseInt(e.target.value, 10) || 0));
                                                 setTransferResources(prev => ({ ...prev, [resKey]: String(v) }));

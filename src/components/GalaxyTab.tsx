@@ -451,6 +451,27 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
     if (isUpgrading) return;
     if (!selectedTarget) return;
 
+    if (fleetType === 'attack') {
+      const isSelf = selectedTarget.id === player.id;
+      const isAllianceMember = player.allianceId && selectedTarget.allianceId === player.allianceId;
+      if (isSelf) {
+        if (showToast) {
+          showToast("Friendly fire protocols active: You are strictly prohibited from attacking your own stations or colony bases!", "error");
+        } else {
+          alert("Friendly fire protocols active: You are strictly prohibited from attacking your own stations or colony bases!");
+        }
+        return;
+      }
+      if (isAllianceMember) {
+        if (showToast) {
+          showToast(`Alliance mutual non-aggression pact active: You cannot attack stations belonging to alliance member ${selectedTarget.username}!`, "error");
+        } else {
+          alert(`Alliance mutual non-aggression pact active: You cannot attack stations belonging to alliance member ${selectedTarget.username}!`);
+        }
+        return;
+      }
+    }
+
     if (selectedReserveFleetId !== 'manual') {
       const fleet = createdFleets.find(f => f.id === selectedReserveFleetId);
       if (!fleet) {
@@ -1049,9 +1070,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     <button 
                                       type="button"
                                       onClick={() => openDispatchFleet(target, 'attack')}
-                                      className="px-3.5 py-2 bg-red-950/20 border border-red-900/30 text-red-400 hover:bg-red-900/20 rounded-xl font-bold transition cursor-pointer text-[11px]"
+                                      disabled={isUserSelf || !!(player.allianceId && target.allianceId === player.allianceId)}
+                                      className="px-3.5 py-2 bg-red-950/20 border border-red-900/30 text-red-400 hover:bg-red-900/20 rounded-xl font-bold transition cursor-pointer text-[11px] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-950/20 disabled:text-red-500/70"
+                                      title={isUserSelf ? "You cannot attack your own station!" : (player.allianceId && target.allianceId === player.allianceId) ? "Alliance members cannot attack each other!" : "Launch offensive combat assault"}
                                     >
-                                      Attack Station
+                                      {isUserSelf ? 'Self Station' : (player.allianceId && target.allianceId === player.allianceId) ? 'Alliance Ally' : 'Attack Station'}
                                     </button>
                                     <button 
                                       type="button"

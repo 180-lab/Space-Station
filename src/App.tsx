@@ -1596,7 +1596,7 @@ export default function App() {
   const handleJoinAlliance = async (allianceId: string) => {
     if (!player) return;
     try {
-      const res = await fetch('/api/alliance/join', {
+      const res = await fetch('/api/alliance/apply', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1606,11 +1606,11 @@ export default function App() {
       });
       const data = await safeParseJson(res);
       if (res.ok) {
-        localStorage.setItem(`moonbase_alliance_joined_${player.id}`, 'true');
-        setPlayer(data.player);
-        showToast(`Successfully registered and joined alliance!`, 'success');
+        localStorage.setItem(`moonbase_alliance_applied_${player.id}`, 'true');
+        showToast(`Your application to join the Alliance has been submitted successfully! Waiting for leadership approval.`, 'success');
+        fetchState();
       } else {
-        showToast(data.error || 'Enlisting failure', 'error');
+        showToast(data.error || 'Application failure', 'error');
       }
     } catch (err) {
       showToast('Alliance join failed', 'error');
@@ -3208,6 +3208,46 @@ export default function App() {
                   )}
                 </div>
 
+                 {/* Alliance invitation recruitment offer panel */}
+                 {player && player.allianceId && (player.allianceRole === 'leader' || player.allianceRole === 'officer') && !targetPlayer.allianceId && targetPlayer.id !== player.id && (
+                   <div className="pt-3 border-t border-[#1E293B]">
+                     <h4 className="text-[10px] font-bold uppercase tracking-widest text-yellow-400 mb-2 font-mono">Alliance Recruitment Command</h4>
+                     <div className="flex items-center justify-between p-2.5 bg-[#1e1b10]/40 border border-yellow-500/20 rounded-xl">
+                       <span className="text-[10px] text-slate-300 mr-2 max-w-[200px] font-sans">
+                         Dispatch formal tactical enlistment invitation to join [{alliances[player.allianceId]?.tag || 'ALLY'}] {alliances[player.allianceId]?.name || 'Alliance'}.
+                       </span>
+                       <button
+                         type="button"
+                         onClick={async () => {
+                           try {
+                             const res = await fetch('/api/alliance/invite', {
+                               method: 'POST',
+                               headers: {
+                                 'Content-Type': 'application/json',
+                                 'x-user-id': player.id
+                               },
+                               body: JSON.stringify({ targetPlayerId: targetPlayer.id })
+                             });
+                             const data = await safeParseJson(res);
+                             if (res.ok) {
+                               showToast(data.message || 'Invitation dispatched successfully!', 'success');
+                               fetchState();
+                               setViewingPlayerId(null);
+                             } else {
+                               showToast(data.error || 'Failed to send invitation', 'error');
+                             }
+                           } catch (err) {
+                             showToast('Network error dispatching invitation', 'error');
+                           }
+                         }}
+                         className="px-3.5 py-1.5 bg-yellow-500 hover:bg-yellow-400 text-slate-950 rounded-lg text-[10.5px] font-black uppercase tracking-widest transition active:scale-95 cursor-pointer shadow-[0_0_12px_rgba(234,179,8,0.15)] shrink-0"
+                       >
+                         🚀 Invite
+                       </button>
+                     </div>
+                   </div>
+                 )}
+
                  {/* Secure Comms Dispatch Panel */}
                 <div className="pt-3 border-t border-[#1E293B]">
                   <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#00F0FF] mb-2 font-mono">Send message to {targetPlayer.username}</h4>
@@ -3545,6 +3585,68 @@ export default function App() {
                       <p className="text-[11.5px] text-slate-300 font-sans leading-relaxed bg-[#05070a]/60 border border-[#1e293b]/40 rounded-lg p-2.5 break-words">
                         {msg.content}
                       </p>
+
+                      {/* Alliance Invitation Interactive Responses */}
+                      {msg.isAllianceInvite && msg.inviteStatus === 'pending' && !showRecipient && (
+                        <div className="flex gap-2.5 p-2 bg-yellow-500/5 border border-yellow-500/10 rounded-xl" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const res = await fetch('/api/alliance/invite/respond', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'x-user-id': player.id
+                                  },
+                                  body: JSON.stringify({ messageId: msg.id, action: 'accept' })
+                                });
+                                const data = await safeParseJson(res);
+                                if (res.ok) {
+                                  showToast('Alliance enlistment completed successfully! Welcome aboard, Commander!', 'success');
+                                  setPlayer(data.player);
+                                  fetchState();
+                                } else {
+                                  showToast(data.error || 'Failed to accept invitation.', 'error');
+                                }
+                              } catch (err) {
+                                showToast('Network link failure.', 'error');
+                              }
+                            }}
+                            className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black tracking-wider text-[10px] uppercase rounded-lg cursor-pointer transition duration-150 text-center"
+                          >
+                            Accept Offer ✅
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const res = await fetch('/api/alliance/invite/respond', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'x-user-id': player.id
+                                  },
+                                  body: JSON.stringify({ messageId: msg.id, action: 'decline' })
+                                });
+                                const data = await safeParseJson(res);
+                                if (res.ok) {
+                                  showToast('Invitation declined and archived.', 'info');
+                                  setPlayer(data.player);
+                                  fetchState();
+                                } else {
+                                  showToast(data.error || 'Decline operation failed.', 'error');
+                                }
+                              } catch (err) {
+                                showToast('Network link failure.', 'error');
+                              }
+                            }}
+                            className="flex-1 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-black tracking-wider text-[10px] uppercase rounded-lg cursor-pointer transition duration-150 text-center"
+                          >
+                            Decline Offer ❌
+                          </button>
+                        </div>
+                      )}
 
                       {/* Action Tools Console */}
                       <div className="flex flex-wrap gap-2 justify-between items-center pt-2 border-t border-[#1E293B]/40 text-[9.5px]">

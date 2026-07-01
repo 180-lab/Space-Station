@@ -131,6 +131,11 @@ export interface CommandMessage {
   isRead: boolean;
   isSaved?: boolean;
   isSent?: boolean;
+  isAllianceInvite?: boolean;
+  allianceId?: string;
+  allianceName?: string;
+  allianceTag?: string;
+  inviteStatus?: 'pending' | 'accepted' | 'declined';
 }
 
 export interface Alliance {

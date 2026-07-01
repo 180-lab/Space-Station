@@ -22,6 +22,7 @@ import {
   CommandMessage,
 } from "./src/types";
 import { getUpgradeResourceCost } from "./src/gameUtils";
+import { checkSpeedHack, redis as serverRedis } from "./antiCheat";
 
 const app = express();
 const PORT = process.env.NODE_ENV === "production" ? (process.env.PORT ? parseInt(process.env.PORT) : 3000) : 3000;
@@ -54,29 +55,23 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// Anti-speed-hack and security validation layer
-const lastRequestTime: Record<string, number> = {};
-
-app.use("/api", (req, res, next) => {
+// Anti-speed-hack and security validation layer powered by Cloud Redis
+app.use("/api", async (req, res, next) => {
   if (req.method === "POST" || req.method === "PUT" || req.method === "DELETE") {
-    const path = req.path.toLowerCase();
-    if (path.includes("/login") || path.includes("/register") || path.includes("/auth/google") || path.includes("/notifications/register-token")) {
+    const apiPath = req.path.toLowerCase();
+    if (apiPath.includes("/login") || apiPath.includes("/register") || apiPath.includes("/auth/google") || apiPath.includes("/notifications/register-token")) {
       return next();
     }
 
     const userId = req.headers["x-user-id"] as string;
     if (userId) {
-      const now = Date.now();
-      const key = `${userId}:${path}`;
-      const lastTime = lastRequestTime[key] || 0;
-      if (now - lastTime < 150) {
-        console.warn(`[Anti-Speed-Hack] Blocking rapid request from user ${userId} on ${path} (${now - lastTime}ms interval)`);
+      const isValid = await checkSpeedHack(userId, apiPath, 150);
+      if (!isValid) {
         return res.status(429).json({ 
           error: "Quantum anti-speed-hack mechanism active: Request rate exceeds safety parameters. Action blocked.",
           success: false 
         });
       }
-      lastRequestTime[key] = now;
     }
   }
   next();
@@ -3434,6 +3429,7 @@ app.post("/api/galaxy/scan", (req, res) => {
         username: player.username,
         faction: player.faction,
         factionColor: player.factionColor,
+        allianceId: player.allianceId || null,
         allianceTag: player.allianceId ? state.alliances[player.allianceId]?.tag : null,
         planetId: pl.id,
         planetName: pl.name,
@@ -3728,6 +3724,26 @@ app.post("/api/fleet/send", (req, res) => {
       
       if (!isAllianceMemberPlanet) {
         return res.status(400).json({ error: "Move relocation directives are only authorized to target your own colonized planets and moonbases or an Alliance member's coordinates!" });
+      }
+    }
+  }
+
+  if (missionType === "attack") {
+    // 1. Check self-attack: Is the target own planet?
+    const destPlanet = p.planets.find(pl => pl.sectorX === targetX && pl.sectorY === targetY);
+    if (destPlanet) {
+      return res.status(400).json({ error: "Friendly fire protocols active: You are strictly prohibited from attacking your own stations or colony bases!" });
+    }
+
+    // 2. Check alliance-attack: Is the target an alliance member's planet?
+    if (p.allianceId) {
+      for (const playerObj of Object.values(state.players)) {
+        if (playerObj.id !== p.id && playerObj.allianceId === p.allianceId) {
+          const memberPlanet = playerObj.planets.find(pl => pl.sectorX === targetX && pl.sectorY === targetY);
+          if (memberPlanet) {
+            return res.status(400).json({ error: `Alliance mutual non-aggression pact active: You cannot attack stations belonging to your own alliance member ${playerObj.username}!` });
+          }
+        }
       }
     }
   }
@@ -4156,6 +4172,10 @@ app.post("/api/alliance/join", (req, res) => {
   const alliance = state.alliances[allianceId];
   if (!alliance) return res.status(404).json({ error: "Alliance not found" });
 
+  if (alliance.members && alliance.members.length >= 10) {
+    return res.status(400).json({ error: "Alliance registry is full. Maximum capacity is 10 commanders!" });
+  }
+
   alliance.members.push({
     playerId: p.id,
     username: p.username,
@@ -4194,6 +4214,10 @@ app.post("/api/alliance/apply", (req, res) => {
   const alliance = state.alliances[allianceId];
   if (!alliance) return res.status(404).json({ error: "Alliance not found" });
 
+  if (alliance.members && alliance.members.length >= 10) {
+    return res.status(400).json({ error: "Cannot apply: This Alliance has already reached its maximum capacity of 10 commanders!" });
+  }
+
   if (!alliance.applications) {
     alliance.applications = [];
   }
@@ -4212,6 +4236,197 @@ app.post("/api/alliance/apply", (req, res) => {
 
   saveState();
   res.json({ player: p, success: true, alliance });
+});
+
+// Alliance invite player
+app.post("/api/alliance/invite", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  if (!p.allianceId) {
+    return res.status(400).json({ error: "You must be in an Alliance to invite players." });
+  }
+
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Your Alliance was not found." });
+
+  if (p.allianceRole !== "leader" && p.allianceRole !== "officer") {
+    return res.status(403).json({ error: "Only Alliance Leaders or Officers can invite players." });
+  }
+
+  const { targetPlayerId } = req.body;
+  if (!targetPlayerId) {
+    return res.status(400).json({ error: "Target player ID is required." });
+  }
+
+  const receiver = state.players[targetPlayerId];
+  if (!receiver) {
+    return res.status(404).json({ error: "Target player not found." });
+  }
+
+  if (receiver.id === p.id) {
+    return res.status(400).json({ error: "You cannot invite yourself." });
+  }
+
+  if (receiver.allianceId) {
+    return res.status(400).json({ error: "Target player is already in an Alliance." });
+  }
+
+  if (alliance.members && alliance.members.length >= 10) {
+    return res.status(400).json({ error: "Your Alliance is full. Maximum capacity is 10 commanders!" });
+  }
+
+  if (!receiver.commandMessages) {
+    receiver.commandMessages = [];
+  }
+
+  // Check if there is already a pending invite
+  const existingInvite = receiver.commandMessages.some(m => m.isAllianceInvite && m.allianceId === alliance.id && m.inviteStatus === 'pending');
+  if (existingInvite) {
+    return res.status(400).json({ error: "A pending invitation from your Alliance has already been dispatched to this commander." });
+  }
+
+  const inviteMsgId = `msg_invite_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`;
+
+  const inviteMessage: CommandMessage = {
+    id: inviteMsgId,
+    senderId: p.id,
+    senderName: p.username,
+    senderFaction: p.faction,
+    senderFactionColor: p.factionColor,
+    receiverId: receiver.id,
+    receiverName: receiver.username,
+    content: `ALLIANCE ENLISTMENT OFFER: Commander ${p.username} has invited you to join their elite Alliance: [${alliance.tag}] ${alliance.name}! Use the response terminal buttons below to accept or decline.`,
+    timestamp: Date.now(),
+    isRead: false,
+    isSaved: false,
+    isAllianceInvite: true,
+    allianceId: alliance.id,
+    allianceName: alliance.name,
+    allianceTag: alliance.tag,
+    inviteStatus: 'pending'
+  };
+
+  receiver.commandMessages.push(inviteMessage);
+
+  // Keep copy in sender's outbox
+  if (!p.commandMessages) {
+    p.commandMessages = [];
+  }
+  const senderMessage = { ...inviteMessage, isSent: true };
+  p.commandMessages.push(senderMessage);
+
+  saveState();
+  res.json({ success: true, message: `Alliance invitation successfully transmitted to Commander ${receiver.username}!` });
+});
+
+// Alliance invite response
+app.post("/api/alliance/invite/respond", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { messageId, action } = req.body; // action can be 'accept' or 'decline'
+  if (!messageId || !action) {
+    return res.status(400).json({ error: "Message ID and response action are required." });
+  }
+
+  if (!p.commandMessages) {
+    p.commandMessages = [];
+  }
+
+  const msgIndex = p.commandMessages.findIndex(m => m.id === messageId);
+  if (msgIndex === -1) {
+    return res.status(404).json({ error: "Invitation transmission not found in your log records." });
+  }
+
+  const msg = p.commandMessages[msgIndex] as any;
+  if (!msg.isAllianceInvite) {
+    return res.status(400).json({ error: "Target transmission is not an alliance invitation." });
+  }
+
+  if (msg.inviteStatus !== 'pending') {
+    return res.status(400).json({ error: `This invitation has already been ${msg.inviteStatus}.` });
+  }
+
+  const allianceId = msg.allianceId;
+  const alliance = state.alliances[allianceId];
+
+  if (action === 'accept') {
+    if (p.allianceId) {
+      return res.status(400).json({ error: "You are already a member of an Alliance. You must leave your current Alliance first." });
+    }
+
+    if (!alliance) {
+      msg.inviteStatus = 'declined';
+      msg.content += " [ALLIANCE NO LONGER EXISTS]";
+      saveState();
+      return res.status(404).json({ error: "The inviting Alliance no longer exists." });
+    }
+
+    if (alliance.members && alliance.members.length >= 10) {
+      return res.status(400).json({ error: "The Alliance has already reached its maximum capacity of 10 commanders!" });
+    }
+
+    // Add member to alliance
+    alliance.members.push({
+      playerId: p.id,
+      username: p.username,
+      role: "member"
+    });
+
+    p.allianceId = alliance.id;
+    p.allianceRole = "member";
+
+    // Update message status
+    msg.inviteStatus = 'accepted';
+    msg.content += " [ACCEPTED]";
+
+    // Remove any of p's pending applications to other alliances (just in case)
+    Object.values(state.alliances).forEach(all => {
+      if (all.applications) {
+        all.applications = all.applications.filter(app => app.playerId !== p.id);
+      }
+    });
+
+    // Create system news alert
+    state.newsEvents.unshift({
+      id: `news_${Math.random().toString(36).substr(2, 9)}`,
+      title: "Member Joined Alliance",
+      content: `${p.username} has joined ${alliance.name} [${alliance.tag}] via invitation!`,
+      type: "system",
+      timestamp: Date.now()
+    });
+
+    // Also update sender's copy in their command messages
+    const sender = state.players[msg.senderId];
+    if (sender && sender.commandMessages) {
+      const senderMsg = sender.commandMessages.find(m => m.id === messageId) as any;
+      if (senderMsg) {
+        senderMsg.inviteStatus = 'accepted';
+        senderMsg.content += " [ACCEPTED]";
+      }
+    }
+
+  } else if (action === 'decline') {
+    // Decline invitation
+    msg.inviteStatus = 'declined';
+    msg.content += " [DECLINED]";
+
+    // Also update sender's copy
+    const sender = state.players[msg.senderId];
+    if (sender && sender.commandMessages) {
+      const senderMsg = sender.commandMessages.find(m => m.id === messageId) as any;
+      if (senderMsg) {
+        senderMsg.inviteStatus = 'declined';
+        senderMsg.content += " [DECLINED]";
+      }
+    }
+  } else {
+    return res.status(400).json({ error: "Invalid response action directive." });
+  }
+
+  saveState();
+  res.json({ success: true, player: p, message: `Successfully responded: ${action.toUpperCase()}` });
 });
 
 // Alliance approve
@@ -4248,6 +4463,10 @@ app.post("/api/alliance/approve", (req, res) => {
     alliance.applications.splice(appIndex, 1);
     saveState();
     return res.status(400).json({ error: "Player has already joined another alliance." });
+  }
+
+  if (alliance.members && alliance.members.length >= 10) {
+    return res.status(400).json({ error: "Cannot approve: This Alliance has already reached its maximum capacity of 10 commanders!" });
   }
 
   // Approve!

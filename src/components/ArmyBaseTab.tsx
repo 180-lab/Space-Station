@@ -173,12 +173,12 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   isUpgrading = false
 }) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({
-    defender: 1,
-    attacker: 1,
-    tank: 1,
-    looter: 1,
-    drone: 1,
-    settlementShip: 1
+    defender: 0,
+    attacker: 0,
+    tank: 0,
+    looter: 0,
+    drone: 0,
+    settlementShip: 0
   });
 
   const [activeTroopInfo, setActiveTroopInfo] = useState<string | null>(null);
@@ -448,7 +448,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   };
 
   const handleQtyChange = (troopId: string, val: string) => {
-    const num = Math.max(1, parseInt(val, 10) || 1);
+    const num = Math.max(0, parseInt(val, 10) || 0);
     setQuantities(prev => ({ ...prev, [troopId]: num }));
   };
 
@@ -929,7 +929,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                 const Icon = details.icon;
                 const currentCount = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
                 const isInfoActive = activeTroopInfo === tId;
-                const qty = quantities[tId] || 1;
+                const qty = quantities[tId] !== undefined ? quantities[tId] : 0;
                 const requiredLevel = TROOP_REQUIRED_LEVELS[tId] || 0;
                 
                 const allWarRoomsReached22 = player.planets.every(pl => (pl.buildings.armyBase?.level || 0) >= 22);
@@ -1186,9 +1186,10 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest font-mono">Build count:</span>
                             <input 
                               type="number"
-                              min={1}
+                              min={0}
                               max={999999}
-                              value={qty}
+                              value={qty === 0 ? '' : qty}
+                              placeholder="0"
                               onChange={(e) => handleQtyChange(tId, e.target.value)}
                               className="w-16 px-3 py-1.5 bg-[#05070A] border border-[#1E293B] rounded-xl font-mono text-xs text-white text-center focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_10px_rgba(34,211,238,0.15)] transition-all duration-200"
                             />
@@ -1222,7 +1223,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
                         <button
                           onClick={() => onTrainTroops(tId, qty)}
-                          disabled={isUpgrading}
+                          disabled={isUpgrading || qty <= 0}
                           className="px-5 py-3 bg-gradient-to-r from-cyan-500/10 to-indigo-500/10 hover:from-cyan-500/20 hover:to-indigo-500/20 border border-cyan-500/35 hover:border-cyan-500/55 text-cyan-400 hover:text-cyan-300 font-bold text-[10px] uppercase tracking-widest font-mono rounded-xl transition duration-150 flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto disabled:opacity-50"
                         >
                           <Play size={11} />
