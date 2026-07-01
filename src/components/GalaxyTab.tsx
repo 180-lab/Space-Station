@@ -26,7 +26,8 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle
 } from 'lucide-react';
 
 interface GalaxyTabProps {
@@ -71,6 +72,7 @@ interface GalaxyTabProps {
   onUpdatePlayer?: (player: PlayerProfile) => void;
   defaultSubTab?: 'scanner' | 'ranking' | 'comms' | 'news' | 'fleets';
   localResources?: Record<string, number>;
+  isUpgrading?: boolean;
 }
 
 async function safeParseJson(res: Response): Promise<any> {
@@ -159,7 +161,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   setCreatedFleets,
   onUpdatePlayer,
   defaultSubTab,
-  localResources
+  localResources,
+  isUpgrading = false
 }) => {
   // Sub-tabs
   const [subTab, setSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>(defaultSubTab || 'scanner');
@@ -275,34 +278,46 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [intelReport, setIntelReport] = useState<any | null>(null);
   const [isFetchingIntel, setIsFetchingIntel] = useState(false);
   const [intelError, setIntelError] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const fetchIntelReport = async (tx: number, ty: number) => {
-    setIsFetchingIntel(true);
-    setIntelError(null);
-    setIntelReport(null); // Clear previous reports
-    try {
-      const res = await fetch('/api/galaxy/intelligence', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': player.id
-        },
-        body: JSON.stringify({ targetX: tx, targetY: ty })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setIntelReport(data.report);
-        if (onRefreshState) {
-          onRefreshState(); // refresh player gold balance in navbar
-        }
-      } else {
-        setIntelError(data.error || "Failed to decrypt local sector coordinates.");
-      }
-    } catch (err) {
-      setIntelError("Signal distortion. Could not receive intelligence packet.");
-    } finally {
-      setIsFetchingIntel(false);
+    if ((player.credits || 0) < 50) {
+      if (showToast) showToast("Insufficient Space Gold. Gathering intelligence report requires 50 Space Gold.", "error");
+      return;
     }
+
+    setConfirmModal({
+      title: 'CONFIRM SPACE GOLD TRANSACTION',
+      message: `Are you sure you want to spend 50 Space Gold to scan the sector [${tx}, ${ty}] and acquire an Intel Report?`,
+      onConfirm: async () => {
+        setIsFetchingIntel(true);
+        setIntelError(null);
+        setIntelReport(null); // Clear previous reports
+        try {
+          const res = await fetch('/api/galaxy/intelligence', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': player.id
+            },
+            body: JSON.stringify({ targetX: tx, targetY: ty })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            setIntelReport(data.report);
+            if (onRefreshState) {
+              onRefreshState(); // refresh player gold balance in navbar
+            }
+          } else {
+            setIntelError(data.error || "Failed to decrypt local sector coordinates.");
+          }
+        } catch (err) {
+          setIntelError("Signal distortion. Could not receive intelligence packet.");
+        } finally {
+          setIsFetchingIntel(false);
+        }
+      }
+    });
   };
 
   // Auto-scan on mount when planet context changes
@@ -433,6 +448,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
   // Dispatch launch
   const handleLaunchFleet = async () => {
+    if (isUpgrading) return;
     if (!selectedTarget) return;
 
     if (selectedReserveFleetId !== 'manual') {
@@ -1223,7 +1239,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   <span className="text-blue-400 font-bold">{player.scores.defence.toLocaleString()}</span>
                 </div>
                 <div className={`p-2 rounded-lg border border-[#1E293B] bg-[#030508]/65 text-center sm:text-right ${rankingMetric === 'raiders' ? 'border-cyan-500/35 bg-cyan-950/10' : ''}`}>
-                  <span className="text-[9px] text-slate-500 block uppercase font-bold text-emerald-400">Resources Hauled</span>
+                  <span className="text-[9px] text-slate-500 block uppercase font-bold text-emerald-400">Raided Points</span>
                   <span className="text-emerald-400 font-bold">{player.scores.raiders.toLocaleString()}</span>
                 </div>
               </div>
@@ -1298,7 +1314,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   { key: 'population', label: '🌾 POPULATION STANDING', color: 'border-cyan-500/30' },
                   { key: 'attack', label: '⚔️ ATTACK POINTS', color: 'border-red-500/30' },
                   { key: 'defence', label: '🛡️ DEFENSE POINTS', color: 'border-blue-500/30' },
-                  { key: 'raiders', label: '💰 RESOURCES HAULED', color: 'border-emerald-500/30' }
+                  { key: 'raiders', label: '💰 RAIDED POINTS', color: 'border-emerald-500/30' }
                 ].map((opt) => (
                   <button
                     key={opt.key}
@@ -1322,10 +1338,10 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                       <tr className="border-b border-[#1E293B]/70 text-slate-500 pb-2">
                         <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">RANK</th>
                         <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">COMMANDER ID</th>
-                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">POPULATION</th>
-                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">ATTACK POINTS</th>
-                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">DEFENSE POINTS</th>
-                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">RESOURCES HAULED</th>
+                        {rankingMetric === 'population' && <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">POPULATION</th>}
+                        {rankingMetric === 'attack' && <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">ATTACK POINTS</th>}
+                        {rankingMetric === 'defence' && <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">DEFENSE POINTS</th>}
+                        {rankingMetric === 'raiders' && <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">RAIDED POINTS</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-900/60 font-medium">
@@ -1359,18 +1375,26 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 </span>
                               </div>
                             </td>
-                            <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'population' ? 'text-cyan-400' : 'text-slate-400'}`}>
-                              {(pl.scores?.population || 0).toLocaleString()}
-                            </td>
-                            <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'attack' ? 'text-red-400' : 'text-slate-400'}`}>
-                              {(pl.scores?.attack || 0).toLocaleString()}
-                            </td>
-                            <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'defence' ? 'text-blue-400' : 'text-slate-400'}`}>
-                              {(pl.scores?.defence || 0).toLocaleString()}
-                            </td>
-                            <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'raiders' ? 'text-emerald-400' : 'text-slate-400'}`}>
-                              {(pl.scores?.raiders || 0).toLocaleString()}
-                            </td>
+                            {rankingMetric === 'population' && (
+                              <td className="py-3.5 px-4 text-right font-bold whitespace-nowrap text-cyan-400">
+                                {(pl.scores?.population || 0).toLocaleString()}
+                              </td>
+                            )}
+                            {rankingMetric === 'attack' && (
+                              <td className="py-3.5 px-4 text-right font-bold whitespace-nowrap text-red-400">
+                                {(pl.scores?.attack || 0).toLocaleString()}
+                              </td>
+                            )}
+                            {rankingMetric === 'defence' && (
+                              <td className="py-3.5 px-4 text-right font-bold whitespace-nowrap text-blue-400">
+                                {(pl.scores?.defence || 0).toLocaleString()}
+                              </td>
+                            )}
+                            {rankingMetric === 'raiders' && (
+                              <td className="py-3.5 px-4 text-right font-bold whitespace-nowrap text-emerald-400">
+                                {(pl.scores?.raiders || 0).toLocaleString()}
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
@@ -1383,10 +1407,10 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                         <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">RANK</th>
                         <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">ALLIANCE [TAG]</th>
                         <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">MEMBERS</th>
-                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">POPULATION</th>
-                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">ATTACK POINTS</th>
-                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">DEFENSE POINTS</th>
-                        <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">RESOURCES HAULED</th>
+                        {rankingMetric === 'population' && <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">POPULATION</th>}
+                        {rankingMetric === 'attack' && <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">ATTACK POINTS</th>}
+                        {rankingMetric === 'defence' && <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">DEFENSE POINTS</th>}
+                        {rankingMetric === 'raiders' && <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">RAIDED POINTS</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-900/60 font-medium">
@@ -1426,24 +1450,32 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               <td className="py-3.5 px-4 text-right text-slate-300 font-bold font-mono">
                                 {all.members.length}
                               </td>
-                              <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'population' ? 'text-[#5bc0be]' : 'text-slate-400'}`}>
-                                {all.combinedScores.population.toLocaleString()}
-                              </td>
-                              <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'attack' ? 'text-red-400' : 'text-slate-400'}`}>
-                                {all.combinedScores.attack.toLocaleString()}
-                              </td>
-                              <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'defence' ? 'text-blue-400' : 'text-slate-400'}`}>
-                                {all.combinedScores.defence.toLocaleString()}
-                              </td>
-                              <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${rankingMetric === 'raiders' ? 'text-emerald-400' : 'text-slate-400'}`}>
-                                {all.combinedScores.raiders.toLocaleString()}
-                              </td>
+                              {rankingMetric === 'population' && (
+                                <td className="py-3.5 px-4 text-right font-bold whitespace-nowrap text-[#5bc0be]">
+                                  {all.combinedScores.population.toLocaleString()}
+                                </td>
+                              )}
+                              {rankingMetric === 'attack' && (
+                                <td className="py-3.5 px-4 text-right font-bold whitespace-nowrap text-red-400">
+                                  {all.combinedScores.attack.toLocaleString()}
+                                </td>
+                              )}
+                              {rankingMetric === 'defence' && (
+                                <td className="py-3.5 px-4 text-right font-bold whitespace-nowrap text-blue-400">
+                                  {all.combinedScores.defence.toLocaleString()}
+                                </td>
+                              )}
+                              {rankingMetric === 'raiders' && (
+                                <td className="py-3.5 px-4 text-right font-bold whitespace-nowrap text-emerald-400">
+                                  {all.combinedScores.raiders.toLocaleString()}
+                                </td>
+                              )}
                             </tr>
 
                             {/* Member list expansion row */}
                             {isExpanded && (
                               <tr>
-                                <td colSpan={7} className="p-4 bg-[#05070a]/80 border-b border-[#1E293B]">
+                                <td colSpan={4} className="p-4 bg-[#05070a]/80 border-b border-[#1E293B]">
                                   <div className="space-y-3 pl-6 pr-4">
                                     <div className="flex items-center justify-between border-b border-[#1E293B]/40 pb-1.5">
                                       <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest font-mono">
@@ -1492,7 +1524,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                                 <span className="text-slate-500">Def:</span> <span className="text-blue-400 font-semibold">{mbr.scores.defence.toLocaleString()}</span>
                                               </div>
                                               <div>
-                                                <span className="text-slate-500">Haul:</span> <span className="text-emerald-400 font-semibold">{mbr.scores.raiders.toLocaleString()}</span>
+                                                <span className="text-slate-500">Raid Pts:</span> <span className="text-emerald-400 font-semibold">{mbr.scores.raiders.toLocaleString()}</span>
                                               </div>
                                             </div>
                                           </div>
@@ -2099,7 +2131,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                         const isRead = readReports[report.id] || false;
 
                         // Calculate raid score (total stolen resources)
-                        const raidScore = Object.values(report.resourcesStolen || {}).reduce((s: number, v: any) => s + (v || 0), 0);
+                        const raidScore = Object.values(report.resourcesStolen || {}).reduce<number>((s: number, v: any) => s + (v || 0), 0);
 
                         return (
                           <div key={report.id} className={`p-3 border rounded-xl space-y-2 transition-colors ${!isRead ? 'border-cyan-500/25 bg-[#061224]/50' : 'border-[#1E293B] bg-[#05070A]'}`}>
@@ -2314,8 +2346,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               {/* Points & Raid Score block */}
                               <div className="p-3 bg-amber-950/10 border border-amber-500/20 rounded-xl space-y-1.5 font-mono text-[10.5px]">
                                 <div className="flex justify-between">
-                                  <span className="text-slate-400">Raid Score (Resources Stolen):</span>
-                                  <span className="font-bold text-emerald-400 font-mono">+{raidScore.toLocaleString()}</span>
+                                  <span className="text-slate-400">Raided Points (Resources Stolen / 1000):</span>
+                                  <span className="font-bold text-emerald-400 font-mono font-extrabold">+{(raidScore / 1000).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} Pts</span>
                                 </div>
                                 <div className="flex justify-between border-t border-[#1E293B]/60 pt-1.5">
                                   <span className="text-slate-400">Attack Points earned (defense force destroyed):</span>
@@ -3024,7 +3056,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               setActionPlanetId(null);
                               setActionType(null);
                             }}
-                            className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-black tracking-widest text-[11px] uppercase rounded-xl transition duration-150 hover:brightness-110 active:scale-[0.99] cursor-pointer shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+                            disabled={isUpgrading}
+                            className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-black tracking-widest text-[11px] uppercase rounded-xl transition duration-150 hover:brightness-110 active:scale-[0.99] cursor-pointer shadow-[0_0_12px_rgba(16,185,129,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             🚀 CONFIRM & DISPATCH Tactical {customNumFleets > 1 ? `${customNumFleets} Fleets` : 'Fleet'} Units
                           </button>
@@ -3681,9 +3714,9 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
               <div className="flex flex-col sm:flex-row gap-3">
                 <button 
                   onClick={handleLaunchFleet}
-                  disabled={!isMissionReady || isLaunchingReserve}
+                  disabled={!isMissionReady || isLaunchingReserve || isUpgrading}
                   className={`flex-1 px-5 py-3 text-[10px] uppercase font-black tracking-widest text-[#05070A] rounded-xl flex items-center justify-center gap-2 transition-all duration-155 ${
-                    isMissionReady && !isLaunchingReserve
+                    isMissionReady && !isLaunchingReserve && !isUpgrading
                       ? 'bg-gradient-to-r from-cyan-400 to-indigo-500 hover:brightness-110 active:scale-[0.98] cursor-pointer shadow-[0_0_20px_rgba(34,211,238,0.3)] font-bold'
                       : 'bg-slate-800 border border-slate-900 text-slate-500 cursor-not-allowed opacity-60'
                   }`}
@@ -4921,6 +4954,38 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           </div>
         </div>
       ); })()}
+      {confirmModal && (
+        <div id="galaxy-confirm-modal-overlay" className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#0D1527] border border-amber-500/30 rounded-2xl p-6 flex flex-col space-y-4 shadow-2xl relative text-left animate-in fade-in zoom-in-95 duration-150">
+            <h3 className="text-sm font-extrabold text-amber-400 font-mono tracking-wider flex items-center gap-2">
+              <AlertTriangle size={16} /> {confirmModal.title}
+            </h3>
+            <p className="text-xs text-slate-300 font-sans leading-relaxed">
+              {confirmModal.message}
+            </p>
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 hover:bg-slate-900 border border-slate-800 text-slate-400 rounded-lg text-xs font-mono transition cursor-pointer"
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const cb = confirmModal.onConfirm;
+                  setConfirmModal(null);
+                  cb();
+                }}
+                className="px-4 py-2 bg-amber-950/40 hover:bg-amber-950 border border-amber-500/40 text-amber-400 rounded-lg text-xs font-mono font-bold transition cursor-pointer"
+              >
+                CONFIRM TRANSACTION
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

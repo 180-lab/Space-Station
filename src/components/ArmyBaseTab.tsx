@@ -68,6 +68,7 @@ interface ArmyBaseTabProps {
   onUpdatePlayer?: (player: PlayerProfile) => void;
   onViewPlayerProfile?: (playerId: string) => void;
   localResources?: Record<string, number>;
+  isUpgrading?: boolean;
 }
 
 const TROOP_DETAILS = {
@@ -168,7 +169,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   setCreatedFleets,
   onUpdatePlayer,
   onViewPlayerProfile,
-  localResources
+  localResources,
+  isUpgrading = false
 }) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({
     defender: 1,
@@ -1203,7 +1205,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                    type="button"
                                    onClick={() => {
                                      setQuantities(prev => ({ ...prev, [tId]: num }));
-                                     onTrainTroops(tId, num);
+                                     if (!isUpgrading) onTrainTroops(tId, num);
                                    }}
                                    className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg border transition cursor-pointer ${
                                      qty === num 
@@ -1220,7 +1222,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
                         <button
                           onClick={() => onTrainTroops(tId, qty)}
-                          className="px-5 py-3 bg-gradient-to-r from-cyan-500/10 to-indigo-500/10 hover:from-cyan-500/20 hover:to-indigo-500/20 border border-cyan-500/35 hover:border-cyan-500/55 text-cyan-400 hover:text-cyan-300 font-bold text-[10px] uppercase tracking-widest font-mono rounded-xl transition duration-150 flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
+                          disabled={isUpgrading}
+                          className="px-5 py-3 bg-gradient-to-r from-cyan-500/10 to-indigo-500/10 hover:from-cyan-500/20 hover:to-indigo-500/20 border border-cyan-500/35 hover:border-cyan-500/55 text-cyan-400 hover:text-cyan-300 font-bold text-[10px] uppercase tracking-widest font-mono rounded-xl transition duration-150 flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto disabled:opacity-50"
                         >
                           <Play size={11} />
                           Begin Build
@@ -1998,12 +2001,12 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
                           {/* Points & Raid Score block */}
                           {(() => {
-                            const raidScore = Object.values(report.resourcesStolen || {}).reduce((s: number, v: any) => s + (v || 0), 0);
+                            const raidScore = Object.values(report.resourcesStolen || {}).reduce<number>((s: number, v: any) => s + (v || 0), 0);
                             return (
                               <div className="p-3 bg-amber-950/10 border border-amber-500/20 rounded-xl space-y-1.5 font-mono text-[10.5px]">
                                 <div className="flex justify-between">
-                                  <span className="text-slate-400">Raid Score (Resources Stolen):</span>
-                                  <span className="font-bold text-emerald-400 font-mono font-extrabold">+{raidScore.toLocaleString()}</span>
+                                  <span className="text-slate-400">Raided Points (Resources Stolen / 1000):</span>
+                                  <span className="font-bold text-emerald-400 font-mono font-extrabold">+{(raidScore / 1000).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} Pts</span>
                                 </div>
                                 <div className="flex justify-between border-t border-[#1E293B]/60 pt-1.5">
                                   <span className="text-slate-400">Attack Points earned (defense force destroyed):</span>

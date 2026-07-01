@@ -317,6 +317,7 @@ export default function App() {
 
   // Selected active colony planet ID
   const [selectedPlanetId, setSelectedPlanetId] = useState<string | null>(null);
+  const [isUpgrading, setIsUpgrading] = useState(false);
   const [showInitialStationNaming, setShowInitialStationNaming] = useState(false);
   const [initialStationName, setInitialStationName] = useState('');
   const [settleFleetId, setSettleFleetId] = useState<string | null>(null);
@@ -1064,64 +1065,107 @@ export default function App() {
 
   // Actions: Upgrade Mine
   const handleUpgradeMine = async (resType: ResourceType, mineIndex: number, queue: boolean = false) => {
+    if (isUpgrading) return;
     if (!player) return;
     const currentPlanet = player.planets.find(pl => pl.id === selectedPlanetId) || player.planets[0];
-    try {
-      const res = await fetch('/api/upgrade/mine', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': player.id
-        },
-        body: JSON.stringify({ planetId: currentPlanet.id, resType, mineIndex, queue })
-      });
-      const data = await safeParseJson(res);
-      if (res.ok) {
-        setPlayer(data.player);
-        if (queue) {
-          showToast('Extractor upgrade project successfully queued (Charged 15 Space Gold)!', 'success');
+
+    const runUpgrade = async () => {
+      setIsUpgrading(true);
+      try {
+        const res = await fetch('/api/upgrade/mine', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': player.id
+          },
+          body: JSON.stringify({ planetId: currentPlanet.id, resType, mineIndex, queue })
+        });
+        const data = await safeParseJson(res);
+        if (res.ok) {
+          setPlayer(data.player);
+          if (queue) {
+            showToast('Extractor upgrade project successfully queued (Charged 15 Space Gold)!', 'success');
+          } else {
+            showToast('Extractor upgrade project initiated and scheduled!', 'success');
+          }
         } else {
-          showToast('Extractor upgrade project initiated and scheduled!', 'success');
+          showToast(data.error || 'Upgrade blocked', 'error');
         }
-      } else {
-        showToast(data.error || 'Upgrade blocked', 'error');
+      } catch (err) {
+        showToast('Operation error.', 'error');
+      } finally {
+        setIsUpgrading(false);
       }
-    } catch (err) {
-      showToast('Operation error.', 'error');
+    };
+
+    if (queue) {
+      if ((player.credits || 0) < 15) {
+        showToast('Insufficient Space Gold! Queuing an upgrade costs 15 Space Gold.', 'error');
+        return;
+      }
+      setAppConfirmModal({
+        title: 'CONFIRM SPACE GOLD TRANSACTION',
+        message: 'Are you sure you want to spend 15 Space Gold to queue this extractor upgrade?',
+        onConfirm: runUpgrade
+      });
+    } else {
+      runUpgrade();
     }
   };
 
   // Actions: Upgrade Building
   const handleUpgradeBuilding = async (buildingKey: string, queue: boolean = false) => {
+    if (isUpgrading) return;
     if (!player) return;
     const currentPlanet = player.planets.find(pl => pl.id === selectedPlanetId) || player.planets[0];
-    try {
-      const res = await fetch('/api/upgrade/building', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': player.id
-        },
-        body: JSON.stringify({ planetId: currentPlanet.id, buildingKey, queue })
-      });
-      const data = await safeParseJson(res);
-      if (res.ok) {
-        setPlayer(data.player);
-        if (queue) {
-          showToast(`${buildingKey.toUpperCase()} upgrade project successfully queued (Charged 15 Space Gold)!`, 'success');
+
+    const runUpgrade = async () => {
+      setIsUpgrading(true);
+      try {
+        const res = await fetch('/api/upgrade/building', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': player.id
+          },
+          body: JSON.stringify({ planetId: currentPlanet.id, buildingKey, queue })
+        });
+        const data = await safeParseJson(res);
+        if (res.ok) {
+          setPlayer(data.player);
+          if (queue) {
+            showToast(`${buildingKey.toUpperCase()} upgrade project successfully queued (Charged 15 Space Gold)!`, 'success');
+          } else {
+            showToast(`${buildingKey.toUpperCase()} upgrade project is active!`, 'success');
+          }
         } else {
-          showToast(`${buildingKey.toUpperCase()} upgrade project is active!`, 'success');
+          showToast(data.error || 'Upgrade blocked', 'error');
         }
-      } else {
-        showToast(data.error || 'Upgrade blocked', 'error');
+      } catch (err) {
+        showToast('Building upgrade failed', 'error');
+      } finally {
+        setIsUpgrading(false);
       }
-    } catch (err) {
-      showToast('Building upgrade failed', 'error');
+    };
+
+    if (queue) {
+      if ((player.credits || 0) < 15) {
+        showToast('Insufficient Space Gold! Queuing an upgrade costs 15 Space Gold.', 'error');
+        return;
+      }
+      setAppConfirmModal({
+        title: 'CONFIRM SPACE GOLD TRANSACTION',
+        message: `Are you sure you want to spend 15 Space Gold to queue this ${buildingKey.toUpperCase()} upgrade?`,
+        onConfirm: runUpgrade
+      });
+    } else {
+      runUpgrade();
     }
   };
 
   // Actions: Fabricate Troops
   const handleTrainTroops = async (troopId: string, quantity: number) => {
+    if (isUpgrading) return;
     if (!player) return;
     const currentPlanet = player.planets.find(pl => pl.id === selectedPlanetId) || player.planets[0];
 
@@ -1134,6 +1178,7 @@ export default function App() {
       // fallback
     }
 
+    setIsUpgrading(true);
     try {
       const res = await fetch('/api/train/troop', {
         method: 'POST',
@@ -1157,6 +1202,8 @@ export default function App() {
       }
     } catch (err) {
       showToast('Troop mobilization failed', 'error');
+    } finally {
+      setIsUpgrading(false);
     }
   };
 
@@ -1175,6 +1222,7 @@ export default function App() {
     planetId?: string;
     createdFleetId?: string;
   }) => {
+    if (isUpgrading) return;
     if (!player) return;
     const currentPlanet = player.planets.find(pl => pl.id === (mission.planetId || selectedPlanetId)) || player.planets[0];
     
@@ -1197,72 +1245,9 @@ export default function App() {
 
     const numFleets = mission.numFleets || 1;
 
-    if (numFleets <= 1) {
-      try {
-        const res = await fetch('/api/fleet/send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-id': player.id
-          },
-          body: JSON.stringify({
-            planetId: currentPlanet.id,
-            troopSpeedLevel,
-            defenseShieldsLevel,
-            ...mission
-          })
-        });
-        const data = await safeParseJson(res);
-        if (res.ok) {
-          setPlayer(data.player);
-          if (data.fleets) {
-            setFleets(data.fleets);
-          }
-          if (mission.missionType === 'recon') {
-            localStorage.setItem(`moonbase_recon_dispatched_${player.id}`, 'true');
-          }
-          showToast(`FLEET DEPLOYED! Mission: ${mission.missionType.toUpperCase()} dispatched.`, 'success');
-          setActiveTab('galaxy'); // Swapp tab to allow monitoring of travels!
-          const newMission = data.fleets?.find((f: any) => f.createdFleetId === mission.createdFleetId) 
-            || (data.fleets && data.fleets[data.fleets.length - 1]);
-          return newMission;
-        } else {
-          showToast(data.error || 'Fleet blocked by flight control', 'error');
-        }
-      } catch (err) {
-        showToast('Launch failure', 'error');
-      }
-    } else {
-      // Split troops across standard separate fleets
-      const fleetsToSend: Record<string, number>[] = Array.from({ length: numFleets }, () => ({
-        defender: 0,
-        attacker: 0,
-        tank: 0,
-        looter: 0,
-        drone: 0,
-        settlementShip: 0
-      }));
-
-      for (const [tId, totalQty] of Object.entries(mission.troops)) {
-        const qty = totalQty || 0;
-        if (qty > 0) {
-          const baseQty = Math.floor(qty / numFleets);
-          const remainder = qty % numFleets;
-          for (let i = 0; i < numFleets; i++) {
-            fleetsToSend[i][tId] = baseQty + (i < remainder ? 1 : 0);
-          }
-        }
-      }
-
-      let latestPlayer = player;
-      let anySuccess = false;
-      let errorMsg = '';
-
-      for (let i = 0; i < numFleets; i++) {
-        const subTroops = fleetsToSend[i];
-        const hasAny = Object.values(subTroops).some(v => v > 0);
-        if (!hasAny) continue;
-
+    setIsUpgrading(true);
+    try {
+      if (numFleets <= 1) {
         try {
           const res = await fetch('/api/fleet/send', {
             method: 'POST',
@@ -1274,37 +1259,105 @@ export default function App() {
               planetId: currentPlanet.id,
               troopSpeedLevel,
               defenseShieldsLevel,
-              targetX: mission.targetX,
-              targetY: mission.targetY,
-              missionType: mission.missionType,
-              troops: subTroops,
-              targetId: mission.targetId,
-              targetName: mission.targetName,
-              targetBuilding: mission.targetBuilding
+              ...mission
             })
           });
           const data = await safeParseJson(res);
           if (res.ok) {
-            latestPlayer = data.player;
-            anySuccess = true;
+            setPlayer(data.player);
+            if (data.fleets) {
+              setFleets(data.fleets);
+            }
+            if (mission.missionType === 'recon') {
+              localStorage.setItem(`moonbase_recon_dispatched_${player.id}`, 'true');
+            }
+            showToast(`FLEET DEPLOYED! Mission: ${mission.missionType.toUpperCase()} dispatched.`, 'success');
+            setActiveTab('galaxy'); // Swapp tab to allow monitoring of travels!
+            const newMission = data.fleets?.find((f: any) => f.createdFleetId === mission.createdFleetId) 
+              || (data.fleets && data.fleets[data.fleets.length - 1]);
+            return newMission;
           } else {
-            errorMsg = data.error || 'Sub-fleet blocked';
+            showToast(data.error || 'Fleet blocked by flight control', 'error');
           }
         } catch (err) {
-          errorMsg = 'Launch failure';
+          showToast('Launch failure', 'error');
         }
-      }
-
-      if (anySuccess) {
-        setPlayer(latestPlayer);
-        if (mission.missionType === 'recon') {
-          localStorage.setItem(`moonbase_recon_dispatched_${player.id}`, 'true');
-        }
-        showToast(`DISPATCHED MULTIPLE FLEETS! Created ${numFleets} distinct en-route tactical squadrons.`, 'success');
-        setActiveTab('galaxy');
       } else {
-        showToast(errorMsg || 'Failed to dispatch plural fleets', 'error');
+        // Split troops across standard separate fleets
+        const fleetsToSend: Record<string, number>[] = Array.from({ length: numFleets }, () => ({
+          defender: 0,
+          attacker: 0,
+          tank: 0,
+          looter: 0,
+          drone: 0,
+          settlementShip: 0
+        }));
+
+        for (const [tId, totalQty] of Object.entries(mission.troops)) {
+          const qty = totalQty || 0;
+          if (qty > 0) {
+            const baseQty = Math.floor(qty / numFleets);
+            const remainder = qty % numFleets;
+            for (let i = 0; i < numFleets; i++) {
+              fleetsToSend[i][tId] = baseQty + (i < remainder ? 1 : 0);
+            }
+          }
+        }
+
+        let latestPlayer = player;
+        let anySuccess = false;
+        let errorMsg = '';
+
+        for (let i = 0; i < numFleets; i++) {
+          const subTroops = fleetsToSend[i];
+          const hasAny = Object.values(subTroops).some(v => v > 0);
+          if (!hasAny) continue;
+
+          try {
+            const res = await fetch('/api/fleet/send', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-user-id': player.id
+              },
+              body: JSON.stringify({
+                planetId: currentPlanet.id,
+                troopSpeedLevel,
+                defenseShieldsLevel,
+                targetX: mission.targetX,
+                targetY: mission.targetY,
+                missionType: mission.missionType,
+                troops: subTroops,
+                targetId: mission.targetId,
+                targetName: mission.targetName,
+                targetBuilding: mission.targetBuilding
+              })
+            });
+            const data = await safeParseJson(res);
+            if (res.ok) {
+              latestPlayer = data.player;
+              anySuccess = true;
+            } else {
+              errorMsg = data.error || 'Sub-fleet blocked';
+            }
+          } catch (err) {
+            errorMsg = 'Launch failure';
+          }
+        }
+
+        if (anySuccess) {
+          setPlayer(latestPlayer);
+          if (mission.missionType === 'recon') {
+            localStorage.setItem(`moonbase_recon_dispatched_${player.id}`, 'true');
+          }
+          showToast(`DISPATCHED MULTIPLE FLEETS! Created ${numFleets} distinct en-route tactical squadrons.`, 'success');
+          setActiveTab('galaxy');
+        } else {
+          showToast(errorMsg || 'Failed to dispatch plural fleets', 'error');
+        }
       }
+    } finally {
+      setIsUpgrading(false);
     }
   };
 
@@ -2449,6 +2502,7 @@ export default function App() {
               showStationsTop={showStationsTop}
               setSelectedPlanetId={setSelectedPlanetId}
               customTasks={customTasks}
+              isUpgrading={isUpgrading}
             />
           );
         })()}
@@ -2475,6 +2529,7 @@ export default function App() {
             onUpdatePlayer={setPlayer}
             onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
             localResources={localResources}
+            isUpgrading={isUpgrading}
           />
         )}
 
@@ -2511,6 +2566,7 @@ export default function App() {
             onUpdatePlayer={setPlayer}
             defaultSubTab={galaxyInitialSubTab}
             localResources={localResources}
+            isUpgrading={isUpgrading}
           />
         )}
 
@@ -2525,6 +2581,7 @@ export default function App() {
             setTheme={setTheme}
             localResources={localResources}
             onRefreshState={fetchState}
+            isUpgrading={isUpgrading}
           />
         )}
 
@@ -3068,8 +3125,8 @@ export default function App() {
                   </div>
                   
                   <div className="p-3 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex items-center justify-between mt-2">
-                    <span className="text-[10px] text-slate-500 uppercase font-black">Maritime Raiders Score</span>
-                    <span className="text-amber-400 font-bold">{(targetPlayer.scores.raiders || 0).toLocaleString()} cargo stolen</span>
+                    <span className="text-[10px] text-slate-500 uppercase font-black">Raided Points</span>
+                    <span className="text-amber-400 font-bold">{(targetPlayer.scores.raiders || 0).toLocaleString()} raided points</span>
                   </div>
                 </div>
 
@@ -3561,8 +3618,8 @@ export default function App() {
       )}
       {appConfirmModal && (
         <div id="app-confirm-modal-overlay" className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#0D1527] border border-red-500/30 rounded-2xl p-6 flex flex-col space-y-4 shadow-2xl relative text-left">
-            <h3 className="text-sm font-extrabold text-red-400 font-mono tracking-wider flex items-center gap-2">
+          <div className={`w-full max-w-md bg-[#0D1527] border ${appConfirmModal.title.includes('GOLD') ? 'border-amber-500/30' : 'border-red-500/30'} rounded-2xl p-6 flex flex-col space-y-4 shadow-2xl relative text-left`}>
+            <h3 className={`text-sm font-extrabold ${appConfirmModal.title.includes('GOLD') ? 'text-amber-400' : 'text-red-400'} font-mono tracking-wider flex items-center gap-2`}>
               <AlertTriangle size={16} /> {appConfirmModal.title}
             </h3>
             <p className="text-xs text-slate-300 font-sans leading-relaxed">
@@ -3583,7 +3640,7 @@ export default function App() {
                   setAppConfirmModal(null);
                   cb();
                 }}
-                className="px-4 py-2 bg-red-950/40 hover:bg-red-950 border border-red-500/40 text-red-400 rounded-lg text-xs font-mono font-bold transition cursor-pointer"
+                className={`px-4 py-2 ${appConfirmModal.title.includes('GOLD') ? 'bg-amber-950/40 hover:bg-amber-950 border border-amber-500/40 text-amber-400' : 'bg-red-950/40 hover:bg-red-950 border border-red-500/40 text-red-400'} rounded-lg text-xs font-mono font-bold transition cursor-pointer`}
               >
                 CONFIRM ACTION
               </button>
