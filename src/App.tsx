@@ -3125,8 +3125,8 @@ export default function App() {
                   </div>
                   
                   <div className="p-3 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex items-center justify-between mt-2">
-                    <span className="text-[10px] text-slate-500 uppercase font-black">Maritime Raiders Score</span>
-                    <span className="text-amber-400 font-bold">{(targetPlayer.scores.raiders || 0).toLocaleString()} cargo stolen</span>
+                    <span className="text-[10px] text-slate-500 uppercase font-black">Raided Points</span>
+                    <span className="text-amber-400 font-bold">{(targetPlayer.scores.raiders || 0).toLocaleString()} raided points</span>
                   </div>
                 </div>
 

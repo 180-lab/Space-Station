@@ -2001,12 +2001,12 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
                           {/* Points & Raid Score block */}
                           {(() => {
-                            const raidScore = Object.values(report.resourcesStolen || {}).reduce((s: number, v: any) => s + (v || 0), 0);
+                            const raidScore = Object.values(report.resourcesStolen || {}).reduce<number>((s: number, v: any) => s + (v || 0), 0);
                             return (
                               <div className="p-3 bg-amber-950/10 border border-amber-500/20 rounded-xl space-y-1.5 font-mono text-[10.5px]">
                                 <div className="flex justify-between">
-                                  <span className="text-slate-400">Raid Score (Resources Stolen):</span>
-                                  <span className="font-bold text-emerald-400 font-mono font-extrabold">+{raidScore.toLocaleString()}</span>
+                                  <span className="text-slate-400">Raided Points (Resources Stolen / 1000):</span>
+                                  <span className="font-bold text-emerald-400 font-mono font-extrabold">+{(raidScore / 1000).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} Pts</span>
                                 </div>
                                 <div className="flex justify-between border-t border-[#1E293B]/60 pt-1.5">
                                   <span className="text-slate-400">Attack Points earned (defense force destroyed):</span>

@@ -635,7 +635,7 @@ function bootstrapUniverse() {
         population: Math.floor(Math.random() * 1000) + 200,
         attack: Math.floor(Math.random() * 8000),
         defence: Math.floor(Math.random() * 6000),
-        raiders: Math.floor(Math.random() * 500000)
+        raiders: Math.floor(Math.random() * 500)
       },
       achievements: ["First Mine", "Fleet Commander"],
       skinId: "default",
@@ -1861,9 +1861,9 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
           loot[item] = stolen;
         });
 
-        // Accumulate raiders score to attacker
+        // Accumulate raiders score to attacker (Raided Points = stolen resources / 1000)
         const totalStolen = Object.values(loot).reduce((sum, val) => sum + val, 0);
-        attacker.scores.raiders += totalStolen;
+        attacker.scores.raiders += totalStolen / 1000;
       }
     }
 
