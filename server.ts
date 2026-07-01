@@ -36,8 +36,25 @@ app.use(express.json());
 // Proxy Subpath Auto-Healer (e.g., /7/api/state -> /api/state)
 app.use((req, res, next) => {
   const match = req.url.match(/\/api(\/|$)/);
-  if (match && match.index && match.index > 0) {
-    req.url = req.url.substring(match.index);
+  if (match && match.index !== undefined && match.index > 0) {
+    const rewritten = req.url.substring(match.index);
+    console.log(`[ROUTER AUTO-HEAL] Rewriting proxy subpath: ${req.url} -> ${rewritten}`);
+    req.url = rewritten;
+  }
+  next();
+});
+
+// Set up permissive CORS headers for native Android Webviews and browser clients
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Expose-Headers", "Content-Type, Content-Length, Authorization, X-Requested-With, x-user-id, X-User-Id");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-user-id, X-User-Id, accept, origin, *");
+  
+  // Handle preflight checks
+  if (req.method === "OPTIONS") {
+    res.sendStatus(200);
+    return;
   }
   next();
 });
@@ -65,34 +82,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Everything below this point remains untouched (your routing / game logic)
-  const match = req.url.match(/\/api(\/|$)/);
-  if (match && match.index !== undefined && match.index > 0) {
-    const rewritten = req.url.substring(match.index);
-    console.log(`[ROUTER AUTO-HEAL] Rewriting proxy subpath: ${req.url} -> ${rewritten}`);
-    req.url = rewritten;
-  }
-  next();
-});
-
-// Set up permissive CORS headers for native Android Webviews and browser clients
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Expose-Headers", "Content-Type, Content-Length, Authorization, X-Requested-With, x-user-id, X-User-Id");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-user-id, X-User-Id, accept, origin, *");
-  
-  // Handle preflight checks
-  if (req.method === "OPTIONS") {
-    res.sendStatus(200);
-    return;
-  }
-  next();
-});
-
-app.use(express.json());
-
-// Anti-speed-hack and security validation layer
+// Anti-speed-hack and security validation data store
 const lastRequestTime: Record<string, number> = {};
 
 app.use("/api", (req, res, next) => {
