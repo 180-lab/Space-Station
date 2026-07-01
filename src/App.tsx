@@ -240,6 +240,16 @@ export default function App() {
     localStorage.setItem('space_station_created_fleets_v1', JSON.stringify(createdFleets));
   }, [createdFleets]);
 
+  // Keep track of the last known state of each fleet mission ID to capture survivors/targets right before completion
+  const lastKnownFleetStateRef = useRef<Record<string, FleetMission>>({});
+  useEffect(() => {
+    if (fleets) {
+      fleets.forEach(f => {
+        lastKnownFleetStateRef.current[f.id] = f;
+      });
+    }
+  }, [fleets]);
+
   // Automatically re-dock traveling reserve fleets when their active mission is no longer in flight
   useEffect(() => {
     if (!player || !fleets) return;
@@ -252,7 +262,7 @@ export default function App() {
     
     const checkAndReDockFleets = async () => {
       let stateChanged = false;
-      const updatedCreatedFleets = [...createdFleets];
+      let updatedCreatedFleets = [...createdFleets];
       let latestPlayer = player;
       
       for (let i = 0; i < updatedCreatedFleets.length; i++) {
@@ -260,43 +270,114 @@ export default function App() {
         if (fleet.activeMissionId) {
           const isStillTraveling = fleets.some(f => f.id === fleet.activeMissionId);
           if (!isStillTraveling) {
-            console.log(`Reserve fleet ${fleet.name} is no longer in active fleets. Re-docking/deducting troops from planet base...`);
+            // Find the last known state of this fleet mission
+            const lastFleetState = lastKnownFleetStateRef.current[fleet.activeMissionId];
+            const missionType = lastFleetState?.missionType || 'attack';
             
-            // Adjust troops back down (i.e. deduct them to store inside the reserve fleet again)
-            const changes: Record<string, number> = {};
-            for (const [tId, val] of Object.entries(fleet.troops)) {
-              const qty = Number(val) || 0;
-              if (qty > 0) {
-                changes[tId] = qty; 
-              }
-            }
+            console.log(`Reserve fleet ${fleet.name} is no longer in active fleets. Mission type: ${missionType}`);
             
-            try {
-              const res = await fetch('/api/troops/adjust', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-user-id': player.id
-                },
-                body: JSON.stringify({
-                  planetId: fleet.planetId,
-                  troopChanges: changes
-                })
-              });
-              const data = await safeParseJson(res);
-              if (res.ok && data.player) {
-                latestPlayer = data.player;
+            if (missionType === 'move') {
+              // For "move" missions: they relocated permanently to the target coordinates
+              const targetCoords = lastFleetState?.targetCoords || { x: 0, y: 0 };
+              const targetPlanet = latestPlayer.planets.find(p => p.sectorX === targetCoords.x && p.sectorY === targetCoords.y);
+              
+              if (targetPlanet) {
+                console.log(`Re-docking reserve fleet ${fleet.name} at destination planet ${targetPlanet.name}...`);
+                // Deduct troops from target planet garrison because they are housed back inside the reserve fleet docked at destination!
+                const changes: Record<string, number> = {};
+                for (const [tId, val] of Object.entries(fleet.troops)) {
+                  const qty = Number(val) || 0;
+                  if (qty > 0) {
+                    changes[tId] = -qty; // Deduct them to keep them inside the reserve fleet!
+                  }
+                }
+                
+                try {
+                  const res = await fetch('/api/troops/adjust', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'x-user-id': latestPlayer.id
+                    },
+                    body: JSON.stringify({
+                      planetId: targetPlanet.id,
+                      troopChanges: changes
+                    })
+                  });
+                  const data = await safeParseJson(res);
+                  if (res.ok && data.player) {
+                    latestPlayer = data.player;
+                    stateChanged = true;
+                  }
+                } catch (err) {
+                  console.error("Failed to adjust troops at destination planet", err);
+                }
+                
+                updatedCreatedFleets[i] = {
+                  ...fleet,
+                  planetId: targetPlanet.id, // Update docked planet ID to target
+                  activeMissionId: null,
+                  isTraveling: false
+                };
+              } else {
+                console.log(`Reserve fleet ${fleet.name} moved to alliance/foreign territory. Disbanding reserve fleet.`);
+                // Disband reserve fleet on client because the player doesn't own destination planet
+                updatedCreatedFleets = updatedCreatedFleets.filter(f => f.id !== fleet.id);
+                i--;
                 stateChanged = true;
               }
-            } catch (err) {
-              console.error("Failed to re-dock returned reserve fleet", err);
+            } else {
+              // For "attack", "recon", or other missions: they return back to origin planet
+              // Let's find surviving troops from last known fleet state
+              const survivors = lastFleetState?.troops || fleet.troops;
+              const survivingCount = Object.values(survivors).reduce<number>((s, v: any) => s + (Number(v) || 0), 0);
+              
+              if (survivingCount > 0) {
+                console.log(`Re-docking surviving reserve fleet ${fleet.name} at origin planet ${fleet.planetId}...`);
+                // Deduct survivors from origin planet garrison because they are housed back inside the reserve fleet docked at origin!
+                const changes: Record<string, number> = {};
+                for (const [tId, val] of Object.entries(survivors)) {
+                  const qty = Number(val) || 0;
+                  if (qty > 0) {
+                    changes[tId] = -qty; // Deduct them!
+                  }
+                }
+                
+                try {
+                  const res = await fetch('/api/troops/adjust', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'x-user-id': latestPlayer.id
+                    },
+                    body: JSON.stringify({
+                      planetId: fleet.planetId,
+                      troopChanges: changes
+                    })
+                  });
+                  const data = await safeParseJson(res);
+                  if (res.ok && data.player) {
+                    latestPlayer = data.player;
+                    stateChanged = true;
+                  }
+                } catch (err) {
+                  console.error("Failed to re-dock returned reserve fleet", err);
+                }
+                
+                updatedCreatedFleets[i] = {
+                  ...fleet,
+                  troops: { ...survivors }, // Update troops to match survivors
+                  activeMissionId: null,
+                  isTraveling: false
+                };
+              } else {
+                console.log(`Reserve fleet ${fleet.name} was completely wiped out. Disbanding reserve fleet.`);
+                // Disband/Delete this reserve fleet on client because all troops died
+                updatedCreatedFleets = updatedCreatedFleets.filter(f => f.id !== fleet.id);
+                i--;
+                stateChanged = true;
+              }
             }
-            
-            updatedCreatedFleets[i] = {
-              ...fleet,
-              activeMissionId: null,
-              isTraveling: false
-            };
           }
         }
       }
@@ -304,7 +385,7 @@ export default function App() {
       if (stateChanged) {
         setPlayer(latestPlayer);
         setCreatedFleets(updatedCreatedFleets);
-        showToast("A tactical reserve fleet has returned to base and docked successfully!", "success");
+        showToast("Tactical reserve fleet operations synchronized and docked successfully!", "success");
       } else {
         setCreatedFleets(updatedCreatedFleets);
       }

@@ -1623,7 +1623,8 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
   if (fleet.isReturning) {
     const sender = state.players[fleet.senderId];
     if (sender) {
-      const homePlanet = sender.planets[0]; // Assumes first planet for simplicity
+      // Find the specific launch planet matching the sender's origin coordinates
+      const homePlanet = sender.planets.find(p => p.sectorX === fleet.senderCoords.x && p.sectorY === fleet.senderCoords.y) || sender.planets[0];
       if (homePlanet) {
         // Return surviving troops
         Object.entries(fleet.troops).forEach(([tId, count]) => {
