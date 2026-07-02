@@ -934,7 +934,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
       {/* Interactive Construction Queue Dashboard */}
         {(() => {
-          const queueList = activePlanet.upgradeQueue || [];
+          const queueList = (activePlanet.upgradeQueue || []).filter((item: any) => item.type !== 'research');
           const activeUpgrades: { type: 'mine' | 'building'; key: string; mineIndex?: number; upgradeEnd: number }[] = [];
           
           for (const rKey of Object.keys(activePlanet.mines)) {

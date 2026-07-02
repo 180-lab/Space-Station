@@ -209,8 +209,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
     });
   };
   const [isBuildQueueOpen, setIsBuildQueueOpen] = useState(false);
-  const [showBreakdown, setShowBreakdown] = useState(false);
-  const [showBuildForces, setShowBuildForces] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(true);
+  const [showBuildForces, setShowBuildForces] = useState(true);
 
   const [isReservesExpanded, setIsReservesExpanded] = useState(false);
   const [activeLaunchFleetId, setActiveLaunchFleetId] = useState<string | null>(null);
@@ -294,6 +294,51 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
     } finally {
       setIsTransferring(null);
     }
+  };
+
+  const adjustTransfer = (fleet: CreatedFleet, resKey: string, delta: number) => {
+    setCargoTransfers(prev => {
+      const currentTransferVal = prev[resKey] || 0;
+      
+      // Calculate current total cargo in fleet including all pending transfers
+      const fleetAmtTotal = Object.values(fleet.resources || {}).reduce<number>((sum, v) => sum + (Number(v) || 0), 0);
+      const pendingTransfersTotal = ['water', 'plasma', 'fuel', 'food', 'respirant'].reduce<number>((sum, key) => sum + (prev[key] || 0), 0);
+      const currentFleetCargo = fleetAmtTotal + pendingTransfersTotal;
+      
+      // Fleet capacity
+      let fleetCapacity = 0;
+      Object.entries(fleet.troops).forEach(([tId, qty]) => {
+        const spec = TROOP_DETAILS[tId as keyof typeof TROOP_DETAILS];
+        if (spec) fleetCapacity += (Number(qty) || 0) * spec.carry;
+      });
+      
+      const planetAmt = activePlanet.resources[resKey as keyof typeof activePlanet.resources] || 0;
+      const fleetAmt = fleet.resources?.[resKey as keyof typeof fleet.resources] || 0;
+      
+      let actualDelta = delta;
+      if (delta > 0) {
+        // Loading onto fleet
+        // Must not exceed planet resource limits
+        const maxLoadFromPlanet = planetAmt - currentTransferVal;
+        // Must not exceed fleet remaining capacity
+        const maxLoadToFleetCapacity = fleetCapacity - currentFleetCargo;
+        
+        const allowed = Math.max(0, Math.min(maxLoadFromPlanet, maxLoadToFleetCapacity));
+        actualDelta = Math.min(delta, allowed);
+      } else {
+        // Unloading from fleet
+        // Must not unload more than what is on the fleet (transfer value cannot go more negative than -fleetAmt)
+        const maxUnloadFromFleet = fleetAmt + currentTransferVal;
+        
+        const allowed = Math.max(0, maxUnloadFromFleet);
+        actualDelta = -Math.min(Math.abs(delta), allowed);
+      }
+      
+      return {
+        ...prev,
+        [resKey]: currentTransferVal + actualDelta
+      };
+    });
   };
 
   // Fleet Create Form States
@@ -798,21 +843,14 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
           {/* Division list for Troops tab */}
           <div className="space-y-3.5">
-            <button
-              onClick={() => setShowBreakdown(!showBreakdown)}
-              className="w-full flex items-center justify-between gap-3 mb-2 border-b border-[#1E293B]/60 pb-2 text-left hover:text-white transition duration-150 cursor-pointer"
-              type="button"
+            <div
+              className="w-full flex items-center justify-between gap-3 mb-2 border-b border-[#1E293B]/60 pb-2 text-left"
             >
               <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#5bc0be] font-mono flex items-center gap-2">
                 Active Space Force Breakdown
-                {showBreakdown ? (
-                  <ChevronUp size={12} className="text-red-500 inline" />
-                ) : (
-                  <ChevronDown size={12} className="text-emerald-500 inline" />
-                )}
               </h3>
               <span className="text-[10.5px] text-slate-500 font-mono font-bold">({totalTroopsCount.toLocaleString()} Combatants)</span>
-            </button>
+            </div>
             
             {showBreakdown && (
               totalTroopsCount === 0 ? (
@@ -1029,20 +1067,13 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
             )}
           </div>
 
-          <button
-            onClick={() => setShowBuildForces(!showBuildForces)}
-            className="w-full flex items-center justify-between gap-3 mb-2 border-b border-[#1E293B]/60 pb-2 text-left hover:text-white transition duration-150 cursor-pointer"
-            type="button"
+          <div
+            className="w-full flex items-center justify-between gap-3 mb-2 border-b border-[#1E293B]/60 pb-2 text-left"
           >
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#5bc0be] font-mono flex items-center gap-2">
               Build Tactical Forces
-              {showBuildForces ? (
-                <ChevronUp size={12} className="text-red-500 inline" />
-              ) : (
-                <ChevronDown size={12} className="text-emerald-500 inline" />
-              )}
             </h3>
-          </button>
+          </div>
 
           {showBuildForces && (
             <div className="grid grid-cols-1 gap-5">
@@ -1686,93 +1717,59 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                           </div>
 
                                           <div className="flex items-center gap-1.5 justify-between">
-                                            {/* Left / Unload Buttons */}
-                                            <div className="flex gap-1">
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  setCargoTransfers(prev => ({
-                                                    ...prev,
-                                                    [resKey]: Math.max(-fleetAmt, (prev[resKey] || 0) - 100)
-                                                  }));
-                                                }}
-                                                className="px-1 py-0.5 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-900/30 text-[8.5px] font-mono rounded cursor-pointer"
-                                              >
-                                                -100
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  setCargoTransfers(prev => ({
-                                                    ...prev,
-                                                    [resKey]: Math.max(-fleetAmt, (prev[resKey] || 0) - 1000)
-                                                  }));
-                                                }}
-                                                className="px-1 py-0.5 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-900/30 text-[8.5px] font-mono rounded cursor-pointer"
-                                              >
-                                                -1K
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  setCargoTransfers(prev => ({
-                                                    ...prev,
-                                                    [resKey]: -fleetAmt
-                                                  }));
-                                                }}
-                                                className="px-1 py-0.5 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-900/30 text-[8.5px] font-mono rounded font-bold cursor-pointer"
-                                              >
-                                                ALL
-                                              </button>
+                                            {/* Left / Unload Buttons - 2 rows of 3 compact buttons */}
+                                            <div className="grid grid-cols-3 gap-0.5 shrink-0">
+                                              {[
+                                                { label: "-100", value: -100 },
+                                                { label: "-1K", value: -1000 },
+                                                { label: "-10K", value: -10000 },
+                                                { label: "-100K", value: -100000 },
+                                                { label: "-1M", value: -1000000 },
+                                                { label: "ALL", value: -999999999 }
+                                              ].map((btn) => (
+                                                <button
+                                                  key={btn.label}
+                                                  type="button"
+                                                  onClick={() => adjustTransfer(fleet, resKey, btn.value)}
+                                                  className={`px-1 py-0.5 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-900/30 text-[8px] font-mono rounded cursor-pointer leading-none text-center ${
+                                                    btn.label === "ALL" ? "font-bold" : ""
+                                                  }`}
+                                                >
+                                                  {btn.label}
+                                                </button>
+                                              ))}
                                             </div>
 
-                                            {/* Transfer input/display */}
-                                            <div className="text-center">
-                                              <span className={`text-[10px] font-mono font-bold ${
-                                                transferVal > 0 ? 'text-emerald-400' : transferVal < 0 ? 'text-amber-400' : 'text-slate-400'
+                                            {/* Transfer value display */}
+                                            <div className="text-center px-1 min-w-[50px]">
+                                              <span className={`text-[10px] font-mono font-bold block ${
+                                                transferVal > 0 ? "text-emerald-400" : transferVal < 0 ? "text-amber-400" : "text-slate-400"
                                               }`}>
-                                                {transferVal > 0 ? `+${transferVal}` : transferVal}
+                                                {transferVal > 0 ? `+${transferVal.toLocaleString()}` : transferVal.toLocaleString()}
                                               </span>
                                             </div>
 
-                                            {/* Right / Load Buttons */}
-                                            <div className="flex gap-1">
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  setCargoTransfers(prev => ({
-                                                    ...prev,
-                                                    [resKey]: Math.min(planetAmt, (prev[resKey] || 0) + 100)
-                                                  }));
-                                                }}
-                                                className="px-1 py-0.5 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-900/30 text-[8.5px] font-mono rounded cursor-pointer"
-                                              >
-                                                +100
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  setCargoTransfers(prev => ({
-                                                    ...prev,
-                                                    [resKey]: Math.min(planetAmt, (prev[resKey] || 0) + 1000)
-                                                  }));
-                                                }}
-                                                className="px-1 py-0.5 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-900/30 text-[8.5px] font-mono rounded cursor-pointer"
-                                              >
-                                                +1K
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  setCargoTransfers(prev => ({
-                                                    ...prev,
-                                                    [resKey]: planetAmt
-                                                  }));
-                                                }}
-                                                className="px-1 py-0.5 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-900/30 text-[8.5px] font-mono rounded font-bold cursor-pointer"
-                                              >
-                                                MAX
-                                              </button>
+                                            {/* Right / Load Buttons - 2 rows of 3 compact buttons */}
+                                            <div className="grid grid-cols-3 gap-0.5 shrink-0">
+                                              {[
+                                                { label: "+100", value: 100 },
+                                                { label: "+1K", value: 1000 },
+                                                { label: "+10K", value: 10000 },
+                                                { label: "+100K", value: 100000 },
+                                                { label: "+1M", value: 1000000 },
+                                                { label: "MAX", value: 999999999 }
+                                              ].map((btn) => (
+                                                <button
+                                                  key={btn.label}
+                                                  type="button"
+                                                  onClick={() => adjustTransfer(fleet, resKey, btn.value)}
+                                                  className={`px-1 py-0.5 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-900/30 text-[8px] font-mono rounded cursor-pointer leading-none text-center ${
+                                                    btn.label === "MAX" ? "font-bold" : ""
+                                                  }`}
+                                                >
+                                                  {btn.label}
+                                                </button>
+                                              ))}
                                             </div>
                                           </div>
                                         </div>

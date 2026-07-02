@@ -630,39 +630,42 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
             </div>
 
             {/* Active and Queued Upgrades Dashboard inside Research Tab */}
-            {activePlanet.upgradeQueue && activePlanet.upgradeQueue.length > 0 && (
+            {activePlanet.upgradeQueue && activePlanet.upgradeQueue.some(q => q.type === 'research') && (
               <div className="mb-4 p-4.5 bg-[#0D1527] border border-[#1E293B]/60 rounded-xl space-y-3 shadow-inner">
                 <span className="text-[10px] text-cyan-400 font-mono font-bold uppercase tracking-wider block">
-                  📍 Active Research & Construction Queue Pipeline
+                  📍 Active Research Queue Pipeline
                 </span>
                 <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                  {activePlanet.upgradeQueue.map((q, idx) => {
-                    const costRefund = Math.round((q.spaceGoldCost || (q.type === 'research' ? 25 : 15)) * 0.6);
-                    return (
-                      <div key={idx} className="flex items-center justify-between p-2.5 bg-[#070B16] border border-[#1E293B]/40 rounded-lg">
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-xs font-bold text-white bg-slate-800 px-2 py-0.5 rounded-md text-[10px] font-mono">
-                            #{idx + 1}
-                          </span>
-                          <div>
-                            <p className="text-[11px] font-semibold text-slate-200 capitalize">
-                              {q.type} Upgrade: <span className="text-cyan-400 font-mono">{q.key.replace(/_/g, ' ')}</span> (Level {q.targetLevel})
-                            </p>
-                            <p className="text-[9.5px] text-slate-500 font-mono">
-                              Queued with {q.spaceGoldCost || (q.type === 'research' ? 25 : 15)} Space Gold | Refund value: {costRefund} Gold
-                            </p>
+                  {activePlanet.upgradeQueue
+                    .map((q, idx) => ({ q, idx }))
+                    .filter(item => item.q.type === 'research')
+                    .map(({ q, idx }, visualIdx) => {
+                      const costRefund = Math.round((q.spaceGoldCost || 25) * 0.6);
+                      return (
+                        <div key={idx} className="flex items-center justify-between p-2.5 bg-[#070B16] border border-[#1E293B]/40 rounded-lg">
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-xs font-bold text-white bg-slate-800 px-2 py-0.5 rounded-md text-[10px] font-mono">
+                              #{visualIdx + 1}
+                            </span>
+                            <div>
+                              <p className="text-[11px] font-semibold text-slate-200 capitalize">
+                                Research Upgrade: <span className="text-cyan-400 font-mono">{q.key.replace(/_/g, ' ')}</span> (Level {q.targetLevel})
+                              </p>
+                              <p className="text-[9.5px] text-slate-500 font-mono">
+                                Queued with {q.spaceGoldCost || 25} Space Gold | Refund value: {costRefund} Gold
+                              </p>
+                            </div>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => cancelQueueItem(idx)}
+                            className="px-2 py-1 text-[9.5px] font-bold text-red-400 hover:text-red-300 border border-red-500/10 hover:border-red-500/30 bg-red-950/10 rounded cursor-pointer transition font-mono uppercase"
+                          >
+                            Cancel Queue
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => cancelQueueItem(idx)}
-                          className="px-2 py-1 text-[9.5px] font-bold text-red-400 hover:text-red-300 border border-red-500/10 hover:border-red-500/30 bg-red-950/10 rounded cursor-pointer transition font-mono uppercase"
-                        >
-                          Cancel Queue
-                        </button>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               </div>
             )}
