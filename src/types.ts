@@ -116,6 +116,8 @@ export interface PlayerProfile {
   lastActive?: number;
   commandMessages?: CommandMessage[];
   fcmToken?: string;
+  createdFleets?: CreatedFleet[];
+  autoUnloadResources?: boolean;
 }
 
 export interface CommandMessage {
@@ -209,6 +211,7 @@ export interface FleetMission {
   troopSpeedLevel?: number;
   defenseShieldsLevel?: number;
   createdFleetId?: string | null;
+  isTimed?: boolean;
 }
 
 export interface BattleReport {
@@ -330,6 +333,13 @@ export interface CreatedFleet {
   planetId: string;
   activeMissionId?: string | null;
   isTraveling?: boolean;
+  resources?: {
+    water: number;
+    plasma: number;
+    fuel: number;
+    food: number;
+    respirant: number;
+  };
 }
 
 export { getUpgradeWeights, getUpgradeResourceCost } from './gameUtils';

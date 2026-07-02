@@ -301,6 +301,29 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     }
   };
 
+  const handleToggleAutoUnload = async () => {
+    const nextVal = player.autoUnloadResources === false; // Toggle to true if currently false, else false
+    try {
+      const res = await fetch('/api/player/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ autoUnloadResources: nextVal })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(nextVal ? 'Auto unload resources enabled' : 'Auto unload resources disabled. Returned/docking fleets will keep loot.', 'success');
+        if (onRefreshState) onRefreshState();
+      } else {
+        showToast(data.error || 'Failed to update settings', 'error');
+      }
+    } catch (err) {
+      showToast('Network error during settings update', 'error');
+    }
+  };
+
   // Audio settings derived from localStorage
   const [soundEnabled, setSoundEnabled] = useState(() => {
     return localStorage.getItem('moonbase_sound_enabled') !== 'false';
@@ -546,6 +569,29 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     }`}
                   >
                     {showStationsTop ? 'ONLINE' : 'MUTED'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Fleet Auto Unload Option */}
+              <div className="space-y-2 pt-4 border-t border-[#1E293B]/40">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-200 block uppercase">Auto Unload Loot Cargo</span>
+                    <p className="text-[10.5px] text-slate-500 leading-relaxed font-sans">
+                      Automatically transfer all captured loot and resources from incoming returned tactical fleets into the station's repository storage upon docking. If disabled, fleets will retain cargo on board until manual extraction.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleAutoUnload}
+                    className={`py-1.5 px-3 rounded-lg border text-[10px] font-bold uppercase tracking-wider shrink-0 transition cursor-pointer ${
+                      player.autoUnloadResources !== false
+                        ? 'bg-cyan-950/20 text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(34,211,238,0.15)]' 
+                        : 'bg-slate-950 text-slate-500 border-slate-900 hover:text-slate-400 hover:border-slate-800'
+                    }`}
+                  >
+                    {player.autoUnloadResources !== false ? 'ENABLED' : 'DISABLED'}
                   </button>
                 </div>
               </div>

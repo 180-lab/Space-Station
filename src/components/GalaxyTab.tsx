@@ -327,7 +327,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
   // Selected Sector details for fleet launch modal
   const [selectedTarget, setSelectedTarget] = useState<any | null>(null);
-  const [fleetType, setFleetType] = useState<'attack' | 'colonize' | 'recon' | 'move'>('move');
+  const [fleetType, setFleetType] = useState<'attack' | 'colonize' | 'recon' | 'move' | 'timed_attack' | 'timed_move'>('move');
+  const [timedLandingTime, setTimedLandingTime] = useState<string>('');
   const [targetBuilding, setTargetBuilding] = useState<string>('random');
   const [fleetTroops, setFleetTroops] = useState<Record<string, number>>({
     defender: 0,
@@ -364,6 +365,51 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
       document.body.style.overflow = '';
     };
   }, [selectedTarget, targetForResources, activeChatWindow]);
+
+  // Automatically initialize timedLandingTime for timed_move and timed_attack
+  React.useEffect(() => {
+    if ((fleetType === 'timed_move' || fleetType === 'timed_attack') && selectedTarget) {
+      const distance = Math.hypot(selectedTarget.coords.x - activePlanet.sectorX, selectedTarget.coords.y - activePlanet.sectorY);
+      let troopSpeedLevel = 1;
+      try {
+        const isFirstPlanet = player.planets[0]?.id === activePlanet.id;
+        const savedTech = localStorage.getItem(`moonbase_tech_${player.id}_${activePlanet.id}`);
+        troopSpeedLevel = savedTech ? (JSON.parse(savedTech).troop_speed ?? (isFirstPlanet ? 20 : 0)) : (isFirstPlanet ? 20 : 0);
+      } catch (err) {}
+      const boostPct = Math.max(0, Math.min(35, (troopSpeedLevel - 1) * (35 / 19))) / 100;
+      const speedMultiplier = 1.0 + boostPct;
+      const speedMap: Record<string, number> = {
+        defender: 7.0,
+        attacker: 11.662,
+        tank: 3.5,
+        looter: 23.331,
+        drone: 17.5,
+        settlementShip: 4.662
+      };
+      const selectedTroops = selectedReserveFleetId !== 'manual'
+        ? (() => {
+            const rf = createdFleets.find(f => f.id === selectedReserveFleetId);
+            return rf ? Object.entries(rf.troops).filter(([_, qty]) => (Number(qty) || 0) > 0) : [];
+          })()
+        : Object.entries(fleetTroops).filter(([_, qty]) => (Number(qty) || 0) > 0);
+      const slowestTroopSpeed = selectedTroops.length > 0
+        ? (selectedTroops.reduce((slowest, [tId, _]) => {
+            const sp = speedMap[tId] || 5;
+            return sp < slowest ? sp : slowest;
+          }, 100)) * speedMultiplier
+        : 100;
+      const travelTimeMs = slowestTroopSpeed > 0 ? Math.round((distance / slowestTroopSpeed) * 60000) : 0;
+      const defaultLanding = Date.now() + travelTimeMs + 5 * 60 * 1000; // travel duration + 5 minutes
+      
+      const date = new Date(defaultLanding);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      setTimedLandingTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+    }
+  }, [fleetType, selectedTarget, selectedReserveFleetId, activePlanet, fleetTroops, player, createdFleets]);
 
   // Alliance setup panel
   const [allianceName, setAllianceName] = useState('');
@@ -451,7 +497,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
     if (isUpgrading) return;
     if (!selectedTarget) return;
 
-    if (fleetType === 'attack') {
+    if (fleetType === 'attack' || fleetType === 'timed_attack') {
       const isSelf = selectedTarget.id === player.id;
       const isAllianceMember = player.allianceId && selectedTarget.allianceId === player.allianceId;
       if (isSelf) {
@@ -516,14 +562,15 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           const activeMission = await onSendFleet({
             targetX: selectedTarget.coords.x,
             targetY: selectedTarget.coords.y,
-            missionType: fleetType,
+            missionType: fleetType === 'timed_move' ? 'move' : fleetType === 'timed_attack' ? 'attack' : fleetType,
             troops: fleet.troops as any,
             targetId: selectedTarget.id || undefined,
             targetName: selectedTarget.planetName || `Sector [${selectedTarget.coords.x}, ${selectedTarget.coords.y}]`,
             targetBuilding: (fleet.troops.tank || 0) > 0 ? targetBuilding : undefined,
             numFleets: 1,
             planetId: activePlanet.id,
-            createdFleetId: fleet.id
+            createdFleetId: fleet.id,
+            landingTime: (fleetType === 'timed_move' || fleetType === 'timed_attack') && timedLandingTime ? new Date(timedLandingTime).getTime() : undefined
           });
 
           // Step 3: Keep the reserve fleet and mark it as traveling
@@ -552,13 +599,14 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
       onSendFleet({
         targetX: selectedTarget.coords.x,
         targetY: selectedTarget.coords.y,
-        missionType: fleetType,
+        missionType: fleetType === 'timed_move' ? 'move' : fleetType === 'timed_attack' ? 'attack' : fleetType,
         troops: fleetTroops,
         targetId: selectedTarget.id || undefined,
         targetName: selectedTarget.planetName || `Sector [${selectedTarget.coords.x}, ${selectedTarget.coords.y}]`,
         targetBuilding: (fleetTroops.tank || 0) > 0 ? targetBuilding : undefined,
         numFleets: dispatchMode === 'multiple' ? dispatchNumFleets : 1,
-        planetId: activePlanet.id
+        planetId: activePlanet.id,
+        landingTime: (fleetType === 'timed_move' || fleetType === 'timed_attack') && timedLandingTime ? new Date(timedLandingTime).getTime() : undefined
       });
       setSelectedTarget(null);
       setDispatchMode('single');
@@ -3641,8 +3689,10 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     className="bg-[#05070A] border border-cyan-800/40 text-cyan-400 text-xs font-mono py-1 px-2.5 rounded-lg focus:outline-none cursor-pointer font-bold"
                     id="drawer-mission-directive-flight-select"
                   >
-                    <option value="move" className="text-slate-300">🛸 Move Relocation</option>
-                    <option value="attack" className="text-slate-300">⚔️ Attack Station</option>
+                    <option value="move" className="text-slate-300">🛸 Move Relocation (Standard)</option>
+                    <option value="timed_move" className="text-slate-300">⏱️ Launch Timed Move (24h Window)</option>
+                    <option value="attack" className="text-slate-300">⚔️ Attack Station (Standard)</option>
+                    <option value="timed_attack" className="text-slate-300">⏱️ Launch Timed Attack (24h Window)</option>
                     <option value="colonize" className="text-slate-300">🚀 Settle Colony</option>
                   </select>
                 </div>
@@ -3697,19 +3747,76 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   ].join(':');
 
                   return (
-                    <div className="flex justify-between items-center border-t border-[#1E293B]/60 pt-1.5 mt-1 text-[10px]">
-                      <span>Estimated Flight Duration:</span>
-                      <span className="font-bold text-amber-400 text-right text-xs">
-                        ⏱️ {timeStr}
-                        <span className="block text-[8px] text-slate-500 font-mono tracking-normal">
-                          (Slowest unit: {selectedTroops.length > 0 ? (TROOP_NAME_MAPPING[selectedTroops.reduce((minT, [tId, _]) => {
-                            const minSp = speedMap[minT] || 5;
-                            const currSp = speedMap[tId] || 5;
-                            return currSp < minSp ? tId : minT;
-                          }, selectedTroops[0][0])] || 'N/A') : 'None'})
+                    <>
+                      <div className="flex justify-between items-center border-t border-[#1E293B]/60 pt-1.5 mt-1 text-[10px]">
+                        <span>Estimated Flight Duration:</span>
+                        <span className="font-bold text-amber-400 text-right text-xs">
+                          ⏱️ {timeStr}
+                          <span className="block text-[8px] text-slate-500 font-mono tracking-normal">
+                            (Slowest unit: {selectedTroops.length > 0 ? (TROOP_NAME_MAPPING[selectedTroops.reduce((minT, [tId, _]) => {
+                              const minSp = speedMap[minT] || 5;
+                              const currSp = speedMap[tId] || 5;
+                              return currSp < minSp ? tId : minT;
+                            }, selectedTroops[0][0])] || 'N/A') : 'None'})
+                          </span>
                         </span>
-                      </span>
-                    </div>
+                      </div>
+
+                      {(fleetType === 'timed_move' || fleetType === 'timed_attack') && (() => {
+                        const formatDateTimeLocalHelper = (timestamp: number) => {
+                          const d = new Date(timestamp);
+                          const y = d.getFullYear();
+                          const mo = String(d.getMonth() + 1).padStart(2, '0');
+                          const dy = String(d.getDate()).padStart(2, '0');
+                          const h = String(d.getHours()).padStart(2, '0');
+                          const mi = String(d.getMinutes()).padStart(2, '0');
+                          return `${y}-${mo}-${dy}T${h}:${mi}`;
+                        };
+
+                        const minVal = Date.now() + travelTimeMs;
+                        const maxVal = Date.now() + 24 * 3600 * 1000;
+                        const minStr = formatDateTimeLocalHelper(minVal);
+                        const maxStr = formatDateTimeLocalHelper(maxVal);
+
+                        const selectedMs = timedLandingTime ? new Date(timedLandingTime).getTime() : 0;
+                        const isLandingValid = selectedMs >= minVal - 5000 && selectedMs <= maxVal + 60000;
+
+                        return (
+                          <div className="bg-amber-950/10 border border-amber-500/20 p-3 rounded-xl mt-3 space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wide flex items-center gap-1">
+                                ⏱️ Coordinate Landing Time
+                              </span>
+                              <span className="text-[8px] text-slate-500 font-mono">Max 24h Window</span>
+                            </div>
+                            <input
+                              type="datetime-local"
+                              value={timedLandingTime}
+                              min={minStr}
+                              max={maxStr}
+                              onChange={(e) => setTimedLandingTime(e.target.value)}
+                              className="w-full bg-[#05070A] border border-amber-500/30 text-amber-400 text-xs font-mono py-1.5 px-2.5 rounded-lg focus:outline-none focus:border-amber-400 cursor-pointer font-bold"
+                            />
+                            <div className="text-[9px] text-slate-400 space-y-1">
+                              <div className="flex justify-between">
+                                <span>Normal travel landing:</span>
+                                <span className="font-mono text-slate-300">{new Date(minVal).toLocaleTimeString()}</span>
+                              </div>
+                              {isLandingValid ? (
+                                <div className="flex justify-between text-emerald-400 font-bold">
+                                  <span>Timed arrival delay:</span>
+                                  <span>+{Math.round((selectedMs - minVal) / 60000)} min</span>
+                                </div>
+                              ) : (
+                                <div className="text-red-400 font-bold text-[9px]">
+                                  {selectedMs < minVal ? "Error: Target is sooner than travel time." : "Error: Target exceeds 24 hour limits."}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </>
                   );
                 })()}
                 {(() => {

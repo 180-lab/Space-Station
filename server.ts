@@ -767,9 +767,83 @@ function tickPlayerState(playerId: string, now: number): boolean {
     const repositoryLvl = planet.buildings.repository.level;
     const storageLimit = getRepositoryCapacity(repositoryLvl);
 
-    // Calculate total troop water consumption per hour
+    // Calculate total troop water consumption per hour (including docking reserve fleets and visiting fleets)
     let waterConsumptionPerHour = 0;
-    Object.entries(planet.troops).forEach(([troopId, count]) => {
+    const combinedTroops = { ...planet.troops };
+
+    // Inspect all players' created reserve fleets
+    Object.values(state.players).forEach(otherPlayer => {
+      if (otherPlayer.createdFleets) {
+        otherPlayer.createdFleets.forEach(fleet => {
+          // Find if there is an active mission associated with this created reserve fleet
+          const activeMission = state.fleets.find(m => m.createdFleetId === fleet.id);
+
+          if (activeMission) {
+            if (activeMission.missionType === "attack") {
+              // Attack missions always consume the home/origin base, never the target
+              if (fleet.planetId === planet.id) {
+                Object.entries(fleet.troops).forEach(([troopId, count]) => {
+                  const qty = Number(count) || 0;
+                  combinedTroops[troopId as keyof typeof combinedTroops] = (combinedTroops[troopId as keyof typeof combinedTroops] || 0) + qty;
+                });
+              }
+            } else if (activeMission.isReturning) {
+              // Returning back to home base
+              if (fleet.planetId === planet.id) {
+                Object.entries(fleet.troops).forEach(([troopId, count]) => {
+                  const qty = Number(count) || 0;
+                  combinedTroops[troopId as keyof typeof combinedTroops] = (combinedTroops[troopId as keyof typeof combinedTroops] || 0) + qty;
+                });
+              }
+            } else {
+              // Going towards target (non-attack mission)
+              const hasArrivedAtTarget = now >= activeMission.arrivesAt;
+              if (hasArrivedAtTarget) {
+                // Reached target. Does it match this planet's coordinates?
+                if (activeMission.targetCoords.x === planet.sectorX && activeMission.targetCoords.y === planet.sectorY) {
+                  Object.entries(fleet.troops).forEach(([troopId, count]) => {
+                    const qty = Number(count) || 0;
+                    combinedTroops[troopId as keyof typeof combinedTroops] = (combinedTroops[troopId as keyof typeof combinedTroops] || 0) + qty;
+                  });
+                }
+              } else {
+                // Still in flight towards target, meaning it is still docking at origin (until they arrive on a different planet)
+                if (fleet.planetId === planet.id) {
+                  Object.entries(fleet.troops).forEach(([troopId, count]) => {
+                    const qty = Number(count) || 0;
+                    combinedTroops[troopId as keyof typeof combinedTroops] = (combinedTroops[troopId as keyof typeof combinedTroops] || 0) + qty;
+                  });
+                }
+              }
+            }
+          } else {
+            // Not traveling, so it is docked at its home planet
+            if (fleet.planetId === planet.id) {
+              Object.entries(fleet.troops).forEach(([troopId, count]) => {
+                const qty = Number(count) || 0;
+                combinedTroops[troopId as keyof typeof combinedTroops] = (combinedTroops[troopId as keyof typeof combinedTroops] || 0) + qty;
+              });
+            }
+          }
+        });
+      }
+    });
+
+    // Inspect regular active fleets that do not have a createdFleetId
+    state.fleets.forEach(mission => {
+      if (!mission.createdFleetId) {
+        if (!mission.isReturning && now >= mission.arrivesAt && mission.missionType !== "attack") {
+          if (mission.targetCoords.x === planet.sectorX && mission.targetCoords.y === planet.sectorY) {
+            Object.entries(mission.troops).forEach(([troopId, count]) => {
+              const qty = Number(count) || 0;
+              combinedTroops[troopId as keyof typeof combinedTroops] = (combinedTroops[troopId as keyof typeof combinedTroops] || 0) + qty;
+            });
+          }
+        }
+      }
+    });
+
+    Object.entries(combinedTroops).forEach(([troopId, count]) => {
       const spec = TROOP_SPECS[troopId as keyof typeof TROOP_SPECS];
       if (spec) {
         waterConsumptionPerHour += count * spec.waterConsumption;
@@ -1621,19 +1695,70 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       // Find the specific launch planet matching the sender's origin coordinates
       const homePlanet = sender.planets.find(p => p.sectorX === fleet.senderCoords.x && p.sectorY === fleet.senderCoords.y) || sender.planets[0];
       if (homePlanet) {
-        // Return surviving troops
-        Object.entries(fleet.troops).forEach(([tId, count]) => {
-          homePlanet.troops[tId as keyof typeof homePlanet.troops] += count;
-        });
-        // Return stolen loot
-        if (fleet.lootCarried) {
-          const cap = getRepositoryCapacity(homePlanet.buildings.repository.level);
-          Object.entries(fleet.lootCarried).forEach(([res, amt]) => {
-            homePlanet.resources[res as ResourceType] = Math.min(
-              cap,
-              homePlanet.resources[res as ResourceType] + amt
-            );
+        const autoUnload = sender.autoUnloadResources !== false;
+
+        if (autoUnload) {
+          // Return surviving troops
+          Object.entries(fleet.troops).forEach(([tId, count]) => {
+            homePlanet.troops[tId as keyof typeof homePlanet.troops] += count;
           });
+          // Return stolen loot
+          if (fleet.lootCarried) {
+            const cap = getRepositoryCapacity(homePlanet.buildings.repository.level);
+            Object.entries(fleet.lootCarried).forEach(([res, amt]) => {
+              homePlanet.resources[res as ResourceType] = Math.min(
+                cap,
+                homePlanet.resources[res as ResourceType] + amt
+              );
+            });
+          }
+        } else {
+          // Auto-unload resources is OFF!
+          if (fleet.createdFleetId) {
+            // It's a reserve fleet: Surviving troops are still returned via client re-docking, so we must add them to garrison
+            // so client's adjustment subtraction works correctly.
+            Object.entries(fleet.troops).forEach(([tId, count]) => {
+              homePlanet.troops[tId as keyof typeof homePlanet.troops] += count;
+            });
+
+            // Put loot into the reserve fleet's cargo
+            const cf = sender.createdFleets?.find(f => f.id === fleet.createdFleetId);
+            if (cf) {
+              if (!cf.resources) {
+                cf.resources = { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
+              }
+              if (fleet.lootCarried) {
+                Object.entries(fleet.lootCarried).forEach(([res, amt]) => {
+                  cf.resources![res as keyof typeof cf.resources] = (cf.resources![res as keyof typeof cf.resources] || 0) + amt;
+                });
+              }
+            }
+          } else {
+            // It's a regular fleet! Convert it into a docked CreatedFleet so it keeps its troops and resources together!
+            const newFleetId = `fleet_${Math.random().toString(36).substr(2, 9)}`;
+            const newFleet = {
+              id: newFleetId,
+              name: `Returned Fleet (${fleet.targetName})`,
+              subsidiary: sender.faction,
+              troops: { ...fleet.troops },
+              planetId: homePlanet.id,
+              activeMissionId: null,
+              isTraveling: false,
+              resources: fleet.lootCarried ? {
+                water: fleet.lootCarried.water || 0,
+                plasma: fleet.lootCarried.plasma || 0,
+                fuel: fleet.lootCarried.fuel || 0,
+                food: fleet.lootCarried.food || 0,
+                respirant: fleet.lootCarried.respirant || 0,
+              } : { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 }
+            };
+            if (!sender.createdFleets) sender.createdFleets = [];
+            sender.createdFleets.push(newFleet);
+
+            // Since it's a docked CreatedFleet, do NOT add troops to the garrison
+            // (Setting fleet.troops to 0 ensures they are not added in any subsequent garrison adding).
+            fleet.troops = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+          }
         }
       }
     }
@@ -1906,15 +2031,31 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       return;
     }
 
-    const defPlanet = defender.planets[0]; // Combat on main station for simpleness
+    const defPlanet = defender.planets.find(pl => pl.sectorX === fleet.targetCoords.x && pl.sectorY === fleet.targetCoords.y) || defender.planets[0];
     const attTroops = { ...fleet.troops };
-    const defTroops = defPlanet ? { ...defPlanet.troops } : { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0 };
+    
+    // Find defender's docking reserve fleets on this planet (not traveling, or finished mission)
+    const dockingDefenderReserveFleets = (defender.createdFleets || []).filter(cf => 
+      cf.planetId === (defPlanet ? defPlanet.id : "") && (!cf.isTraveling || !cf.activeMissionId)
+    );
+
+    const defTroops = defPlanet 
+      ? { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0, ...defPlanet.troops } 
+      : { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+
+    // Combine docking reserve fleets into the defender troops
+    dockingDefenderReserveFleets.forEach(cf => {
+      Object.entries(cf.troops).forEach(([tId, count]) => {
+        const qty = Number(count) || 0;
+        defTroops[tId as keyof typeof defTroops] = (defTroops[tId as keyof typeof defTroops] || 0) + qty;
+      });
+    });
 
     // Execute Moonbase combat simulation
     const attShieldLvl = fleet.defenseShieldsLevel || 10;
     let defShieldLvl = 10;
     if (defender) {
-      const defRc = defender.planets[0]?.buildings.researchCenter;
+      const defRc = defPlanet?.buildings.researchCenter;
       if (defRc) defShieldLvl = defRc.level;
     }
 
@@ -1927,11 +2068,74 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       defShieldLvl
     );
 
-    // Apply casualties to defender
+    // Apply casualties to defender (local garrison and docking reserve fleets)
     if (defPlanet) {
-      Object.entries(combat.defenderLosses).forEach(([tId, count]) => {
-        defPlanet.troops[tId as keyof typeof defPlanet.troops] -= count;
+      Object.entries(combat.defenderLosses).forEach(([tId, totalLoss]) => {
+        if (totalLoss <= 0) return;
+
+        // Collect all sources of this troop type
+        const sources: Array<{
+          name: string;
+          type: "garrison" | "reserve";
+          currentCount: number;
+          deduct: (qty: number) => void;
+        }> = [];
+
+        // Source 1: Local garrison
+        const garrisonCount = defPlanet.troops[tId as keyof typeof defPlanet.troops] || 0;
+        if (garrisonCount > 0) {
+          sources.push({
+            name: "garrison",
+            type: "garrison",
+            currentCount: garrisonCount,
+            deduct: (qty) => {
+              defPlanet.troops[tId as keyof typeof defPlanet.troops] = Math.max(0, defPlanet.troops[tId as keyof typeof defPlanet.troops] - qty);
+            }
+          });
+        }
+
+        // Source 2: Docking reserve fleets
+        dockingDefenderReserveFleets.forEach(cf => {
+          const count = cf.troops[tId as keyof typeof cf.troops] || 0;
+          if (count > 0) {
+            sources.push({
+              name: cf.id,
+              type: "reserve",
+              currentCount: count,
+              deduct: (qty) => {
+                cf.troops[tId as keyof typeof cf.troops] = Math.max(0, cf.troops[tId as keyof typeof cf.troops] - qty);
+              }
+            });
+          }
+        });
+
+        // Distribute losses proportionally
+        const totalAvailable = sources.reduce((sum, s) => sum + s.currentCount, 0);
+        if (totalAvailable <= 0) return;
+
+        let lossesToDistribute = Math.min(totalLoss, totalAvailable);
+
+        // Distribute proportionally
+        sources.forEach((source, index) => {
+          if (lossesToDistribute <= 0) return;
+          if (index === sources.length - 1) {
+            source.deduct(lossesToDistribute);
+          } else {
+            const share = Math.round((source.currentCount / totalAvailable) * totalLoss);
+            const applied = Math.min(lossesToDistribute, share, source.currentCount);
+            source.deduct(applied);
+            lossesToDistribute -= applied;
+          }
+        });
       });
+
+      // Filter out empty reserve fleets from the defender
+      if (defender.createdFleets) {
+        defender.createdFleets = defender.createdFleets.filter(cf => {
+          const totalTroops = Object.values(cf.troops).reduce((sum, count) => sum + (Number(count) || 0), 0);
+          return totalTroops > 0;
+        });
+      }
     }
 
     // Award scoring for actual units destroyed on both sides (loser of the attack does not get points)
@@ -2578,9 +2782,13 @@ app.get("/api/health", (req, res) => {
 });
 
 // Sync full state
-app.get("/api/state", (req, res) => {
+app.all("/api/state", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  if (req.method === "POST" && req.body && Array.isArray(req.body.createdFleets)) {
+    p.createdFleets = req.body.createdFleets;
+  }
 
   const now = Date.now();
   p.lastActive = now;
@@ -3650,7 +3858,7 @@ app.post("/api/fleet/send", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { planetId, missionType, troops, targetId, targetName, targetBuilding, createdFleetId } = req.body;
+  const { planetId, missionType, troops, targetId, targetName, targetBuilding, createdFleetId, landingTime } = req.body;
   const targetX = parseInt(String(req.body.targetX), 10);
   const targetY = parseInt(String(req.body.targetY), 10);
   
@@ -3797,6 +4005,26 @@ app.post("/api/fleet/send", (req, res) => {
     }
   }
 
+  let resolvedArrivesAt = now + travelTimeMs;
+  let isTimed = false;
+
+  if (landingTime) {
+    const requestedLandingTimeMs = parseInt(String(landingTime), 10);
+    if (!isNaN(requestedLandingTimeMs)) {
+      const minLandingTime = now + travelTimeMs - 15000; // Allow a 15-second grace period for clock/network lag
+      const maxLandingTime = now + 24 * 3600 * 1000 + 60000; // Allow a 1-minute grace period
+
+      if (requestedLandingTimeMs < minLandingTime) {
+        return res.status(400).json({ error: "The coordinate landing time cannot be earlier than standard flight travel duration!" });
+      }
+      if (requestedLandingTimeMs > maxLandingTime) {
+        return res.status(400).json({ error: "The coordinate landing time cannot exceed the maximum 24 hour flight window!" });
+      }
+      resolvedArrivesAt = requestedLandingTimeMs;
+      isTimed = true;
+    }
+  }
+
   const mission: FleetMission = {
     id: `fleet_${Math.random().toString(36).substr(2, 9)}`,
     senderId: p.id,
@@ -3808,12 +4036,13 @@ app.post("/api/fleet/send", (req, res) => {
     missionType: missionType as "attack" | "recon" | "colonize" | "move",
     troops: troopSend,
     startedAt: now,
-    arrivesAt: now + travelTimeMs,
+    arrivesAt: resolvedArrivesAt,
     isReturning: false,
     isWaitingToSettle: false,
     targetBuilding: targetBuilding || undefined,
     troopSpeedLevel: speedLvl,
-    createdFleetId: createdFleetId || undefined
+    createdFleetId: createdFleetId || undefined,
+    isTimed: isTimed
   };
 
   state.fleets.push(mission);
@@ -4012,6 +4241,122 @@ app.post("/api/fleet/reroute", (req, res) => {
 
   saveState();
   res.json({ player: p, success: true, fleets: state.fleets });
+});
+
+// Toggle Auto Unload Resources Settings
+app.post("/api/player/settings", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { autoUnloadResources } = req.body;
+  p.autoUnloadResources = !!autoUnloadResources;
+  state.players[p.id].autoUnloadResources = !!autoUnloadResources;
+
+  saveState();
+  res.json({ player: p, success: true });
+});
+
+// Manually unload resources from a docked reserve fleet to planet
+app.post("/api/fleet/unload", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { fleetId } = req.body;
+  if (!p.createdFleets) p.createdFleets = [];
+  const fleet = p.createdFleets.find(f => f.id === fleetId);
+  if (!fleet) return res.status(404).json({ error: "Reserve fleet not found" });
+
+  if (fleet.isTraveling) {
+    return res.status(400).json({ error: "Cannot unload resources from a traveling fleet!" });
+  }
+
+  const planet = p.planets.find(pl => pl.id === fleet.planetId);
+  if (!planet) return res.status(404).json({ error: "Home station not found" });
+
+  const cap = getRepositoryCapacity(planet.buildings.repository.level);
+
+  if (fleet.resources) {
+    Object.entries(fleet.resources).forEach(([resName, amt]) => {
+      const amount = Number(amt) || 0;
+      if (amount > 0) {
+        const current = planet.resources[resName as any] || 0;
+        const addable = Math.min(cap - current, amount);
+        planet.resources[resName as any] = current + addable;
+        fleet.resources![resName as keyof typeof fleet.resources] = amount - addable;
+      }
+    });
+  }
+
+  saveState();
+  res.json({ player: p, success: true });
+});
+
+// Transfer resources between planet and docked reserve fleet
+app.post("/api/fleet/transfer-resources", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { fleetId, transfers } = req.body;
+  if (!p.createdFleets) p.createdFleets = [];
+  const fleet = p.createdFleets.find(f => f.id === fleetId);
+  if (!fleet) return res.status(404).json({ error: "Reserve fleet not found" });
+
+  if (fleet.isTraveling) {
+    return res.status(400).json({ error: "Cannot transfer resources with a traveling fleet!" });
+  }
+
+  const planet = p.planets.find(pl => pl.id === fleet.planetId);
+  if (!planet) return res.status(404).json({ error: "Home station not found" });
+
+  const cap = getRepositoryCapacity(planet.buildings.repository.level);
+
+  if (!fleet.resources) {
+    fleet.resources = { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
+  }
+
+  // Calculate fleet carry capacity
+  let fleetCapacity = 0;
+  Object.entries(fleet.troops).forEach(([tId, qty]) => {
+    const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+    if (spec) {
+      fleetCapacity += (Number(qty) || 0) * spec.carry;
+    }
+  });
+
+  let currentTotalFleetResources = Object.values(fleet.resources).reduce((sum, v) => sum + (Number(v) || 0), 0);
+
+  for (const [resName, value] of Object.entries(transfers || {})) {
+    const val = parseInt(String(value), 10) || 0;
+    if (val === 0) continue;
+
+    const key = resName as any;
+    if (planet.resources[key] === undefined) continue;
+
+    const currentPlanetAmt = planet.resources[key] || 0;
+    const currentFleetAmt = fleet.resources[key as keyof typeof fleet.resources] || 0;
+
+    if (val > 0) {
+      // Load onto fleet from planet
+      const spaceLeft = Math.max(0, fleetCapacity - currentTotalFleetResources);
+      const toTransfer = Math.min(val, currentPlanetAmt, spaceLeft);
+      
+      planet.resources[key] = currentPlanetAmt - toTransfer;
+      fleet.resources[key as keyof typeof fleet.resources] = currentFleetAmt + toTransfer;
+      currentTotalFleetResources += toTransfer;
+    } else {
+      // Unload from fleet to planet
+      const toTransfer = Math.min(Math.abs(val), currentFleetAmt);
+      const planetSpace = Math.max(0, cap - currentPlanetAmt);
+      const actualTransfer = Math.min(toTransfer, planetSpace);
+
+      planet.resources[key] = currentPlanetAmt + actualTransfer;
+      fleet.resources[key as keyof typeof fleet.resources] = currentFleetAmt - actualTransfer;
+      currentTotalFleetResources -= actualTransfer;
+    }
+  }
+
+  saveState();
+  res.json({ player: p, success: true });
 });
 
 // Rename Commander / Player Profile Username

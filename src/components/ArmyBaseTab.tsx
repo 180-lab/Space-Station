@@ -69,6 +69,7 @@ interface ArmyBaseTabProps {
   onViewPlayerProfile?: (playerId: string) => void;
   localResources?: Record<string, number>;
   isUpgrading?: boolean;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 const TROOP_DETAILS = {
@@ -170,7 +171,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   onUpdatePlayer,
   onViewPlayerProfile,
   localResources,
-  isUpgrading = false
+  isUpgrading = false,
+  showToast
 }) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({
     defender: 0,
@@ -214,9 +216,85 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   const [activeLaunchFleetId, setActiveLaunchFleetId] = useState<string | null>(null);
   const [directLaunchX, setDirectLaunchX] = useState<number>(activePlanet.sectorX);
   const [directLaunchY, setDirectLaunchY] = useState<number>(activePlanet.sectorY);
-  const [directMissionType, setDirectMissionType] = useState<'attack' | 'colonize' | 'recon' | 'move'>('move');
+  const [directMissionType, setDirectMissionType] = useState<'attack' | 'colonize' | 'recon' | 'move' | 'timed_attack' | 'timed_move'>('move');
+  const [directTimedLandingTime, setDirectTimedLandingTime] = useState<string>('');
   const [directTargetBuilding, setDirectTargetBuilding] = useState<string>('random');
   const [isLaunchingDirect, setIsLaunchingDirect] = useState(false);
+
+  const [managingCargoFleetId, setManagingCargoFleetId] = useState<string | null>(null);
+  const [cargoTransfers, setCargoTransfers] = useState<Record<string, number>>({
+    water: 0,
+    plasma: 0,
+    fuel: 0,
+    food: 0,
+    respirant: 0
+  });
+  const [isUnloading, setIsUnloading] = useState<string | null>(null);
+  const [isTransferring, setIsTransferring] = useState<string | null>(null);
+
+  const handleManualUnload = async (fleet: CreatedFleet) => {
+    setIsUnloading(fleet.id);
+    try {
+      const res = await fetch('/api/fleet/unload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ fleetId: fleet.id })
+      });
+      const data = await res.json();
+      if (res.ok && data.player) {
+        showToast(`Cargo successfully unloaded into station storage.`, 'success');
+        if (onUpdatePlayer) onUpdatePlayer(data.player);
+        if (data.player.createdFleets) setCreatedFleets(data.player.createdFleets);
+      } else {
+        showToast(data.error || 'Failed to unload cargo', 'error');
+      }
+    } catch (err) {
+      showToast('Network error during manual cargo unload', 'error');
+    } finally {
+      setIsUnloading(null);
+    }
+  };
+
+  const handleTransferResources = async (fleetId: string) => {
+    setIsTransferring(fleetId);
+    try {
+      const res = await fetch('/api/fleet/transfer-resources', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({
+          fleetId,
+          transfers: cargoTransfers
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.player) {
+        showToast(`Fleet cargo distribution updated successfully.`, 'success');
+        if (onUpdatePlayer) onUpdatePlayer(data.player);
+        if (data.player.createdFleets) setCreatedFleets(data.player.createdFleets);
+        // Reset transfers
+        setCargoTransfers({
+          water: 0,
+          plasma: 0,
+          fuel: 0,
+          food: 0,
+          respirant: 0
+        });
+        setManagingCargoFleetId(null);
+      } else {
+        showToast(data.error || 'Failed to transfer cargo resources', 'error');
+      }
+    } catch (err) {
+      showToast('Network error during resource transfer', 'error');
+    } finally {
+      setIsTransferring(null);
+    }
+  };
 
   // Fleet Create Form States
   const [fleetName, setFleetName] = useState('');
@@ -375,6 +453,48 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
     }
   };
 
+  // Automatically initialize directTimedLandingTime for direct timed attacks and moves
+  React.useEffect(() => {
+    if ((directMissionType === 'timed_move' || directMissionType === 'timed_attack') && activeLaunchFleetId) {
+      const fleet = createdFleets.find(f => f.id === activeLaunchFleetId);
+      if (!fleet) return;
+      const distance = Math.hypot(directLaunchX - activePlanet.sectorX, directLaunchY - activePlanet.sectorY);
+      let troopSpeedLevel = 1;
+      try {
+        const isFirstPlanet = player.planets[0]?.id === activePlanet.id;
+        const savedTech = localStorage.getItem(`moonbase_tech_${player.id}_${activePlanet.id}`);
+        troopSpeedLevel = savedTech ? (JSON.parse(savedTech).troop_speed ?? (isFirstPlanet ? 20 : 0)) : (isFirstPlanet ? 20 : 0);
+      } catch (err) {}
+      const boostPct = Math.max(0, Math.min(35, (troopSpeedLevel - 1) * (35 / 19))) / 100;
+      const speedMultiplier = 1.0 + boostPct;
+      const speedMap: Record<string, number> = {
+        defender: 7.0,
+        attacker: 11.662,
+        tank: 3.5,
+        looter: 23.331,
+        drone: 17.5,
+        settlementShip: 4.662
+      };
+      const selectedTroops = Object.entries(fleet.troops).filter(([_, qty]) => (Number(qty) || 0) > 0);
+      const slowestTroopSpeed = selectedTroops.length > 0
+        ? (selectedTroops.reduce((slowest, [tId, _]) => {
+            const sp = speedMap[tId] || 5;
+            return sp < slowest ? sp : slowest;
+          }, 100)) * speedMultiplier
+        : 100;
+      const travelTimeMs = slowestTroopSpeed > 0 ? Math.round((distance / slowestTroopSpeed) * 60000) : 0;
+      const defaultLanding = Date.now() + travelTimeMs + 5 * 60 * 1000; // travel duration + 5 minutes
+      
+      const date = new Date(defaultLanding);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      setDirectTimedLandingTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+    }
+  }, [directMissionType, directLaunchX, directLaunchY, activeLaunchFleetId, activePlanet, player, createdFleets]);
+
   const handleLaunchDirect = async (fleet: CreatedFleet) => {
     if (directLaunchX === undefined || directLaunchY === undefined) {
       alert("Please provide valid coordinates.");
@@ -416,11 +536,12 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
           activeMission = await onSendFleet({
             targetX: directLaunchX,
             targetY: directLaunchY,
-            missionType: directMissionType,
+            missionType: directMissionType === 'timed_move' ? 'move' : directMissionType === 'timed_attack' ? 'attack' : directMissionType,
             troops: fleet.troops as any,
             targetBuilding: (fleet.troops.tank || 0) > 0 ? directTargetBuilding : undefined,
             planetId: activePlanet.id,
-            createdFleetId: fleet.id
+            createdFleetId: fleet.id,
+            landingTime: (directMissionType === 'timed_move' || directMissionType === 'timed_attack') && directTimedLandingTime ? new Date(directTimedLandingTime).getTime() : undefined
           });
         }
 
@@ -1475,6 +1596,203 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                             })}
                           </div>
 
+                          {/* Carried Cargo Display */}
+                          {fleet.resources && Object.values(fleet.resources).some(v => (Number(v) || 0) > 0) && (
+                            <div className="pt-1.5 border-t border-[#1E293B]/60 text-left">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider font-mono">📦 Carried Cargo:</span>
+                                <button
+                                  type="button"
+                                  disabled={isUnloading === fleet.id || fleet.isTraveling}
+                                  onClick={() => handleManualUnload(fleet)}
+                                  className="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-50 text-amber-400 border border-amber-500/25 rounded text-[8px] font-bold uppercase transition cursor-pointer"
+                                >
+                                  {isUnloading === fleet.id ? 'Unloading...' : 'Unload All'}
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-1 text-[9px] font-mono text-amber-200 bg-amber-950/10 p-1.5 border border-amber-500/10 rounded-lg">
+                                {Object.entries(fleet.resources).map(([res, val]) => {
+                                  const qty = Number(val) || 0;
+                                  if (qty <= 0) return null;
+                                  return (
+                                    <div key={res} className="flex justify-between px-1">
+                                      <span className="capitalize">{res}:</span>
+                                      <span className="font-bold text-white">{qty.toLocaleString()}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {!fleet.isTraveling && (
+                            <div className="mt-1 pb-1 text-left">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (managingCargoFleetId === fleet.id) {
+                                    setManagingCargoFleetId(null);
+                                  } else {
+                                    setManagingCargoFleetId(fleet.id);
+                                    setCargoTransfers({
+                                      water: 0,
+                                      plasma: 0,
+                                      fuel: 0,
+                                      food: 0,
+                                      respirant: 0
+                                    });
+                                  }
+                                }}
+                                className={`w-full py-1 text-[9.5px] font-bold uppercase rounded font-mono transition duration-150 cursor-pointer flex items-center justify-center gap-1 ${
+                                  managingCargoFleetId === fleet.id
+                                    ? 'bg-slate-800 text-slate-300'
+                                    : 'bg-emerald-950/30 text-emerald-400 hover:bg-emerald-900/20 border border-emerald-500/20 hover:border-emerald-500/40'
+                                }`}
+                              >
+                                <span>🚚</span>
+                                <span>{managingCargoFleetId === fleet.id ? 'CLOSE CARGO MANAGER' : 'MANAGE CARGO TRANSFERS'}</span>
+                              </button>
+
+                              {managingCargoFleetId === fleet.id && (
+                                <div className="p-2 border border-emerald-500/20 bg-emerald-950/10 rounded-lg space-y-2.5 mt-2 font-sans">
+                                  <div className="flex justify-between items-center border-b border-emerald-500/10 pb-1">
+                                    <span className="text-[9.5px] font-bold text-emerald-400 uppercase font-mono">Cargo Logistics Center</span>
+                                    <span className="text-[8.5px] font-mono text-slate-400">
+                                      Cap: {(() => {
+                                        let cap = 0;
+                                        Object.entries(fleet.troops).forEach(([tId, qty]) => {
+                                          const spec = TROOP_DETAILS[tId as keyof typeof TROOP_DETAILS];
+                                          if (spec) cap += (Number(qty) || 0) * spec.carry;
+                                        });
+                                        const currentTotal = Object.values(fleet.resources || {}).reduce<number>((sum, v) => sum + (Number(v) || 0), 0);
+                                        return `${currentTotal.toLocaleString()} / ${cap.toLocaleString()}`;
+                                      })()}
+                                    </span>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    {['water', 'plasma', 'fuel', 'food', 'respirant'].map((resKey) => {
+                                      const planetAmt = activePlanet.resources[resKey as keyof typeof activePlanet.resources] || 0;
+                                      const fleetAmt = fleet.resources?.[resKey as keyof typeof fleet.resources] || 0;
+                                      const transferVal = cargoTransfers[resKey] || 0;
+
+                                      return (
+                                        <div key={resKey} className="space-y-1 p-1 bg-black/30 rounded border border-[#1E293B]/40">
+                                          <div className="flex justify-between text-[9px] font-mono">
+                                            <span className="capitalize font-bold text-slate-300">{resKey}</span>
+                                            <span className="text-slate-400">
+                                              Base: <span className="text-slate-200 font-bold">{planetAmt.toLocaleString()}</span> | Fleet: <span className="text-amber-200 font-bold">{fleetAmt.toLocaleString()}</span>
+                                            </span>
+                                          </div>
+
+                                          <div className="flex items-center gap-1.5 justify-between">
+                                            {/* Left / Unload Buttons */}
+                                            <div className="flex gap-1">
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setCargoTransfers(prev => ({
+                                                    ...prev,
+                                                    [resKey]: Math.max(-fleetAmt, (prev[resKey] || 0) - 100)
+                                                  }));
+                                                }}
+                                                className="px-1 py-0.5 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-900/30 text-[8.5px] font-mono rounded cursor-pointer"
+                                              >
+                                                -100
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setCargoTransfers(prev => ({
+                                                    ...prev,
+                                                    [resKey]: Math.max(-fleetAmt, (prev[resKey] || 0) - 1000)
+                                                  }));
+                                                }}
+                                                className="px-1 py-0.5 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-900/30 text-[8.5px] font-mono rounded cursor-pointer"
+                                              >
+                                                -1K
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setCargoTransfers(prev => ({
+                                                    ...prev,
+                                                    [resKey]: -fleetAmt
+                                                  }));
+                                                }}
+                                                className="px-1 py-0.5 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-900/30 text-[8.5px] font-mono rounded font-bold cursor-pointer"
+                                              >
+                                                ALL
+                                              </button>
+                                            </div>
+
+                                            {/* Transfer input/display */}
+                                            <div className="text-center">
+                                              <span className={`text-[10px] font-mono font-bold ${
+                                                transferVal > 0 ? 'text-emerald-400' : transferVal < 0 ? 'text-amber-400' : 'text-slate-400'
+                                              }`}>
+                                                {transferVal > 0 ? `+${transferVal}` : transferVal}
+                                              </span>
+                                            </div>
+
+                                            {/* Right / Load Buttons */}
+                                            <div className="flex gap-1">
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setCargoTransfers(prev => ({
+                                                    ...prev,
+                                                    [resKey]: Math.min(planetAmt, (prev[resKey] || 0) + 100)
+                                                  }));
+                                                }}
+                                                className="px-1 py-0.5 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-900/30 text-[8.5px] font-mono rounded cursor-pointer"
+                                              >
+                                                +100
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setCargoTransfers(prev => ({
+                                                    ...prev,
+                                                    [resKey]: Math.min(planetAmt, (prev[resKey] || 0) + 1000)
+                                                  }));
+                                                }}
+                                                className="px-1 py-0.5 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-900/30 text-[8.5px] font-mono rounded cursor-pointer"
+                                              >
+                                                +1K
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setCargoTransfers(prev => ({
+                                                    ...prev,
+                                                    [resKey]: planetAmt
+                                                  }));
+                                                }}
+                                                className="px-1 py-0.5 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-900/30 text-[8.5px] font-mono rounded font-bold cursor-pointer"
+                                              >
+                                                MAX
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    disabled={isTransferring === fleet.id}
+                                    onClick={() => handleTransferResources(fleet.id)}
+                                    className="w-full py-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-[#05070A] text-[10px] font-black uppercase tracking-wider rounded font-mono transition cursor-pointer"
+                                  >
+                                    {isTransferring === fleet.id ? 'PROCESSING SHIPMENTS...' : 'EXECUTE RESOURCE TRANSFERS'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           {fleet.isTraveling ? (
                             <div className="mt-2.5 pt-2 text-center text-[10px] font-mono text-amber-400 bg-amber-950/15 border border-amber-550/20 rounded py-1.5 leading-tight">
                               🚀 Tactical fleet currently traveling in deep space on active mission orders.
@@ -1544,15 +1862,97 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                       onChange={(e) => setDirectMissionType(e.target.value as any)}
                                       className="w-full bg-[#05070A] border border-[#1E293B] text-cyan-300 text-[10px] font-mono rounded px-1.5 py-1 focus:outline-none cursor-pointer"
                                     >
-                                      <option value="move" className="bg-slate-950">MOVE (Transit/Reinforcements)</option>
-                                      <option value="attack" className="bg-slate-950">ATTACK (Planetary Raid)</option>
-                                      <option value="colonize" className="bg-slate-950">COLONIZE (New Planet Settlement)</option>
-                                      <option value="recon" className="bg-slate-950">RECON (Stealth Probe)</option>
+                                      <option value="move" className="bg-slate-950">🛸 MOVE (Transit/Reinforcements)</option>
+                                      <option value="timed_move" className="bg-slate-950">⏱️ TIMED MOVE (24h Window)</option>
+                                      <option value="attack" className="bg-slate-950">⚔️ ATTACK (Planetary Raid)</option>
+                                      <option value="timed_attack" className="bg-slate-950">⏱️ TIMED ATTACK (24h Window)</option>
+                                      <option value="colonize" className="bg-slate-950">🚀 COLONIZE (New Planet Settlement)</option>
+                                      <option value="recon" className="bg-slate-950">📡 RECON (Stealth Probe)</option>
                                     </select>
                                   </div>
 
+                                  {/* Timed landing coordinate picker */}
+                                  {(directMissionType === 'timed_move' || directMissionType === 'timed_attack') && (() => {
+                                    const distance = Math.hypot(directLaunchX - activePlanet.sectorX, directLaunchY - activePlanet.sectorY);
+                                    let troopSpeedLevel = 1;
+                                    try {
+                                      const isFirstPlanet = player.planets[0]?.id === activePlanet.id;
+                                      const savedTech = localStorage.getItem(`moonbase_tech_${player.id}_${activePlanet.id}`);
+                                      troopSpeedLevel = savedTech ? (JSON.parse(savedTech).troop_speed ?? (isFirstPlanet ? 20 : 0)) : (isFirstPlanet ? 20 : 0);
+                                    } catch (err) {}
+                                    const boostPct = Math.max(0, Math.min(35, (troopSpeedLevel - 1) * (35 / 19))) / 100;
+                                    const speedMultiplier = 1.0 + boostPct;
+                                    const speedMap: Record<string, number> = {
+                                      defender: 7.0,
+                                      attacker: 11.662,
+                                      tank: 3.5,
+                                      looter: 23.331,
+                                      drone: 17.5,
+                                      settlementShip: 4.662
+                                    };
+                                    const selectedTroops = Object.entries(fleet.troops).filter(([_, qty]) => (Number(qty) || 0) > 0);
+                                    const slowestTroopSpeed = selectedTroops.length > 0
+                                      ? (selectedTroops.reduce((slowest, [tId, _]) => {
+                                          const sp = speedMap[tId] || 5;
+                                          return sp < slowest ? sp : slowest;
+                                        }, 100)) * speedMultiplier
+                                      : 100;
+                                    const travelTimeMs = slowestTroopSpeed > 0 ? Math.round((distance / slowestTroopSpeed) * 60000) : 0;
+
+                                    const formatDateTimeLocalHelper = (timestamp: number) => {
+                                      const d = new Date(timestamp);
+                                      const y = d.getFullYear();
+                                      const mo = String(d.getMonth() + 1).padStart(2, '0');
+                                      const dy = String(d.getDate()).padStart(2, '0');
+                                      const h = String(d.getHours()).padStart(2, '0');
+                                      const mi = String(d.getMinutes()).padStart(2, '0');
+                                      return `${y}-${mo}-${dy}T${h}:${mi}`;
+                                    };
+
+                                    const minVal = Date.now() + travelTimeMs;
+                                    const maxVal = Date.now() + 24 * 3600 * 1000;
+                                    const minStr = formatDateTimeLocalHelper(minVal);
+                                    const maxStr = formatDateTimeLocalHelper(maxVal);
+
+                                    const selectedMs = directTimedLandingTime ? new Date(directTimedLandingTime).getTime() : 0;
+                                    const isLandingValid = selectedMs >= minVal - 5000 && selectedMs <= maxVal + 60000;
+
+                                    return (
+                                      <div className="bg-[#05070A] border border-amber-500/20 p-2 rounded-lg mt-2 space-y-1">
+                                        <div className="flex justify-between items-center text-[8px] font-mono">
+                                          <span className="text-amber-400 font-bold uppercase">⏱️ Landing Time</span>
+                                          <span className="text-slate-500 font-sans">Max 24h</span>
+                                        </div>
+                                        <input
+                                          type="datetime-local"
+                                          value={directTimedLandingTime}
+                                          min={minStr}
+                                          max={maxStr}
+                                          onChange={(e) => setDirectTimedLandingTime(e.target.value)}
+                                          className="w-full bg-[#05070A] border border-amber-500/30 text-amber-400 text-[10px] font-mono py-1 px-1.5 rounded focus:outline-none focus:border-amber-400 cursor-pointer font-bold"
+                                        />
+                                        <div className="text-[8px] text-slate-400 font-mono space-y-0.5">
+                                          <div className="flex justify-between">
+                                            <span>Normal ETA:</span>
+                                            <span>{new Date(minVal).toLocaleTimeString()}</span>
+                                          </div>
+                                          {isLandingValid ? (
+                                            <div className="flex justify-between text-emerald-400 font-bold">
+                                              <span>Delay offset:</span>
+                                              <span>+{Math.round((selectedMs - minVal) / 60000)} min</span>
+                                            </div>
+                                          ) : (
+                                            <div className="text-red-400 font-bold">
+                                              {selectedMs < minVal ? "Too soon!" : "Exceeds 24h limit!"}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+
                                   {/* Disrupter target building choice */}
-                                  {(fleet.troops.tank || 0) > 0 && directMissionType === 'attack' && (
+                                  {(fleet.troops.tank || 0) > 0 && (directMissionType === 'attack' || directMissionType === 'timed_attack') && (
                                     <div className="space-y-1">
                                       <label className="text-[8px] font-bold uppercase text-amber-500 font-mono block mb-0.5">Disrupter Demolition Target</label>
                                       <select

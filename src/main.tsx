@@ -3,6 +3,61 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
+// Storage Shield: Prevents security exceptions when iframe blocks third-party localStorage/sessionStorage
+(function() {
+  if (typeof window === 'undefined') return;
+
+  function createInMemoryStorage() {
+    let store: Record<string, string> = {};
+    return {
+      getItem(key: string): string | null {
+        return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null;
+      },
+      setItem(key: string, value: string): void {
+        store[key] = String(value);
+      },
+      removeItem(key: string): void {
+        delete store[key];
+      },
+      clear(): void {
+        store = {};
+      },
+      get length(): number {
+        return Object.keys(store).length;
+      },
+      key(index: number): string | null {
+        return Object.keys(store)[index] || null;
+      }
+    };
+  }
+
+  try {
+    const testKey = '__storage_test__';
+    window.localStorage.setItem(testKey, testKey);
+    window.localStorage.removeItem(testKey);
+  } catch (e) {
+    console.warn('[Storage Shield] localStorage is blocked or unavailable inside iframe. Falling back to in-memory storage.', e);
+    Object.defineProperty(window, 'localStorage', {
+      value: createInMemoryStorage(),
+      configurable: true,
+      writable: true
+    });
+  }
+
+  try {
+    const testKey = '__storage_test__';
+    window.sessionStorage.setItem(testKey, testKey);
+    window.sessionStorage.removeItem(testKey);
+  } catch (e) {
+    console.warn('[Storage Shield] sessionStorage is blocked or unavailable inside iframe. Falling back to in-memory storage.', e);
+    Object.defineProperty(window, 'sessionStorage', {
+      value: createInMemoryStorage(),
+      configurable: true,
+      writable: true
+    });
+  }
+})();
+
 // Unregister any stale or background service workers to prevent iframe security and network fetch errors in AI Studio
 try {
   if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {

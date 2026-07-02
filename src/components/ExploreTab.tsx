@@ -416,13 +416,84 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   const respirantHourlyTotal = getResourceProduction('respirant');
   const foodHourlyTotal = getResourceProduction('food');
 
-  // Let's calculate total troop water consumption per hour
+  // Let's calculate total troop water consumption per hour (including docking reserve fleets and visiting fleets)
   const getWaterConsumption = () => {
     let tot = 0;
     const specCosts = { defender: 1.0, attacker: 2.0, tank: 4.0, looter: 3.0, drone: 0.4, settlementShip: 5.0 };
+    
+    // 1. Stationed troops directly on this planet
     Object.entries(activePlanet.troops).forEach(([tId, count]) => {
       tot += (Number(count) || 0) * (specCosts[tId as keyof typeof specCosts] || 0);
     });
+
+    // 2. Reserve fleets belonging to the player
+    if (player.createdFleets) {
+      player.createdFleets.forEach(fleet => {
+        // Find if there is an active mission associated with this created reserve fleet
+        const activeMission = fleets.find(m => m.createdFleetId === fleet.id);
+
+        if (activeMission) {
+          if (activeMission.missionType === "attack") {
+            // Attack missions always consume the home/origin base, never the target
+            if (fleet.planetId === activePlanet.id) {
+              Object.entries(fleet.troops).forEach(([tId, count]) => {
+                tot += (Number(count) || 0) * (specCosts[tId as keyof typeof specCosts] || 0);
+              });
+            }
+          } else if (activeMission.isReturning) {
+            // Returning back to home base
+            if (fleet.planetId === activePlanet.id) {
+              Object.entries(fleet.troops).forEach(([tId, count]) => {
+                tot += (Number(count) || 0) * (specCosts[tId as keyof typeof specCosts] || 0);
+              });
+            }
+          } else {
+            // Going towards target (non-attack mission)
+            const hasArrivedAtTarget = serverTime >= activeMission.arrivesAt;
+            if (hasArrivedAtTarget) {
+              // Reached target. Does it match this planet's coordinates?
+              if (activeMission.targetCoords.x === activePlanet.sectorX && activeMission.targetCoords.y === activePlanet.sectorY) {
+                Object.entries(fleet.troops).forEach(([tId, count]) => {
+                  tot += (Number(count) || 0) * (specCosts[tId as keyof typeof specCosts] || 0);
+                });
+              }
+            } else {
+              // Still traveling, so it is still docking at origin (until they arrive on a different planet)
+              if (fleet.planetId === activePlanet.id) {
+                Object.entries(fleet.troops).forEach(([tId, count]) => {
+                  tot += (Number(count) || 0) * (specCosts[tId as keyof typeof specCosts] || 0);
+                });
+              }
+            }
+          }
+        } else {
+          // Not traveling, so it is docked at its home planet
+          if (fleet.planetId === activePlanet.id) {
+            Object.entries(fleet.troops).forEach(([tId, count]) => {
+              tot += (Number(count) || 0) * (specCosts[tId as keyof typeof specCosts] || 0);
+            });
+          }
+        }
+      });
+    }
+
+    // 3. Inspect regular active fleets that do not have a createdFleetId, and visiting reserve fleets from other players
+    fleets.forEach(mission => {
+      // Avoid double counting our own reserve fleets since we handled them above
+      if (mission.createdFleetId && mission.senderId === player.id) {
+        return;
+      }
+
+      // If the fleet has reached this planet and is not returning
+      if (!mission.isReturning && serverTime >= mission.arrivesAt && mission.missionType !== "attack") {
+        if (mission.targetCoords.x === activePlanet.sectorX && mission.targetCoords.y === activePlanet.sectorY) {
+          Object.entries(mission.troops).forEach(([tId, count]) => {
+            tot += (Number(count) || 0) * (specCosts[tId as keyof typeof specCosts] || 0);
+          });
+        }
+      }
+    });
+
     return tot;
   };
 

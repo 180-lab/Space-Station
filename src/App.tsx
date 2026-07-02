@@ -364,11 +364,24 @@ export default function App() {
                   console.error("Failed to re-dock returned reserve fleet", err);
                 }
                 
+                const loot = lastFleetState?.lootCarried;
+                let currentResources = fleet.resources || { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
+                if (loot && latestPlayer?.autoUnloadResources === false) {
+                  currentResources = {
+                    water: (currentResources.water || 0) + (loot.water || 0),
+                    plasma: (currentResources.plasma || 0) + (loot.plasma || 0),
+                    fuel: (currentResources.fuel || 0) + (loot.fuel || 0),
+                    food: (currentResources.food || 0) + (loot.food || 0),
+                    respirant: (currentResources.respirant || 0) + (loot.respirant || 0),
+                  };
+                }
+
                 updatedCreatedFleets[i] = {
                   ...fleet,
                   troops: { ...survivors }, // Update troops to match survivors
                   activeMissionId: null,
-                  isTraveling: false
+                  isTraveling: false,
+                  resources: currentResources
                 };
               } else {
                 console.log(`Reserve fleet ${fleet.name} was completely wiped out. Disbanding reserve fleet.`);
@@ -953,13 +966,23 @@ export default function App() {
   const fetchState = async () => {
     try {
       const res = await fetch('/api/state', {
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'x-user-id': userId || ''
-        }
+        },
+        body: JSON.stringify({ createdFleets })
       });
       const data = await safeParseJson(res);
       if (res.ok) {
         setPlayer(data.player);
+        if (data.player && Array.isArray(data.player.createdFleets)) {
+          const localStr = JSON.stringify(createdFleets);
+          const serverStr = JSON.stringify(data.player.createdFleets);
+          if (localStr !== serverStr) {
+            setCreatedFleets(data.player.createdFleets);
+          }
+        }
         setPlayersList(data.playersList || []);
         setAlliances(data.alliances);
         setChatMessages(data.chatMessages);
@@ -1300,6 +1323,7 @@ export default function App() {
     numFleets?: number;
     planetId?: string;
     createdFleetId?: string;
+    landingTime?: number;
   }) => {
     if (isUpgrading) return;
     if (!player) return;
@@ -1409,7 +1433,8 @@ export default function App() {
                 troops: subTroops,
                 targetId: mission.targetId,
                 targetName: mission.targetName,
-                targetBuilding: mission.targetBuilding
+                targetBuilding: mission.targetBuilding,
+                landingTime: mission.landingTime
               })
             });
             const data = await safeParseJson(res);
@@ -2592,6 +2617,7 @@ export default function App() {
             onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
             localResources={localResources}
             isUpgrading={isUpgrading}
+            showToast={showToast}
           />
         )}
 
@@ -3948,9 +3974,32 @@ export default function App() {
                                   }`}>
                                     {isWaiting ? 'Ready' : isReturn ? 'Returning' : 'Inbound'}
                                   </span>
+                                  {fleet.isTimed && (
+                                    <span className="text-[9.5px] px-1.5 py-0.2 border border-purple-500/30 text-purple-300 bg-purple-950/40 rounded-full font-bold uppercase shrink-0">
+                                      ⏱️ Timed Landing
+                                    </span>
+                                  )}
                                 </p>
                                 <p className="text-slate-400 leading-normal break-all">Target Sector: <span className="text-slate-200">{fleet.targetName} Coordinates [{fleet.targetCoords.x}, {fleet.targetCoords.y}]</span></p>
                               </div>
+                              {!isWaiting && (
+                                <div className="text-left sm:text-right shrink-0 mt-2 sm:mt-0 border-t border-slate-800 sm:border-0 pt-2 sm:pt-0 font-mono">
+                                  <span className="text-amber-400 font-bold block tracking-wider text-sm">
+                                    {(() => {
+                                      if (secondsLeft <= 0) return "Arrived";
+                                      const h = Math.floor(secondsLeft / 3600);
+                                      const m = Math.floor((secondsLeft % 3600) / 60);
+                                      const s = secondsLeft % 60;
+                                      if (h > 0) return `${h}h ${m}m ${s}s`;
+                                      if (m > 0) return `${m}m ${s}s`;
+                                      return `${s}s`;
+                                    })()}
+                                  </span>
+                                  <span className="text-[9px] text-slate-500 block uppercase font-bold mt-0.5">
+                                    Time Remaining
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
