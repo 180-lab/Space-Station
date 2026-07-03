@@ -176,6 +176,32 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Screen vibration haptic visual feedback state
+  const [isVibrating, setIsVibrating] = useState(false);
+  const [vibrateIntensity, setVibrateIntensity] = useState<'normal' | 'heavy'>('normal');
+
+  useEffect(() => {
+    let timer: any;
+    const handleVibrate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ isAttack?: boolean }>;
+      const isAttack = customEvent.detail?.isAttack || false;
+      
+      setVibrateIntensity(isAttack ? 'heavy' : 'normal');
+      setIsVibrating(true);
+      
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        setIsVibrating(false);
+      }, isAttack ? 2000 : 400);
+    };
+
+    window.addEventListener('moonbase_vibrate', handleVibrate);
+    return () => {
+      window.removeEventListener('moonbase_vibrate', handleVibrate);
+      clearTimeout(timer);
+    };
+  }, []);
+
   // Sync userId with Service Worker for background notifications
   useEffect(() => {
     if (userId) {
@@ -1933,7 +1959,7 @@ export default function App() {
   // Login signup routing
   if (!userId || !player) {
     return (
-      <div className={`min-h-screen bg-[#05070A] text-slate-300 flex flex-col items-center justify-center p-4 font-mono select-none theme-${theme}`}>
+      <div className={`min-h-screen bg-[#05070A] text-slate-300 flex flex-col items-center justify-center p-4 font-mono select-none theme-${theme} ${isVibrating ? (vibrateIntensity === 'heavy' ? 'animate-vibrate-heavy' : 'animate-vibrate') : ''}`}>
         <div className="w-full max-w-lg p-8 bg-[#0A0F1D] border border-[#1E293B] rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.05)] backdrop-blur-md relative overflow-hidden">
           {/* Glowing particle background accent */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -2330,7 +2356,7 @@ export default function App() {
     : 10000;
 
   return (
-    <div className={`min-h-screen max-w-full overflow-x-hidden font-sans bg-[#05070A] text-slate-350 selection:bg-cyan-500/25 pb-24 theme-${theme}`}>
+    <div className={`min-h-screen max-w-full overflow-x-hidden font-sans bg-[#05070A] text-slate-350 selection:bg-cyan-500/25 pb-24 theme-${theme} ${isVibrating ? (vibrateIntensity === 'heavy' ? 'animate-vibrate-heavy' : 'animate-vibrate') : ''}`}>
       
       {/* Toast Notice alerts */}
       {toast && (

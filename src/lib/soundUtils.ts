@@ -9,9 +9,8 @@ function getAudioContext(): AudioContext {
 }
 
 /**
- * Plays a simple but urgent, high-visibility tactical alarm / alerty sound.
- * Uses a crisp, urgent triple-chirp sequence with frequency sweeps and modulation
- * to add intense tactical urgency and instantly alert the player.
+ * Plays a simple, sweet, and elegant digital double-ding notification sound.
+ * Uses sweet, harmonious sine waves instead of sharp sawtooth laser sweeps.
  */
 export function playAlertySound() {
   try {
@@ -21,40 +20,29 @@ export function playAlertySound() {
     }
     const now = ctx.currentTime;
 
-    const playBeep = (startTime: number) => {
+    // A beautiful sweet digital chime (D5 -> A5 -> D6 chime swipe)
+    const playChimeTone = (freq: number, delay: number, dur: number) => {
       const osc = ctx.createOscillator();
-      const oscMod = ctx.createOscillator();
-      const modGain = ctx.createGain();
       const gainNode = ctx.createGain();
 
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(1100, startTime);
-      osc.frequency.exponentialRampToValueAtTime(350, startTime + 0.12);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + delay);
 
-      oscMod.type = 'sine';
-      oscMod.frequency.setValueAtTime(160, startTime);
-      modGain.gain.setValueAtTime(250, startTime);
+      gainNode.gain.setValueAtTime(0.001, now + delay);
+      gainNode.gain.linearRampToValueAtTime(0.08, now + delay + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + delay + dur);
 
-      gainNode.gain.setValueAtTime(0.15, startTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + 0.12);
-
-      oscMod.connect(modGain);
-      modGain.connect(osc.frequency);
-      
       osc.connect(gainNode);
       gainNode.connect(ctx.destination);
 
-      oscMod.start(startTime);
-      osc.start(startTime);
-      
-      oscMod.stop(startTime + 0.13);
-      osc.stop(startTime + 0.13);
+      osc.start(now + delay);
+      osc.stop(now + delay + dur);
     };
 
-    // 3 rapid, urgent, alerty pulses
-    playBeep(now);
-    playBeep(now + 0.15);
-    playBeep(now + 0.30);
+    // A sweet, gentle double-ding harmonic arpeggio
+    playChimeTone(587.33, 0, 0.4);      // D5
+    playChimeTone(880.00, 0.08, 0.6);   // A5
+    playChimeTone(1174.66, 0.16, 0.8);  // D6
   } catch (err) {
     console.warn('[Sound Engine] Failed to play alerty alarm:', err);
   }
@@ -141,13 +129,25 @@ export function triggerNotificationAlert(isAttack: boolean) {
   }
 
   // 2. Play Vibe
-  if (playVibrate && typeof navigator !== 'undefined' && navigator.vibrate) {
-    if (isAttack) {
-      // Nuclear attack alarm pulse: heavy 3-pulse vibration pattern
-      navigator.vibrate([600, 200, 600, 200, 600]);
-    } else {
-      // Standard gentle pulse
-      navigator.vibrate([100]);
+  if (playVibrate) {
+    // Dispatch a custom event so that the UI can render a responsive visual "shake/vibration" fallback.
+    // This provides high-fidelity tactile feedback even on desktop browsers, iOS Safari, or restricted iframes.
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('moonbase_vibrate', { detail: { isAttack } }));
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        if (isAttack) {
+          // Nuclear attack alarm pulse: heavy 3-pulse vibration pattern
+          navigator.vibrate([600, 200, 600, 200, 600]);
+        } else {
+          // Standard pleasant double-pulse vibration
+          navigator.vibrate([150, 80, 150]);
+        }
+      } catch (err) {
+        console.warn('[Vibration Engine] Hardware vibration failed:', err);
+      }
     }
   }
 }

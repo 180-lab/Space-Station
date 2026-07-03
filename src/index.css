@@ -259,3 +259,35 @@ body {
   background-color: rgba(30, 64, 175, 0.25) !important;
 }
 
+/* Custom Screen Vibration Fallback Keyframes */
+@keyframes vibrate {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-2px, 1.5px); }
+  40% { transform: translate(-1.5px, -1px); }
+  60% { transform: translate(1px, 2px); }
+  80% { transform: translate(1.5px, -1.5px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes vibrate-heavy {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(-5px, 3px) rotate(-0.5deg); }
+  20% { transform: translate(3px, -3px) rotate(0.5deg); }
+  30% { transform: translate(-4px, -1px) rotate(0deg); }
+  40% { transform: translate(4px, 2px) rotate(0.5deg); }
+  50% { transform: translate(-3px, 3px) rotate(-0.5deg); }
+  60% { transform: translate(5px, -1px) rotate(0.5deg); }
+  70% { transform: translate(-2px, -2px) rotate(-0.5deg); }
+  80% { transform: translate(4px, 3px) rotate(0deg); }
+  90% { transform: translate(-3px, -1px) rotate(0.5deg); }
+  100% { transform: translate(0, 0); }
+}
+
+.animate-vibrate {
+  animation: vibrate 0.12s linear infinite;
+}
+
+.animate-vibrate-heavy {
+  animation: vibrate-heavy 0.15s linear infinite;
+}
+
