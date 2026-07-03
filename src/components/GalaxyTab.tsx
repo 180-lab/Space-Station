@@ -422,6 +422,132 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [isIntelOpen, setIsIntelOpen] = useState(false);
   const [isRadarFolderOpen, setIsRadarFolderOpen] = useState(true);
   const [radarPage, setRadarPage] = useState(0);
+
+  // Watchlist & Groups state
+  const [watchlistGroups, setWatchlistGroups] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem(`moonbase_watchlist_groups_${player.id}`);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error("Failed to load watchlist from localStorage:", e);
+    }
+    return [
+      { id: 'group_enemies', name: '🎯 High-Value Targets', items: [] },
+      { id: 'group_allies', name: '🤝 Allied Systems', items: [] },
+      { id: 'group_farming', name: '🌾 Resource Outposts', items: [] }
+    ];
+  });
+
+  const [activeWatchlistGroupTab, setActiveWatchlistGroupTab] = useState<string>('all');
+  const [isWatchlistOpen, setIsWatchlistOpen] = useState<boolean>(true);
+  const [newGroupNameInput, setNewGroupNameInput] = useState<string>('');
+  const [showAddToWatchlistMenu, setShowAddToWatchlistMenu] = useState<string | null>(null);
+  const [isAddingNewGroupInline, setIsAddingNewGroupInline] = useState<boolean>(false);
+  const [inlineNewGroupName, setInlineNewGroupName] = useState<string>('');
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingGroupNameInput, setEditingGroupNameInput] = useState<string>('');
+
+  const saveWatchlist = (updatedGroups: any[]) => {
+    setWatchlistGroups(updatedGroups);
+    try {
+      localStorage.setItem(`moonbase_watchlist_groups_${player.id}`, JSON.stringify(updatedGroups));
+    } catch (e) {
+      console.error("Failed to save watchlist to localStorage:", e);
+    }
+  };
+
+  const handleCreateGroup = (name: string) => {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    if (watchlistGroups.some(g => g.name.toLowerCase() === trimmedName.toLowerCase())) {
+      if (showToast) showToast(`Group "${trimmedName}" already exists!`, 'error');
+      return;
+    }
+    const newGroup = {
+      id: `group_${Math.random().toString(36).substring(2, 9)}`,
+      name: trimmedName,
+      items: []
+    };
+    const updated = [...watchlistGroups, newGroup];
+    saveWatchlist(updated);
+    if (showToast) showToast(`Watchlist group "${trimmedName}" created!`, 'success');
+  };
+
+  const handleDeleteGroup = (groupId: string, groupName: string) => {
+    const updated = watchlistGroups.filter(g => g.id !== groupId);
+    saveWatchlist(updated);
+    if (showToast) showToast(`Deleted group "${groupName}".`, 'info');
+  };
+
+  const handleRenameGroup = (groupId: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const updated = watchlistGroups.map(g => {
+      if (g.id === groupId) {
+        return { ...g, name: trimmed };
+      }
+      return g;
+    });
+    saveWatchlist(updated);
+    if (showToast) showToast(`Group renamed to "${trimmed}".`, 'success');
+  };
+
+  const handleAddStationToGroup = (target: any, groupId: string) => {
+    const groupIndex = watchlistGroups.findIndex(g => g.id === groupId);
+    if (groupIndex === -1) return;
+
+    const group = watchlistGroups[groupIndex];
+    if (group.items.some((item: any) => item.planetId === target.planetId)) {
+      if (showToast) showToast(`Station "${target.planetName}" already in "${group.name}".`, 'info');
+      setShowAddToWatchlistMenu(null);
+      return;
+    }
+
+    const watchlistItem = {
+      planetId: target.planetId,
+      planetName: target.planetName,
+      coords: { x: target.coords.x, y: target.coords.y },
+      username: target.username,
+      id: target.id,
+      isHabitable: !!target.isHabitable,
+      allianceTag: target.allianceTag,
+      allianceId: target.allianceId,
+      scores: target.scores || { population: 0, attack: 0, defence: 0, raiders: 0 },
+      addedAt: Date.now()
+    };
+
+    const updated = watchlistGroups.map(g => {
+      if (g.id === groupId) {
+        return { ...g, items: [...g.items, watchlistItem] };
+      }
+      return g;
+    });
+
+    saveWatchlist(updated);
+    if (showToast) showToast(`Added "${target.planetName}" to "${group.name}".`, 'success');
+    setShowAddToWatchlistMenu(null);
+  };
+
+  const handleRemoveStationFromGroup = (planetId: string, groupId: string) => {
+    const updated = watchlistGroups.map(g => {
+      if (g.id === groupId) {
+        return { ...g, items: g.items.filter((item: any) => item.planetId !== planetId) };
+      }
+      return g;
+    });
+    saveWatchlist(updated);
+    if (showToast) showToast("Removed station from watchlist group.", "info");
+  };
+
+  const handleWatchlistQuickScan = (x: number, y: number) => {
+    setSearchX(x.toString());
+    setSearchY(y.toString());
+    setTargetCoords({ x, y });
+    handleScan(x, y);
+    if (showToast) showToast(`Target sector [${x}, ${y}] locked. Scanning...`, 'info');
+  };
   const [expandedCombatReports, setExpandedCombatReports] = useState<Record<string, boolean>>({});
   const [expandedIntelReports, setExpandedIntelReports] = useState<Record<string, boolean>>({});
   const [intelPopupExpandedBuildings, setIntelPopupExpandedBuildings] = useState<Record<string, boolean>>({});
@@ -997,7 +1123,13 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           <div className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-3">
                               <div 
-                                className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 border border-cyan-500/45 text-cyan-400 bg-cyan-500/10 uppercase font-mono shadow-inner shadow-cyan-500/15"
+                                onClick={() => {
+                                  if (!target.isHabitable && target.id && onViewPlayerProfile) {
+                                    onViewPlayerProfile(target.id);
+                                  }
+                                }}
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 border border-cyan-500/45 text-cyan-400 bg-cyan-500/10 uppercase font-mono shadow-inner shadow-cyan-500/15 ${!target.isHabitable && target.id && onViewPlayerProfile ? 'cursor-pointer hover:bg-cyan-500/20 hover:text-cyan-300' : ''}`}
+                                title={!target.isHabitable && target.id && onViewPlayerProfile ? "Click to view Commander Profile" : undefined}
                               >
                                 {target.planetName[0]}
                               </div>
@@ -1005,29 +1137,151 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 <h4 className="font-bold text-slate-200 text-sm leading-tight">
                                   {target.planetName} <span className="text-xs text-cyan-400 font-mono ml-2">({(targetDist * 1.917).toFixed(2)} Space Miles)</span>
                                 </h4>
-                                <p className="text-[11px] text-slate-400 font-medium">
+                                <div className="text-[11px] text-slate-400 font-medium">
                                   {target.isHabitable ? (
                                     <span className="text-emerald-450 font-bold uppercase tracking-wide text-[10px] text-emerald-400 font-sans">Habitable Planetary Target</span>
                                   ) : (
-                                    <>Commander: <span className="text-cyan-400 font-bold font-mono">{target.username}</span></>
+                                    <>Commander: <button type="button" onClick={() => { if (onViewPlayerProfile && target.id) onViewPlayerProfile(target.id); }} className="text-cyan-400 font-bold font-mono hover:underline hover:text-cyan-300 transition cursor-pointer text-left">{target.username}</button></>
                                   )}
-                                </p>
+                                </div>
                               </div>
                             </div>
 
-                            {/* Dropdown Box / Click Toggle Button */}
-                            <button 
-                              onClick={() => {
-                                setExpandedTargets(prev => ({
-                                  ...prev,
-                                  [target.planetId]: !prev[target.planetId]
-                                }));
-                              }}
-                              className="px-3 py-1.5 bg-[#0D1527] border border-[#1E293B] hover:border-[#38bdf8]/40 hover:bg-[#0F1E36] rounded-lg text-xs font-bold font-mono text-slate-300 hover:text-cyan-400 flex items-center gap-1 transition cursor-pointer"
-                            >
-                              <span>{isExpanded ? "Hide" : "Show"} Details</span>
-                              {isExpanded ? <ChevronUp size={14} className="text-red-400" /> : <ChevronDown size={14} className="text-cyan-400" />}
-                            </button>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {/* Watchlist dropdown */}
+                              <div className="relative">
+                                <button 
+                                  onClick={() => {
+                                    setShowAddToWatchlistMenu(showAddToWatchlistMenu === target.planetId ? null : target.planetId);
+                                    setIsAddingNewGroupInline(false);
+                                  }}
+                                  className={`px-3 py-1.5 border hover:bg-[#1E293B]/45 rounded-lg text-xs font-bold font-mono flex items-center gap-1 transition cursor-pointer ${
+                                    watchlistGroups.some(g => g.items.some((item: any) => item.planetId === target.planetId))
+                                      ? 'bg-amber-500/15 border-amber-500/45 text-amber-450 hover:bg-amber-500/25'
+                                      : 'bg-[#0A0F1D] border-[#1E293B] text-slate-400 hover:text-white'
+                                  }`}
+                                  title="Add or organize this station into your watchlist groups"
+                                >
+                                  <span>★</span>
+                                  <span className="hidden sm:inline">Watch</span>
+                                </button>
+
+                                {showAddToWatchlistMenu === target.planetId && (
+                                  <div className="absolute right-0 mt-2 w-56 bg-[#0B132B] border border-[#1E293B] rounded-xl p-3 shadow-2xl z-50 text-left font-mono space-y-2.5 text-xs">
+                                    <div className="font-bold text-amber-450 text-[10px] uppercase tracking-wider">Save to Group:</div>
+                                    
+                                    {watchlistGroups.length === 0 ? (
+                                      <p className="text-[10px] text-slate-500">No groups configured. Create one below!</p>
+                                    ) : (
+                                      <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                                        {watchlistGroups.map(group => {
+                                          const inGroup = group.items.some((item: any) => item.planetId === target.planetId);
+                                          return (
+                                            <button
+                                              key={group.id}
+                                              onClick={() => {
+                                                if (inGroup) {
+                                                  handleRemoveStationFromGroup(target.planetId, group.id);
+                                                } else {
+                                                  handleAddStationToGroup(target, group.id);
+                                                }
+                                              }}
+                                              className={`w-full text-left px-2 py-1.5 rounded hover:bg-[#1C2541]/50 flex items-center justify-between text-[11px] transition cursor-pointer ${inGroup ? 'text-amber-450 font-bold bg-[#1C2541]/30' : 'text-slate-300'}`}
+                                            >
+                                              <span className="truncate">{group.name}</span>
+                                              <span>{inGroup ? '✓ Saved' : '+ Add'}</span>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+
+                                    <div className="border-t border-white/5 pt-2">
+                                      {isAddingNewGroupInline ? (
+                                        <div className="space-y-1.5">
+                                          <input 
+                                            type="text"
+                                            placeholder="New Group..."
+                                            value={inlineNewGroupName}
+                                            onChange={(e) => setInlineNewGroupName(e.target.value)}
+                                            className="w-full bg-[#05070A] border border-[#1E293B] focus:border-amber-500 focus:outline-none rounded px-2 py-1 text-[11px] text-white"
+                                            autoFocus
+                                          />
+                                          <div className="flex gap-1.5">
+                                            <button
+                                              onClick={() => {
+                                                const trimmed = inlineNewGroupName.trim();
+                                                if (trimmed) {
+                                                  const newId = `group_${Math.random().toString(36).substring(2, 9)}`;
+                                                  const newGroup = { id: newId, name: trimmed, items: [] };
+                                                  const updated = [...watchlistGroups, newGroup];
+                                                  setWatchlistGroups(updated);
+                                                  localStorage.setItem(`moonbase_watchlist_groups_${player.id}`, JSON.stringify(updated));
+                                                  if (showToast) showToast(`Group "${trimmed}" created!`, 'success');
+                                                  
+                                                  const watchlistItem = {
+                                                    planetId: target.planetId,
+                                                    planetName: target.planetName,
+                                                    coords: { x: target.coords.x, y: target.coords.y },
+                                                    username: target.username,
+                                                    id: target.id,
+                                                    isHabitable: !!target.isHabitable,
+                                                    allianceTag: target.allianceTag,
+                                                    allianceId: target.allianceId,
+                                                    scores: target.scores || { population: 0, attack: 0, defence: 0, raiders: 0 },
+                                                    addedAt: Date.now()
+                                                  };
+                                                  const updatedWithItem = updated.map(g => {
+                                                    if (g.id === newId) {
+                                                      return { ...g, items: [watchlistItem] };
+                                                    }
+                                                    return g;
+                                                  });
+                                                  saveWatchlist(updatedWithItem);
+                                                  if (showToast) showToast(`Added "${target.planetName}" to "${trimmed}".`, 'success');
+                                                  setShowAddToWatchlistMenu(null);
+                                                  setInlineNewGroupName('');
+                                                  setIsAddingNewGroupInline(false);
+                                                }
+                                              }}
+                                              className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-[10px] font-bold py-1 rounded transition border border-amber-500/20 cursor-pointer text-center"
+                                            >
+                                              Confirm
+                                            </button>
+                                            <button
+                                              onClick={() => setIsAddingNewGroupInline(false)}
+                                              className="flex-1 bg-slate-900 hover:bg-slate-800 text-slate-400 text-[10px] py-1 rounded transition border border-slate-850 cursor-pointer text-center"
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => setIsAddingNewGroupInline(true)}
+                                          className="w-full text-center py-1 bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-white rounded text-[10px] font-bold transition cursor-pointer border border-slate-800/50"
+                                        >
+                                          + Create New Group
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              <button 
+                                onClick={() => {
+                                  setExpandedTargets(prev => ({
+                                    ...prev,
+                                    [target.planetId]: !prev[target.planetId]
+                                  }));
+                                }}
+                                className="px-3 py-1.5 bg-[#0D1527] border border-[#1E293B] hover:border-[#38bdf8]/40 hover:bg-[#0F1E36] rounded-lg text-xs font-bold font-mono text-slate-300 hover:text-cyan-400 flex items-center gap-1 transition cursor-pointer"
+                              >
+                                <span>{isExpanded ? "Hide" : "Show"} Details</span>
+                                {isExpanded ? <ChevronUp size={14} className="text-red-400" /> : <ChevronDown size={14} className="text-cyan-400" />}
+                              </button>
+                            </div>
                           </div>
 
                           {/* Dropdown Details Box Content */}
@@ -1038,7 +1292,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 <div className="p-2.5 bg-[#030508]/60 border border-[#161E2E] rounded-xl">
                                   <span className="text-slate-500 block text-[9px] uppercase tracking-wider">Alliance Rank</span>
                                   {target.isHabitable ? (
-                                    <span className="font-bold text-emerald-400 text-xs uppercase text-emerald-400">Uncharted Planet</span>
+                                    <span className="font-bold text-emerald-400 text-xs uppercase text-emerald-450">Uncharted Planet</span>
                                   ) : target.allianceTag ? (
                                     <span className="font-bold text-yellow-400 text-xs">[{target.allianceTag}] alliance member</span>
                                   ) : (
@@ -1101,6 +1355,15 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   </>
                                 ) : (
                                   <>
+                                    {onViewPlayerProfile && target.id && (
+                                      <button 
+                                        type="button"
+                                        onClick={() => onViewPlayerProfile(target.id)}
+                                        className="px-3.5 py-2 bg-indigo-950/25 border border-indigo-500/45 text-indigo-400 hover:bg-[#4f46e5]/15 rounded-xl font-bold transition cursor-pointer text-[11px]"
+                                      >
+                                        👤 Commander Profile
+                                      </button>
+                                    )}
                                     <button 
                                       type="button"
                                       onClick={() => fetchIntelReport(target.coords.x, target.coords.y)}
@@ -1181,6 +1444,305 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   </div>
                 );
               })()}
+              </div>
+            )}
+          </div>
+
+          {/* Watchlist Section */}
+          <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4 shadow-lg">
+            <div 
+              onClick={() => setIsWatchlistOpen(!isWatchlistOpen)}
+              className="flex items-center justify-between cursor-pointer hover:bg-[#1E293B]/45 p-2 rounded-lg transition"
+            >
+              <h3 className="text-sm font-bold uppercase tracking-widest text-amber-400 flex items-center gap-2 font-mono">
+                <span className="text-amber-400 shrink-0">⭐️</span> SCANNER WATCHLIST
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-500 font-mono font-bold">
+                  ({watchlistGroups.reduce((acc, g) => acc + g.items.length, 0)} STATIONS BOOKMARKED)
+                </span>
+                {isWatchlistOpen ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+              </div>
+            </div>
+
+            {isWatchlistOpen && (
+              <div className="pt-4 border-t border-white/5 space-y-4">
+                {/* Create Group Form & Filter Tabs */}
+                <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+                  {/* Quick Filter tabs by Group */}
+                  <div className="flex flex-wrap gap-1 bg-[#05070A] p-1 border border-[#1E293B] rounded-xl text-[10px] font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setActiveWatchlistGroupTab('all')}
+                      className={`px-3 py-1.5 rounded-lg font-bold transition-all ${activeWatchlistGroupTab === 'all' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_8px_rgba(245,158,11,0.1)]' : 'text-slate-400 hover:text-white border border-transparent cursor-pointer'}`}
+                    >
+                      ALL GROUPS
+                    </button>
+                    {watchlistGroups.map(g => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setActiveWatchlistGroupTab(g.id)}
+                        className={`px-3 py-1.5 rounded-lg font-bold transition-all ${activeWatchlistGroupTab === g.id ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_8px_rgba(245,158,11,0.1)]' : 'text-slate-400 hover:text-white border border-transparent cursor-pointer'}`}
+                      >
+                        {g.name} ({g.items.length})
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Create Group Input */}
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleCreateGroup(newGroupNameInput);
+                      setNewGroupNameInput('');
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <input 
+                      type="text"
+                      placeholder="New Group Name..."
+                      value={newGroupNameInput}
+                      onChange={(e) => setNewGroupNameInput(e.target.value)}
+                      className="bg-[#05070A] border border-[#1E293B] hover:border-slate-700 focus:border-amber-500 focus:outline-none rounded-lg px-3 py-1.5 text-xs text-white font-mono placeholder-slate-600"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500/50 rounded-lg text-[10px] text-amber-400 font-extrabold font-mono uppercase tracking-wider whitespace-nowrap cursor-pointer transition duration-150"
+                    >
+                      + Add Group
+                    </button>
+                  </form>
+                </div>
+
+                {/* List of Groups */}
+                <div className="space-y-6">
+                  {watchlistGroups
+                    .filter(g => activeWatchlistGroupTab === 'all' || activeWatchlistGroupTab === g.id)
+                    .map(group => {
+                      const isEditing = editingGroupId === group.id;
+
+                      return (
+                        <div key={group.id} className="border border-[#1E293B]/70 bg-[#05070A]/50 rounded-xl p-4 space-y-3">
+                          {/* Group Header */}
+                          <div className="flex items-center justify-between border-b border-[#1E293B]/40 pb-2">
+                            <div className="flex items-center gap-2">
+                              {isEditing ? (
+                                <div className="flex items-center gap-1.5">
+                                  <input 
+                                    type="text"
+                                    value={editingGroupNameInput}
+                                    onChange={(e) => setEditingGroupNameInput(e.target.value)}
+                                    className="bg-[#0A0F1D] border border-amber-500/50 text-white rounded px-2 py-0.5 text-xs font-bold"
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleRenameGroup(group.id, editingGroupNameInput);
+                                      setEditingGroupId(null);
+                                    }}
+                                    className="text-emerald-400 hover:text-emerald-300 text-xs font-bold font-mono px-1.5 py-0.5 border border-emerald-500/20 bg-emerald-500/5 rounded cursor-pointer"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingGroupId(null)}
+                                    className="text-slate-400 hover:text-slate-300 text-xs font-bold font-mono px-1.5 py-0.5 border border-slate-500/20 bg-slate-500/5 rounded cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="text-xs font-bold text-amber-400 uppercase tracking-widest font-mono">
+                                    {group.name}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 font-mono font-bold">
+                                    ({group.items.length} items)
+                                  </span>
+                                </>
+                              )}
+                            </div>
+
+                            {!isEditing && (
+                              <div className="flex items-center gap-2 text-[10px] font-mono">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingGroupId(group.id);
+                                    setEditingGroupNameInput(group.name);
+                                  }}
+                                  className="text-slate-400 hover:text-amber-400 transition cursor-pointer"
+                                >
+                                  Rename
+                                </button>
+                                <span className="text-slate-700">|</span>
+                                <button
+                                  type="button"
+                                  disabled={group.items.length > 0}
+                                  onClick={() => handleDeleteGroup(group.id, group.name)}
+                                  className="text-slate-500 hover:text-red-400 disabled:opacity-30 disabled:hover:text-slate-500 transition cursor-pointer"
+                                  title={group.items.length > 0 ? "Cannot delete non-empty group" : "Delete group"}
+                                >
+                                  Delete Group
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Group Items List */}
+                          {group.items.length === 0 ? (
+                            <div className="py-6 text-center border border-dashed border-[#1E293B]/50 rounded-lg text-slate-500 text-xs font-mono">
+                              No bookmarks in this group. Add stations from your active radar signature results!
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {group.items.map((item: any) => {
+                                const dist = Math.hypot(item.coords.x - activePlanet.sectorX, item.coords.y - activePlanet.sectorY);
+                                const spaceMiles = dist * 1.917;
+
+                                return (
+                                  <div 
+                                    key={item.planetId}
+                                    className="p-3.5 bg-[#030508]/80 border border-[#161E2E] rounded-xl flex flex-col justify-between space-y-3 hover:border-amber-500/30 transition duration-150"
+                                  >
+                                    <div className="flex items-start justify-between">
+                                      <div className="text-left space-y-0.5">
+                                        <h5 className="font-bold text-slate-200 text-xs font-mono flex items-center gap-1.5">
+                                          <span>{item.planetName}</span>
+                                          <span className="text-[10px] text-amber-500 font-normal">[{item.coords.x}, {item.coords.y}]</span>
+                                        </h5>
+                                        <div className="text-[10px] text-slate-400 leading-normal">
+                                          {item.isHabitable ? (
+                                            <span className="text-emerald-450 font-bold uppercase tracking-wider text-[9px] text-emerald-550">Habitable</span>
+                                          ) : (
+                                            <>Commander: <button type="button" onClick={() => { if (onViewPlayerProfile && item.id) onViewPlayerProfile(item.id); }} className="text-cyan-400 font-bold font-mono hover:underline hover:text-cyan-300 transition cursor-pointer text-left">{item.username}</button></>
+                                          )}
+                                        </div>
+                                        {item.allianceTag && (
+                                          <p className="text-[9px] text-yellow-450 font-mono font-bold uppercase">
+                                            [{item.allianceTag}] member
+                                          </p>
+                                        )}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveStationFromGroup(item.planetId, group.id)}
+                                        className="text-slate-500 hover:text-red-400 transition text-[11px] p-1 cursor-pointer"
+                                        title="Remove from watchlist group"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+
+                                    {/* Tactical Watchlist Actions */}
+                                    <div className="border-t border-[#1E293B]/30 pt-2 flex flex-wrap gap-1.5 justify-start">
+                                      {item.isHabitable ? (
+                                        <>
+                                          <button 
+                                            type="button"
+                                            onClick={() => fetchIntelReport(item.coords.x, item.coords.y)}
+                                            className="px-2 py-1 bg-amber-950/20 border border-amber-500/30 text-amber-400 hover:bg-[#b45309]/10 rounded-lg font-bold transition cursor-pointer text-[10px] font-mono"
+                                          >
+                                            Intel (50 Gold)
+                                          </button>
+                                          <button 
+                                            type="button"
+                                            onClick={() => openDispatchFleet(item, 'move')}
+                                            className="px-2 py-1 bg-[#0D1527] border border-[#1E293B] text-slate-300 rounded-lg hover:bg-[#0F1E36] font-bold transition cursor-pointer text-[10px] font-mono"
+                                          >
+                                            Move Fleet
+                                          </button>
+                                          <button 
+                                            type="button"
+                                            onClick={() => openDispatchFleet(item, 'colonize')}
+                                            className="px-2.5 py-1 bg-emerald-950/20 border border-emerald-500/30 text-emerald-400 hover:bg-[#10b981]/10 rounded-lg font-bold transition cursor-pointer text-[10px] font-mono animate-pulse"
+                                          >
+                                            Settle
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <button 
+                                            type="button"
+                                            onClick={() => fetchIntelReport(item.coords.x, item.coords.y)}
+                                            className="px-2 py-1 bg-amber-950/20 border border-amber-500/30 text-amber-400 hover:bg-[#b45309]/10 rounded-lg font-bold transition cursor-pointer text-[10px] font-mono"
+                                          >
+                                            Intel (50 Gold)
+                                          </button>
+                                          <button 
+                                            type="button"
+                                            onClick={() => openDispatchFleet(item, 'move')}
+                                            className="px-2 py-1 bg-slate-900 border border-[#1E293B] text-slate-300 rounded-lg hover:bg-slate-850 font-bold transition cursor-pointer text-[10px] font-mono"
+                                          >
+                                            Move Fleet
+                                          </button>
+                                          <button 
+                                            type="button"
+                                            onClick={() => openDispatchFleet(item, 'attack')}
+                                            disabled={item.id === player.id || !!(player.allianceId && item.allianceId === player.allianceId)}
+                                            className="px-2 py-1 bg-red-950/25 border border-red-900/25 text-red-400 hover:bg-red-900/15 rounded-lg font-bold transition cursor-pointer text-[10px] font-mono disabled:opacity-40 disabled:cursor-not-allowed"
+                                            title={item.id === player.id ? "You cannot attack your own station!" : (player.allianceId && item.allianceId === player.allianceId) ? "Alliance members cannot attack each other!" : "Launch attack"}
+                                          >
+                                            {item.id === player.id ? 'Self' : (player.allianceId && item.allianceId === player.allianceId) ? 'Ally' : 'Attack'}
+                                          </button>
+                                          <button 
+                                            type="button"
+                                            onClick={() => {
+                                              setTargetForResources(item);
+                                              setResourceSendValues({
+                                                water: 0,
+                                                plasma: 0,
+                                                fuel: 0,
+                                                food: 0,
+                                                respirant: 0
+                                              });
+                                            }}
+                                            className="px-2 py-1 bg-sky-950/20 border border-sky-900/25 text-sky-400 hover:bg-[#0284c7]/10 rounded-lg font-bold transition cursor-pointer text-[10px] font-mono"
+                                          >
+                                            📦 Transmit
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 border-t border-[#1E293B]/20 pt-2">
+                                      <span>{spaceMiles.toFixed(1)} Space Miles</span>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleWatchlistQuickScan(item.coords.x, item.coords.y)}
+                                          className="text-cyan-400 hover:text-cyan-300 font-bold cursor-pointer transition uppercase"
+                                          title="Perform quick scanner lock sweep on this station's coordinates"
+                                        >
+                                          📡 Scan
+                                        </button>
+                                        {!item.isHabitable && item.id && onViewPlayerProfile && (
+                                          <>
+                                            <span className="text-slate-700">|</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => onViewPlayerProfile(item.id)}
+                                              className="text-amber-400 hover:text-amber-300 font-bold cursor-pointer transition uppercase"
+                                              title="Open player profile"
+                                            >
+                                              👤 Profile
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
             )}
           </div>

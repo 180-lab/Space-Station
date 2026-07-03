@@ -438,7 +438,8 @@ export default function App() {
     return localStorage.getItem('moonbase_interactive_tabs') === 'true';
   });
   const [showStationsTop, setShowStationsTop] = useState<boolean>(() => {
-    return localStorage.getItem('moonbase_show_stations_top') === 'true';
+    const saved = localStorage.getItem('moonbase_show_stations_top');
+    return saved !== 'false';
   });
   const [isScrolling, setIsScrolling] = useState(false);
   const [isMobileView, setIsMobileView] = useState(() => {
@@ -2692,11 +2693,11 @@ export default function App() {
 
       {/* Persistent Top Stations Dock */}
       {showStationsTop && player && activePlanet && (
-        <div className="sticky top-20 z-30 bg-[#070B16] border-b border-[#1E293B]/70 shadow-md backdrop-blur-md bg-opacity-95 py-2 px-6 overflow-x-auto scrollbar-none flex items-center gap-3">
+        <div className="sticky top-20 z-30 bg-[#070B16] border-b border-[#1E293B]/70 shadow-md backdrop-blur-md bg-opacity-95 py-2 px-6 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5 shrink-0 border-r border-[#1E293B]/60 pr-3 mr-1">
             <span className="text-[10px] font-bold text-slate-400 font-mono tracking-widest uppercase">STATIONS</span>
           </div>
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
             {player.planets.map((pl, idx) => {
               const isActive = pl.id === activePlanet.id;
               return (
