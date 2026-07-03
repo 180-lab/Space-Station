@@ -52,7 +52,8 @@ import {
   Check,
   Send,
   Reply,
-  Compass
+  Compass,
+  Gamepad2
 } from 'lucide-react';
 
 const TROOP_NAME_MAPPING: Record<string, string> = {
@@ -124,6 +125,7 @@ export default function App() {
 
   // Google Sign-In & Payments Dialog states
   const [showGoogleDialog, setShowGoogleDialog] = useState(false);
+  const [showGPGSSimulator, setShowGPGSSimulator] = useState(false);
   const [deviceGoogleAccounts, setDeviceGoogleAccounts] = useState<{ email: string; name: string }[]>(() => {
     try {
       const saved = localStorage.getItem('moonbase_device_google_accounts');
@@ -1106,6 +1108,77 @@ export default function App() {
     }
   };
 
+  // Auth: Google Play Games Services Sign-In
+  const handleGooglePlaySignIn = async (authCode: string, isSimulated = false, simulatedProfile?: { playerId: string; displayName: string }) => {
+    try {
+      const res = await fetch('/api/auth/google-play', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          authCode,
+          isSimulated,
+          simulatedProfile
+        })
+      });
+      const data = await safeParseJson(res);
+      if (res.ok) {
+        localStorage.setItem('moonbase_userId', data.player.id);
+        setUserId(data.player.id);
+        setPlayer(data.player);
+        showToast(`Play Games sync complete! Welcome, Commander ${data.player.username}.`, 'success');
+        setShowGPGSSimulator(false);
+        if (data.isNew) {
+          setInitialStationName(`${data.player.username}'s Station`);
+          setShowInitialStationNaming(true);
+        }
+      } else {
+        showToast(data.error || 'Google Play Games Sync failed.', 'error');
+      }
+    } catch (err) {
+      showToast('Verify network connection with terminal gateway.', 'error');
+    }
+  };
+
+  const triggerGooglePlayGamesSignIn = async () => {
+    // Check if running on native mobile device (Capacitor)
+    const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor;
+    const GPGSPlugin = isCapacitor ? ((window as any).Capacitor.Plugins?.GooglePlayGamesServices || (window as any).Capacitor.Plugins?.GPGSAuth) : null;
+    
+    if (isCapacitor && GPGSPlugin) {
+      try {
+        showToast("Accessing Google Play Services...", "info");
+        
+        // Trigger the native GPGS login. We request the serverAuthCode which we will safely exchange on our Node backend.
+        const result = await GPGSPlugin.signIn({
+          webClientId: "YOUR_GOOGLE_PLAY_CLIENT_ID.apps.googleusercontent.com", // Web client ID from Google Cloud Console
+          requestServerAuthCode: true,
+          requestEmail: true
+        });
+        
+        if (result && result.serverAuthCode) {
+          showToast("Play Games authorization acquired. Syncing with server...", "success");
+          await handleGooglePlaySignIn(result.serverAuthCode, false);
+        } else {
+          throw new Error("No server authorization code returned from Play Games.");
+        }
+      } catch (err: any) {
+        console.error("GPGS Mobile Error:", err);
+        showToast(`Mobile Sign-in failed: ${err.message || err}`, "error");
+        // Fall back to simulator if sign in failed
+        showToast("Falling back to local GPGS profile simulator...", "info");
+        setShowGPGSSimulator(true);
+      }
+    } else {
+      if (isCapacitor) {
+        showToast("Capacitor GPGS Plugin not registered. Launching simulator...", "info");
+      }
+      // Display the interactive simulator modal to test the end-to-end flow!
+      setShowGPGSSimulator(true);
+    }
+  };
+
   // Initial Station Naming handler
   const handleInitialStationNamingSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -2045,6 +2118,16 @@ export default function App() {
             <span>Continue with Google Account</span>
           </button>
 
+          {/* Branded Google Play Games Login button */}
+          <button 
+            type="button"
+            onClick={triggerGooglePlayGamesSignIn}
+            className="w-full mt-3 py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs tracking-wider uppercase rounded-xl flex items-center justify-center gap-3 active:scale-[0.98] transition duration-150 cursor-pointer shadow-md"
+          >
+            <Gamepad2 className="w-4 h-4 text-emerald-100" />
+            <span>Sign in with Play Games</span>
+          </button>
+
 
 
         </div>
@@ -2129,6 +2212,89 @@ export default function App() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* GPGS Simulator Dialog Overlay (sandbox testing mode) */}
+        {showGPGSSimulator && (
+          <div className="fixed inset-0 bg-[#05070A]/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div className="w-full max-w-sm bg-gradient-to-b from-slate-900 to-[#0A0F1D] rounded-2xl shadow-2xl p-6 border border-[#10B981]/20 flex flex-col items-center">
+              {/* Play Games Green Controller Banner */}
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-4 text-emerald-400">
+                <Gamepad2 className="w-6 h-6" />
+              </div>
+
+              <h2 className="text-lg font-bold text-slate-100 font-sans tracking-tight text-center">Google Play Games Simulator</h2>
+              <p className="text-xs text-slate-400 text-center mt-1 mb-5">
+                Securely simulating Play Games SDK signature payloads in the local sandbox preview.
+              </p>
+
+              {/* Simulated parameters form */}
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = e.target as HTMLFormElement;
+                  const displayName = (form.elements.namedItem("simGpgsName") as HTMLInputElement).value.trim();
+                  const playerId = (form.elements.namedItem("simGpgsId") as HTMLInputElement).value.trim();
+                  if (!displayName) {
+                    showToast("Please enter a simulated gamer name", "error");
+                    return;
+                  }
+                  
+                  // Trigger handleGooglePlaySignIn with simulated flags
+                  handleGooglePlaySignIn(
+                    "sim_auth_code_" + Math.random().toString(36).substring(2, 12),
+                    true, // isSimulated
+                    {
+                      playerId: playerId || `gpay_${Math.random().toString(36).substring(2, 10)}`,
+                      displayName
+                    }
+                  );
+                }}
+                className="w-full space-y-4"
+              >
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Simulated Gamer Tag</label>
+                  <input 
+                    name="simGpgsName" 
+                    type="text" 
+                    placeholder="e.g. MasterCommander" 
+                    required
+                    defaultValue={`Gamer_${Math.random().toString(36).substring(2, 7).toUpperCase()}`}
+                    className="w-full bg-[#05070A] border border-[#1E293B] text-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Simulated Player ID (Sub Claim)</label>
+                  <input 
+                    name="simGpgsId" 
+                    type="text" 
+                    placeholder="Auto-generated if left empty" 
+                    className="w-full bg-[#05070A] border border-[#1E293B] text-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <span className="text-[9px] text-slate-500 leading-relaxed block mt-1 font-sans">
+                    Matches sub value or GPGS player ID database indexes.
+                  </span>
+                </div>
+
+                <div className="pt-3 flex items-center justify-between gap-3">
+                  <button 
+                    type="button"
+                    onClick={() => setShowGPGSSimulator(false)}
+                    className="flex-1 py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-lg shadow-emerald-900/20"
+                  >
+                    Sync Profile
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

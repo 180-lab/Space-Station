@@ -23,6 +23,7 @@ import {
 } from "./src/types";
 import { getUpgradeResourceCost } from "./src/gameUtils";
 import { checkSpeedHack, redis as serverRedis } from "./antiCheat";
+import { OAuth2Client } from "google-auth-library";
 
 const app = express();
 const PORT = process.env.NODE_ENV === "production" ? (process.env.PORT ? parseInt(process.env.PORT) : 3000) : 3000;
@@ -852,13 +853,32 @@ function tickPlayerState(playerId: string, now: number): boolean {
 
     // We can run a tick based on a fast-forward/real-time delta
     // Since we want reliable values, let's keep track of a "lastTick" or use a time comparison.
-    // We will associate a _lastTick on the planet. If not present, default to now.
-    const lastTick = (planet as any)._lastTick || now;
+    // We will associate a _lastTick on the planet. If not present, default to player's lastActive or now.
+    
+    // Sanitization Guard: If the player's lastActive timestamp is missing, invalid, or set to 0,
+    // reset it to the current timestamp (now) to avoid evaluating a massive time difference.
+    if (!player.lastActive || typeof player.lastActive !== "number" || player.lastActive <= 0 || isNaN(player.lastActive)) {
+      player.lastActive = now;
+    }
+
+    let lastTick = (planet as any)._lastTick || player.lastActive || now;
+    if (!lastTick || typeof lastTick !== "number" || lastTick <= 0 || isNaN(lastTick)) {
+      lastTick = now;
+    }
     (planet as any)._lastTick = now;
 
     let lastCompletedUpgradeTime = 0;
 
-    const deltaMs = now - lastTick;
+    let deltaMs = now - lastTick;
+
+    // Maximum Catch-up Cap: Cap the maximum allowed offline production time calculation to 1 hour (3600 seconds)
+    const MAX_CATCHUP_MS = 3600 * 1000; // 1 hour maximum limit
+    if (deltaMs > MAX_CATCHUP_MS) {
+      deltaMs = MAX_CATCHUP_MS;
+    } else if (deltaMs < 0) {
+      deltaMs = 0; // Prevent negative delta calculation
+    }
+
     if (deltaMs > 0) {
       const deltaHours = deltaMs / 3600000;
 
@@ -2420,6 +2440,9 @@ function getFirebaseAdmin(): App | null {
  * via firebase-admin if the active SSE connection is silent or breaks (is inactive).
  */
 function sendNotificationWithFallback(userId: string, title: string, body: string) {
+  if (userId && userId.startsWith('ai_')) {
+    return; // Silently ignore artificial intelligence synthetic players
+  }
   const activeSse = activeSseClients.get(userId);
   
   if (activeSse) {
@@ -2736,6 +2759,157 @@ app.post("/api/auth/google", async (req, res) => {
   } catch (err: any) {
     console.error("[Google Auth Error]", err);
     return res.status(401).json({ error: `Google login verification failed: ${err.message}` });
+  }
+});
+
+// Google Play Games Services (GPGS) Authentication and verification endpoint
+app.post("/api/auth/google-play", async (req, res) => {
+  const { authCode, isSimulated, simulatedProfile } = req.body;
+
+  if (!authCode) {
+    return res.status(400).json({ error: "Google Play Games authorization code is required." });
+  }
+
+  try {
+    let playerId = "";
+    let displayName = "GPGS Commander";
+
+    if (isSimulated && (process.env.NODE_ENV !== "production" || !process.env.GOOGLE_PLAY_CLIENT_ID)) {
+      // In web preview / sandbox testing, allow simulation of GPGS authentication to let users test end-to-end
+      console.log("[GPGS Auth] Simulating Google Play Games sign-in for development...");
+      playerId = simulatedProfile?.playerId || `gpay_${Math.random().toString(36).substring(2, 10)}`;
+      displayName = simulatedProfile?.displayName || `Commander GPGS`;
+    } else {
+      // Production secure verification
+      const clientId = process.env.GOOGLE_PLAY_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_PLAY_CLIENT_SECRET;
+
+      if (!clientId || !clientSecret) {
+        return res.status(500).json({
+          error: "Google Play Games integration is not configured on the server. Please set GOOGLE_PLAY_CLIENT_ID and GOOGLE_PLAY_CLIENT_SECRET in your settings/environment."
+        });
+      }
+
+      // Initialize OAuth2 client
+      const oauth2Client = new OAuth2Client({
+        clientId,
+        clientSecret,
+        redirectUri: "postmessage", // Standard for server-side auth exchange from mobile clients
+      });
+
+      // Exchange authorization code for tokens
+      const { tokens } = await oauth2Client.getToken(authCode);
+      oauth2Client.setCredentials(tokens);
+
+      // Verify and decode profile
+      if (tokens.id_token) {
+        const ticket = await oauth2Client.verifyIdToken({
+          idToken: tokens.id_token,
+          audience: clientId,
+        });
+        const payload = ticket.getPayload();
+        if (payload) {
+          playerId = payload.sub; // Unique subject ID from google
+          displayName = payload.name || `GPGS_${playerId.substring(0, 5)}`;
+        }
+      }
+
+      // Fallback: Query Google Play Games profile API using verified access token
+      if (!playerId && tokens.access_token) {
+        const response = await fetch("https://www.googleapis.com/games/v1/players/me", {
+          headers: {
+            Authorization: `Bearer ${tokens.access_token}`,
+          },
+        });
+        if (response.ok) {
+          const profileData: any = await response.json();
+          playerId = profileData.playerId || profileData.playerId;
+          displayName = profileData.displayName || displayName;
+        } else {
+          throw new Error("Unable to fetch GPGS profile with access token.");
+        }
+      }
+
+      if (!playerId) {
+        throw new Error("Failed to verify Google Play Player ID.");
+      }
+    }
+
+    // --- GAME LIFECYCLE CHECK & REGISTRATION HOOK ---
+    // Look up if a player profile exists with this GPGS ID in the galaxy state (stored in state.players)
+    let player = Object.values(state.players).find(p => p.gpgsPlayerId === playerId);
+
+    if (player) {
+      // Existing user found! Log them in
+      console.log(`[GPGS Auth] Existing user found: ${player.username} (ID: ${player.id})`);
+      return res.json({ player, isNew: false });
+    }
+
+    // Initialize new baseline profile for the GPGS commander
+    const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
+    const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
+    const selectFaction = factions[0];
+    const selectColor = factionColors[0];
+
+    const cleanUsername = displayName.replace(/[^a-zA-Z0-9_ ]/g, "").substring(0, 15) || `Commander_${playerId.substring(0, 5)}`;
+    const uid = `gpgs_${playerId}`;
+
+    const newPlayer: PlayerProfile = {
+      id: uid,
+      username: cleanUsername,
+      faction: selectFaction,
+      factionColor: selectColor,
+      allianceId: null,
+      allianceRole: null,
+      planets: [],
+      scores: {
+        population: 0,
+        attack: 0,
+        defence: 0,
+        raiders: 0
+      },
+      achievements: ["GPGS Connected", "Google Verified Commander"],
+      skinId: "default",
+      bannerId: "default",
+      lastDailyRewardClaim: Date.now(),
+      credits: 10000,
+      gpgsPlayerId: playerId,
+      gpgsDisplayName: displayName
+    };
+
+    state.players[uid] = newPlayer;
+
+    // Log discovery event to the galaxy
+    state.newsEvents.unshift({
+      id: `news_${Math.random().toString(36).substr(2, 9)}`,
+      title: "GPGS Commander Joined",
+      content: `Commander ${cleanUsername} authorized via Google Play Games!`,
+      type: "discovery",
+      timestamp: Date.now()
+    });
+
+    // Welcome message in global chat
+    state.chatMessages.push({
+      id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
+      channel: "global",
+      senderId: "system",
+      senderName: "CENTRAL COMMAND",
+      senderFaction: "System",
+      senderFactionColor: "#7F8C8D",
+      allianceTag: "SYS",
+      receiverId: null,
+      content: `Google Play Games sync established. Welcome Commander ${cleanUsername} to active space duty!`,
+      timestamp: Date.now()
+    });
+
+    // Save database to disk
+    saveState();
+
+    return res.json({ player: newPlayer, isNew: true });
+
+  } catch (err: any) {
+    console.error("[GPGS Auth Error]", err);
+    return res.status(401).json({ error: `Google Play Games verification failed: ${err.message}` });
   }
 });
 
@@ -3528,12 +3702,12 @@ app.post("/api/train/troop", (req, res) => {
   if (troopId === "settlementShip") {
     const allWarRoomsReached22 = p.planets.every(pl => (pl.buildings.armyBase?.level || 0) >= 22);
     if (!allWarRoomsReached22) {
-      return res.status(400).json({ error: "To queue/train a Settlement Ship, ALL of your War Rooms (Army Bases) must be upgraded to Level 22 or higher!" });
+      return res.status(400).json({ error: "To queue/train a Settlement Ship, ALL of your War Rooms must be upgraded to Level 22 or higher!" });
     }
 
     const hasActiveBaseLevel1 = (planet.buildings.armyBase?.level || 0) >= 1;
     if (!hasActiveBaseLevel1) {
-      return res.status(400).json({ error: "To build a Settlement Ship, this base's War Room (Army Base) must be upgraded to Level 1!" });
+      return res.status(400).json({ error: "To build a Settlement Ship, this base's War Room must be upgraded to Level 1!" });
     }
 
     if (count > 1) {

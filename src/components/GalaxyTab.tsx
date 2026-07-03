@@ -3440,7 +3440,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                       
                       {planetReserves.length === 0 ? (
                         <p className="text-[9.5px] text-slate-400 leading-relaxed font-sans">
-                          No pre-constructed reserve fleets docked on this station. To prepare reserve fleets, visit the <span className="text-cyan-400 font-bold">War Room (Army Base)</span> where you can build, name, and manage subsidiaries of duplicate fleets.
+                          No pre-constructed reserve fleets docked on this station. To prepare reserve fleets, visit the <span className="text-cyan-400 font-bold">War Room (CMD Tab)</span> where you can build, name, and manage subsidiaries of duplicate fleets.
                         </p>
                       ) : (
                         <div className="space-y-2">

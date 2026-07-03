@@ -9,7 +9,7 @@ export const redis = new Redis({
   lazyConnect: true, // Non-blocking lazy connection
   maxRetriesPerRequest: 1, // Fail fast on requests if connection drops
   connectTimeout: 2000, // Timeout connection after 2 seconds
-  enableOfflineQueue: false, // Do not queue commands when Redis is offline
+  enableOfflineQueue: true, // Allow commands to queue while connection is establishing
 });
 
 redis.on("connect", () => {

@@ -73,7 +73,7 @@ const TECHS: TechDef[] = [
 const FAQS = [
   {
     q: "How do I acquire new stations/colonies?",
-    a: "Build a Settlement Ship in the Shipyard (Army tab) and dispatch it to an uncolonized coordinate in the Galaxy Map. Once it arrives, load that planet in your Sector Hub to materialize your new outpost."
+    a: "Build a Settlement Ship in the War Room (CMD tab) and dispatch it to an uncolonized coordinate in the Galaxy Map. Once it arrives, load that planet in your Sector Hub to materialize your new outpost."
   },
   {
     q: "What happens if my resources run negative?",
@@ -85,7 +85,7 @@ const FAQS = [
   },
   {
     q: "How do I expand my resource storage limits?",
-    a: "Upgrade the Repository facility in your established structures. Each upgrade level expands your maximum warehouse limit for all local resources."
+    a: "Upgrade the Silo facility in your established structures. Each upgrade level expands your maximum warehouse limit for all local resources."
   },
   {
     q: "How can I speed up research and manufacturing?",
@@ -101,11 +101,11 @@ const FAQS = [
   },
   {
     q: "Can I rename my space station outpost?",
-    a: "Absolutely. Navigate to the Explore Tab, click on your facility name or the 'Rename' button at the top header, type a majestic sovereign name of your choice, and confirm."
+    a: "Absolutely. Navigate to the XPL (Explore) Tab, click on your facility name or the 'Rename' button at the top header, type a majestic sovereign name of your choice, and confirm."
   },
   {
     q: "How do I activate extraction overdrive production boosts?",
-    a: "Click 'BOOST PRODUCTION' at the top of the Explore Tab (above the resources listings) to temporarily buy a 1.14x (14%) resource extraction factor booster for credits."
+    a: "Click 'BOOST PRODUCTION' at the top of the XPL (Explore) Tab (above the resources listings) to temporarily buy a 1.14x (14%) resource extraction factor booster for credits."
   },
   {
     q: "How do Alliance systems work?",
@@ -113,7 +113,7 @@ const FAQS = [
   },
   {
     q: "Where can I locate foreign sector coordinate targets?",
-    a: "Navigate to the Galaxy Tab or the Sovereignty page, run telemetry radar sweeps to scan, or enter target coordinate vectors directly to discover habitable nodes or other bases."
+    a: "Navigate to the RDR (Galaxy) Tab or the Sovereignty page, run telemetry radar sweeps to scan, or enter target coordinate vectors directly to discover habitable nodes or other bases."
   },
   {
     q: "How does battle plunder work?",
@@ -133,7 +133,7 @@ const FAQS = [
   },
   {
     q: "Why can I not build or upgrade research projects on my new colony?",
-    a: "Each new colony outpost must possess its own active Research Center. Construct it in the 'Established Structures' lists under the Explore Tab to unlock labs."
+    a: "Each new colony outpost must possess its own active Research Center. Construct it in the 'Established Structures' lists under the XPL (Explore) Tab to unlock labs."
   },
   {
     q: "What is the difference between Interceptors and Assault Drones?",

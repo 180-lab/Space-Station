@@ -112,6 +112,8 @@ export interface PlayerProfile {
   credits: number;
   completedTutorialTasks?: number[];
   googleEmail?: string;
+  gpgsPlayerId?: string;
+  gpgsDisplayName?: string;
   password?: string;
   lastActive?: number;
   commandMessages?: CommandMessage[];
