@@ -61,6 +61,98 @@ export function playAlertySound() {
 }
 
 /**
+ * Plays a powerful, high-priority oscillating siren that sounds like a nuclear warning.
+ * Uses detuned sawtooth oscillators modulated by an LFO to create a heavy warbling alarm effect.
+ */
+export function playNuclearWarningSound() {
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    const now = ctx.currentTime;
+    const duration = 2.0;
+
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    const gainNode = ctx.createGain();
+
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(380, now);
+    
+    osc2.type = 'sawtooth';
+    osc2.frequency.setValueAtTime(383, now); // slightly detuned
+
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(2.0, now); // 2Hz siren oscillation
+
+    lfoGain.gain.setValueAtTime(100, now); // oscillate by 100Hz
+
+    gainNode.gain.setValueAtTime(0.001, now);
+    gainNode.gain.linearRampToValueAtTime(0.2, now + 0.15);
+    gainNode.gain.setValueAtTime(0.2, now + duration - 0.4);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc1.frequency);
+    lfoGain.connect(osc2.frequency);
+
+    osc1.connect(gainNode);
+    osc2.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    lfo.start(now);
+    osc1.start(now);
+    osc2.start(now);
+
+    lfo.stop(now + duration);
+    osc1.stop(now + duration);
+    osc2.stop(now + duration);
+  } catch (err) {
+    console.warn('[Sound Engine] Failed to play nuclear warning:', err);
+  }
+}
+
+/**
+ * Handles unified vibration and audio alert based on the user's selected mode.
+ * Modes: 'vibrate' | 'sound' | 'both' | 'mute'
+ * isAttack: if true, triggers a nuclear warning sound and heavy pulsing vibration pattern.
+ */
+export function triggerNotificationAlert(isAttack: boolean) {
+  // Read alert mode from localStorage, default to 'both'
+  const alertMode = localStorage.getItem('moonbase_notification_alert_mode') || 'both';
+
+  if (alertMode === 'mute') {
+    return; // Do absolutely nothing when muted
+  }
+
+  const playSound = alertMode === 'sound' || alertMode === 'both';
+  const playVibrate = alertMode === 'vibrate' || alertMode === 'both';
+
+  // 1. Play Sound
+  if (playSound) {
+    if (isAttack) {
+      playNuclearWarningSound();
+    } else {
+      playAlertySound();
+    }
+  }
+
+  // 2. Play Vibe
+  if (playVibrate && typeof navigator !== 'undefined' && navigator.vibrate) {
+    if (isAttack) {
+      // Nuclear attack alarm pulse: heavy 3-pulse vibration pattern
+      navigator.vibrate([600, 200, 600, 200, 600]);
+    } else {
+      // Standard gentle pulse
+      navigator.vibrate([100]);
+    }
+  }
+}
+
+/**
  * Plays a beautiful, soft, chilled positive chime.
  * Uses a gentle arpeggiated major chord with a sine wave and smooth decay.
  */

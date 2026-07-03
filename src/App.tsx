@@ -14,7 +14,7 @@ import {
 } from './types';
 import { sendMobileNotification } from './lib/mobileNotifications';
 import { initializePushNotifications, setupSSEConnection } from './lib/pushNotifications';
-import { playAlertySound, playChilledSound } from './lib/soundUtils';
+import { playAlertySound, playChilledSound, triggerNotificationAlert } from './lib/soundUtils';
 import { ExploreTab } from './components/ExploreTab';
 import { ArmyBaseTab } from './components/ArmyBaseTab';
 import { GalaxyTab } from './components/GalaxyTab';
@@ -672,8 +672,15 @@ export default function App() {
       // Mirror to local phone alerts
       sendMobileNotification(notification.title, notification.body);
       
-      // Play tactical notification chime
-      playAlertySound();
+      // Play tactical notification chime or nuclear alarm based on settings
+      const titleLower = notification.title.toLowerCase();
+      const bodyLower = notification.body.toLowerCase();
+      const isAttack = titleLower.includes('attack') || bodyLower.includes('attack') || titleLower.includes('tactical alert') || titleLower.includes('hostile') || bodyLower.includes('hostile');
+      const isLaunch = titleLower.includes('deployed') || bodyLower.includes('deployed') || titleLower.includes('launched') || bodyLower.includes('launched') || titleLower.includes('dispatched') || bodyLower.includes('dispatched');
+
+      if (!isLaunch) {
+        triggerNotificationAlert(isAttack);
+      }
     });
 
     return () => {
@@ -775,29 +782,48 @@ export default function App() {
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
 
-    // Play notification sound if SFX is enabled
-    const soundEnabled = localStorage.getItem('moonbase_sound_enabled') !== 'false';
+    const messageLower = message.toLowerCase();
+    const isLaunch = messageLower.includes('deployed') || 
+                      messageLower.includes('dispatched') || 
+                      messageLower.includes('sent') || 
+                      messageLower.includes('launched');
 
-    if (soundEnabled) {
-      const isAttack = message.toLowerCase().includes('tactical alert') || 
-                       message.toLowerCase().includes('intel warning') || 
-                       message.toLowerCase().includes('attack') || 
-                       message.toLowerCase().includes('hostile');
-      if (isAttack) {
-        playAlertySound();
-      } else {
-        const isCommonMutedAction = 
-          message.toLowerCase().includes('switched') || 
-          message.toLowerCase().includes('rename') || 
-          message.toLowerCase().includes('setting') || 
-          message.toLowerCase().includes('profile') || 
-          message.toLowerCase().includes('clipboard') || 
-          message.toLowerCase().includes('copied');
-        
-        const nonCriticalSoundEnabled = localStorage.getItem('moonbase_non_critical_sound_enabled') === 'true';
+    if (isLaunch) {
+      return; // no sound happens when launching an attack
+    }
 
-        if (!isCommonMutedAction && nonCriticalSoundEnabled) {
-          playChilledSound();
+    const isAttack = messageLower.includes('tactical alert') || 
+                     messageLower.includes('intel warning') || 
+                     messageLower.includes('attack') || 
+                     messageLower.includes('hostile');
+
+    const isCommonMutedAction = 
+      messageLower.includes('switched') || 
+      messageLower.includes('rename') || 
+      messageLower.includes('setting') || 
+      messageLower.includes('profile') || 
+      messageLower.includes('clipboard') || 
+      messageLower.includes('copied');
+
+    if (isAttack) {
+      triggerNotificationAlert(true);
+    } else if (!isCommonMutedAction) {
+      const alertMode = localStorage.getItem('moonbase_notification_alert_mode') || 'both';
+      const nonCriticalEnabled = localStorage.getItem('moonbase_non_critical_sound_enabled') === 'true';
+
+      if (alertMode !== 'mute') {
+        const playSound = alertMode === 'sound' || alertMode === 'both';
+        const playVibrate = alertMode === 'vibrate' || alertMode === 'both';
+
+        if (playSound) {
+          if (nonCriticalEnabled) {
+            playChilledSound();
+          } else {
+            playAlertySound();
+          }
+        }
+        if (playVibrate && typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate([100]);
         }
       }
     }

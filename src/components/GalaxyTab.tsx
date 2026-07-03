@@ -428,15 +428,27 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
     try {
       const saved = localStorage.getItem(`moonbase_watchlist_groups_${player.id}`);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.map(group => {
+            if (group.id === 'group_allies' && group.name === '🤝 Allied Systems') {
+              return { ...group, name: '🤝 Allied Players on the Watchlist' };
+            }
+            if (group.id === 'group_farming' && group.name === '🌾 Resource Outposts') {
+              return { ...group, name: '🌾 Farms' };
+            }
+            return group;
+          });
+        }
+        return parsed;
       }
     } catch (e) {
       console.error("Failed to load watchlist from localStorage:", e);
     }
     return [
       { id: 'group_enemies', name: '🎯 High-Value Targets', items: [] },
-      { id: 'group_allies', name: '🤝 Allied Systems', items: [] },
-      { id: 'group_farming', name: '🌾 Resource Outposts', items: [] }
+      { id: 'group_allies', name: '🤝 Allied Players on the Watchlist', items: [] },
+      { id: 'group_farming', name: '🌾 Farms', items: [] }
     ];
   });
 

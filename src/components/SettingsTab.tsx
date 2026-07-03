@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlayerProfile } from '../types';
 import { requestNotificationPermission, sendMobileNotification } from '../lib/mobileNotifications';
+import { playChilledSound } from '../lib/soundUtils';
 import { DEFAULT_TUTORIAL_TASKS } from './CommanderTutorial';
 import { 
   Settings, 
@@ -350,6 +351,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     return localStorage.getItem('moonbase_comms_notifications_enabled') !== 'false';
   });
 
+  // Notification Alert Mode: 'vibrate' | 'sound' | 'both' | 'mute'
+  const [notificationAlertMode, setNotificationAlertMode] = useState<'vibrate' | 'sound' | 'both' | 'mute'>(() => {
+    return (localStorage.getItem('moonbase_notification_alert_mode') as any) || 'both';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('moonbase_notification_alert_mode', notificationAlertMode);
+  }, [notificationAlertMode]);
+
   // Track state changes to persist
   useEffect(() => {
     localStorage.setItem('moonbase_sound_enabled', String(soundEnabled));
@@ -619,6 +629,44 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           {showSoundFx && (
             <>
               <div className="space-y-5">
+                {/* Notification Alert Mode selection group */}
+                <div className="space-y-2 pt-1 border-b border-[#1E293B]/40 pb-4">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-200 block uppercase">Notification Alert Mode</span>
+                    <p className="text-[10.5px] text-slate-500 leading-relaxed font-sans">
+                      Select how you receive transmission alerts. Attacks trigger nuclear sirens and custom heavy vibrations.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5 p-1 bg-[#05070A] border border-[#1E293B] rounded-xl text-[10px] font-mono">
+                    {(['vibrate', 'sound', 'both', 'mute'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => {
+                          setNotificationAlertMode(mode);
+                          localStorage.setItem('moonbase_notification_alert_mode', mode);
+                          showToast(`Alert style updated to: ${mode.toUpperCase()}`, 'info');
+                          
+                          // Short test pulse/sound
+                          if (mode === 'sound' || mode === 'both') {
+                            playChilledSound();
+                          }
+                          if ((mode === 'vibrate' || mode === 'both') && typeof navigator !== 'undefined' && navigator.vibrate) {
+                            navigator.vibrate([100]);
+                          }
+                        }}
+                        className={`py-2 rounded-lg font-bold uppercase transition-all duration-150 cursor-pointer ${
+                          notificationAlertMode === mode 
+                            ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_8px_rgba(34,211,238,0.1)]' 
+                            : 'text-slate-400 hover:text-white border border-transparent'
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Sound FX Toggle */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-0.5">
