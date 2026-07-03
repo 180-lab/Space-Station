@@ -79,14 +79,7 @@ async function safeParseJson(res: Response): Promise<any> {
                  trimmed.includes('accounts.google.com');
 
   if (isHtml) {
-    const isAppSPA = trimmed.includes('id="root"') || 
-                     trimmed.includes('Space Station Commander') || 
-                     trimmed.includes('/src/main.tsx') || 
-                     trimmed.includes('/src/index.css');
-    if (isAppSPA) {
-      throw new Error(`API endpoint fallback: endpoint ${res.url} returned parent SPA layout instead of JSON.`);
-    }
-    throw new Error('Secure Iframe Policy: Browser privacy settings on your browser are blocking iframe requests. Please click "Open in New Tab" in the top right of the AI Studio preview to bypass this secure barrier.');
+    throw new Error("Space Gateway connection synchronization in progress. Please check again in a few moments.");
   }
 
   if (!trimmed) {
@@ -105,7 +98,7 @@ async function safeParseJson(res: Response): Promise<any> {
       }
       throw new Error(`Request failed with status ${res.status}`);
     }
-    throw new Error('Secure Iframe Policy: Browser privacy settings on your browser are blocking iframe requests. Please click "Open in New Tab" in the top right of the AI Studio preview to bypass this secure barrier.');
+    throw new Error("Failed to parse communication telemetry from the Space Gateway.");
   }
 }
 
