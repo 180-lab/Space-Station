@@ -1159,15 +1159,15 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="flex flex-col items-end gap-1.5 shrink-0">
                               {/* Watchlist dropdown */}
-                              <div className="relative">
+                              <div className="relative w-full sm:w-auto">
                                 <button 
                                   onClick={() => {
                                     setShowAddToWatchlistMenu(showAddToWatchlistMenu === target.planetId ? null : target.planetId);
                                     setIsAddingNewGroupInline(false);
                                   }}
-                                  className={`px-3 py-1.5 border hover:bg-[#1E293B]/45 rounded-lg text-xs font-bold font-mono flex items-center gap-1 transition cursor-pointer ${
+                                  className={`px-3 py-1.5 border hover:bg-[#1E293B]/45 rounded-lg text-xs font-bold font-mono flex items-center justify-center gap-1 transition cursor-pointer w-full sm:w-28 ${
                                     watchlistGroups.some(g => g.items.some((item: any) => item.planetId === target.planetId))
                                       ? 'bg-amber-500/15 border-amber-500/45 text-amber-450 hover:bg-amber-500/25'
                                       : 'bg-[#0A0F1D] border-[#1E293B] text-slate-400 hover:text-white'
@@ -1175,7 +1175,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   title="Add or organize this station into your watchlist groups"
                                 >
                                   <span>★</span>
-                                  <span className="hidden sm:inline">Watch</span>
+                                  <span>Watch</span>
                                 </button>
 
                                 {showAddToWatchlistMenu === target.planetId && (
@@ -1288,7 +1288,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     [target.planetId]: !prev[target.planetId]
                                   }));
                                 }}
-                                className="px-3 py-1.5 bg-[#0D1527] border border-[#1E293B] hover:border-[#38bdf8]/40 hover:bg-[#0F1E36] rounded-lg text-xs font-bold font-mono text-slate-300 hover:text-cyan-400 flex items-center gap-1 transition cursor-pointer"
+                                className="px-3 py-1.5 bg-[#0D1527] border border-[#1E293B] hover:border-[#38bdf8]/40 hover:bg-[#0F1E36] rounded-lg text-xs font-bold font-mono text-slate-300 hover:text-cyan-400 flex items-center justify-center gap-1 transition cursor-pointer w-full sm:w-28"
                               >
                                 <span>{isExpanded ? "Hide" : "Show"} Details</span>
                                 {isExpanded ? <ChevronUp size={14} className="text-red-400" /> : <ChevronDown size={14} className="text-cyan-400" />}
