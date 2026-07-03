@@ -70,6 +70,8 @@ interface ArmyBaseTabProps {
   localResources?: Record<string, number>;
   isUpgrading?: boolean;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  onCancelFleet?: (fleetId: string) => Promise<void>;
+  onRerouteFleet?: (fleetId: string, targetX: number, targetY: number, missionType?: string) => Promise<void>;
 }
 
 const TROOP_DETAILS = {
@@ -172,7 +174,9 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   onViewPlayerProfile,
   localResources,
   isUpgrading = false,
-  showToast
+  showToast,
+  onCancelFleet,
+  onRerouteFleet
 }) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({
     defender: 0,
@@ -182,6 +186,11 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
     drone: 0,
     settlementShip: 0
   });
+
+  // Rerouting inputs state
+  const [reroutingFleetId, setReroutingFleetId] = useState<string | null>(null);
+  const [rerouteX, setRerouteX] = useState<string>('');
+  const [rerouteY, setRerouteY] = useState<string>('');
 
   const [activeTroopInfo, setActiveTroopInfo] = useState<string | null>(null);
   const [activeImageZoom, setActiveImageZoom] = useState<string | null>(null);
@@ -2073,6 +2082,137 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                             >
                               🚀 INITIATE HABITATION COLONIAL CORING
                             </button>
+                          </div>
+                        )}
+
+                        {/* Cancel, Recall & Reroute Actions */}
+                        {isOutgoing && !fleet.isReturning && (
+                          <div className="mt-3.5 space-y-2 border-t border-slate-800/40 pt-2.5">
+                            {fleet.isWaitingToSettle ? (
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onCancelFleet) onCancelFleet(fleet.id);
+                                  }}
+                                  className="py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold uppercase text-[9px] rounded-lg transition cursor-pointer text-center"
+                                >
+                                  ↩ Recall Troops
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReroutingFleetId(fleet.id);
+                                    setRerouteX('');
+                                    setRerouteY('');
+                                  }}
+                                  className="py-1.5 px-3 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/30 font-bold uppercase text-[9px] rounded-lg transition cursor-pointer text-center"
+                                >
+                                  📍 Move planet
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-2">
+                                {(() => {
+                                  const totalDuration = fleet.arrivesAt - fleet.startedAt;
+                                  const elapsed = serverTime - fleet.startedAt;
+                                  const progressPercent = totalDuration > 0 ? (elapsed / totalDuration) * 100 : 0;
+                                  const isAttack = fleet.missionType === 'attack';
+                                  const cannotRecallAttack = isAttack && progressPercent > 45;
+
+                                  return (
+                                    <button
+                                      type="button"
+                                      disabled={cannotRecallAttack}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (onCancelFleet) onCancelFleet(fleet.id);
+                                      }}
+                                      className={`py-1.5 px-3 font-bold uppercase text-[9px] rounded-lg transition border text-center ${
+                                        cannotRecallAttack
+                                          ? 'bg-red-950/40 text-red-500 border-red-950 cursor-not-allowed'
+                                          : 'bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 cursor-pointer'
+                                      }`}
+                                    >
+                                      {cannotRecallAttack ? `🚫 Locked (${Math.round(progressPercent)}%)` : '🛑 Abort Mission'}
+                                    </button>
+                                  );
+                                })()}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReroutingFleetId(fleet.id);
+                                    setRerouteX('');
+                                    setRerouteY('');
+                                  }}
+                                  className="py-1.5 px-3 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/25 font-bold uppercase text-[9px] rounded-lg transition cursor-pointer text-center"
+                                >
+                                  📍 Reroute
+                                </button>
+                              </div>
+                            )}
+
+                            {reroutingFleetId === fleet.id && (
+                              <div className="p-3 bg-slate-950/90 border border-[#1E293B] rounded-lg space-y-2 mt-2" onClick={e => e.stopPropagation()}>
+                                <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">Set New Flight Vectors</p>
+                                <div className="flex gap-2 items-center">
+                                  <div className="flex-1">
+                                    <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Coord X</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      value={rerouteX}
+                                      onChange={(e) => setRerouteX(e.target.value)}
+                                      placeholder="0-100"
+                                      className="w-full bg-[#05070A] border border-slate-800 text-cyan-400 rounded px-2 py-1 text-xs text-center font-bold"
+                                    />
+                                  </div>
+                                  <div className="flex-1">
+                                    <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Coord Y</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      value={rerouteY}
+                                      onChange={(e) => setRerouteY(e.target.value)}
+                                      placeholder="0-100"
+                                      className="w-full bg-[#05070A] border border-slate-800 text-cyan-400 rounded px-2 py-1 text-xs text-center font-bold"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const tx = parseInt(rerouteX, 10);
+                                      const ty = parseInt(rerouteY, 10);
+                                      if (isNaN(tx) || isNaN(ty) || tx < 0 || tx > 100 || ty < 0 || ty > 100) {
+                                        showToast('Invalid coordinates (0-100 allowed)', 'error');
+                                        return;
+                                      }
+                                      if (onRerouteFleet) {
+                                        await onRerouteFleet(fleet.id, tx, ty);
+                                        setReroutingFleetId(null);
+                                      }
+                                    }}
+                                    className="flex-1 py-1 px-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded font-bold uppercase text-[9px] cursor-pointer"
+                                  >
+                                    Confirm Jump
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setReroutingFleetId(null)}
+                                    className="py-1 px-3 bg-slate-800 hover:bg-slate-700 text-slate-350 rounded font-bold uppercase text-[9px] cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

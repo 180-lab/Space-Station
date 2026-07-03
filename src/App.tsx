@@ -1613,6 +1613,30 @@ export default function App() {
     }
   };
 
+  const handleCancelFleet = async (fleetId: string) => {
+    if (!player) return;
+    try {
+      const res = await fetch('/api/fleet/cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ fleetId })
+      });
+      const data = await safeParseJson(res);
+      if (res.ok) {
+        setPlayer(data.player);
+        fetchState();
+        showToast('TACTICAL ABORT CONFIRMED! Fleet ordered back to base.', 'success');
+      } else {
+        showToast(data.error || 'Tactical abort request refused', 'error');
+      }
+    } catch (err) {
+      showToast('Network error on aborting mission', 'error');
+    }
+  };
+
   const handleStartSettleFlow = (fleetId: string) => {
     setSettleFleetId(fleetId);
     setCustomColonyName(''); // Ensure it starts completely empty with no default name
@@ -2802,6 +2826,8 @@ export default function App() {
               setSelectedPlanetId={setSelectedPlanetId}
               customTasks={customTasks}
               isUpgrading={isUpgrading}
+              onCancelFleet={handleCancelFleet}
+              onRerouteFleet={handleRerouteFleet}
             />
           );
         })()}
@@ -2830,6 +2856,8 @@ export default function App() {
             localResources={localResources}
             isUpgrading={isUpgrading}
             showToast={showToast}
+            onCancelFleet={handleCancelFleet}
+            onRerouteFleet={handleRerouteFleet}
           />
         )}
 
@@ -4193,6 +4221,56 @@ export default function App() {
                                   )}
                                 </p>
                                 <p className="text-slate-400 leading-normal break-all">Target Sector: <span className="text-slate-200">{fleet.targetName} Coordinates [{fleet.targetCoords.x}, {fleet.targetCoords.y}]</span></p>
+
+                                {/* Action Buttons Inside Alert Item */}
+                                {!isReturn && (
+                                  <div className="pt-2 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+                                    {isWaiting ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleStartSettleFlow(fleet.id);
+                                            setIsAlertsOpen(false);
+                                          }}
+                                          className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold uppercase text-[9px] rounded cursor-pointer transition"
+                                        >
+                                          🚀 Establish Colony
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCancelFleet(fleet.id)}
+                                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-350 border border-slate-700 font-bold uppercase text-[9px] rounded cursor-pointer transition"
+                                        >
+                                          ↩ Recall Troops
+                                        </button>
+                                      </>
+                                    ) : (
+                                      (() => {
+                                        const totalDuration = fleet.arrivesAt - fleet.startedAt;
+                                        const elapsed = serverTime - fleet.startedAt;
+                                        const progressPercent = totalDuration > 0 ? (elapsed / totalDuration) * 100 : 0;
+                                        const isAttack = fleet.missionType === 'attack';
+                                        const cannotRecallAttack = isAttack && progressPercent > 45;
+
+                                        return (
+                                          <button
+                                            type="button"
+                                            disabled={cannotRecallAttack}
+                                            onClick={() => handleCancelFleet(fleet.id)}
+                                            className={`px-2.5 py-1 font-bold uppercase text-[9px] rounded transition border ${
+                                              cannotRecallAttack
+                                                ? 'bg-red-950/40 text-red-500 border-red-950 cursor-not-allowed'
+                                                : 'bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 cursor-pointer'
+                                            }`}
+                                          >
+                                            {cannotRecallAttack ? `🚫 Recall Locked (${Math.round(progressPercent)}%)` : '🛑 Abort Mission'}
+                                          </button>
+                                        );
+                                      })()
+                                    )}
+                                  </div>
+                                )}
                               </div>
                               {!isWaiting && (
                                 <div className="text-left sm:text-right shrink-0 mt-2 sm:mt-0 border-t border-slate-800 sm:border-0 pt-2 sm:pt-0 font-mono">

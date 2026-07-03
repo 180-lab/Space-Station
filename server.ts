@@ -4372,9 +4372,13 @@ app.post("/api/fleet/reroute", (req, res) => {
     }
   }
 
-  // Calculate coordinates distance
-  const dx = targetX - fleet.senderCoords.x;
-  const dy = targetY - fleet.senderCoords.y;
+  // Calculate coordinates distance from current location (which is targetCoords if landed)
+  const isLanded = !!fleet.isWaitingToSettle;
+  const originX = isLanded ? fleet.targetCoords.x : fleet.senderCoords.x;
+  const originY = isLanded ? fleet.targetCoords.y : fleet.senderCoords.y;
+
+  const dx = targetX - originX;
+  const dy = targetY - originY;
   const dist = Math.hypot(dx, dy);
 
   const speedLvl = fleet.troopSpeedLevel || 1;
@@ -4390,6 +4394,11 @@ app.post("/api/fleet/reroute", (req, res) => {
 
   const travelTimeMs = Math.round((dist / slowestTroopSpeed) * 60000);
   const now = Date.now();
+
+  // If the fleet was landed, its new starting point for the next jump is where it landed
+  if (isLanded) {
+    fleet.senderCoords = { x: originX, y: originY };
+  }
 
   // Update fleet state
   fleet.targetId = targetId;
@@ -4414,6 +4423,74 @@ app.post("/api/fleet/reroute", (req, res) => {
 
   fleet.startedAt = now;
   fleet.arrivesAt = now + travelTimeMs;
+
+  saveState();
+  res.json({ player: p, success: true, fleets: state.fleets });
+});
+
+
+// Cancel or recall an active or landed fleet mission
+app.post("/api/fleet/cancel", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { fleetId } = req.body;
+  const fleet = state.fleets.find(f => f.id === fleetId && f.senderId === p.id);
+  if (!fleet) {
+    return res.status(404).json({ error: "Active mission fleet not found or not owned by you" });
+  }
+
+  if (fleet.isReturning) {
+    return res.status(400).json({ error: "This fleet is already returning to its home coordinates!" });
+  }
+
+  const now = Date.now();
+
+  // Rule: attacks cannot be recalled if they have completed more than 45% of the journey
+  if (fleet.missionType === "attack" && !fleet.isWaitingToSettle) {
+    const totalDuration = fleet.arrivesAt - fleet.startedAt;
+    const elapsed = now - fleet.startedAt;
+    const progressPercent = totalDuration > 0 ? (elapsed / totalDuration) * 100 : 0;
+    if (progressPercent > 45) {
+      return res.status(400).json({
+        error: `Recall denied! Attack fleet has completed ${Math.round(progressPercent)}% of its journey (maximum 45% allowed for cancel/recall).`
+      });
+    }
+  }
+
+  // Calculate return time
+  if (fleet.isWaitingToSettle) {
+    // Landed fleet: must travel the full distance back from targetCoords to senderCoords
+    const dx = fleet.senderCoords.x - fleet.targetCoords.x;
+    const dy = fleet.senderCoords.y - fleet.targetCoords.y;
+    const dist = Math.hypot(dx, dy);
+
+    const speedLvl = fleet.troopSpeedLevel || 1;
+    const boostPct = Math.max(0, Math.min(35, (speedLvl - 1) * (35 / 19))) / 100;
+    const speedMultiplier = 1.0 + boostPct;
+
+    const slowestTroopSpeed = (Object.entries(fleet.troops)
+      .filter(([_, qty]) => (qty as number) > 0)
+      .reduce((slowest, [tId, _]) => {
+        const sp = TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.speed || 5;
+        return sp < slowest ? sp : slowest;
+      }, 100)) * speedMultiplier;
+
+    const travelTimeMs = Math.round((dist / slowestTroopSpeed) * 60000);
+
+    fleet.isReturning = true;
+    fleet.isWaitingToSettle = false;
+    fleet.startedAt = now;
+    fleet.arrivesAt = now + travelTimeMs;
+  } else {
+    // In transit: returns in the same amount of time it has already spent in the air
+    const elapsed = now - fleet.startedAt;
+    const returnDuration = Math.max(0, elapsed);
+
+    fleet.isReturning = true;
+    fleet.startedAt = now;
+    fleet.arrivesAt = now + returnDuration;
+  }
 
   saveState();
   res.json({ player: p, success: true, fleets: state.fleets });
