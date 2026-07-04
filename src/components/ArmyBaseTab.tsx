@@ -240,6 +240,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   });
   const [isUnloading, setIsUnloading] = useState<string | null>(null);
   const [isTransferring, setIsTransferring] = useState<string | null>(null);
+  const [isDisbandingAll, setIsDisbandingAll] = useState(false);
 
   const handleManualUnload = async (fleet: CreatedFleet) => {
     setIsUnloading(fleet.id);
@@ -250,7 +251,10 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
           'Content-Type': 'application/json',
           'x-user-id': player.id
         },
-        body: JSON.stringify({ fleetId: fleet.id })
+        body: JSON.stringify({
+          fleetId: fleet.id,
+          createdFleets
+        })
       });
       const data = await res.json();
       if (res.ok && data.player) {
@@ -278,7 +282,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
         },
         body: JSON.stringify({
           fleetId,
-          transfers: cargoTransfers
+          transfers: cargoTransfers,
+          createdFleets
         })
       });
       const data = await res.json();
@@ -504,6 +509,44 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
       alert('Network error during fleet disassembly');
     } finally {
       setIsRefunding(null);
+    }
+  };
+
+  const handleDisbandAllFleets = async () => {
+    const docked = createdFleets.filter(f => f.planetId === activePlanet.id && !f.isTraveling);
+    if (docked.length === 0) return;
+    
+    if (!confirm(`Are you sure you want to disassemble all ${docked.length} docked reserve fleets? All troops will return to active hangar, and carried cargo will be unloaded to the repository.`)) {
+      return;
+    }
+
+    setIsDisbandingAll(true);
+    try {
+      const res = await fetch('/api/fleet/disassemble-all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({
+          planetId: activePlanet.id,
+          createdFleets
+        })
+      });
+      const data = await safeParseJson(res);
+      if (res.ok && data.player) {
+        if (onUpdatePlayer) {
+          onUpdatePlayer(data.player);
+        }
+        setCreatedFleets(prev => prev.filter(f => !(f.planetId === activePlanet.id && !f.isTraveling)));
+        showToast(`Disassembled all docked reserve fleets & successfully returned all units and cargo to active hangar.`, 'success');
+      } else {
+        showToast(data.error || 'Failed to disassemble all fleets', 'error');
+      }
+    } catch {
+      showToast('Network error during bulk disassembly', 'error');
+    } finally {
+      setIsDisbandingAll(false);
     }
   };
 
@@ -1577,16 +1620,37 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
               {/* Garrisoned Reserve Fleets list on this station */}
               <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-2xl space-y-3 text-left">
                 <h3 
-                  onClick={() => setIsReservesExpanded(!isReservesExpanded)}
-                  className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] border-b border-[#1E293B]/60 pb-2 flex items-center justify-between cursor-pointer select-none hover:text-cyan-400 transition"
+                  className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] border-b border-[#1E293B]/60 pb-2 flex items-center justify-between"
                 >
-                  <span className="flex items-center gap-1.5">
+                  <span 
+                    onClick={() => setIsReservesExpanded(!isReservesExpanded)}
+                    className="flex items-center gap-1.5 cursor-pointer select-none hover:text-cyan-400 transition"
+                  >
                     <span>🎒 DOCKED RESERVE ({createdFleets.filter(f => f.planetId === activePlanet.id).length})</span>
                     <span className="text-[10px] text-slate-500 font-mono">{isReservesExpanded ? '▼' : '▶'}</span>
                   </span>
-                  <span className="text-[9px] font-mono text-slate-500 hover:underline">
-                    {isReservesExpanded ? 'Collapse' : 'Expand Reserves'}
-                  </span>
+                  
+                  <div className="flex items-center gap-3">
+                    {createdFleets.filter(f => f.planetId === activePlanet.id && !f.isTraveling).length > 0 && (
+                      <button
+                        type="button"
+                        disabled={isDisbandingAll}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDisbandAllFleets();
+                        }}
+                        className="px-2 py-0.5 bg-red-950/35 hover:bg-red-900/40 text-red-400 border border-red-500/20 rounded text-[9px] font-bold font-mono transition cursor-pointer disabled:opacity-50"
+                      >
+                        {isDisbandingAll ? 'DISASSEMBLING...' : 'DISASSEMBLE ALL DOCKED'}
+                      </button>
+                    )}
+                    <span 
+                      onClick={() => setIsReservesExpanded(!isReservesExpanded)}
+                      className="text-[9px] font-mono text-slate-500 hover:underline cursor-pointer"
+                    >
+                      {isReservesExpanded ? 'Collapse' : 'Expand'}
+                    </span>
+                  </div>
                 </h3>
 
                 {isReservesExpanded && (

@@ -317,6 +317,7 @@ export interface LeaderboardPlayer {
   };
   achievements?: string[];
   planetsCount?: number;
+  planets?: { id: string; name: string; sectorX: number; sectorY: number; }[];
   lastActive?: number;
 }
 

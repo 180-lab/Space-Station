@@ -1132,8 +1132,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           className={`p-4 rounded-xl border flex flex-col transition duration-150 ${isUserSelf ? 'bg-indigo-950/10 border-indigo-500/30' : 'bg-[#05070A] border-[#1E293B] hover:border-white/15'}`}
                         >
                           {/* Top Header Row (Always Visible) */}
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+                            <div className="flex items-center gap-3 min-w-0">
                               <div 
                                 onClick={() => {
                                   if (!target.isHabitable && target.id && onViewPlayerProfile) {
@@ -1145,9 +1145,17 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               >
                                 {target.planetName[0]}
                               </div>
-                              <div className="text-left">
-                                <h4 className="font-bold text-slate-200 text-sm leading-tight">
-                                  {target.planetName} <span className="text-xs text-cyan-400 font-mono ml-2">({(targetDist * 1.917).toFixed(2)} Space Miles)</span>
+                              <div className="text-left min-w-0">
+                                <h4 
+                                  onClick={() => {
+                                    if (!target.isHabitable && target.id && onViewPlayerProfile) {
+                                      onViewPlayerProfile(target.id);
+                                    }
+                                  }}
+                                  className={`font-bold text-slate-200 text-[11px] sm:text-sm leading-tight truncate ${!target.isHabitable && target.id && onViewPlayerProfile ? 'cursor-pointer hover:text-cyan-400 transition' : ''}`}
+                                  title={!target.isHabitable && target.id && onViewPlayerProfile ? "Click to view Commander Profile" : undefined}
+                                >
+                                  {target.planetName} <span className="text-[10px] sm:text-xs text-cyan-400 font-mono ml-1.5">({(targetDist * 1.917).toFixed(2)} Space Miles)</span>
                                 </h4>
                                 <div className="text-[11px] text-slate-400 font-medium">
                                   {target.isHabitable ? (
@@ -1159,9 +1167,9 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               </div>
                             </div>
 
-                            <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
                               {/* Watchlist dropdown */}
-                              <div className="relative w-full sm:w-auto">
+                              <div className="relative w-1/2 sm:w-auto">
                                 <button 
                                   onClick={() => {
                                     setShowAddToWatchlistMenu(showAddToWatchlistMenu === target.planetId ? null : target.planetId);
@@ -1288,7 +1296,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     [target.planetId]: !prev[target.planetId]
                                   }));
                                 }}
-                                className="px-3 py-1.5 bg-[#0D1527] border border-[#1E293B] hover:border-[#38bdf8]/40 hover:bg-[#0F1E36] rounded-lg text-xs font-bold font-mono text-slate-300 hover:text-cyan-400 flex items-center justify-center gap-1 transition cursor-pointer w-full sm:w-28"
+                                className="px-2 sm:px-3 py-1.5 bg-[#0D1527] border border-[#1E293B] hover:border-[#38bdf8]/40 hover:bg-[#0F1E36] rounded-lg text-[10px] sm:text-xs font-bold font-mono text-slate-300 hover:text-cyan-400 flex items-center justify-center gap-1 transition cursor-pointer w-1/2 sm:w-28 shrink-0"
                               >
                                 <span>{isExpanded ? "Hide" : "Show"} Details</span>
                                 {isExpanded ? <ChevronUp size={14} className="text-red-400" /> : <ChevronDown size={14} className="text-cyan-400" />}
@@ -1367,15 +1375,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   </>
                                 ) : (
                                   <>
-                                    {onViewPlayerProfile && target.id && (
-                                      <button 
-                                        type="button"
-                                        onClick={() => onViewPlayerProfile(target.id)}
-                                        className="px-3.5 py-2 bg-indigo-950/25 border border-indigo-500/45 text-indigo-400 hover:bg-[#4f46e5]/15 rounded-xl font-bold transition cursor-pointer text-[11px]"
-                                      >
-                                        👤 Commander Profile
-                                      </button>
-                                    )}
+
                                     <button 
                                       type="button"
                                       onClick={() => fetchIntelReport(target.coords.x, target.coords.y)}

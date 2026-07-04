@@ -379,7 +379,12 @@ async function loadState() {
   try {
     if (fs.existsSync(STATE_FILE)) {
       const data = fs.readFileSync(STATE_FILE, "utf8");
-      state = JSON.parse(data);
+      try {
+        state = JSON.parse(data);
+      } catch (parseErr: any) {
+        console.warn("Warning: Failed to parse state file JSON, falling back to a fresh default state.", parseErr.message);
+        state = { players: {} } as any;
+      }
       if (!state.feedbacks) {
         state.feedbacks = [];
       }
@@ -4514,7 +4519,10 @@ app.post("/api/fleet/unload", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { fleetId } = req.body;
+  const { fleetId, createdFleets } = req.body;
+  if (Array.isArray(createdFleets)) {
+    p.createdFleets = createdFleets;
+  }
   if (!p.createdFleets) p.createdFleets = [];
   const fleet = p.createdFleets.find(f => f.id === fleetId);
   if (!fleet) return res.status(404).json({ error: "Reserve fleet not found" });
@@ -4549,7 +4557,10 @@ app.post("/api/fleet/transfer-resources", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { fleetId, transfers } = req.body;
+  const { fleetId, transfers, createdFleets } = req.body;
+  if (Array.isArray(createdFleets)) {
+    p.createdFleets = createdFleets;
+  }
   if (!p.createdFleets) p.createdFleets = [];
   const fleet = p.createdFleets.find(f => f.id === fleetId);
   if (!fleet) return res.status(404).json({ error: "Reserve fleet not found" });
@@ -4607,6 +4618,56 @@ app.post("/api/fleet/transfer-resources", (req, res) => {
       currentTotalFleetResources -= actualTransfer;
     }
   }
+
+  saveState();
+  res.json({ player: p, success: true });
+});
+
+// Disassemble all docked fleets on a given planet and return troops & cargo
+app.post("/api/fleet/disassemble-all", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId, createdFleets } = req.body;
+  if (Array.isArray(createdFleets)) {
+    p.createdFleets = createdFleets;
+  }
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  if (!p.createdFleets) p.createdFleets = [];
+
+  const dockedFleets = p.createdFleets.filter(f => f.planetId === planetId && !f.isTraveling);
+  if (dockedFleets.length === 0) {
+    return res.status(400).json({ error: "No docked fleets to disassemble on this station." });
+  }
+
+  const cap = getRepositoryCapacity(planet.buildings.repository.level);
+
+  dockedFleets.forEach(fleet => {
+    // Return all troops
+    for (const [tId, qty] of Object.entries(fleet.troops)) {
+      const q = Number(qty) || 0;
+      if (q > 0) {
+        planet.troops[tId as keyof typeof planet.troops] = (planet.troops[tId as keyof typeof planet.troops] || 0) + q;
+      }
+    }
+
+    // Unload all resources
+    if (fleet.resources) {
+      Object.entries(fleet.resources).forEach(([resName, amt]) => {
+        const amount = Number(amt) || 0;
+        if (amount > 0) {
+          const current = planet.resources[resName as any] || 0;
+          const addable = Math.min(Math.max(0, cap - current), amount);
+          planet.resources[resName as any] = current + addable;
+        }
+      });
+    }
+  });
+
+  // Remove disassembled fleets
+  p.createdFleets = p.createdFleets.filter(f => !(f.planetId === planetId && !f.isTraveling));
 
   saveState();
   res.json({ player: p, success: true });

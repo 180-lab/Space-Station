@@ -3356,6 +3356,7 @@ export default function App() {
              scores: player.scores,
              achievements: player.achievements || [],
              planetsCount: player.planets?.length || 1,
+             planets: player.planets || [],
              lastActive: Date.now()
           } : null);
 
@@ -3455,6 +3456,29 @@ export default function App() {
                   <div className="p-3 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex items-center justify-between mt-2">
                     <span className="text-[10px] text-slate-500 uppercase font-black">Raided Points</span>
                     <span className="text-amber-400 font-bold">{(targetPlayer.scores.raiders || 0).toLocaleString()} raided points</span>
+                  </div>
+                </div>
+
+                {/* Sovereign Bases List */}
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Sovereign Bases ({targetPlayer.planets?.length || targetPlayer.planetsCount || 1})</h4>
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1">
+                    {(targetPlayer.planets && targetPlayer.planets.length > 0) ? (
+                      targetPlayer.planets.map((pl: any, pIdx: number) => (
+                        <div key={pl.id || pIdx} className="p-2.5 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex items-center justify-between text-xs font-mono">
+                          <span className="text-slate-350 font-bold flex items-center gap-1.5">
+                            <span>🛰️</span>
+                            <span>{pl.name}</span>
+                          </span>
+                          <span className="text-[#00F0FF] text-[10px] font-mono">Sector [{pl.sectorX}, {pl.sectorY}]</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-2.5 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex items-center justify-between text-xs font-mono">
+                        <span className="text-slate-300 font-bold">🛰️ Main Sector Base</span>
+                        <span className="text-[#00F0FF] text-[10px] font-mono">Sector Coordinates Uncharted</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
