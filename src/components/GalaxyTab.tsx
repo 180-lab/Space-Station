@@ -1155,7 +1155,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   className={`font-bold text-slate-200 text-[11px] sm:text-sm leading-tight truncate ${!target.isHabitable && target.id && onViewPlayerProfile ? 'cursor-pointer hover:text-cyan-400 transition' : ''}`}
                                   title={!target.isHabitable && target.id && onViewPlayerProfile ? "Click to view Commander Profile" : undefined}
                                 >
-                                  {target.planetName} <span className="text-[10px] sm:text-xs text-cyan-400 font-mono ml-1.5">({(targetDist * 1.917).toFixed(2)} Space Miles)</span>
+                                  {target.planetName} <span className="text-[10px] sm:text-xs text-cyan-400 font-mono ml-1.5">[{target.coords.x}, {target.coords.y}]</span>
                                 </h4>
                                 <div className="text-[11px] text-slate-400 font-medium">
                                   {target.isHabitable ? (

@@ -3492,7 +3492,7 @@ export default function App() {
                     ) : (
                       <div className="p-3 bg-red-950/20 border border-red-500/10 text-red-400 rounded-xl text-[10px] uppercase font-bold tracking-tight text-center flex flex-col items-center gap-1">
                         <span>🔒 RESTRICTED SENSORY LOCK</span>
-                        <span className="text-slate-500 text-[9px] font-medium leading-relaxed max-w-[280px]">Sovereign planetary counts and coordinates are classified. Visible only to alliance members or administrators.</span>
+                        <span className="text-slate-500 text-[9px] font-medium leading-relaxed max-w-[280px]">Sovereign planetary counts and coordinates are classified. Visible only to alliance members.</span>
                       </div>
                     )}
                   </div>
