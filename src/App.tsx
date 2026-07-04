@@ -3366,6 +3366,11 @@ export default function App() {
         const factionColor = targetPlayer.factionColor || '#22d3ee';
         const targetAlliance = targetPlayer.allianceId ? alliances[targetPlayer.allianceId] : null;
 
+        const isAdmin = !!(player?.googleEmail && player.googleEmail.toLowerCase() === 'banele180@gmail.com');
+        const isSelf = player?.id === targetPlayer.id;
+        const isAllianceMember = !!(player?.allianceId && targetPlayer.allianceId === player.allianceId);
+        const canSeeStations = isAdmin || isSelf || isAllianceMember;
+
         return (
           <div 
             className="fixed inset-0 bg-[#05070A]/90 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
@@ -3437,7 +3442,9 @@ export default function App() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-3 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex flex-col justify-between">
                       <span className="text-[10px] text-slate-500">Colony Count</span>
-                      <span className="text-base font-bold text-slate-200 mt-1">{targetPlayer.planetsCount || 1} Starbases</span>
+                      <span className="text-base font-bold text-slate-200 mt-1">
+                        {canSeeStations ? `${targetPlayer.planetsCount || 1} Starbases` : "[CLASSIFIED]"}
+                      </span>
                     </div>
                     <div className="p-3 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex flex-col justify-between">
                       <span className="text-[10px] text-slate-500">Combined Population</span>
@@ -3461,22 +3468,31 @@ export default function App() {
 
                 {/* Sovereign Bases List */}
                 <div className="space-y-2">
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Sovereign Bases ({targetPlayer.planets?.length || targetPlayer.planetsCount || 1})</h4>
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                    Sovereign Bases ({canSeeStations ? (targetPlayer.planets?.length || targetPlayer.planetsCount || 1) : '[CLASSIFIED]'})
+                  </h4>
                   <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1">
-                    {(targetPlayer.planets && targetPlayer.planets.length > 0) ? (
-                      targetPlayer.planets.map((pl: any, pIdx: number) => (
-                        <div key={pl.id || pIdx} className="p-2.5 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex items-center justify-between text-xs font-mono">
-                          <span className="text-slate-350 font-bold flex items-center gap-1.5">
-                            <span>🛰️</span>
-                            <span>{pl.name}</span>
-                          </span>
-                          <span className="text-[#00F0FF] text-[10px] font-mono">Sector [{pl.sectorX}, {pl.sectorY}]</span>
+                    {canSeeStations ? (
+                      (targetPlayer.planets && targetPlayer.planets.length > 0) ? (
+                        targetPlayer.planets.map((pl: any, pIdx: number) => (
+                          <div key={pl.id || pIdx} className="p-2.5 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex items-center justify-between text-xs font-mono">
+                            <span className="text-slate-350 font-bold flex items-center gap-1.5">
+                              <span>🛰️</span>
+                              <span>{pl.name}</span>
+                            </span>
+                            <span className="text-[#00F0FF] text-[10px] font-mono">Sector [{pl.sectorX}, {pl.sectorY}]</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-2.5 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex items-center justify-between text-xs font-mono">
+                          <span className="text-slate-300 font-bold">🛰️ Main Sector Base</span>
+                          <span className="text-[#00F0FF] text-[10px] font-mono">Sector Coordinates Uncharted</span>
                         </div>
-                      ))
+                      )
                     ) : (
-                      <div className="p-2.5 bg-[#05070A]/50 border border-[#1E293B] rounded-xl flex items-center justify-between text-xs font-mono">
-                        <span className="text-slate-300 font-bold">🛰️ Main Sector Base</span>
-                        <span className="text-[#00F0FF] text-[10px] font-mono">Sector Coordinates Uncharted</span>
+                      <div className="p-3 bg-red-950/20 border border-red-500/10 text-red-400 rounded-xl text-[10px] uppercase font-bold tracking-tight text-center flex flex-col items-center gap-1">
+                        <span>🔒 RESTRICTED SENSORY LOCK</span>
+                        <span className="text-slate-500 text-[9px] font-medium leading-relaxed max-w-[280px]">Sovereign planetary counts and coordinates are classified. Visible only to alliance members or administrators.</span>
                       </div>
                     )}
                   </div>
