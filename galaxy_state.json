@@ -154,7 +154,7 @@
           },
           "buildings": {
             "fabricator": {
-              "level": 11,
+              "level": 10,
               "maxLevel": 10,
               "isUpgrading": false,
               "upgradeEnd": null,
@@ -207,24 +207,24 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 5000000,
-            "respirant": 5000000
+            "food": 4999999.89454556,
+            "respirant": 4999999.83595976
           },
           "troops": {
-            "defender": 0,
-            "attacker": 0,
-            "tank": 0,
-            "looter": 0,
-            "drone": 0,
+            "defender": 7,
+            "attacker": 10,
+            "tank": 2,
+            "looter": 5,
+            "drone": 1,
             "settlementShip": 0
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
-        "population": 9540,
+        "population": 9510,
         "attack": 6094,
         "defence": 2358,
         "raiders": 88
@@ -460,7 +460,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -700,7 +700,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -874,7 +874,7 @@
           },
           "buildings": {
             "fabricator": {
-              "level": 11,
+              "level": 10,
               "maxLevel": 10,
               "isUpgrading": false,
               "upgradeEnd": null,
@@ -927,8 +927,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.91129783,
-            "respirant": 4999999.862018847
+            "food": 4999999.07225201,
+            "respirant": 4999998.55683646
           },
           "troops": {
             "defender": 57,
@@ -940,11 +940,11 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
-        "population": 9540,
+        "population": 9510,
         "attack": 2964,
         "defence": 2710,
         "raiders": 159.99399999999997
@@ -1121,7 +1121,7 @@
               "health": 100
             },
             "commsHub": {
-              "level": 6,
+              "level": 5,
               "maxLevel": 5,
               "isUpgrading": false,
               "upgradeEnd": null,
@@ -1167,8 +1167,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.97707427,
-            "respirant": 4999999.964337753
+            "food": 4999999.76021669,
+            "respirant": 4999999.62700374
           },
           "troops": {
             "defender": 14,
@@ -1180,11 +1180,11 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
-        "population": 9540,
+        "population": 9510,
         "attack": 651,
         "defence": 3870,
         "raiders": 167.198
@@ -1407,8 +1407,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.96539135,
-            "respirant": 4999999.946164322
+            "food": 4999999.63802345,
+            "respirant": 4999999.4369253665
           },
           "troops": {
             "defender": 20,
@@ -1420,7 +1420,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -1647,8 +1647,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.9815954,
-            "respirant": 4999999.9713706225
+            "food": 4999999.8075038,
+            "respirant": 4999999.700561467
           },
           "troops": {
             "defender": 10,
@@ -1660,7 +1660,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -1887,8 +1887,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.92822206,
-            "respirant": 4999999.888345427
+            "food": 4999999.24926482,
+            "respirant": 4999998.83218972
           },
           "troops": {
             "defender": 49,
@@ -1900,7 +1900,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -2127,26 +2127,26 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.94766692,
-            "respirant": 4999999.918592987
+            "food": 4999999.47482015,
+            "respirant": 4999999.183053567
           },
           "troops": {
             "defender": 30,
-            "attacker": 52,
-            "tank": 9,
-            "looter": 27,
-            "drone": 14,
+            "attacker": 47,
+            "tank": 8,
+            "looter": 28,
+            "drone": 15,
             "settlementShip": 1
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
         "population": 9510,
         "attack": 4402,
-        "defence": 6263,
+        "defence": 7412,
         "raiders": 273.591
       },
       "achievements": [
@@ -2314,7 +2314,7 @@
           },
           "buildings": {
             "fabricator": {
-              "level": 11,
+              "level": 10,
               "maxLevel": 10,
               "isUpgrading": false,
               "upgradeEnd": null,
@@ -2367,24 +2367,24 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.99691923,
-            "respirant": 4999999.995207692
+            "food": 4999999.91253977,
+            "respirant": 4999999.863950754
           },
           "troops": {
-            "defender": 4,
-            "attacker": 2,
-            "tank": 1,
-            "looter": 1,
-            "drone": 1,
+            "defender": 7,
+            "attacker": 7,
+            "tank": 2,
+            "looter": 4,
+            "drone": 2,
             "settlementShip": 0
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
-        "population": 9540,
+        "population": 9510,
         "attack": 3868,
         "defence": 2368,
         "raiders": 83.19800000000001
@@ -2607,8 +2607,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.99411853,
-            "respirant": 4999999.9908510465
+            "food": 4999999.93848491,
+            "respirant": 4999999.90430986
           },
           "troops": {
             "defender": 3,
@@ -2620,7 +2620,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -2847,20 +2847,20 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.99983996,
-            "respirant": 4999999.999751049
+            "food": 4999999.86567113,
+            "respirant": 4999999.79104398
           },
           "troops": {
-            "defender": 0,
-            "attacker": 0,
-            "tank": 0,
-            "looter": 0,
-            "drone": 2,
+            "defender": 9,
+            "attacker": 14,
+            "tank": 2,
+            "looter": 6,
+            "drone": 3,
             "settlementShip": 0
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -3087,8 +3087,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.93322331,
-            "respirant": 4999999.896125149
+            "food": 4999999.30157357,
+            "respirant": 4999998.913558886
           },
           "troops": {
             "defender": 47,
@@ -3100,7 +3100,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -3327,8 +3327,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.97967492,
-            "respirant": 4999999.968383209
+            "food": 4999999.78741724,
+            "respirant": 4999999.669315707
           },
           "troops": {
             "defender": 14,
@@ -3340,7 +3340,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -3567,8 +3567,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.98215554,
-            "respirant": 4999999.972241951
+            "food": 4999999.81336238,
+            "respirant": 4999999.709674814
           },
           "troops": {
             "defender": 14,
@@ -3580,7 +3580,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -3807,20 +3807,20 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.96995249,
-            "respirant": 4999999.953259429
+            "food": 4999999.57818224,
+            "respirant": 4999999.34383904
           },
           "troops": {
-            "defender": 19,
-            "attacker": 29,
-            "tank": 5,
-            "looter": 15,
-            "drone": 8,
+            "defender": 26,
+            "attacker": 41,
+            "tank": 7,
+            "looter": 19,
+            "drone": 9,
             "settlementShip": 1
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -3994,14 +3994,14 @@
           },
           "buildings": {
             "fabricator": {
-              "level": 11,
+              "level": 10,
               "maxLevel": 10,
               "isUpgrading": false,
               "upgradeEnd": null,
               "health": 100
             },
             "commsHub": {
-              "level": 6,
+              "level": 5,
               "maxLevel": 5,
               "isUpgrading": false,
               "upgradeEnd": null,
@@ -4047,8 +4047,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.9779945,
-            "respirant": 4999999.965769222
+            "food": 4999999.7698415,
+            "respirant": 4999999.641975666
           },
           "troops": {
             "defender": 10,
@@ -4060,11 +4060,11 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
-        "population": 9570,
+        "population": 9510,
         "attack": 494,
         "defence": 1655,
         "raiders": 192.998
@@ -4234,7 +4234,7 @@
           },
           "buildings": {
             "fabricator": {
-              "level": 11,
+              "level": 10,
               "maxLevel": 10,
               "isUpgrading": false,
               "upgradeEnd": null,
@@ -4285,10 +4285,10 @@
           },
           "resources": {
             "water": 5000000,
-            "plasma": 4999527.336579147,
-            "fuel": 4999527.336579147,
-            "food": 4999528.331696707,
-            "respirant": 4999528.32898424
+            "plasma": 5000000,
+            "fuel": 5000000,
+            "food": 5000000,
+            "respirant": 5000000
           },
           "troops": {
             "defender": 0,
@@ -4300,11 +4300,11 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
-        "population": 9540,
+        "population": 9510,
         "attack": 7240,
         "defence": 1980,
         "raiders": 310.798
@@ -4527,8 +4527,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.98591648,
-            "respirant": 4999999.978092303
+            "food": 4999999.85269856,
+            "respirant": 4999999.770864427
           },
           "troops": {
             "defender": 11,
@@ -4540,7 +4540,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -4767,8 +4767,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.97763441,
-            "respirant": 4999999.965209082
+            "food": 4999999.76607527,
+            "respirant": 4999999.636117087
           },
           "troops": {
             "defender": 15,
@@ -4780,7 +4780,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -5007,20 +5007,20 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.9995999,
-            "respirant": 4999999.999377622
+            "food": 4999999.86316031,
+            "respirant": 4999999.78713826
           },
           "troops": {
-            "defender": 0,
-            "attacker": 0,
-            "tank": 0,
-            "looter": 0,
-            "drone": 5,
+            "defender": 9,
+            "attacker": 14,
+            "tank": 2,
+            "looter": 6,
+            "drone": 6,
             "settlementShip": 0
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -5247,8 +5247,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.98283571,
-            "respirant": 4999999.973299993
+            "food": 4999999.82047637,
+            "respirant": 4999999.72074102
           },
           "troops": {
             "defender": 11,
@@ -5260,7 +5260,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -5487,8 +5487,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.98891723,
-            "respirant": 4999999.982760136
+            "food": 4999999.88408381,
+            "respirant": 4999999.819685927
           },
           "troops": {
             "defender": 8,
@@ -5500,7 +5500,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -5727,8 +5727,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.98975744,
-            "respirant": 4999999.984067129
+            "food": 4999999.89287168,
+            "respirant": 4999999.8333559465
           },
           "troops": {
             "defender": 8,
@@ -5740,7 +5740,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -5914,7 +5914,7 @@
           },
           "buildings": {
             "fabricator": {
-              "level": 11,
+              "level": 10,
               "maxLevel": 10,
               "isUpgrading": false,
               "upgradeEnd": null,
@@ -5967,8 +5967,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.9783946,
-            "respirant": 4999999.9663916
+            "food": 4999999.7740262,
+            "respirant": 4999999.6484852
           },
           "troops": {
             "defender": 15,
@@ -5980,11 +5980,11 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
-        "population": 9540,
+        "population": 9510,
         "attack": 4993,
         "defence": 2823,
         "raiders": 362.396
@@ -6207,8 +6207,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.97967492,
-            "respirant": 4999999.968383209
+            "food": 4999999.78741724,
+            "respirant": 4999999.669315707
           },
           "troops": {
             "defender": 14,
@@ -6220,7 +6220,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -6447,8 +6447,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.9483871,
-            "respirant": 4999999.919713267
+            "food": 4999999.4601737,
+            "respirant": 4999999.1602702
           },
           "troops": {
             "defender": 33,
@@ -6460,7 +6460,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -6687,8 +6687,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.97587397,
-            "respirant": 4999999.96247062
+            "food": 4999999.74766259,
+            "respirant": 4999999.60747514
           },
           "troops": {
             "defender": 18,
@@ -6700,7 +6700,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -6927,8 +6927,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.97123281,
-            "respirant": 4999999.955251038
+            "food": 4999999.69912007,
+            "respirant": 4999999.5319645535
           },
           "troops": {
             "defender": 17,
@@ -6940,7 +6940,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -7167,8 +7167,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.98287572,
-            "respirant": 4999999.973362231
+            "food": 4999999.82089484,
+            "respirant": 4999999.721391973
           },
           "troops": {
             "defender": 10,
@@ -7180,7 +7180,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -7407,8 +7407,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.97615404,
-            "respirant": 4999999.962906284
+            "food": 4999999.75059188,
+            "respirant": 4999999.612031814
           },
           "troops": {
             "defender": 15,
@@ -7420,7 +7420,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -7647,8 +7647,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.96215054,
-            "respirant": 4999999.941123062
+            "food": 4999999.60412738,
+            "respirant": 4999999.384198147
           },
           "troops": {
             "defender": 25,
@@ -7660,7 +7660,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -7887,8 +7887,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.92002001,
-            "respirant": 4999999.875586682
+            "food": 4999999.16347847,
+            "respirant": 4999998.698744287
           },
           "troops": {
             "defender": 58,
@@ -7900,7 +7900,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -8127,8 +8127,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.98731683,
-            "respirant": 4999999.980270624
+            "food": 4999999.86734501,
+            "respirant": 4999999.793647793
           },
           "troops": {
             "defender": 12,
@@ -8140,7 +8140,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -8367,8 +8367,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.98235559,
-            "respirant": 4999999.97255314
+            "food": 4999999.81545473,
+            "respirant": 4999999.71292958
           },
           "troops": {
             "defender": 11,
@@ -8380,7 +8380,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -8607,8 +8607,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.99155789,
-            "respirant": 4999999.986867829
+            "food": 4999999.91170283,
+            "respirant": 4999999.862648847
           },
           "troops": {
             "defender": 6,
@@ -8620,7 +8620,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -8847,8 +8847,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.99035759,
-            "respirant": 4999999.985000695
+            "food": 4999999.89914873,
+            "respirant": 4999999.843120247
           },
           "troops": {
             "defender": 6,
@@ -8860,7 +8860,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -9087,8 +9087,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.97955489,
-            "respirant": 4999999.968196495
+            "food": 4999999.78616183,
+            "respirant": 4999999.667362846
           },
           "troops": {
             "defender": 10,
@@ -9100,7 +9100,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -9327,20 +9327,20 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.94930733,
-            "respirant": 4999999.921144736
+            "food": 4999999.40200637,
+            "respirant": 4999999.069787687
           },
           "troops": {
-            "defender": 33,
-            "attacker": 51,
-            "tank": 9,
-            "looter": 25,
-            "drone": 6,
+            "defender": 37,
+            "attacker": 58,
+            "tank": 11,
+            "looter": 27,
+            "drone": 7,
             "settlementShip": 1
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -9567,8 +9567,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.95606902,
-            "respirant": 4999999.93166292
+            "food": 4999999.54051994,
+            "respirant": 4999999.28525324
           },
           "troops": {
             "defender": 28,
@@ -9580,7 +9580,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -9807,26 +9807,26 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.98491623,
-            "respirant": 4999999.976536358
+            "food": 4999999.84223681,
+            "respirant": 4999999.754590593
           },
           "troops": {
-            "defender": 12,
-            "attacker": 16,
-            "tank": 2,
-            "looter": 7,
-            "drone": 6,
+            "defender": 6,
+            "attacker": 9,
+            "tank": 1,
+            "looter": 5,
+            "drone": 3,
             "settlementShip": 0
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
         "population": 9510,
         "attack": 6725,
-        "defence": 5476,
+        "defence": 5826,
         "raiders": 416.998
       },
       "achievements": [
@@ -10047,8 +10047,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.97307327,
-            "respirant": 4999999.958113976
+            "food": 4999999.71836969,
+            "respirant": 4999999.561908406
           },
           "troops": {
             "defender": 15,
@@ -10060,7 +10060,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -10287,8 +10287,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.99471868,
-            "respirant": 4999999.991784614
+            "food": 4999999.94476196,
+            "respirant": 4999999.91407416
           },
           "troops": {
             "defender": 2,
@@ -10300,7 +10300,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -10474,7 +10474,7 @@
           },
           "buildings": {
             "fabricator": {
-              "level": 11,
+              "level": 10,
               "maxLevel": 10,
               "isUpgrading": false,
               "upgradeEnd": null,
@@ -10527,8 +10527,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.99491873,
-            "respirant": 4999999.992095802
+            "food": 4999999.94685431,
+            "respirant": 4999999.917328927
           },
           "troops": {
             "defender": 3,
@@ -10540,11 +10540,11 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
-        "population": 9540,
+        "population": 9510,
         "attack": 2818,
         "defence": 3422,
         "raiders": 83.998
@@ -10780,7 +10780,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -11007,8 +11007,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.99983996,
-            "respirant": 4999999.999751049
+            "food": 4999999.99832612,
+            "respirant": 4999999.997396187
           },
           "troops": {
             "defender": 0,
@@ -11020,7 +11020,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -11247,8 +11247,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.99511878,
-            "respirant": 4999999.992406991
+            "food": 4999999.94894666,
+            "respirant": 4999999.920583693
           },
           "troops": {
             "defender": 2,
@@ -11260,7 +11260,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -11487,8 +11487,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.99567892,
-            "respirant": 4999999.99327832
+            "food": 4999999.95480524,
+            "respirant": 4999999.92969704
           },
           "troops": {
             "defender": 2,
@@ -11500,7 +11500,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -11727,8 +11727,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.95510878,
-            "respirant": 4999999.930169214
+            "food": 4999999.53047666,
+            "respirant": 4999999.26963036
           },
           "troops": {
             "defender": 32,
@@ -11740,7 +11740,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -11967,8 +11967,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999999.98283571,
-            "respirant": 4999999.973299993
+            "food": 4999999.82047637,
+            "respirant": 4999999.72074102
           },
           "troops": {
             "defender": 11,
@@ -11980,7 +11980,7 @@
           },
           "trainingQueue": [],
           "upgradeQueue": [],
-          "_lastTick": 1783197211084
+          "_lastTick": 1783253968628
         }
       ],
       "scores": {
@@ -12207,8 +12207,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999985.36734275,
-            "respirant": 4999977.238088722
+            "food": 4999846.95505925,
+            "respirant": 4999761.930092167
           },
           "troops": {
             "defender": 12500,
@@ -12219,7 +12219,7 @@
             "settlementShip": 1
           },
           "trainingQueue": [],
-          "_lastTick": 1783197211084,
+          "_lastTick": 1783253968628,
           "upgradeQueue": []
         }
       ],
@@ -12463,8 +12463,8 @@
             "water": 5000000,
             "plasma": 5000000,
             "fuel": 5000000,
-            "food": 4999991.216498167,
-            "respirant": 4999985.230799001
+            "food": 4999847.2220385,
+            "respirant": 4999762.345393222
           },
           "troops": {
             "defender": 12500,
@@ -12475,7 +12475,7 @@
             "settlementShip": 1
           },
           "trainingQueue": [],
-          "_lastTick": 1783197211256,
+          "_lastTick": 1783253968628,
           "upgradeQueue": []
         }
       ],
@@ -12509,7 +12509,7 @@
           "planetId": "planet_om42ly65g"
         }
       ],
-      "lastActive": 1783197211256,
+      "lastActive": 1783253926854,
       "commandMessages": []
     }
   },
@@ -12542,234 +12542,30 @@
   ],
   "fleets": [
     {
-      "id": "fleet_536mtwvjk",
-      "senderId": "ai_39",
-      "senderName": "CyberDrifter",
+      "id": "fleet_j90dpsr5x",
+      "senderId": "ai_17",
+      "senderName": "AstroCruiser",
       "senderCoords": {
-        "x": 85,
-        "y": 92
+        "x": 52,
+        "y": 6
       },
-      "targetId": "ai_30",
-      "targetName": "ProtonRanger",
-      "targetCoords": {
-        "x": 8,
-        "y": 16
-      },
-      "missionType": "attack",
-      "troops": {
-        "defender": 4,
-        "attacker": 7,
-        "tank": 2,
-        "looter": 2,
-        "drone": 1,
-        "settlementShip": 0
-      },
-      "startedAt": 1783195810863,
-      "arrivesAt": 1783197665543,
-      "isReturning": true,
-      "lootCarried": {
-        "water": 0,
-        "plasma": 0,
-        "fuel": 0,
-        "food": 0,
-        "respirant": 0
-      }
-    },
-    {
-      "id": "fleet_bbaq36plf",
-      "senderId": "ai_10",
-      "senderName": "VoidPhantom",
-      "senderCoords": {
-        "x": 82,
-        "y": 95
-      },
-      "targetId": "ai_14",
-      "targetName": "AlphaRebel",
-      "targetCoords": {
-        "x": 71,
-        "y": 33
-      },
-      "missionType": "attack",
-      "troops": {
-        "defender": 3,
-        "attacker": 5,
-        "tank": 1,
-        "looter": 3,
-        "drone": 1,
-        "settlementShip": 0
-      },
-      "startedAt": 1783196326316,
-      "arrivesAt": 1783197405772,
-      "isReturning": true,
-      "lootCarried": {
-        "water": 0,
-        "plasma": 0,
-        "fuel": 0,
-        "food": 0,
-        "respirant": 0
-      }
-    },
-    {
-      "id": "fleet_jajyxjop6",
-      "senderId": "ai_21",
-      "senderName": "DarkLord",
-      "senderCoords": {
-        "x": 12,
-        "y": 70
-      },
-      "targetId": "ai_10",
-      "targetName": "VoidPhantom",
-      "targetCoords": {
-        "x": 82,
-        "y": 95
-      },
-      "missionType": "attack",
-      "troops": {
-        "defender": 9,
-        "attacker": 14,
-        "tank": 2,
-        "looter": 6,
-        "drone": 1,
-        "settlementShip": 0
-      },
-      "startedAt": 1783196530986,
-      "arrivesAt": 1783197805220,
-      "isReturning": true,
-      "lootCarried": {
-        "water": 3440,
-        "plasma": 3440,
-        "fuel": 3440,
-        "food": 3439,
-        "respirant": 3439
-      }
-    },
-    {
-      "id": "fleet_orqkgdmet",
-      "senderId": "ai_12",
-      "senderName": "EclipseRaider",
-      "senderCoords": {
-        "x": 89,
-        "y": 29
-      },
-      "targetId": "ai_46",
-      "targetName": "NebulaRanger",
-      "targetCoords": {
-        "x": 5,
-        "y": 55
-      },
-      "missionType": "attack",
-      "troops": {
-        "defender": 9,
-        "attacker": 14,
-        "tank": 2,
-        "looter": 6,
-        "drone": 1,
-        "settlementShip": 0
-      },
-      "startedAt": 1783196562991,
-      "arrivesAt": 1783198070393,
-      "isReturning": true,
-      "lootCarried": {
-        "water": 3440,
-        "plasma": 3440,
-        "fuel": 3440,
-        "food": 3439,
-        "respirant": 3439
-      }
-    },
-    {
-      "id": "fleet_rqowit6h6",
-      "senderId": "ai_1",
-      "senderName": "VectorRebel",
-      "senderCoords": {
-        "x": 63,
-        "y": 54
-      },
-      "targetId": "ai_48",
-      "targetName": "AstroSovereign",
+      "targetId": "ai_41",
+      "targetName": "LightEmperor",
       "targetCoords": {
         "x": 29,
-        "y": 9
+        "y": 39
       },
       "missionType": "attack",
       "troops": {
         "defender": 7,
-        "attacker": 10,
-        "tank": 2,
-        "looter": 5,
-        "drone": 1,
-        "settlementShip": 0
-      },
-      "startedAt": 1783196785359,
-      "arrivesAt": 1783197752222,
-      "isReturning": true,
-      "lootCarried": {
-        "water": 0,
-        "plasma": 0,
-        "fuel": 0,
-        "food": 0,
-        "respirant": 0
-      }
-    },
-    {
-      "id": "fleet_1g5ijvsbd",
-      "senderId": "ai_9",
-      "senderName": "OmegaPioneer",
-      "senderCoords": {
-        "x": 13,
-        "y": 92
-      },
-      "targetId": "ai_18",
-      "targetName": "SolarKnight",
-      "targetCoords": {
-        "x": 73,
-        "y": 66
-      },
-      "missionType": "attack",
-      "troops": {
-        "defender": 12,
-        "attacker": 17,
-        "tank": 2,
-        "looter": 9,
-        "drone": 1,
-        "settlementShip": 0
-      },
-      "startedAt": 1783196851029,
-      "arrivesAt": 1783197972020,
-      "isReturning": true,
-      "lootCarried": {
-        "water": 4640,
-        "plasma": 4640,
-        "fuel": 4640,
-        "food": 4639,
-        "respirant": 4639
-      }
-    },
-    {
-      "id": "fleet_b3zryicmr",
-      "senderId": "ai_16",
-      "senderName": "OrionStalker",
-      "senderCoords": {
-        "x": 78,
-        "y": 9
-      },
-      "targetId": "ai_35",
-      "targetName": "XenonCruiser",
-      "targetCoords": {
-        "x": 78,
-        "y": 41
-      },
-      "missionType": "attack",
-      "troops": {
-        "defender": 7,
-        "attacker": 12,
-        "tank": 2,
+        "attacker": 14,
+        "tank": 3,
         "looter": 4,
         "drone": 1,
         "settlementShip": 0
       },
-      "startedAt": 1783197079066,
-      "arrivesAt": 1783197627637,
+      "startedAt": 1783253968628,
+      "arrivesAt": 1783254658189,
       "isReturning": true,
       "lootCarried": {
         "water": 0,
@@ -12778,23 +12574,25 @@
         "food": 0,
         "respirant": 0
       }
-    },
+    }
+  ],
+  "battleReports": [
     {
-      "id": "fleet_63q3vhcdt",
-      "senderId": "ai_43",
-      "senderName": "NebulaKnight",
-      "senderCoords": {
-        "x": 45,
-        "y": 66
+      "id": "battle_b5myniqh5",
+      "timestamp": 1783253968628,
+      "attackerId": "ai_17",
+      "attackerName": "AstroCruiser",
+      "defenderId": "ai_41",
+      "defenderName": "LightEmperor",
+      "attackerCoords": {
+        "x": 52,
+        "y": 6
       },
-      "targetId": "ai_9",
-      "targetName": "OmegaPioneer",
-      "targetCoords": {
-        "x": 13,
-        "y": 92
+      "defenderCoords": {
+        "x": 29,
+        "y": 39
       },
-      "missionType": "attack",
-      "troops": {
+      "attackerInitialTroops": {
         "defender": 15,
         "attacker": 25,
         "tank": 3,
@@ -12802,12 +12600,165 @@
         "drone": 1,
         "settlementShip": 0
       },
-      "startedAt": 1783197175079,
-      "arrivesAt": 1783197236926,
-      "isReturning": false
-    }
-  ],
-  "battleReports": [
+      "attackerLosses": {
+        "defender": 8,
+        "attacker": 11,
+        "tank": 0,
+        "looter": 6,
+        "drone": 0,
+        "settlementShip": 0
+      },
+      "defenderInitialTroops": {
+        "defender": 12,
+        "attacker": 16,
+        "tank": 2,
+        "looter": 7,
+        "drone": 6,
+        "settlementShip": 0
+      },
+      "defenderLosses": {
+        "defender": 6,
+        "attacker": 7,
+        "tank": 1,
+        "looter": 2,
+        "drone": 3,
+        "settlementShip": 0
+      },
+      "winner": "defender",
+      "resourcesStolen": {
+        "water": 0,
+        "plasma": 0,
+        "fuel": 0,
+        "food": 0,
+        "respirant": 0
+      },
+      "attackHpKilled": 350,
+      "defenceHpKilled": 651,
+      "battleRounds": [
+        {
+          "round": 1,
+          "logs": [
+            "--- COMBAT CYCLE 1 INITIATED ---",
+            "Attackers throw 1,153 megawatt laser channels into target coordinates.",
+            "Defenders are being attacked under siege. Their offensive HP does not count; only their defense HP (1,118 total DEF) is channeled into 950 retaliatory counter-firepower.",
+            "Attacker casualties: 15 Interceptor, 25 Assault Drone, 3 Disrupter, 10 Matter Extractor, 1 Missile Launcher.",
+            "Defender casualties: 12 Interceptor, 16 Assault Drone, 2 Disrupter, 7 Matter Extractor, 6 Missile Launcher.",
+            "🛡️ [Tactical Deflection Force] Attacker had 36.8% HP advantage! Survival security field guaranteed that at least 36.8% of original squads survive.",
+            "🛡️ [Tactical Deflection Force] Defender had 42.9% HP advantage! Survival security field guaranteed that at least 42.9% of original squads survive.",
+            "=== BATTLEFIELD ORBIT RECOVERY REPORT ===",
+            "[Nano-Salvage Array] Planetary defense rigs gathered scrap, reconstructing: 2 Assault Drone, 1 Matter Extractor for the Defender.",
+            "[Tactical Medical Bay] Offside carrier teams salvaged and re-launched: 1 Interceptor, 4 Assault Drone, 1 Disrupter for the Attacker."
+          ],
+          "attackerRemaining": {
+            "defender": 0,
+            "attacker": 0,
+            "tank": 0,
+            "looter": 0,
+            "drone": 0,
+            "settlementShip": 0
+          },
+          "defenderRemaining": {
+            "defender": 0,
+            "attacker": 0,
+            "tank": 0,
+            "looter": 0,
+            "drone": 0,
+            "settlementShip": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "battle_3mq6heyaz",
+      "timestamp": 1783253830764,
+      "attackerId": "ai_43",
+      "attackerName": "NebulaKnight",
+      "defenderId": "ai_9",
+      "defenderName": "OmegaPioneer",
+      "attackerCoords": {
+        "x": 45,
+        "y": 66
+      },
+      "defenderCoords": {
+        "x": 13,
+        "y": 92
+      },
+      "attackerInitialTroops": {
+        "defender": 15,
+        "attacker": 25,
+        "tank": 3,
+        "looter": 10,
+        "drone": 1,
+        "settlementShip": 0
+      },
+      "attackerLosses": {
+        "defender": 15,
+        "attacker": 25,
+        "tank": 3,
+        "looter": 10,
+        "drone": 1,
+        "settlementShip": 0
+      },
+      "defenderInitialTroops": {
+        "defender": 42,
+        "attacker": 69,
+        "tank": 11,
+        "looter": 36,
+        "drone": 15,
+        "settlementShip": 1
+      },
+      "defenderLosses": {
+        "defender": 12,
+        "attacker": 22,
+        "tank": 3,
+        "looter": 8,
+        "drone": 0,
+        "settlementShip": 0
+      },
+      "winner": "defender",
+      "resourcesStolen": {
+        "water": 0,
+        "plasma": 0,
+        "fuel": 0,
+        "food": 0,
+        "respirant": 0
+      },
+      "attackHpKilled": 1149,
+      "defenceHpKilled": 711,
+      "battleRounds": [
+        {
+          "round": 1,
+          "logs": [
+            "--- COMBAT CYCLE 1 INITIATED ---",
+            "Attackers throw 1,128 megawatt laser channels into target coordinates.",
+            "Defenders are being attacked under siege. Their offensive HP does not count; only their defense HP (3,426 total DEF) is channeled into 3,385 retaliatory counter-firepower.",
+            "Attacker casualties: 15 Interceptor, 25 Assault Drone, 3 Disrupter, 10 Matter Extractor, 1 Missile Launcher.",
+            "Defender casualties: 18 Interceptor, 62 Assault Drone, 6 Disrupter, 10 Matter Extractor.",
+            "🛡️ [Tactical Deflection Force] Defender had 58.9% HP advantage! Survival security field guaranteed that at least 58.9% of original squads survive.",
+            "=== BATTLEFIELD ORBIT RECOVERY REPORT ===",
+            "[Nano-Salvage Array] Planetary defense rigs gathered scrap, reconstructing: 5 Interceptor, 6 Assault Drone, 1 Disrupter, 2 Matter Extractor for the Defender.",
+            "[Tactical Medical Bay] Offside carrier teams salvaged and re-launched: 3 Interceptor, 4 Assault Drone for the Attacker.",
+            "💥 [TACTICAL OVERWHELM] Defender's initial force HP of 3,945 exceeded 150% more than the attacker's total involved HP (1,149). Absolute overwhelm triggered; all attacking squadron forces have been wiped out with ZERO survivors!"
+          ],
+          "attackerRemaining": {
+            "defender": 0,
+            "attacker": 0,
+            "tank": 0,
+            "looter": 0,
+            "drone": 0,
+            "settlementShip": 0
+          },
+          "defenderRemaining": {
+            "defender": 24,
+            "attacker": 7,
+            "tank": 5,
+            "looter": 26,
+            "drone": 15,
+            "settlementShip": 1
+          }
+        }
+      ]
+    },
     {
       "id": "battle_f55x9g3p5",
       "timestamp": 1783197079066,
@@ -50987,6 +50938,20 @@
   ],
   "newsEvents": [
     {
+      "id": "news_v83fut6fx",
+      "title": "Raid Defended!",
+      "content": "LightEmperor repelled a brutal fleet raid sent by AstroCruiser!",
+      "type": "raid",
+      "timestamp": 1783253968628
+    },
+    {
+      "id": "news_0osbq64l3",
+      "title": "Raid Defended!",
+      "content": "OmegaPioneer repelled a brutal fleet raid sent by NebulaKnight!",
+      "type": "raid",
+      "timestamp": 1783253830764
+    },
+    {
       "id": "news_0av91tsiw",
       "title": "Raid Defended!",
       "content": "XenonCruiser repelled a brutal fleet raid sent by OrionStalker!",
@@ -51321,20 +51286,6 @@
       "content": "HyperSlayer repelled a brutal fleet raid sent by LightSentinel!",
       "type": "raid",
       "timestamp": 1783109014099
-    },
-    {
-      "id": "news_etn266430",
-      "title": "Raid Defended!",
-      "content": "SolarKnight repelled a brutal fleet raid sent by CyberDrifter!",
-      "type": "raid",
-      "timestamp": 1783108862732
-    },
-    {
-      "id": "news_rblux5hif",
-      "title": "Raid Defended!",
-      "content": "ProtonReaper repelled a brutal fleet raid sent by ProtonStalker!",
-      "type": "raid",
-      "timestamp": 1783108828090
     }
   ],
   "habitablePlanets": [

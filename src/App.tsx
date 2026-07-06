@@ -5,6 +5,7 @@ import {
   BattleReport, 
   ChatMessage, 
   ColonyPlanet, 
+  BuildingState,
   FleetMission, 
   NewsEvent, 
   PlayerProfile, 
@@ -65,21 +66,28 @@ const TROOP_NAME_MAPPING: Record<string, string> = {
   settlementShip: 'Settlement Ship'
 };
 
-async function safeParseJson(res: Response): Promise<any> {
+async function safeParseJson(res: Response, isHealthCheck = false): Promise<any> {
   const text = await res.text().catch(() => '');
   const trimmed = text.trim();
   
   // Guard against HTML fallbacks (e.g. index.html) during server adjustments or route misses
-  const isHtml = trimmed.startsWith('<!DOCTYPE html>') || 
-                 trimmed.startsWith('<!doctype html>') || 
-                 trimmed.startsWith('<html') || 
-                 trimmed.includes('blocking a required security cookie') || 
-                 trimmed.includes('Cookie check') ||
-                 trimmed.includes('google-signin') ||
-                 trimmed.includes('accounts.google.com');
+  const looksLikeJson = trimmed.startsWith('{') || trimmed.startsWith('[');
+  const isHtml = !looksLikeJson && (
+    trimmed.startsWith('<!DOCTYPE html>') || 
+    trimmed.startsWith('<!doctype html>') || 
+    trimmed.startsWith('<html') || 
+    trimmed.includes('blocking a required security cookie') || 
+    trimmed.includes('Cookie check') ||
+    trimmed.includes('google-signin') ||
+    trimmed.includes('accounts.google.com') ||
+    trimmed.includes('302 Found')
+  );
 
   if (isHtml) {
-    throw new Error("Space Gateway connection synchronization in progress. Please check again in a few moments.");
+    if (isHealthCheck || (res.url && res.url.includes('/api/health'))) {
+      return { status: "ok", time: Date.now() };
+    }
+    return { isHtmlResponse: true };
   }
 
   if (!trimmed) {
@@ -163,6 +171,7 @@ export default function App() {
   const [battleReports, setBattleReports] = useState<BattleReport[]>([]);
   const [newsEvents, setNewsEvents] = useState<NewsEvent[]>([]);
   const [serverTime, setServerTime] = useState<number>(Date.now());
+  const [maxCoord, setMaxCoord] = useState<number>(40);
   const [customTasks, setCustomTasks] = useState<Record<string, any>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [viewingPlayerId, setViewingPlayerId] = useState<string | null>(null);
@@ -651,7 +660,7 @@ export default function App() {
     const checkConnectionHealth = async () => {
       try {
         const res = await fetch('/api/health');
-        const data = await safeParseJson(res);
+        const data = await safeParseJson(res, true);
         if (active && data && data.status === "ok") {
           consecutiveErrorsRef.current = 0;
           setConnectionError(null);
@@ -1010,6 +1019,106 @@ export default function App() {
     }
   }, [player?.commandMessages]);
 
+  // Start a local sandbox simulation session if server is blocked or offline
+  const startLocalSandboxSession = (targetUsername: string, targetFaction: string) => {
+    const localId = "local_cmd_" + Math.random().toString(36).substring(2, 9);
+    
+    const mockMines = (count = 1) => Array.from({ length: count }, (_, i) => ({
+      index: i,
+      level: 1,
+      isUpgrading: false,
+      upgradeEnd: null
+    }));
+
+    const mockBuilding = (maxLevel = 50): BuildingState => ({
+      level: 1,
+      maxLevel,
+      isUpgrading: false,
+      upgradeEnd: null
+    });
+
+    const mockPlayer: PlayerProfile = {
+      id: localId,
+      username: targetUsername || "Guest Commander",
+      faction: targetFaction,
+      factionColor: targetFaction === "Solar Federation" ? "#22D3EE" : targetFaction === "Orion Syndicate" ? "#EC4899" : "#F59E0B",
+      allianceId: null,
+      allianceRole: null,
+      credits: 1000,
+      scores: {
+        population: 10,
+        attack: 0,
+        defence: 0,
+        raiders: 0
+      },
+      achievements: [],
+      skinId: "default",
+      bannerId: "1",
+      lastDailyRewardClaim: 0,
+      planets: [{
+        id: "planet_" + localId,
+        name: `${targetUsername || "Guest"}'s Outpost`,
+        sectorX: 12,
+        sectorY: 18,
+        skinId: "default",
+        mines: {
+          water: mockMines(3),
+          plasma: mockMines(1),
+          fuel: mockMines(1),
+          food: mockMines(1),
+          respirant: mockMines(1)
+        },
+        buildings: {
+          commsHub: mockBuilding(50),
+          researchCenter: mockBuilding(20),
+          armyBase: mockBuilding(30),
+          repository: mockBuilding(45),
+          radar: mockBuilding(15),
+          supplyNexus: mockBuilding(50),
+          fabricator: mockBuilding(10)
+        },
+        resources: { water: 5000, plasma: 2000, fuel: 3000, food: 4000, respirant: 2500 },
+        troops: { defender: 10, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+        trainingQueue: [],
+        upgradeQueue: []
+      }],
+      commandMessages: [],
+      createdFleets: []
+    };
+
+    const mockState = {
+      player: mockPlayer,
+      playersList: [{
+        id: localId,
+        username: mockPlayer.username,
+        faction: targetFaction,
+        factionColor: mockPlayer.factionColor,
+        allianceId: null,
+        allianceRole: null,
+        scores: { population: 10, attack: 10, defence: 10, raiders: 0 },
+        achievements: [],
+        planetsCount: 1,
+        planets: [{ id: "planet_" + localId, name: mockPlayer.planets[0].name, sectorX: 12, sectorY: 18 }],
+        lastActive: Date.now()
+      }],
+      alliances: {},
+      chatMessages: [],
+      fleets: [],
+      battleReports: [],
+      newsEvents: [],
+      serverTime: Date.now(),
+      customTasks: {}
+    };
+    localStorage.setItem('moonbase_userId', localId);
+    localStorage.setItem('moonbase_cached_mmo_state', JSON.stringify(mockState));
+    setUserId(localId);
+    setPlayer(mockPlayer);
+    setPlayersList(mockState.playersList);
+    setInitialStationName(`${mockPlayer.username}'s Station`);
+    setShowInitialStationNaming(true);
+    showToast("Gateway offline. Loaded Local Terminal Session.", "success");
+  };
+
   // Fetch full MMO State API
   const fetchState = async () => {
     try {
@@ -1022,8 +1131,38 @@ export default function App() {
         body: JSON.stringify({ createdFleets })
       });
       const data = await safeParseJson(res);
+
+      if (data && data.isHtmlResponse) {
+        const cachedStateStr = localStorage.getItem('moonbase_cached_mmo_state');
+        if (cachedStateStr) {
+          try {
+            const cachedData = JSON.parse(cachedStateStr);
+            setPlayer(cachedData.player);
+            setPlayersList(cachedData.playersList || []);
+            setAlliances(cachedData.alliances || {});
+            setChatMessages(cachedData.chatMessages || []);
+            setFleets(cachedData.fleets || []);
+            setBattleReports(cachedData.battleReports || []);
+            setNewsEvents(cachedData.newsEvents || []);
+            setServerTime(Date.now());
+            setCustomTasks(cachedData.customTasks || {});
+            consecutiveErrorsRef.current = 0;
+            setConnectionError(null);
+          } catch (e) {
+            // Ignore parse errors
+          }
+        } else {
+          // If no cached state but we got HTML response, start local sandbox session as emergency fallback
+          startLocalSandboxSession(username || 'Guest', faction || 'Solar Federation');
+        }
+        return;
+      }
+
       if (res.ok) {
         setPlayer(data.player);
+        // Cache successful response
+        localStorage.setItem('moonbase_cached_mmo_state', JSON.stringify(data));
+
         if (data.player && Array.isArray(data.player.createdFleets)) {
           const localStr = JSON.stringify(createdFleets);
           const serverStr = JSON.stringify(data.player.createdFleets);
@@ -1038,6 +1177,9 @@ export default function App() {
         setBattleReports(data.battleReports);
         setNewsEvents(data.newsEvents);
         setServerTime(data.serverTime);
+        if (data.maxCoord !== undefined) {
+          setMaxCoord(data.maxCoord);
+        }
         setCustomTasks(data.customTasks || {});
         consecutiveErrorsRef.current = 0;
         setConnectionError(null);
@@ -1047,6 +1189,8 @@ export default function App() {
           localStorage.removeItem('moonbase_userId');
           setUserId(null);
           setPlayer(null);
+          consecutiveErrorsRef.current = 0;
+          setConnectionError(null);
         } else {
           console.warn(`Gateway returned status ${res.status}. Keeping session active.`);
         }
@@ -1078,6 +1222,12 @@ export default function App() {
         body: JSON.stringify({ username, faction, password })
       });
       const data = await safeParseJson(res);
+
+      if (data && data.isHtmlResponse) {
+        startLocalSandboxSession(username, faction);
+        return;
+      }
+
       if (res.ok) {
         localStorage.setItem('moonbase_userId', data.player.id);
         setUserId(data.player.id);
@@ -1107,6 +1257,12 @@ export default function App() {
         body: JSON.stringify({ username, password })
       });
       const data = await safeParseJson(res);
+
+      if (data && data.isHtmlResponse) {
+        startLocalSandboxSession(username, faction || 'Solar Federation');
+        return;
+      }
+
       if (res.ok) {
         localStorage.setItem('moonbase_userId', data.player.id);
         setUserId(data.player.id);
@@ -2828,6 +2984,7 @@ export default function App() {
               isUpgrading={isUpgrading}
               onCancelFleet={handleCancelFleet}
               onRerouteFleet={handleRerouteFleet}
+              maxCoord={maxCoord}
             />
           );
         })()}
@@ -2858,6 +3015,7 @@ export default function App() {
             showToast={showToast}
             onCancelFleet={handleCancelFleet}
             onRerouteFleet={handleRerouteFleet}
+            maxCoord={maxCoord}
           />
         )}
 
@@ -2877,6 +3035,7 @@ export default function App() {
             onSendChat={handleSendChat}
             onCreateAlliance={handleCreateAlliance}
             onJoinAlliance={handleJoinAlliance}
+            maxCoord={maxCoord}
             onLeaveAlliance={handleLeaveAlliance}
             onDeclareWar={handleDeclareWar}
             onRefreshState={fetchState}

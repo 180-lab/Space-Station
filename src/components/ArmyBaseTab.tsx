@@ -72,6 +72,7 @@ interface ArmyBaseTabProps {
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   onCancelFleet?: (fleetId: string) => Promise<void>;
   onRerouteFleet?: (fleetId: string, targetX: number, targetY: number, missionType?: string) => Promise<void>;
+  maxCoord?: number;
 }
 
 const TROOP_DETAILS = {
@@ -176,7 +177,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   isUpgrading = false,
   showToast,
   onCancelFleet,
-  onRerouteFleet
+  onRerouteFleet,
+  maxCoord = 100
 }) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({
     defender: 0,
@@ -2228,10 +2230,10 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                     <input
                                       type="number"
                                       min="0"
-                                      max="100"
+                                      max={maxCoord}
                                       value={rerouteX}
                                       onChange={(e) => setRerouteX(e.target.value)}
-                                      placeholder="0-100"
+                                      placeholder={`0-${maxCoord}`}
                                       className="w-full bg-[#05070A] border border-slate-800 text-cyan-400 rounded px-2 py-1 text-xs text-center font-bold"
                                     />
                                   </div>
@@ -2240,10 +2242,10 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                     <input
                                       type="number"
                                       min="0"
-                                      max="100"
+                                      max={maxCoord}
                                       value={rerouteY}
                                       onChange={(e) => setRerouteY(e.target.value)}
-                                      placeholder="0-100"
+                                      placeholder={`0-${maxCoord}`}
                                       className="w-full bg-[#05070A] border border-slate-800 text-cyan-400 rounded px-2 py-1 text-xs text-center font-bold"
                                     />
                                   </div>
@@ -2254,8 +2256,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                     onClick={async () => {
                                       const tx = parseInt(rerouteX, 10);
                                       const ty = parseInt(rerouteY, 10);
-                                      if (isNaN(tx) || isNaN(ty) || tx < 0 || tx > 100 || ty < 0 || ty > 100) {
-                                        showToast('Invalid coordinates (0-100 allowed)', 'error');
+                                      if (isNaN(tx) || isNaN(ty) || tx < 0 || tx > maxCoord || ty < 0 || ty > maxCoord) {
+                                        showToast(`Invalid coordinates (0-${maxCoord} allowed)`, 'error');
                                         return;
                                       }
                                       if (onRerouteFleet) {

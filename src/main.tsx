@@ -82,7 +82,7 @@ try {
   const isCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor;
   const desc = typeof window !== 'undefined' ? Object.getOwnPropertyDescriptor(window, 'fetch') : null;
   
-  if (isCapacitor || (desc && desc.configurable)) {
+  if (isCapacitor || typeof window.fetch === 'function') {
     const originalFetch = window.fetch;
     const customFetch = function (input: RequestInfo | URL, init?: RequestInit) {
       let targetInput = input;

@@ -73,6 +73,7 @@ interface GalaxyTabProps {
   defaultSubTab?: 'scanner' | 'ranking' | 'comms' | 'news' | 'fleets';
   localResources?: Record<string, number>;
   isUpgrading?: boolean;
+  maxCoord?: number;
 }
 
 async function safeParseJson(res: Response): Promise<any> {
@@ -162,7 +163,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   onUpdatePlayer,
   defaultSubTab,
   localResources,
-  isUpgrading = false
+  isUpgrading = false,
+  maxCoord = 100
 }) => {
   // Sub-tabs
   const [subTab, setSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>(defaultSubTab || 'scanner');
@@ -271,6 +273,40 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
     } catch (e) {
       console.error(e);
       if (showToast) showToast("Network error updating highlights.", "error");
+    }
+  };
+
+  // Instant colonization handler
+  const handleInstantColonize = async (tx: number, ty: number) => {
+    try {
+      if (!activePlanet) {
+        if (showToast) showToast("You must select an active space station to colonize from!", "error");
+        return;
+      }
+      
+      const res = await fetch("/api/colonize", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": player.id
+        },
+        body: JSON.stringify({
+          planetId: activePlanet.id,
+          targetX: tx,
+          targetY: ty
+        })
+      });
+      
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (showToast) showToast(data.message || "Sector successfully colonized!", "success");
+        if (onRefreshState) onRefreshState();
+      } else {
+        if (showToast) showToast(data.error || "Failed to colonize sector.", "error");
+      }
+    } catch (e) {
+      console.error(e);
+      if (showToast) showToast("Network error executing colonization command.", "error");
     }
   };
 
@@ -603,8 +639,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   // Search input change
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const xVal = Math.min(100, Math.max(0, parseInt(searchX, 10) || 0));
-    const yVal = Math.min(100, Math.max(0, parseInt(searchY, 10) || 0));
+    const xVal = Math.min(maxCoord, Math.max(0, parseInt(searchX, 10) || 0));
+    const yVal = Math.min(maxCoord, Math.max(0, parseInt(searchY, 10) || 0));
     setTargetCoords({ x: xVal, y: yVal });
     handleScan(xVal, yVal);
   };
@@ -754,11 +790,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
   // Direct Quick Scan Coordinate Deployment
   const handleDirectLaunchCoords = (type: 'attack' | 'move') => {
-    const xVal = Math.min(100, Math.max(0, parseInt(searchX, 10) || 0));
-    const yVal = Math.min(100, Math.max(0, parseInt(searchY, 10) || 0));
+    const xVal = Math.min(maxCoord, Math.max(0, parseInt(searchX, 10) || 0));
+    const yVal = Math.min(maxCoord, Math.max(0, parseInt(searchY, 10) || 0));
     
-    if (isNaN(xVal) || isNaN(yVal) || xVal < 0 || xVal > 100 || yVal < 0 || yVal > 100) {
-      if (showToast) showToast('Coordinates must be inside grid 0 to 100', 'error');
+    if (isNaN(xVal) || isNaN(yVal) || xVal < 0 || xVal > maxCoord || yVal < 0 || yVal > maxCoord) {
+      if (showToast) showToast(`Coordinates must be inside grid 0 to ${maxCoord}`, 'error');
       return;
     }
     
@@ -1372,6 +1408,13 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     >
                                       Settle Sector
                                     </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleInstantColonize(target.coords.x, target.coords.y)}
+                                      className="px-4 py-2 bg-teal-950/45 border border-teal-500/40 text-teal-300 hover:bg-[#14b8a6]/15 rounded-xl font-bold transition cursor-pointer text-[11px] font-mono"
+                                    >
+                                      Instant Colonize
+                                    </button>
                                   </>
                                 ) : (
                                   <>
@@ -1673,6 +1716,13 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                             className="px-2.5 py-1 bg-emerald-950/20 border border-emerald-500/30 text-emerald-400 hover:bg-[#10b981]/10 rounded-lg font-bold transition cursor-pointer text-[10px] font-mono animate-pulse"
                                           >
                                             Settle
+                                          </button>
+                                          <button 
+                                            type="button"
+                                            onClick={() => handleInstantColonize(item.coords.x, item.coords.y)}
+                                            className="px-2.5 py-1 bg-teal-950/40 border border-teal-500/30 text-teal-300 hover:bg-[#14b8a6]/10 rounded-lg font-bold transition cursor-pointer text-[10px] font-mono ml-1"
+                                          >
+                                            Instant Settle
                                           </button>
                                         </>
                                       ) : (
@@ -3677,8 +3727,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                             onClick={() => {
                               const xVal = parseInt(customX, 10);
                               const yVal = parseInt(customY, 10);
-                              if (isNaN(xVal) || isNaN(yVal) || xVal < 0 || xVal > 100 || yVal < 0 || yVal > 100) {
-                                if (showToast) showToast('Coordinates must be inside grid 0 to 100', 'error');
+                              if (isNaN(xVal) || isNaN(yVal) || xVal < 0 || xVal > maxCoord || yVal < 0 || yVal > maxCoord) {
+                                if (showToast) showToast(`Coordinates must be inside grid 0 to ${maxCoord}`, 'error');
                                 return;
                               }
 
@@ -3873,8 +3923,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               onClick={() => {
                                 const rx = parseInt(rerouteX, 10);
                                 const ry = parseInt(rerouteY, 10);
-                                if (isNaN(rx) || isNaN(ry) || rx < 0 || rx > 100 || ry < 0 || ry > 100) {
-                                  if (showToast) showToast('Telemetry coordinate must be inside grid boundary 0-100', 'error');
+                                if (isNaN(rx) || isNaN(ry) || rx < 0 || rx > maxCoord || ry < 0 || ry > maxCoord) {
+                                  if (showToast) showToast(`Telemetry coordinate must be inside grid boundary 0-${maxCoord}`, 'error');
                                   return;
                                 }
 

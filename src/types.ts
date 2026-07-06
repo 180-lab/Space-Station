@@ -293,6 +293,7 @@ export interface GameState {
   habitablePlanets?: HabitablePlanet[];
   feedbacks?: SuggestionFeedback[];
   customTasks?: Record<string, any>;
+  maxCoord?: number;
 }
 
 export interface HabitablePlanet {

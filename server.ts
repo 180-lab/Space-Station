@@ -90,19 +90,96 @@ let state: GameState = {
   newsEvents: [],
   habitablePlanets: [
     { id: "hab_12_18", name: "Habitable Gaia Aurelia", coords: { x: 12, y: 18 }, isColonized: false },
-    { id: "hab_34_72", name: "Habitable Station Kepler-Prime", coords: { x: 34, y: 72 }, isColonized: false },
-    { id: "hab_45_19", name: "Habitable Outpost Gliese-91", coords: { x: 45, y: 19 }, isColonized: false },
-    { id: "hab_67_82", name: "Habitable Station New Hope", coords: { x: 67, y: 82 }, isColonized: false },
-    { id: "hab_15_55", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 55 }, isColonized: false },
-    { id: "hab_85_44", name: "Habitable Station Zephyr-9", coords: { x: 85, y: 44 }, isColonized: false },
-    { id: "hab_52_63", name: "Habitable Planet Arcadia", coords: { x: 52, y: 63 }, isColonized: false },
+    { id: "hab_34_22", name: "Habitable Station Kepler-Prime", coords: { x: 34, y: 22 }, isColonized: false },
+    { id: "hab_25_19", name: "Habitable Outpost Gliese-91", coords: { x: 25, y: 19 }, isColonized: false },
+    { id: "hab_17_32", name: "Habitable Station New Hope", coords: { x: 17, y: 32 }, isColonized: false },
+    { id: "hab_15_25", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 25 }, isColonized: false },
+    { id: "hab_35_14", name: "Habitable Station Zephyr-9", coords: { x: 35, y: 14 }, isColonized: false },
+    { id: "hab_22_33", name: "Habitable Planet Arcadia", coords: { x: 22, y: 33 }, isColonized: false },
     { id: "hab_29_31", name: "Habitable Core Dome-A", coords: { x: 29, y: 31 }, isColonized: false },
-    { id: "hab_73_25", name: "Habitable Station Oasis-1", coords: { x: 73, y: 25 }, isColonized: false },
-    { id: "hab_91_85", name: "Habitable Planet Eden-X", coords: { x: 91, y: 85 }, isColonized: false },
-    { id: "hab_8_92", name: "Habitable Outpost Genesis", coords: { x: 8, y: 92 }, isColonized: false },
-    { id: "hab_40_40", name: "Habitable Station Midway", coords: { x: 40, y: 40 }, isColonized: false }
+    { id: "hab_13_25", name: "Habitable Station Oasis-1", coords: { x: 13, y: 25 }, isColonized: false },
+    { id: "hab_31_35", name: "Habitable Planet Eden-X", coords: { x: 31, y: 35 }, isColonized: false },
+    { id: "hab_8_32", name: "Habitable Outpost Genesis", coords: { x: 8, y: 32 }, isColonized: false },
+    { id: "hab_35_35", name: "Habitable Station Midway", coords: { x: 35, y: 35 }, isColonized: false }
   ]
 };
+
+// Map expansion limits rules: Start at 40, expand progressively up to 235 as density grows.
+function getCurrentMapLimits(): number {
+  let totalBases = 0;
+  if (state.players) {
+    for (const p of Object.values(state.players)) {
+      totalBases += p.planets?.length || 0;
+    }
+  }
+
+  let c = 40;
+  const stages = [40, 60, 80, 100, 120, 150, 180, 210, 235];
+  for (let i = 0; i < stages.length; i++) {
+    const stageMax = stages[i];
+    const threshold = Math.floor(stageMax * stageMax * 0.25); // 25% occupancy threshold
+    if (totalBases >= threshold && i < stages.length - 1) {
+      c = stages[i + 1];
+    } else if (totalBases < threshold) {
+      break;
+    }
+  }
+  return c;
+}
+
+// Generate coordinate within the current limit margins [5, maxCoord - 5]
+function getRandomCoordinates(maxCoord: number): { x: number; y: number } {
+  const range = maxCoord - 10;
+  if (range <= 0) {
+    return {
+      x: Math.floor(Math.random() * maxCoord),
+      y: Math.floor(Math.random() * maxCoord)
+    };
+  }
+  const x = Math.floor(Math.random() * range) + 5;
+  const y = Math.floor(Math.random() * range) + 5;
+  return { x, y };
+}
+
+// Search concentric rings for closest vacant coordinate
+function findClusterCoordinate(targetX: number, targetY: number): { x: number; y: number } | null {
+  const limit = getCurrentMapLimits();
+  
+  // Concentric ring search starting from distance d = 0, up to 100 rings
+  for (let d = 0; d < 100; d++) {
+    for (let dx = -d; dx <= d; dx++) {
+      const dy1 = d - Math.abs(dx);
+      const dy2 = -dy1;
+      
+      const candidateYVals = dy1 === dy2 ? [dy1] : [dy1, dy2];
+      for (const dy of candidateYVals) {
+        const cx = targetX + dx;
+        const cy = targetY + dy;
+        
+        if (cx < 5 || cx > limit - 5 || cy < 5 || cy > limit - 5) {
+          continue;
+        }
+        
+        let overlapPlayer = false;
+        if (state.players) {
+          for (const player of Object.values(state.players)) {
+            if (player.planets && player.planets.some(pl => pl.sectorX === cx && pl.sectorY === cy)) {
+              overlapPlayer = true;
+              break;
+            }
+          }
+        }
+        if (overlapPlayer) continue;
+        
+        const overlapHabitable = state.habitablePlanets?.some(hp => hp.coords.x === cx && hp.coords.y === cy);
+        if (overlapHabitable) continue;
+        
+        return { x: cx, y: cy };
+      }
+    }
+  }
+  return null;
+}
 
 // Default Troop Specifications
 const TROOP_SPECS = {
@@ -184,8 +261,10 @@ function ensureAIsCount(count: number, s: GameState) {
     usedNames.add(name.toLowerCase());
 
     const factionIdx = Math.floor(Math.random() * factions.length);
-    const x = Math.floor(Math.random() * 91) + 5;
-    const y = Math.floor(Math.random() * 91) + 5;
+    const limit = getCurrentMapLimits();
+    const coords = getRandomCoordinates(limit);
+    const x = coords.x;
+    const y = coords.y;
     const planet = createInitialPlanet(`${name}'s Station`, x, y);
 
     // Highly producing extractors
@@ -623,8 +702,10 @@ function ensureMinimumHabitablePlanets() {
 
     while (!foundCoords && attempts < 200) {
       attempts++;
-      targetX = Math.floor(Math.random() * 90) + 5;
-      targetY = Math.floor(Math.random() * 90) + 5;
+      const limit = getCurrentMapLimits();
+      const coords = getRandomCoordinates(limit);
+      targetX = coords.x;
+      targetY = coords.y;
 
       const overlapHabitable = state.habitablePlanets.some(hp => hp.coords.x === targetX && hp.coords.y === targetY);
       if (overlapHabitable) continue;
@@ -699,8 +780,10 @@ function bootstrapUniverse() {
     if (!usedNames.has(name)) {
       usedNames.add(name);
       const factionIdx = Math.floor(Math.random() * factions.length);
-      const x = Math.floor(Math.random() * 91) + 5;
-      const y = Math.floor(Math.random() * 91) + 5;
+      const limit = getCurrentMapLimits();
+      const coords = getRandomCoordinates(limit);
+      const x = coords.x;
+      const y = coords.y;
       aiNames.push({
         name,
         coords: { x, y },
@@ -2593,8 +2676,10 @@ app.post("/api/register", (req, res) => {
   const selectColor = factionColors[idx];
 
   const id = `user_${Math.random().toString(36).substr(2, 9)}`;
-  const startX = Math.floor(Math.random() * 90) + 5;
-  const startY = Math.floor(Math.random() * 90) + 5;
+  const limit = getCurrentMapLimits();
+  const coords = getRandomCoordinates(limit);
+  const startX = coords.x;
+  const startY = coords.y;
 
   const planet = createInitialPlanet(`${username}'s Station`, startX, startY, true);
   
@@ -3014,7 +3099,8 @@ app.all("/api/state", (req, res) => {
     newsEvents: state.newsEvents,
     playersList,
     serverTime: now,
-    customTasks: state.customTasks || {}
+    customTasks: state.customTasks || {},
+    maxCoord: getCurrentMapLimits()
   });
 });
 
@@ -4042,8 +4128,9 @@ app.post("/api/fleet/send", (req, res) => {
   const targetX = parseInt(String(req.body.targetX), 10);
   const targetY = parseInt(String(req.body.targetY), 10);
   
-  if (isNaN(targetX) || isNaN(targetY)) {
-    return res.status(400).json({ error: "Invalid target coordinates. Directives must specify a numeric zone on the coordinate grid." });
+  const limit = getCurrentMapLimits();
+  if (isNaN(targetX) || isNaN(targetY) || targetX < 0 || targetX > limit || targetY < 0 || targetY > limit) {
+    return res.status(400).json({ error: `Invalid target coordinates. Targeted sector must be within universe boundaries (0-${limit} allowed)` });
   }
 
   const planet = p.planets.find(pl => pl.id === planetId);
@@ -4336,6 +4423,107 @@ app.post("/api/fleet/settle", (req, res) => {
 });
 
 
+// Colonize a target sector instantly
+app.post("/api/colonize", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { planetId } = req.body;
+  const targetX = parseInt(String(req.body.targetX), 10);
+  const targetY = parseInt(String(req.body.targetY), 10);
+
+  const limit = getCurrentMapLimits();
+
+  if (isNaN(targetX) || isNaN(targetY) || targetX < 0 || targetX > limit || targetY < 0 || targetY > limit) {
+    return res.status(400).json({ error: `Invalid coordinates. Targeted sector must be within universe boundaries (0-${limit} allowed)` });
+  }
+
+  const planet = p.planets.find(pl => pl.id === planetId);
+  if (!planet) {
+    return res.status(404).json({ error: "Sending planet or space station not found!" });
+  }
+
+  // Check War Room level 22
+  if ((planet.buildings.armyBase?.level || 0) < 22) {
+    return res.status(400).json({ error: "Colonization command requires a Level 22 War Room!" });
+  }
+
+  // Check Settlement Ship inventory
+  if ((planet.troops.settlementShip || 0) < 1) {
+    return res.status(400).json({ error: "You need at least 1 Settlement Ship in your station's army base to colonize!" });
+  }
+
+  // Check map occupancy limits or max planets limit
+  if (p.planets.length >= 20) {
+    return res.status(400).json({ error: "Command limits reached. Max 20 colonized planets allowed." });
+  }
+
+  // Find destination coordinates (targetX, targetY)
+  // Check for vacancy
+  let isVacant = true;
+  for (const playerObj of Object.values(state.players)) {
+    if (playerObj.planets && playerObj.planets.some(pl => pl.sectorX === targetX && pl.sectorY === targetY)) {
+      isVacant = false;
+      break;
+    }
+  }
+  if (isVacant) {
+    const isHabitableOccupied = state.habitablePlanets?.some(hp => hp.coords.x === targetX && hp.coords.y === targetY && hp.isColonized);
+    if (isHabitableOccupied) {
+      isVacant = false;
+    }
+  }
+
+  let finalX = targetX;
+  let finalY = targetY;
+
+  if (!isVacant) {
+    // Find nearby cluster coordinate
+    const vacantCoords = findClusterCoordinate(targetX, targetY);
+    if (!vacantCoords) {
+      return res.status(400).json({ error: "All nearby coordinates in the star system cluster are fully colonized!" });
+    }
+    finalX = vacantCoords.x;
+    finalY = vacantCoords.y;
+  }
+
+  // Deduct Settlement Ship
+  planet.troops.settlementShip -= 1;
+
+  // Mark habitable planet as colonized if matching coordinates
+  const hp = state.habitablePlanets?.find(item => item.coords.x === finalX && item.coords.y === finalY);
+  if (hp) {
+    hp.isColonized = true;
+  }
+
+  // Create new planet
+  const newColonyName = hp ? hp.name : `${p.username}'s Colony [${finalX}, ${finalY}]`;
+  const newPlanet = createInitialPlanet(newColonyName, finalX, finalY, false);
+  p.planets.push(newPlanet);
+
+  // System news event
+  state.newsEvents.unshift({
+    id: `news_${Math.random().toString(36).substr(2, 9)}`,
+    title: "Quantum Colony Established",
+    content: `${p.username} has established a new settled research colony at sector [${finalX}, ${finalY}]!`,
+    type: "discovery",
+    timestamp: Date.now()
+  });
+
+  ensureMinimumHabitablePlanets();
+  saveState();
+
+  return res.json({
+    success: true,
+    planet: newPlanet,
+    player: p,
+    message: isVacant 
+      ? `Successfully colonized sector [${finalX}, ${finalY}]!` 
+      : `Target sector was occupied. Auto-rerouted and colonized vacant sector [${finalX}, ${finalY}]!`
+  });
+});
+
+
 // Reroute active fleet to a different station or attack coordinate
 app.post("/api/fleet/reroute", (req, res) => {
   const p = getLoggedPlayer(req);
@@ -4345,8 +4533,9 @@ app.post("/api/fleet/reroute", (req, res) => {
   const targetX = parseInt(String(req.body.targetX), 10);
   const targetY = parseInt(String(req.body.targetY), 10);
 
-  if (isNaN(targetX) || isNaN(targetY) || targetX < 0 || targetX > 100 || targetY < 0 || targetY > 100) {
-    return res.status(400).json({ error: "Invalid target grid coordinates (0-100 allowed)" });
+  const limit = getCurrentMapLimits();
+  if (isNaN(targetX) || isNaN(targetY) || targetX < 0 || targetX > limit || targetY < 0 || targetY > limit) {
+    return res.status(400).json({ error: `Invalid target grid coordinates (0-${limit} allowed)` });
   }
 
   const fleet = state.fleets.find(f => f.id === fleetId && f.senderId === p.id);
