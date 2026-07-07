@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ColonyPlanet, PlayerProfile, ResourceType, getUpgradeResourceCost, FleetMission, BuildingState, ChatMessage } from '../types';
+import { ColonyPlanet, PlayerProfile, ResourceType, getUpgradeResourceCost, FleetMission, BuildingState, ChatMessage, Alliance } from '../types';
 import { CommanderTutorial } from './CommanderTutorial';
+import { CommunicationsHubDetail } from './CommunicationsHubDetail';
 import { 
   Droplet, 
   Flame, 
@@ -122,6 +123,14 @@ interface ExploreTabProps {
   onCancelFleet?: (fleetId: string) => Promise<void>;
   onRerouteFleet?: (fleetId: string, targetX: number, targetY: number, missionType?: string) => Promise<void>;
   maxCoord?: number;
+  alliances?: Record<string, Alliance>;
+  playersList?: PlayerProfile[];
+  onCreateAlliance?: (name: string, tag: string, bannerColor: string, bannerSymbol: string) => Promise<void>;
+  onJoinAlliance?: (allianceId: string) => Promise<void>;
+  onLeaveAlliance?: () => Promise<void>;
+  onDeclareWar?: (targetAllianceId: string) => Promise<void>;
+  onNavigateToGalaxySubTab?: (subTab: 'scanner' | 'ranking' | 'comms' | 'news' | 'fleets') => void;
+  onOpenCommsHub?: () => void;
 }
 
 const RESOURCE_INFO: Record<ResourceType, { name: string; color: string; icon: any; desc: string }> = {
@@ -166,7 +175,15 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   isUpgrading = false,
   onCancelFleet,
   onRerouteFleet,
-  maxCoord = 100
+  maxCoord = 100,
+  alliances,
+  playersList,
+  onCreateAlliance,
+  onJoinAlliance,
+  onLeaveAlliance,
+  onDeclareWar,
+  onNavigateToGalaxySubTab,
+  onOpenCommsHub
 }) => {
   const [expandedCategory, setExpandedCategory] = useState<ResourceType | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -1693,7 +1710,27 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                   {/* Building Trigger Header Button */}
                   <button
                     type="button"
-                    onClick={() => setExpandedBuilding(isExpanded ? null : bKey)}
+                    onClick={() => {
+                      if (bKey === 'radar') {
+                        if (onNavigateToGalaxySubTab) {
+                          onNavigateToGalaxySubTab('scanner');
+                        } else {
+                          setActiveTab('galaxy');
+                        }
+                      } else if (bKey === 'researchCenter') {
+                        setActiveTab('research');
+                      } else if (bKey === 'armyBase') {
+                        setActiveTab('army');
+                      } else if (bKey === 'commsHub') {
+                        if (onOpenCommsHub) {
+                          onOpenCommsHub();
+                        } else {
+                          setExpandedBuilding(isExpanded ? null : bKey);
+                        }
+                      } else {
+                        setExpandedBuilding(isExpanded ? null : bKey);
+                      }
+                    }}
                     className="w-full p-4 flex items-center justify-between text-left transition hover:bg-white/[0.02]"
                   >
                     <div className="flex items-center gap-4">
@@ -1750,6 +1787,23 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         </div>
                       )}
                       
+                      {bKey === 'commsHub' && alliances && playersList && (
+                        <CommunicationsHubDetail
+                          player={player}
+                          alliances={alliances}
+                          playersList={playersList}
+                          chatMessages={chatMessages}
+                          onSendChat={onSendChat}
+                          onCreateAlliance={onCreateAlliance || (async () => {})}
+                          onJoinAlliance={onJoinAlliance || (async () => {})}
+                          onLeaveAlliance={onLeaveAlliance || (async () => {})}
+                          onDeclareWar={onDeclareWar || (async () => {})}
+                          onViewPlayerProfile={onViewPlayerProfile}
+                          showToast={showToast}
+                          onRefreshState={onRefreshState}
+                        />
+                      )}
+
                       {bKey === 'repository' && (
                         <div className="text-xs text-cyan-400 font-mono font-bold text-left">
                           Current Store Capacity Limit: <span className="text-white bg-cyan-950/40 border border-cyan-800/30 px-1.5 py-0.5 rounded font-bold">{(Math.round(10000 * Math.pow(500, (bState.level - 1) / 44))).toLocaleString()}</span> units per resource
@@ -2077,7 +2131,21 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                       
                       <button
                         type="button"
-                        onClick={() => setExpandedBuilding(isExpanded ? null : bKey)}
+                        onClick={() => {
+                          if (bKey === 'radar') {
+                            if (onNavigateToGalaxySubTab) {
+                              onNavigateToGalaxySubTab('scanner');
+                            } else {
+                              setActiveTab('galaxy');
+                            }
+                          } else if (bKey === 'researchCenter') {
+                            setActiveTab('research');
+                          } else if (bKey === 'armyBase') {
+                            setActiveTab('army');
+                          } else {
+                            setExpandedBuilding(isExpanded ? null : bKey);
+                          }
+                        }}
                         className="px-3 py-1.5 bg-[#5bc0be] hover:bg-[#5bc0be]/90 text-slate-950 font-bold font-mono text-[9px] uppercase tracking-wider rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                       >
                         <span>Blueprint</span>

@@ -167,7 +167,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   maxCoord = 100
 }) => {
   // Sub-tabs
-  const [subTab, setSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>(defaultSubTab || 'scanner');
+  const [subTab, setSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>(defaultSubTab || 'ranking');
 
   React.useEffect(() => {
     if (defaultSubTab) {
@@ -953,48 +953,26 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const rankedState = Object.values(alliances) as Alliance[];  return (
     <div className="space-y-1.5 pb-24 font-mono">
       {/* Visual Navigation Pill Bars as a 2-rowed layout assembly to fit mobile viewports exactly */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-1 bg-[#0A0F1D] p-1.5 rounded-xl border border-[#1E293B] shrink-0 text-[10px] sm:text-xs">
-        <button 
-          onClick={() => { setSubTab('scanner'); handleScan(targetCoords.x, targetCoords.y); }}
-          className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'scanner' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
-          title="Surveillance arrays: survey adjacent coordinates, sectors, and cosmic features"
-        >
-          <Radar size={13} className={subTab === 'scanner' && isScanning ? 'animate-spin' : ''} title="Scanning Radar sweep line" />
-          <span>SURVEILLANCE</span>
-        </button>
-        <button 
-          onClick={() => setSubTab('ranking')}
-          className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'ranking' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
-          title="Sovereignty Leaderboard: inspect combined firepower rank standings of galactic alliances"
-        >
-          <Trophy size={13} title="Trophy award leader prize" />
-          <span>LEADERBOARD</span>
-        </button>
-        <button 
-          onClick={() => setSubTab('comms')}
-          className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'comms' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
-          title="Alliance Core Hub: form coalitions, manage treaties and covenants"
-        >
-          <Users size={13} title="Group of astronauts Alliance icon" />
-          <span>ALLIANCE HUB</span>
-        </button>
-        <button 
-          onClick={() => setSubTab('news')}
-          className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'news' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
-          title="Sector DEC_LINKS: review decrypted battle reports and public newsletters feed"
-        >
-          <Radio size={13} title="Radio waves beacon transceiver" />
-          <span>DEC_LINKS</span>
-        </button>
-        <button 
-          onClick={() => setSubTab('fleets')}
-          className={`col-span-2 md:col-span-1 py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'fleets' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
-          title="Tactical Fleets array: relocate or deploy offense squadrons with separate routes"
-        >
-          <Compass size={13} title="Compass locator tool" />
-          <span>FLEETS</span>
-        </button>
-      </div>
+      {subTab !== 'scanner' && (
+        <div className="grid grid-cols-2 gap-1 bg-[#0A0F1D] p-1.5 rounded-xl border border-[#1E293B] shrink-0 text-[10px] sm:text-xs">
+          <button 
+            onClick={() => setSubTab('ranking')}
+            className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'ranking' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+            title="Sovereignty Leaderboard: inspect combined firepower rank standings of galactic alliances"
+          >
+            <Trophy size={13} title="Trophy award leader prize" />
+            <span>LEADERBOARD</span>
+          </button>
+          <button 
+            onClick={() => setSubTab('news')}
+            className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'news' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+            title="Sector DEC_LINKS: review decrypted battle reports and public newsletters feed"
+          >
+            <Radio size={13} title="Radio waves beacon transceiver" />
+            <span>DEC_LINKS</span>
+          </button>
+        </div>
+      )}
 
       {/* SUB TAB 1: RADAR SCANNER */}
       {subTab === 'scanner' && (

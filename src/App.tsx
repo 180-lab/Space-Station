@@ -22,6 +22,7 @@ import { GalaxyTab } from './components/GalaxyTab';
 import { ResearchTab } from './components/ResearchTab';
 import { SettingsTab } from './components/SettingsTab';
 import { CommanderTutorial } from './components/CommanderTutorial';
+import { CommunicationsHubModal } from './components/CommunicationsHubModal';
 import { 
   Droplet, 
   Flame, 
@@ -271,6 +272,7 @@ export default function App() {
 
   // Command message deck states
   const [showCommDeck, setShowCommDeck] = useState(false);
+  const [showCommsHubModal, setShowCommsHubModal] = useState(false);
   const [commDeckTab, setCommDeckTab] = useState<'incoming' | 'saved' | 'sent' | 'compose'>('incoming');
   const [profileMsgText, setProfileMsgText] = useState("");
   const [isSendingMsg, setIsSendingMsg] = useState(false);
@@ -281,7 +283,7 @@ export default function App() {
 
   // Active Screen / Navigation Tab selector: 'explore' | 'army' | 'galaxy' | 'research' | 'settings'
   const [activeTab, setActiveTab ] = useState<'explore' | 'army' | 'galaxy' | 'research' | 'settings'>('explore');
-  const [galaxyInitialSubTab, setGalaxyInitialSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>('scanner');
+  const [galaxyInitialSubTab, setGalaxyInitialSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>('ranking');
 
   // Local reserve / created fleets state
   const [createdFleets, setCreatedFleets] = useState<CreatedFleet[]>(() => {
@@ -3187,6 +3189,17 @@ export default function App() {
               onCancelFleet={handleCancelFleet}
               onRerouteFleet={handleRerouteFleet}
               maxCoord={maxCoord}
+              alliances={alliances}
+              playersList={playersList}
+              onCreateAlliance={handleCreateAlliance}
+              onJoinAlliance={handleJoinAlliance}
+              onLeaveAlliance={handleLeaveAlliance}
+              onDeclareWar={handleDeclareWar}
+              onNavigateToGalaxySubTab={(sub) => {
+                setGalaxyInitialSubTab(sub);
+                setActiveTab('galaxy');
+              }}
+              onOpenCommsHub={() => setShowCommsHubModal(true)}
             />
           );
         })()}
@@ -3336,7 +3349,7 @@ export default function App() {
           {/* Tab 3: Galaxy Scan Map */}
           <button 
             onClick={() => {
-              setGalaxyInitialSubTab('scanner');
+              setGalaxyInitialSubTab('ranking');
               setActiveTab('galaxy');
             }}
             className={`flex-1 h-full flex flex-col items-center justify-center gap-1 border-r border-[#1E293B] group relative transition-colors duration-150 cursor-pointer ${activeTab === 'galaxy' ? 'bg-cyan-500/10' : ''}`}
@@ -4483,6 +4496,26 @@ export default function App() {
 
           </div>
         </div>
+      )}
+      {showCommsHubModal && player && (
+        <CommunicationsHubModal
+          isOpen={showCommsHubModal}
+          onClose={() => setShowCommsHubModal(false)}
+          player={player}
+          alliances={alliances}
+          playersList={playersList}
+          onSendMessage={handleSendMessage}
+          onToggleMessageRead={handleToggleMessageRead}
+          onToggleSaveMessage={handleToggleSaveMessage}
+          onDeleteMessage={handleDeleteMessage}
+          onCreateAlliance={handleCreateAlliance}
+          onJoinAlliance={handleJoinAlliance}
+          onLeaveAlliance={handleLeaveAlliance}
+          onDeclareWar={handleDeclareWar}
+          onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
+          showToast={showToast}
+          onRefreshState={fetchState}
+        />
       )}
       {appConfirmModal && (
         <div id="app-confirm-modal-overlay" className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
