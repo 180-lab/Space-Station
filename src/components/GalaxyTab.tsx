@@ -2632,10 +2632,10 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 <div className="space-y-2.5">
                   <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest block font-mono">⚔️ Tactical Combat Dec Links</span>
                   <div className="space-y-2 max-h-[255px] overflow-y-auto pr-1">
-                    {battleReports.filter(r => r.isRecon !== true).length === 0 ? (
+                    {battleReports.filter(r => r.isRecon !== true && r.isMove !== true).length === 0 ? (
                       <p className="text-slate-600 text-[11px] italic font-sans py-2 font-mono">No military encounters decrypted.</p>
                     ) : (
-                      battleReports.filter(r => r.isRecon !== true).map((report) => {
+                      battleReports.filter(r => r.isRecon !== true && r.isMove !== true).map((report) => {
                         const isExpanded = expandedCombatReports[report.id] || false;
                         const isAttacker = report.attackerId === player.id;
                         const isDefender = report.defenderId === player.id;
@@ -2703,7 +2703,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/20 p-1.5 rounded-lg transition flex-1"
               >
                 <h3 className="text-sm font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2 font-mono" title="Secure sector combat encounter history and archives logs">
-                  <ShieldAlert size={16} title="Battle alert logs warning status" /> Military Combat Reports ({battleReports.filter(r => r.isRecon !== true).length})
+                  <ShieldAlert size={16} title="Battle alert logs warning status" /> Military Combat Reports ({battleReports.filter(r => r.isRecon !== true && r.isMove !== true).length})
                 </h3>
                 {isCombatOpen ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
               </div>
@@ -2722,7 +2722,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             {isCombatOpen && (
               <div className="pt-2 border-t border-white/5 space-y-3">
                 {(() => {
-                  const filtered = battleReports.filter(r => r.isRecon !== true);
+                  const filtered = battleReports.filter(r => r.isRecon !== true && r.isMove !== true);
                   return (
                     /* Category filters (Separating Attacks and Defenses) and local action button */
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-2 border-b border-white/5">
@@ -2778,7 +2778,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 })()}
 
                 {(() => {
-                  const filtered = battleReports.filter(r => r.isRecon !== true);
+                  const filtered = battleReports.filter(r => r.isRecon !== true && r.isMove !== true);
                   let resultList = filtered;
                   if (combatCategoryFilter === 'saved') {
                     resultList = filtered.filter(r => savedReports[r.id]);

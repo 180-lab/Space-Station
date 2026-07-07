@@ -64,6 +64,7 @@ export interface ColonyPlanet {
     radar: BuildingState;         // Max 15
     supplyNexus: BuildingState;   // Max 50
     fabricator: BuildingState;    // Max 10
+    bunker?: BuildingState;
   };
   resources: {
     water: number;
@@ -226,6 +227,7 @@ export interface BattleReport {
   defenderName: string;
   defenderAlliance?: string;
   isRecon?: boolean;
+  isMove?: boolean;
   attackerCoords: { x: number; y: number };
   defenderCoords: { x: number; y: number };
   attackerInitialTroops: Record<string, number>;

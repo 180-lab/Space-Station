@@ -104,7 +104,7 @@ let state: GameState = {
   ]
 };
 
-// Map expansion limits rules: Start at 40, expand progressively up to 235 as density grows.
+// Map expansion limits rules: Start at 20, expand progressively up to 235 as density grows.
 function getCurrentMapLimits(): number {
   let totalBases = 0;
   if (state.players) {
@@ -113,8 +113,8 @@ function getCurrentMapLimits(): number {
     }
   }
 
-  let c = 40;
-  const stages = [40, 60, 80, 100, 120, 150, 180, 210, 235];
+  let c = 20;
+  const stages = [20, 40, 60, 80, 100, 120, 150, 180, 210, 235];
   for (let i = 0; i < stages.length; i++) {
     const stageMax = stages[i];
     const threshold = Math.floor(stageMax * stageMax * 0.25); // 25% occupancy threshold
@@ -127,17 +127,18 @@ function getCurrentMapLimits(): number {
   return c;
 }
 
-// Generate coordinate within the current limit margins [5, maxCoord - 5]
+// Generate coordinate within the current limit margins [margin, maxCoord - margin]
 function getRandomCoordinates(maxCoord: number): { x: number; y: number } {
-  const range = maxCoord - 10;
+  const margin = maxCoord <= 20 ? 1 : 5;
+  const range = maxCoord - (margin * 2);
   if (range <= 0) {
     return {
       x: Math.floor(Math.random() * maxCoord),
       y: Math.floor(Math.random() * maxCoord)
     };
   }
-  const x = Math.floor(Math.random() * range) + 5;
-  const y = Math.floor(Math.random() * range) + 5;
+  const x = Math.floor(Math.random() * range) + margin;
+  const y = Math.floor(Math.random() * range) + margin;
   return { x, y };
 }
 
@@ -313,6 +314,60 @@ function ensureAIsCount(count: number, s: GameState) {
 // Normalize GameState to ensure all newly-added properties exist across legacy states
 function normalizeState(s: GameState) {
   if (!s) return;
+
+  const limit = getCurrentMapLimits();
+
+  // Relocate any player/AI planets that are outside current map limits
+  if (s.players) {
+    Object.values(s.players).forEach((p) => {
+      if (p && p.planets) {
+        p.planets.forEach((pl: any) => {
+          if (pl.sectorX > limit || pl.sectorY > limit) {
+            const oldX = pl.sectorX;
+            const oldY = pl.sectorY;
+            const coords = getRandomCoordinates(limit);
+            pl.sectorX = coords.x;
+            pl.sectorY = coords.y;
+
+            // Sync the habitable planet if it was colonized at those coordinates
+            if (s.habitablePlanets) {
+              const hp = s.habitablePlanets.find(item => item.coords.x === oldX && item.coords.y === oldY);
+              if (hp) {
+                hp.coords.x = coords.x;
+                hp.coords.y = coords.y;
+                hp.id = `hab_${coords.x}_${coords.y}`;
+              }
+            }
+          }
+        });
+      }
+    });
+  }
+
+  // Ensure all uncolonized habitable planets are within current limits, filtering out any that are outside
+  if (s.habitablePlanets) {
+    s.habitablePlanets = s.habitablePlanets.filter(hp => {
+      if (hp.isColonized) return true; // Keep colonized
+      return hp.coords.x <= limit && hp.coords.y <= limit;
+    });
+  }
+
+  // Relocate active fleets if target/sender is out of bounds
+  if (s.fleets) {
+    s.fleets.forEach((f: any) => {
+      if (f.targetCoords && (f.targetCoords.x > limit || f.targetCoords.y > limit)) {
+        const coords = getRandomCoordinates(limit);
+        f.targetCoords.x = coords.x;
+        f.targetCoords.y = coords.y;
+      }
+      if (f.senderCoords && (f.senderCoords.x > limit || f.senderCoords.y > limit)) {
+        const coords = getRandomCoordinates(limit);
+        f.senderCoords.x = coords.x;
+        f.senderCoords.y = coords.y;
+      }
+    });
+  }
+
   ensureMinimumHabitablePlanets();
   if (!s.players) s.players = {};
   if (!s.alliances) s.alliances = {};
@@ -381,7 +436,8 @@ function normalizeState(s: GameState) {
         armyBase: { level: isFirst ? 22 : 0, maxLevel: 22 },
         repository: { level: isFirst ? 45 : 0, maxLevel: 45 },
         radar: { level: isFirst ? 15 : 0, maxLevel: 15 },
-        supplyNexus: { level: isFirst ? 50 : 0, maxLevel: 50 }
+        supplyNexus: { level: isFirst ? 50 : 0, maxLevel: 50 },
+        bunker: { level: isFirst ? 25 : 0, maxLevel: 25 }
       };
 
       Object.entries(buildingDefaults).forEach(([bKey, bDef]) => {
@@ -474,7 +530,25 @@ async function loadState() {
       // Auto-migrate any outpost names to station names for loaded sectors
       if (state && state.players) {
         Object.values(state.players).forEach((p: any) => {
-          if (p && Array.isArray(p.planets)) {
+          if (p) {
+            if (!p.planets || !Array.isArray(p.planets) || p.planets.length === 0) {
+              const limit = getCurrentMapLimits();
+              const coords = getRandomCoordinates(limit);
+              const startX = coords.x;
+              const startY = coords.y;
+              const planet = createInitialPlanet(`${p.username || "Commander"}'s Station`, startX, startY, true);
+              planet.resources.water = 5000000;
+              planet.resources.plasma = 5000000;
+              planet.resources.fuel = 5000000;
+              planet.resources.food = 5000000;
+              planet.resources.respirant = 5000000;
+              p.planets = [planet];
+              if (!p.scores) {
+                p.scores = { population: 10, attack: 0, defence: 0, raiders: 0 };
+              } else if (p.scores.population <= 0) {
+                p.scores.population = 10;
+              }
+            }
             p.planets.forEach((pl: any) => {
               if (pl && typeof pl.name === "string" && pl.name.includes("Outpost")) {
                 pl.name = pl.name.replace(/Outpost/g, "Station");
@@ -509,17 +583,17 @@ async function loadState() {
       if (!state.habitablePlanets) {
         state.habitablePlanets = [
           { id: "hab_12_18", name: "Habitable Gaia Aurelia", coords: { x: 12, y: 18 }, isColonized: false },
-          { id: "hab_34_72", name: "Habitable Station Kepler-Prime", coords: { x: 34, y: 72 }, isColonized: false },
-          { id: "hab_45_19", name: "Habitable Outpost Gliese-91", coords: { x: 45, y: 19 }, isColonized: false },
-          { id: "hab_67_82", name: "Habitable Station New Hope", coords: { x: 67, y: 82 }, isColonized: false },
-          { id: "hab_15_55", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 55 }, isColonized: false },
-          { id: "hab_85_44", name: "Habitable Station Zephyr-9", coords: { x: 85, y: 44 }, isColonized: false },
-          { id: "hab_52_63", name: "Habitable Planet Arcadia", coords: { x: 52, y: 63 }, isColonized: false },
-          { id: "hab_29_31", name: "Habitable Core Dome-A", coords: { x: 29, y: 31 }, isColonized: false },
-          { id: "hab_73_25", name: "Habitable Station Oasis-1", coords: { x: 73, y: 25 }, isColonized: false },
-          { id: "hab_91_85", name: "Habitable Planet Eden-X", coords: { x: 91, y: 85 }, isColonized: false },
-          { id: "hab_8_92", name: "Habitable Outpost Genesis", coords: { x: 8, y: 92 }, isColonized: false },
-          { id: "hab_40_40", name: "Habitable Station Midway", coords: { x: 40, y: 40 }, isColonized: false }
+          { id: "hab_14_8", name: "Habitable Station Kepler-Prime", coords: { x: 14, y: 8 }, isColonized: false },
+          { id: "hab_5_15", name: "Habitable Outpost Gliese-91", coords: { x: 5, y: 15 }, isColonized: false },
+          { id: "hab_17_12", name: "Habitable Station New Hope", coords: { x: 17, y: 12 }, isColonized: false },
+          { id: "hab_15_5", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 5 }, isColonized: false },
+          { id: "hab_3_14", name: "Habitable Station Zephyr-9", coords: { x: 3, y: 14 }, isColonized: false },
+          { id: "hab_8_3", name: "Habitable Planet Arcadia", coords: { x: 8, y: 3 }, isColonized: false },
+          { id: "hab_9_9", name: "Habitable Core Dome-A", coords: { x: 9, y: 9 }, isColonized: false },
+          { id: "hab_13_15", name: "Habitable Station Oasis-1", coords: { x: 13, y: 15 }, isColonized: false },
+          { id: "hab_11_15", name: "Habitable Planet Eden-X", coords: { x: 11, y: 15 }, isColonized: false },
+          { id: "hab_8_12", name: "Habitable Outpost Genesis", coords: { x: 8, y: 12 }, isColonized: false },
+          { id: "hab_10_10", name: "Habitable Station Midway", coords: { x: 10, y: 10 }, isColonized: false }
         ];
       }
 
@@ -575,7 +649,8 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number, isF
       armyBase: { level: isFirstStation ? 22 : 0, maxLevel: 22, isUpgrading: false, upgradeEnd: null, health: 100 },
       repository: { level: isFirstStation ? 45 : 0, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
       radar: { level: isFirstStation ? 15 : 0, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
-      supplyNexus: { level: isFirstStation ? 50 : 0, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 }
+      supplyNexus: { level: isFirstStation ? 50 : 0, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 },
+      bunker: { level: isFirstStation ? 25 : 0, maxLevel: 25, isUpgrading: false, upgradeEnd: null, health: 100 }
     },
     resources: {
       water: isFirstStation ? 5000000 : 5000,
@@ -606,7 +681,7 @@ function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarg
   let mineType = "";
   
   if (target === "random") {
-    const choices = ["commsHub", "researchCenter", "armyBase", "repository", "radar", "supplyNexus", "mines.water", "mines.plasma", "mines.fuel", "mines.food", "mines.respirant"];
+    const choices = ["commsHub", "researchCenter", "armyBase", "repository", "radar", "supplyNexus", "bunker", "mines.water", "mines.plasma", "mines.fuel", "mines.food", "mines.respirant"];
     target = choices[Math.floor(Math.random() * choices.length)];
   }
 
@@ -648,7 +723,7 @@ function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarg
     if (computedHealth > 0) {
       targetState.health = computedHealth;
       buildingDamageReports.push({
-        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName,
+        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName === "bunker" ? "Bunker" : finalName,
         levelsDestroyed: 0,
         previousLevel: prevLvl,
         newLevel: prevLvl
@@ -665,7 +740,7 @@ function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarg
       targetState.health = newHealth;
 
       buildingDamageReports.push({
-        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName,
+        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName === "bunker" ? "Bunker" : finalName,
         levelsDestroyed: levelsLost,
         previousLevel: prevLvl,
         newLevel: newLvl
@@ -680,6 +755,13 @@ function ensureMinimumHabitablePlanets() {
   if (!state.habitablePlanets) {
     state.habitablePlanets = [];
   }
+  
+  const limit = getCurrentMapLimits();
+  // Filter out any uncolonized habitable planets that are outside the current map limit
+  state.habitablePlanets = state.habitablePlanets.filter(p => {
+    if (p.isColonized) return true;
+    return p.coords.x <= limit && p.coords.y <= limit;
+  });
   
   const uncolonized = state.habitablePlanets.filter(p => !p.isColonized);
   if (uncolonized.length >= 20) return;
@@ -742,17 +824,17 @@ function bootstrapUniverse() {
   state.battleReports = [];
   state.habitablePlanets = [
     { id: "hab_12_18", name: "Habitable Gaia Aurelia", coords: { x: 12, y: 18 }, isColonized: false },
-    { id: "hab_34_72", name: "Habitable Station Kepler-Prime", coords: { x: 34, y: 72 }, isColonized: false },
-    { id: "hab_45_19", name: "Habitable Outpost Gliese-91", coords: { x: 45, y: 19 }, isColonized: false },
-    { id: "hab_67_82", name: "Habitable Station New Hope", coords: { x: 67, y: 82 }, isColonized: false },
-    { id: "hab_15_55", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 55 }, isColonized: false },
-    { id: "hab_85_44", name: "Habitable Station Zephyr-9", coords: { x: 85, y: 44 }, isColonized: false },
-    { id: "hab_52_63", name: "Habitable Planet Arcadia", coords: { x: 52, y: 63 }, isColonized: false },
-    { id: "hab_29_31", name: "Habitable Core Dome-A", coords: { x: 29, y: 31 }, isColonized: false },
-    { id: "hab_73_25", name: "Habitable Station Oasis-1", coords: { x: 73, y: 25 }, isColonized: false },
-    { id: "hab_91_85", name: "Habitable Planet Eden-X", coords: { x: 91, y: 85 }, isColonized: false },
-    { id: "hab_8_92", name: "Habitable Outpost Genesis", coords: { x: 8, y: 92 }, isColonized: false },
-    { id: "hab_40_40", name: "Habitable Station Midway", coords: { x: 40, y: 40 }, isColonized: false }
+    { id: "hab_14_8", name: "Habitable Station Kepler-Prime", coords: { x: 14, y: 8 }, isColonized: false },
+    { id: "hab_5_15", name: "Habitable Outpost Gliese-91", coords: { x: 5, y: 15 }, isColonized: false },
+    { id: "hab_17_12", name: "Habitable Station New Hope", coords: { x: 17, y: 12 }, isColonized: false },
+    { id: "hab_15_5", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 5 }, isColonized: false },
+    { id: "hab_3_14", name: "Habitable Station Zephyr-9", coords: { x: 3, y: 14 }, isColonized: false },
+    { id: "hab_8_3", name: "Habitable Planet Arcadia", coords: { x: 8, y: 3 }, isColonized: false },
+    { id: "hab_9_9", name: "Habitable Core Dome-A", coords: { x: 9, y: 9 }, isColonized: false },
+    { id: "hab_13_15", name: "Habitable Station Oasis-1", coords: { x: 13, y: 15 }, isColonized: false },
+    { id: "hab_11_15", name: "Habitable Planet Eden-X", coords: { x: 11, y: 15 }, isColonized: false },
+    { id: "hab_8_12", name: "Habitable Outpost Genesis", coords: { x: 8, y: 12 }, isColonized: false },
+    { id: "hab_10_10", name: "Habitable Station Midway", coords: { x: 10, y: 10 }, isColonized: false }
   ];
   state.newsEvents = [
     {
@@ -1897,10 +1979,18 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       }
 
       if (targetPlanet) {
-        // Transfer all troops to the destination planet
-        Object.entries(fleet.troops).forEach(([tId, count]) => {
-          targetPlanet!.troops[tId as keyof typeof targetPlanet.troops] = (targetPlanet!.troops[tId as keyof typeof targetPlanet.troops] || 0) + count;
-        });
+        const cf = fleet.createdFleetId ? attacker.createdFleets?.find(f => f.id === fleet.createdFleetId) : null;
+        if (cf) {
+          // Relocate the reserve fleet container itself to the target planet (with its troops & resources intact)
+          cf.planetId = targetPlanet.id;
+          cf.isTraveling = false;
+          cf.activeMissionId = null;
+        } else {
+          // Transfer all troops to the destination planet garrison
+          Object.entries(fleet.troops).forEach(([tId, count]) => {
+            targetPlanet!.troops[tId as keyof typeof targetPlanet.troops] = (targetPlanet!.troops[tId as keyof typeof targetPlanet.troops] || 0) + count;
+          });
+        }
 
         // Add relocation report/log
         const report: BattleReport = {
@@ -1911,6 +2001,7 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
           defenderId: targetOwner.id,
           defenderName: targetPlanet.name,
           isRecon: false,
+          isMove: true,
           attackerCoords: fleet.senderCoords,
           defenderCoords: fleet.targetCoords,
           attackerInitialTroops: { ...fleet.troops },
@@ -1927,7 +2018,9 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
               logs: [
                 "--- SECURE FLEET TRANSIT RELOCATION ---",
                 `All relocated squadrons have safely made orbital insertion at '${targetPlanet.name}'.`,
-                "Troops have been successfully deployed and integrated into the local defense network.",
+                cf 
+                  ? "Reserve fleet container has docked locally, keeping all transport cargo resources and forces structured."
+                  : "Troops have been successfully deployed and integrated into the local defense network.",
                 `Arriving payload: ${Object.entries(fleet.troops).filter(([_, q]) => q > 0).map(([t, q]) => `${q} ${t}`).join(', ') || 'No spacecraft'}`
               ],
               attackerRemaining: { ...fleet.troops },
@@ -2265,16 +2358,29 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
     });
 
     if (combat.winner === "attacker" && totalLootCapacity > 0 && defPlanet) {
-      // Steal equal proportion of each resource
       const items: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
-      let defenseTotalResources = items.reduce((sum, item) => sum + defPlanet.resources[item], 0);
+      
+      // Calculate protected amount per resource based on Bunker level
+      const bunkerLevel = (defPlanet.buildings && defPlanet.buildings.bunker) ? defPlanet.buildings.bunker.level : 0;
+      const protectedAmountPerType = Math.round(500000 * (bunkerLevel / 25));
 
-      if (defenseTotalResources > 0) {
-        const stealAmount = Math.min(totalLootCapacity, defenseTotalResources);
-        const stealFrac = stealAmount / defenseTotalResources;
+      // Calculate how much of each resource is actually available to steal (exceeding the bunker protection)
+      const availableResources = items.reduce((acc, item) => {
+        acc[item] = Math.max(0, defPlanet.resources[item] - protectedAmountPerType);
+        return acc;
+      }, {} as Record<ResourceType, number>);
+
+      let defenseTotalAvailableResources = items.reduce((sum, item) => sum + availableResources[item], 0);
+
+      if (defenseTotalAvailableResources > 0) {
+        const stealAmount = Math.min(totalLootCapacity, defenseTotalAvailableResources);
+        const stealFrac = stealAmount / defenseTotalAvailableResources;
 
         items.forEach(item => {
-          const stolen = Math.floor(defPlanet.resources[item] * stealFrac);
+          const stolen = Math.min(
+            availableResources[item], // Can't steal more than what is available (outside bunker)
+            Math.floor(availableResources[item] * stealFrac)
+          );
           defPlanet.resources[item] -= stolen;
           loot[item] = stolen;
         });
@@ -2759,9 +2865,99 @@ app.post("/api/login", (req, res) => {
 
 // Google Authentication secure endpoint
 app.post("/api/auth/google", async (req, res) => {
-  const { idToken } = req.body;
+  const { idToken, email, username, faction } = req.body;
+  
   if (!idToken) {
-    return res.status(400).json({ error: "Google credentials authorization failed. ID Token is required." });
+    if (!email) {
+      return res.status(400).json({ error: "Google credentials authorization failed. ID Token or Email is required." });
+    }
+    
+    try {
+      // Check if player with this googleEmail already exists (case-insensitive)
+      const player = Object.values(state.players).find(
+        p => p.googleEmail && p.googleEmail.toLowerCase() === email.toLowerCase()
+      );
+      
+      if (player) {
+        return res.json({ player, isNew: false });
+      }
+      
+      // Register new player fallback
+      const uid = `google_sim_${Math.random().toString(36).substring(2, 10)}`;
+      const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
+      const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
+      
+      const selectFaction = faction || factions[0];
+      const selectColor = selectFaction === "Nexus Syndicate" ? factionColors[1] : selectFaction === "Eclipse Vanguard" ? factionColors[2] : factionColors[0];
+      const defaultUsername = username || email.split("@")[0];
+
+      // Create initial starting planet
+      const limit = getCurrentMapLimits();
+      const coords = getRandomCoordinates(limit);
+      const startX = coords.x;
+      const startY = coords.y;
+      const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY, true);
+      
+      // Set reasonable starting resources
+      planet.resources.water = 5000000;
+      planet.resources.plasma = 5000000;
+      planet.resources.fuel = 5000000;
+      planet.resources.food = 5000000;
+      planet.resources.respirant = 5000000;
+      
+      const newPlayer: PlayerProfile = {
+        id: uid,
+        username: defaultUsername,
+        faction: selectFaction,
+        factionColor: selectColor,
+        allianceId: null,
+        allianceRole: null,
+        planets: [planet],
+        scores: {
+          population: 10,
+          attack: 0,
+          defence: 0,
+          raiders: 0
+        },
+        achievements: ["Google Verified Commander"],
+        skinId: "default",
+        bannerId: "default",
+        lastDailyRewardClaim: Date.now(),
+        credits: 10000,
+        googleEmail: email
+      };
+
+      state.players[uid] = newPlayer;
+
+      // Log discovery
+      state.newsEvents.unshift({
+        id: `news_${Math.random().toString(36).substr(2, 9)}`,
+        title: "Google Commander Registered",
+        content: `Commander ${defaultUsername} synced via secure quantum keys!`,
+        type: "discovery",
+        timestamp: Date.now()
+      });
+
+      // Welcome message in global chat
+      state.chatMessages.push({
+        id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
+        channel: "global",
+        senderId: "system",
+        senderName: "CENTRAL COMMAND",
+        senderFaction: "System",
+        senderFactionColor: "#7F8C8D",
+        allianceTag: "SYS",
+        receiverId: null,
+        content: `Google Secure sync approved. Welcome Commander ${defaultUsername} to active space duty!`,
+        timestamp: Date.now()
+      });
+
+      saveState();
+      return res.json({ player: newPlayer, isNew: true });
+    } catch (e: any) {
+      console.error("[Google Simulation Error]", e);
+      return res.status(500).json({ error: "Failed to simulate Google Sign-in on active station." });
+    }
   }
 
   try {
@@ -2795,6 +2991,20 @@ app.post("/api/auth/google", async (req, res) => {
 
     const defaultUsername = name || (email ? email.split("@")[0] : `Commander_${uid.substring(0, 5)}`);
 
+    // Create initial starting planet
+    const limit = getCurrentMapLimits();
+    const coords = getRandomCoordinates(limit);
+    const startX = coords.x;
+    const startY = coords.y;
+    const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY, true);
+    
+    // Set reasonable starting resources
+    planet.resources.water = 5000000;
+    planet.resources.plasma = 5000000;
+    planet.resources.fuel = 5000000;
+    planet.resources.food = 5000000;
+    planet.resources.respirant = 5000000;
+
     const newPlayer: PlayerProfile = {
       id: uid,
       username: defaultUsername,
@@ -2802,9 +3012,9 @@ app.post("/api/auth/google", async (req, res) => {
       factionColor: selectColor,
       allianceId: null,
       allianceRole: null,
-      planets: [], // Empty planets array as requested
+      planets: [planet],
       scores: {
-        population: 0,
+        population: 10,
         attack: 0,
         defence: 0,
         raiders: 0
@@ -2944,6 +3154,20 @@ app.post("/api/auth/google-play", async (req, res) => {
     const cleanUsername = displayName.replace(/[^a-zA-Z0-9_ ]/g, "").substring(0, 15) || `Commander_${playerId.substring(0, 5)}`;
     const uid = `gpgs_${playerId}`;
 
+    // Create initial starting planet
+    const limit = getCurrentMapLimits();
+    const coords = getRandomCoordinates(limit);
+    const startX = coords.x;
+    const startY = coords.y;
+    const planet = createInitialPlanet(`${cleanUsername}'s Station`, startX, startY, true);
+    
+    // Set reasonable starting resources
+    planet.resources.water = 5000000;
+    planet.resources.plasma = 5000000;
+    planet.resources.fuel = 5000000;
+    planet.resources.food = 5000000;
+    planet.resources.respirant = 5000000;
+
     const newPlayer: PlayerProfile = {
       id: uid,
       username: cleanUsername,
@@ -2951,9 +3175,9 @@ app.post("/api/auth/google-play", async (req, res) => {
       factionColor: selectColor,
       allianceId: null,
       allianceRole: null,
-      planets: [],
+      planets: [planet],
       scores: {
-        population: 0,
+        population: 10,
         attack: 0,
         defence: 0,
         raiders: 0
@@ -5773,36 +5997,36 @@ app.post("/api/tutorial/claim", (req, res) => {
   }
 
   const rewards: Record<number, { water: number; plasma: number; fuel: number; food: number; respirant: number; credits: number }> = {
-    1: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 15000 },  // Colonize 2nd planet
-    2: { water: 10280, plasma: 10180, fuel: 10180, food: 10180, respirant: 10180, credits: 3000 },   // Rename Outpost
-    3: { water: 10180, plasma: 10180, fuel: 10180, food: 10180, respirant: 10280, credits: 5000 },   // Hydrothermal pump Lvl 2
-    4: { water: 10180, plasma: 10180, fuel: 10180, food: 10280, respirant: 10180, credits: 4000 },   // Air Scrubber Lvl 2
-    5: { water: 10180, plasma: 10280, fuel: 10180, food: 10180, respirant: 10180, credits: 4000 },   // Food bio-synth Lvl 2
-    6: { water: 10150, plasma: 10000, fuel: 10000, food: 10200, respirant: 10100, credits: 4000 },   // Plasma refinery Lvl 2
-    7: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },   // Comms Hub Activation
-    8: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 6000 },   // Expand Repository
-    9: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },   // Send Resources
-    10: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },  // Recon fleet
-    11: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 7500 },  // Attack Fleet
-    12: { water: 10291, plasma: 10302, fuel: 10302, food: 10302, respirant: 10302, credits: 5000 },  // Production boost
-    13: { water: 11000, plasma: 11000, fuel: 11000, food: 11000, respirant: 11000, credits: 6000 },  // Dual boost overdrive
-    14: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 6000 },  // Fabricator Lvl 2
-    15: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5005 },  // Radar Array Lvl 1
-    16: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 4000 },  // Sector scan
-    17: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000, credits: 8000 },  // Research Center Lvl 1
-    18: { water: 12000, plasma: 12000, fuel: 12000, food: 12000, respirant: 12000, credits: 6000 },  // Metallurgy level 2
-    19: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 5000 },  // Scientific tech research
-    20: { water: 12250, plasma: 10000, fuel: 10000, food: 13000, respirant: 11500, credits: 6000 },  // War room level 1
-    21: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },  // Train 15 troops
-    22: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },  // 5 Interceptors
-    23: { water: 12000, plasma: 12000, fuel: 12000, food: 12000, respirant: 12000, credits: 6000 },  // 2 Bombers
-    24: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 3000 },  // Private text PM
-    25: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 5000 },  // Nexus claim
-    26: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 7000 },  // Star Alliance
-    27: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000, credits: 3000 },  // Chat broadcast
-    28: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 8000 },  // Warp thruster research
-    29: { water: 11500, plasma: 11000, fuel: 12000, food: 11500, respirant: 11000, credits: 4000 },  // Leaderboard payroll audit
-    30: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 30000 }, // Settle 3rd Planet outpost!
+    1: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Colonize 2nd planet
+    2: { water: 10280, plasma: 10180, fuel: 10180, food: 10180, respirant: 10180, credits: 50 },   // Rename Outpost
+    3: { water: 10180, plasma: 10180, fuel: 10180, food: 10180, respirant: 10280, credits: 50 },   // Hydrothermal pump Lvl 2
+    4: { water: 10180, plasma: 10180, fuel: 10180, food: 10280, respirant: 10180, credits: 50 },   // Air Scrubber Lvl 2
+    5: { water: 10180, plasma: 10280, fuel: 10180, food: 10180, respirant: 10180, credits: 50 },   // Food bio-synth Lvl 2
+    6: { water: 10150, plasma: 10000, fuel: 10000, food: 10200, respirant: 10100, credits: 50 },   // Plasma refinery Lvl 2
+    7: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },   // Comms Hub Activation
+    8: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },   // Expand Repository
+    9: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },   // Send Resources
+    10: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Recon fleet
+    11: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Attack Fleet
+    12: { water: 10291, plasma: 10302, fuel: 10302, food: 10302, respirant: 10302, credits: 50 },  // Production boost
+    13: { water: 11000, plasma: 11000, fuel: 11000, food: 11000, respirant: 11000, credits: 50 },  // Dual boost overdrive
+    14: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 50 },  // Fabricator Lvl 2
+    15: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Radar Array Lvl 1
+    16: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 50 },  // Sector scan
+    17: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000, credits: 50 },  // Research Center Lvl 1
+    18: { water: 12000, plasma: 12000, fuel: 12000, food: 12000, respirant: 12000, credits: 50 },  // Metallurgy level 2
+    19: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 50 },  // Scientific tech research
+    20: { water: 12250, plasma: 10000, fuel: 10000, food: 13000, respirant: 11500, credits: 50 },  // War room level 1
+    21: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Train 15 troops
+    22: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // 5 Interceptors
+    23: { water: 12000, plasma: 12000, fuel: 12000, food: 12000, respirant: 12000, credits: 50 },  // 2 Bombers
+    24: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Private text PM
+    25: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Nexus claim
+    26: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Star Alliance
+    27: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000, credits: 50 },  // Chat broadcast
+    28: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Warp thruster research
+    29: { water: 11500, plasma: 11000, fuel: 12000, food: 11500, respirant: 11000, credits: 50 },  // Leaderboard payroll audit
+    30: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 15000 }, // Settle 3rd Planet outpost!
   };
 
   let rawId = taskId;

@@ -194,7 +194,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       shortDesc: 'Extend local warehouse capacities to safely store large resource reserves.',
       requirementHtml: 'Upgrade <strong>Silo to Level 10 or higher</strong> on your planetary starbase.',
       hint: 'Upgrade the Silo building under your XPL tab infrastructure list.',
-      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Locate the <strong>Silo</strong> building slot in the infrastructure grid.<br/>3. Upgrade it to Level 10 or higher (use Speed Credits to complete instantly if desired).',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Locate the <strong>Silo</strong> building slot in the infrastructure grid.<br/>3. Upgrade it to Level 10 or higher (use Space Gold to complete instantly if desired).',
       commanderTip: 'XPL tab -> Base Infrastructure Buildings -> Silo.',
       congratsMessage: '🏦 STORAGE CAPACITY EXTENDED! Heavy-duty vaults are successfully reinforced to contain massive fluid reserves without pressure failure risks!',
       encouragementQuote: 'Incredible early infrastructure development, Admiral! Larger repositories ensure you never lose passive yields during long offline cycles.',
@@ -255,13 +255,13 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     {
       id: 12,
       title: '🔋 Extractor Production Overdrive',
-      shortDesc: 'Use your accumulated Space Gold credits to boost planetary extraction pump outputs.',
+      shortDesc: 'Use your accumulated Space Gold to boost planetary extraction pump outputs.',
       requirementHtml: 'Activate a <strong>Production Boost overdrive</strong> on any active extractor category.',
       hint: 'Go to the XPL tab, find the yellow button marked "BOOST PRODUCTION" above your Resource Extractor list, select 1-day duration, and activate the booster.',
       howToGetThere: '1. Click open the <strong>XPL</strong> tab.<br/>2. Find the yellow <strong>"BOOST PRODUCTION"</strong> button next to Resource Extractor Outposts header.<br/>3. Pick a boost target, select 1 Day duration, and click <strong>"Activate Boost Overdrive"</strong>.',
       commanderTip: 'XPL tab -> "BOOST PRODUCTION" yellow button on right column.',
       congratsMessage: '🔋 OVERDRIVE SEQUENCE AUTHORIZED! Extractors are working at +14% overclocked efficiency, flooding storage vaults with resources!',
-      encouragementQuote: 'Outstanding productivity tactics! Speed credits booster allows you to fast-lane resource collection for heavy shipbuilding or research.',
+      encouragementQuote: 'Outstanding productivity tactics! Space Gold booster allows you to fast-lane resource collection for heavy shipbuilding or research.',
       targetTab: 'explore',
       rewards: {
         resources: { water: 10291, plasma: 10302, fuel: 10302, food: 10302, respirant: 10302 },
@@ -307,7 +307,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       requirementHtml: 'Upgrade the <strong>Radar Array building to Level 1 or higher</strong>.',
       hint: 'In the XPL tab buildings list, locate the Radar Array, and click Upgrade/Build.',
       howToGetThere: '1. Navigate to the <strong>XPL</strong> tab.<br/>2. Find the <strong>Radar Array</strong> building row (under base buildings grid).<br/>3. Click <strong>"Upgrade Building"</strong> to start building level 1. If queued, click ' +
-        '"Instant Upgrade" using credits to finish instantly!',
+        '"Instant Upgrade" using Space Gold to finish instantly!',
       commanderTip: 'XPL tab -> Base Infrastructure Buildings -> Radar Array.',
       congratsMessage: '📡 RADAR ARRAY OPERATIONAL! Deep-space radar scanner frequencies are active, tracking passing ships and neighboring solar grids!',
       encouragementQuote: 'Incredible early warning system! A sovereign admiral is never caught blind - keeping your radar level high maps out incoming hostile coordinates.',
@@ -531,7 +531,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       shortDesc: 'Inspect rankings, leader positions, and Space gold logs to keep books tidy.',
       requirementHtml: 'Review your <strong>Commander summary scores</strong> on the global Leaderboard stats roster.',
       hint: 'Navigate to the Settings tab, locate the stats or leaderboard lists, find your name, and examine your standing score.',
-      howToGetThere: '1. Open the <strong>Settings</strong> tab.<br/>2. Locate the <strong>Commander Statistics Summary</strong> card.<br/>3. Review your population score (from mine upgrades), defense ratings, and space credit allocations.',
+      howToGetThere: '1. Open the <strong>Settings</strong> tab.<br/>2. Locate the <strong>Commander Statistics Summary</strong> card.<br/>3. Review your population score (from mine upgrades), defense ratings, and Space Gold balance.',
       commanderTip: 'Settings tab -> Overview and Leaderboard section.',
       congratsMessage: '📊 SOVEREIGNDOM STATS VERIFIED! Sector audits are green, marking you as a legitimate certified emperor of space command ledger boards!',
       encouragementQuote: 'Terrific ledger discipline! A master commander must constantly calculate population sizes and credit reserves to stay ahead of the pack.',
@@ -561,8 +561,9 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
 
   const tasks: TutorialTask[] = rawTasks.map(t => {
     const custom = customTasks?.[t.id] || customTasks?.[String(t.id)];
+    let base = t;
     if (custom) {
-      return {
+      base = {
         ...t,
         title: custom.title || t.title,
         shortDesc: custom.shortDesc || t.shortDesc,
@@ -574,11 +575,18 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
         encouragementQuote: custom.encouragementQuote || t.encouragementQuote,
       };
     }
-    return t;
+    const creditsReward = base.id === 30 ? 1500 : 50;
+    return {
+      ...base,
+      rewards: {
+        ...base.rewards,
+        credits: creditsReward
+      }
+    };
   });
 
-  if (DEFAULT_TUTORIAL_TASKS.length === 0 && rawTasks.length > 0) {
-    DEFAULT_TUTORIAL_TASKS = rawTasks;
+  if (DEFAULT_TUTORIAL_TASKS.length === 0 && tasks.length > 0) {
+    DEFAULT_TUTORIAL_TASKS = tasks;
   }
 
   // Tasks must be done on the player's latest planet (the last one in the planets array) and not any earlier planet
@@ -934,7 +942,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                       <span>✨ WELCOME STATION COMMANDER!</span>
                     </h4>
                     <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                      Rule the stars! We have configured an epic progressive training program to walk you through the core of your empire's assembly lines, science labs, fleet transponders, text DMs, public chat, and outer coordinate expansions. Grab materials and free **Speed Credits** for each task claim!
+                      Rule the stars! We have configured an epic progressive training program to walk you through the core of your empire's assembly lines, science labs, fleet transponders, text DMs, public chat, and outer coordinate expansions. Grab materials and free **Space Gold** for each task claim!
                     </p>
                   </div>
                 )}
@@ -1048,7 +1056,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                       </div>
                     ))}
                     <div className="flex justify-between items-center text-[10px] px-2 py-1 rounded bg-[#090D1A] border border-[#06b6d4]/10">
-                      <span className="text-amber-400">🪙 Speed Credits</span>
+                      <span className="text-amber-400">🪙 Space Gold</span>
                       <span className="font-black text-amber-400">+{activeTask.rewards.credits.toLocaleString()}</span>
                     </div>
                   </div>

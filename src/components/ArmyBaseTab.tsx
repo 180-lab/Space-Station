@@ -189,6 +189,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
     settlementShip: 0
   });
 
+  const filteredBattleReports = battleReports.filter(r => r.isRecon !== true && r.isMove !== true);
+
   // Rerouting inputs state
   const [reroutingFleetId, setReroutingFleetId] = useState<string | null>(null);
   const [rerouteX, setRerouteX] = useState<string>('');
@@ -756,20 +758,20 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
             setShowReportsModal(true);
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-xs font-bold shrink-0 shadow-lg justify-center w-full sm:w-auto relative cursor-pointer border transition duration-150 ${
-            battleReports.filter(r => !seenReports[r.id]).length > 0 
+            filteredBattleReports.filter(r => !seenReports[r.id]).length > 0 
               ? "bg-red-950/40 hover:bg-red-900/45 border-red-500/30 hover:border-red-500/65 text-red-400 hover:text-red-350"
               : "bg-emerald-950/40 hover:bg-emerald-900/45 border-emerald-500/30 hover:border-emerald-500/65 text-emerald-400 hover:text-emerald-350"
           }`}
           title="Decrypt and view local planetary security encounters."
         >
-          {battleReports.filter(r => !seenReports[r.id]).length > 0 && <ShieldAlert size={14} className="animate-pulse" />}
+          {filteredBattleReports.filter(r => !seenReports[r.id]).length > 0 && <ShieldAlert size={14} className="animate-pulse" />}
           <span>ATTACK REPORTS</span>
           <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-            battleReports.filter(r => !seenReports[r.id]).length > 0
+            filteredBattleReports.filter(r => !seenReports[r.id]).length > 0
               ? "bg-red-500 text-slate-950"
               : "bg-emerald-500 text-slate-950"
           }`}>
-            {battleReports.filter(r => !seenReports[r.id]).length}
+            {filteredBattleReports.filter(r => !seenReports[r.id]).length}
           </span>
         </button>
 
@@ -2341,31 +2343,31 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                 onClick={() => setCombatLogsFilter('all')}
                 className={`flex-1 py-1.5 px-3 font-bold rounded-lg transition-colors border cursor-pointer ${combatLogsFilter === 'all' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/45 shadow-[0_0_10px_rgba(34,211,238,0.15)]' : 'bg-[#05070A] text-slate-400 border-[#1E293B] hover:text-slate-200'}`}
               >
-                📝 ALL ({battleReports.length})
+                📝 ALL ({filteredBattleReports.length})
               </button>
               <button
                 type="button"
                 onClick={() => setCombatLogsFilter('unread')}
                 className={`flex-1 py-1.5 px-3 font-bold rounded-lg transition-colors border cursor-pointer ${combatLogsFilter === 'unread' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/45 shadow-[0_0_10px_rgba(34,211,238,0.15)]' : 'bg-[#05070A] text-slate-400 border-[#1E293B] hover:text-slate-200'}`}
               >
-                🔵 UNREAD ({battleReports.filter(r => !readReports[r.id]).length})
+                🔵 UNREAD ({filteredBattleReports.filter(r => !readReports[r.id]).length})
               </button>
               <button
                 type="button"
                 onClick={() => setCombatLogsFilter('saved')}
                 className={`flex-1 py-1.5 px-3 font-bold rounded-lg transition-colors border cursor-pointer ${combatLogsFilter === 'saved' ? 'bg-amber-500/20 text-amber-300 border-amber-500/45 shadow-[0_0_10px_rgba(245,158,11,0.15)]' : 'bg-[#05070A] text-slate-400 border-[#1E293B] hover:text-slate-200'}`}
               >
-                ⭐ SAVED ({battleReports.filter(r => savedReports[r.id]).length})
+                ⭐ SAVED ({filteredBattleReports.filter(r => savedReports[r.id]).length})
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-4 pr-1">
               {(() => {
                 const filteredReports = combatLogsFilter === 'saved'
-                  ? battleReports.filter(r => savedReports[r.id])
+                  ? filteredBattleReports.filter(r => savedReports[r.id])
                   : combatLogsFilter === 'unread'
-                  ? battleReports.filter(r => !readReports[r.id])
-                  : battleReports;
+                  ? filteredBattleReports.filter(r => !readReports[r.id])
+                  : filteredBattleReports;
 
                 if (filteredReports.length === 0) {
                   return (

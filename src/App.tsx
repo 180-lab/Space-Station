@@ -126,12 +126,28 @@ export default function App() {
 
   // Google Sign-In & Payments Dialog states
   const [showGoogleDialog, setShowGoogleDialog] = useState(false);
+  const [googleDialogMode, setGoogleDialogMode] = useState<'choose' | 'add'>('choose');
+  const [newAccountEmail, setNewAccountEmail] = useState('');
+  const [newAccountName, setNewAccountName] = useState('');
   const [showGPGSSimulator, setShowGPGSSimulator] = useState(false);
   const [deviceGoogleAccounts, setDeviceGoogleAccounts] = useState<{ email: string; name: string }[]>(() => {
     try {
       const saved = localStorage.getItem('moonbase_device_google_accounts');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Remove default mock/personal accounts from active list if they were saved previously
+          const cleaned = parsed.filter(acc => 
+            acc.email && 
+            acc.email.toLowerCase() !== 'hopeworthn1@gmail.com' && 
+            acc.email.toLowerCase() !== 'lorenleehaynes@gmail.com' && 
+            acc.email.toLowerCase() !== 'banele180@gmail.com'
+          );
+          if (cleaned.length !== parsed.length) {
+            localStorage.setItem('moonbase_device_google_accounts', JSON.stringify(cleaned));
+          }
+          return cleaned;
+        }
       }
     } catch (e) {
       // Ignore
@@ -140,18 +156,23 @@ export default function App() {
   });
 
   const addDeviceGoogleAccount = (email: string, name: string) => {
-    setDeviceGoogleAccounts(() => {
-      // Strictly enforce exactly 1 account maximum on this device!
-      const updated = [{ email, name }];
-      localStorage.setItem('moonbase_device_google_accounts', JSON.stringify(updated));
+    setDeviceGoogleAccounts((prev) => {
+      const filtered = prev.filter(acc => acc.email.toLowerCase() !== email.toLowerCase());
+      const updated = [{ email, name }, ...filtered];
+      try {
+        localStorage.setItem('moonbase_device_google_accounts', JSON.stringify(updated));
+      } catch (e) {}
       return updated;
     });
   };
 
   const removeDeviceGoogleAccount = (email: string) => {
-    setDeviceGoogleAccounts(() => {
-      localStorage.removeItem('moonbase_device_google_accounts');
-      return [];
+    setDeviceGoogleAccounts((prev) => {
+      const updated = prev.filter(acc => acc.email.toLowerCase() !== email.toLowerCase());
+      try {
+        localStorage.setItem('moonbase_device_google_accounts', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
     });
   };
 
@@ -163,6 +184,12 @@ export default function App() {
 
   // Synced state from server
   const [player, setPlayer] = useState<PlayerProfile | null>(null);
+
+  useEffect(() => {
+    if (player && player.googleEmail) {
+      addDeviceGoogleAccount(player.googleEmail, player.username);
+    }
+  }, [player]);
   const [appConfirmModal, setAppConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [playersList, setPlayersList] = useState<LeaderboardPlayer[]>([]);
   const [alliances, setAlliances] = useState<Record<string, Alliance>>({});
@@ -903,7 +930,8 @@ export default function App() {
             repository: 'Silo',
             radar: 'Radar Array',
             supplyNexus: 'Supply Nexus',
-            fabricator: 'Fabricator'
+            fabricator: 'Fabricator',
+            bunker: 'Bunker'
           };
           const bName = bNames[key] || key;
           const msg = `${bName} construction finished! Upgraded to Level ${lvl}.`;
@@ -1075,7 +1103,8 @@ export default function App() {
           repository: mockBuilding(45),
           radar: mockBuilding(15),
           supplyNexus: mockBuilding(50),
-          fabricator: mockBuilding(10)
+          fabricator: mockBuilding(10),
+          bunker: mockBuilding(25)
         },
         resources: { water: 5000, plasma: 2000, fuel: 3000, food: 4000, respirant: 2500 },
         troops: { defender: 10, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
@@ -1482,7 +1511,7 @@ export default function App() {
       }
       setAppConfirmModal({
         title: 'CONFIRM SPACE GOLD TRANSACTION',
-        message: 'Are you sure you want to spend 15 Space Gold to queue this extractor upgrade?',
+        message: 'Are you sure you want to spend 15 Space Gold to queue this extractor upgrade? (Please note: This is a beta version of the transaction.)',
         onConfirm: runUpgrade
       });
     } else {
@@ -1532,7 +1561,7 @@ export default function App() {
       }
       setAppConfirmModal({
         title: 'CONFIRM SPACE GOLD TRANSACTION',
-        message: `Are you sure you want to spend 15 Space Gold to queue this ${buildingKey.toUpperCase()} upgrade?`,
+        message: `Are you sure you want to spend 15 Space Gold to queue this ${buildingKey.toUpperCase()} upgrade? (Please note: This is a beta version of the transaction.)`,
         onConfirm: runUpgrade
       });
     } else {
@@ -2325,13 +2354,13 @@ export default function App() {
           {/* Branded Google Login button */}
           <button 
             type="button"
-            onClick={async () => {
+            onClick={() => {
               if (deviceGoogleAccounts && deviceGoogleAccounts.length > 0) {
-                // INSTANTLY automatic connect to the single saved Google account on the device!
-                await handleGoogleSignIn(deviceGoogleAccounts[0].email, deviceGoogleAccounts[0].name);
+                setGoogleDialogMode('choose');
               } else {
-                setShowGoogleDialog(true);
+                setGoogleDialogMode('add');
               }
+              setShowGoogleDialog(true);
             }}
             className="w-full py-3 px-4 bg-white hover:bg-slate-100 text-[#1F2937] font-bold text-xs tracking-wider uppercase rounded-xl flex items-center justify-center gap-3 active:scale-[0.98] transition duration-150 cursor-pointer shadow-md"
           >
@@ -2360,84 +2389,249 @@ export default function App() {
 
         {/* Google Authentication Dialog Overlay */}
         {showGoogleDialog && (
-          <div className="fixed inset-0 bg-[#05070A]/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 font-sans text-gray-800 border border-gray-100 flex flex-col items-center">
-              {/* Google Brand Logo in color */}
-              <div className="flex items-center gap-1 mb-6">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+          <div className="fixed inset-0 bg-[#05070A]/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden font-sans text-gray-800 border border-gray-100 flex flex-col">
+              
+              {/* Header: Sign in with Google */}
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3 bg-gray-50/50">
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
                   <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.13-.07-.25-.15-.35-.22" fill="#FBBC05" />
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
                 </svg>
-                <span className="font-semibold text-sm text-gray-700">Google Credentials</span>
+                <span className="text-sm font-medium text-gray-700">Sign in with Google</span>
+                <button
+                  type="button"
+                  onClick={() => setShowGoogleDialog(false)}
+                  className="ml-auto text-gray-400 hover:text-gray-650 transition cursor-pointer"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
 
-              <h2 className="text-xl font-bold text-gray-900 text-center">Sync Google Account</h2>
-              <p className="text-xs text-gray-500 text-center mt-1 mb-6">to bind with Space Station device instance</p>
-
-              {/* Accounts list */}
-              <div className="w-full space-y-2.5">
-                {deviceGoogleAccounts.length === 0 ? (
-                  <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl text-center">
-                    <p className="text-xs text-gray-400">No active device Google sessions detected.</p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const customEmail = window.prompt("Please enter your Google account email:");
-                        if (customEmail && customEmail.includes("@")) {
-                          const customName = window.prompt("Please choose your Commander name for this Google Account:", customEmail.split("@")[0]);
-                          handleGoogleSignIn(customEmail, customName || undefined);
-                        } else if (customEmail) {
-                          window.alert("Invalid email format!");
-                        }
-                      }}
-                      className="mt-3.5 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold font-mono text-[11px] uppercase tracking-wider hover:bg-slate-800 transition cursor-pointer"
-                    >
-                      + SYNC NATIVE EMAIL
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center mb-2">
-                      <p className="text-[11px] text-amber-700 font-semibold leading-relaxed">
-                        ⚠️ <strong>Device Bound Constraint</strong>: Only 1 Google account can be associated with this device instance. To switch accounts, you must clear your game/app cache manually.
-                      </p>
+              {/* 2-Column Layout */}
+              <div className="flex flex-col md:flex-row p-6 md:p-10 gap-8 min-h-[380px]">
+                
+                {/* Left Column: Brand & Title */}
+                <div className="flex-1 flex flex-col justify-between">
+                  <div>
+                    {/* Brand Identifier */}
+                    <div className="select-none mb-4">
+                      <img 
+                        src={welcomeBanner} 
+                        className="h-14 w-auto object-contain rounded-xl shadow-sm border border-slate-100" 
+                        alt="Space Station"
+                        referrerPolicy="no-referrer"
+                      />
                     </div>
-                    {deviceGoogleAccounts.slice(0, 1).map((acc) => (
-                      <div 
-                        key={acc.email}
-                        className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 flex items-center justify-between gap-2"
+                    
+                    {googleDialogMode === 'choose' ? (
+                      <>
+                        <h2 className="text-3xl font-normal text-gray-900 tracking-tight mt-6 md:mt-10 leading-snug">
+                          Choose an account
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-2">
+                          to continue to <span className="font-semibold text-gray-700">Space Station Commander</span>
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <h2 className="text-3xl font-normal text-gray-900 tracking-tight mt-6 md:mt-10 leading-snug">
+                          Sign in
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-2">
+                          with your Google Account to connect
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Subtle decorative helper */}
+                  <div className="hidden md:block text-xs text-gray-400">
+                    Secure 256-bit credentials integrity sync.
+                  </div>
+                </div>
+
+                {/* Right Column: Interactive Content */}
+                <div className="flex-1 flex flex-col justify-between border-t md:border-t-0 md:border-l border-gray-100 pt-6 md:pt-0 md:pl-8">
+                  {googleDialogMode === 'choose' ? (
+                    /* CHOOSE ACCOUNT MODE */
+                    <div className="space-y-1">
+                      <div className="max-h-[260px] overflow-y-auto pr-1 space-y-1">
+                        {deviceGoogleAccounts.map((acc) => {
+                          // Deterministic premium color backgrounds matching standard client accounts
+                          const colors = ['bg-[#1A5276]', 'bg-[#922B21]', 'bg-[#1B4F72]', 'bg-[#114B3E]', 'bg-[#6C3483]', 'bg-[#7D6608]'];
+                          let hash = 0;
+                          const emailLower = acc.email.toLowerCase();
+                          for (let i = 0; i < emailLower.length; i++) {
+                            hash = emailLower.charCodeAt(i) + ((hash << 5) - hash);
+                          }
+                          const avatarBg = colors[Math.abs(hash) % colors.length];
+                          
+                          // Check if active session
+                          const isLinked = player?.googleEmail?.toLowerCase() === acc.email.toLowerCase();
+
+                          return (
+                            <div
+                              key={acc.email}
+                              className="w-full flex items-center justify-between hover:bg-slate-50 rounded-xl transition group"
+                            >
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await handleGoogleSignIn(acc.email, acc.name);
+                                }}
+                                className="flex-1 text-left p-3 flex items-center gap-3 min-w-0 cursor-pointer"
+                              >
+                                {/* Account Avatar */}
+                                <div className={`w-10 h-10 rounded-full ${avatarBg} text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm`}>
+                                  {acc.name ? acc.name.charAt(0).toUpperCase() : acc.email.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-gray-800 truncate leading-tight">
+                                    {acc.name}
+                                  </div>
+                                  <div className="text-xs text-gray-500 truncate mt-0.5">
+                                    {acc.email}
+                                  </div>
+                                </div>
+                              </button>
+                              
+                              <div className="flex items-center gap-2 pr-3 shrink-0 select-none">
+                                <div className="text-xs text-gray-400 font-medium whitespace-nowrap">
+                                  {isLinked ? (
+                                    <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full text-[10px] font-bold">Signed in</span>
+                                  ) : (
+                                    "Signed out"
+                                  )}
+                                </div>
+                                {!isLinked && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeDeviceGoogleAccount(acc.email);
+                                    }}
+                                    className="p-1 hover:bg-rose-50 text-gray-400 hover:text-rose-600 rounded transition cursor-pointer md:opacity-0 group-hover:opacity-100"
+                                    title="Remove account from device"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Divider */}
+                      <div className="border-t border-gray-100 my-2"></div>
+
+                      {/* Use another account option */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewAccountEmail('');
+                          setNewAccountName('');
+                          setGoogleDialogMode('add');
+                        }}
+                        className="w-full text-left p-3 hover:bg-slate-50 active:bg-slate-100 rounded-xl flex items-center gap-3 transition cursor-pointer border border-transparent hover:border-gray-100"
                       >
-                        <button 
-                          type="button"
-                          onClick={() => handleGoogleSignIn(acc.email, acc.name)}
-                          className="flex-1 text-left flex items-center gap-2.5 cursor-pointer"
+                        <div className="w-10 h-10 rounded-full border border-gray-200 bg-white text-gray-650 flex items-center justify-center shrink-0">
+                          <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-gray-700">
+                            Use another account
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                  ) : (
+                    /* ADD ACCOUNT MODE (Beautiful Google-style sign in inputs) */
+                    <form 
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!newAccountEmail || !newAccountEmail.includes('@')) {
+                          showToast('Please enter a valid Google email address.', 'error');
+                          return;
+                        }
+                        const name = newAccountName.trim() || newAccountEmail.split('@')[0];
+                        await handleGoogleSignIn(newAccountEmail, name);
+                      }}
+                      className="space-y-6"
+                    >
+                      <div className="space-y-5">
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2 font-mono">
+                            GOOGLE EMAIL ADDRESS
+                          </label>
+                          <input
+                            type="email"
+                            required
+                            value={newAccountEmail}
+                            onChange={(e) => setNewAccountEmail(e.target.value)}
+                            placeholder="e.g. commander.sol@gmail.com"
+                            className="w-full px-4 py-3 bg-[#05070A] border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder-gray-500 text-slate-100 shadow-inner"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2 font-mono">
+                            COMMANDER DISPLAY NAME
+                          </label>
+                          <input
+                            type="text"
+                            value={newAccountName}
+                            onChange={(e) => setNewAccountName(e.target.value)}
+                            placeholder="Choose your callsign (optional)"
+                            className="w-full px-4 py-3 bg-[#05070A] border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder-gray-500 text-slate-100 shadow-inner"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Actions row */}
+                      <div className="flex items-center justify-between pt-4">
+                        {deviceGoogleAccounts && deviceGoogleAccounts.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setGoogleDialogMode('choose')}
+                            className="text-xs font-bold font-mono text-blue-600 hover:text-blue-700 uppercase tracking-wider cursor-pointer"
+                          >
+                            &larr; Back to accounts
+                          </button>
+                        ) : (
+                          <div /> // empty spacer when there's no back option
+                        )}
+                        <button
+                          type="submit"
+                          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition shadow-md cursor-pointer"
                         >
-                          <div className="w-8 h-8 rounded-full bg-cyan-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                            {acc.name ? acc.name.charAt(0).toUpperCase() : acc.email.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="min-w-0 pr-2">
-                            <div className="text-xs font-bold text-gray-800 truncate">{acc.name}</div>
-                            <div className="text-[10px] text-gray-500 truncate">{acc.email}</div>
-                          </div>
+                          Next
                         </button>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </form>
+                  )}
 
-                {/* Custom input or cancel options */}
-                <div className="pt-3 border-t border-gray-100 flex justify-between w-full">
-                  <button 
-                    type="button"
-                    onClick={() => setShowGoogleDialog(false)}
-                    className="text-xs text-gray-400 hover:text-gray-650 hover:underline ml-auto"
-                  >
-                    Cancel
-                  </button>
+                  {/* Google Legal Disclaimer matching screenshot */}
+                  <div className="text-[11px] text-gray-400 leading-normal pt-4 mt-6 border-t border-gray-100 text-left">
+                    Before using this app, you can review Space Station Commander's{' '}
+                    <a href="#privacy" className="text-blue-600 hover:underline">Privacy Policy</a>
+                    {' '}and{' '}
+                    <a href="#terms" className="text-blue-600 hover:underline">Terms of Service</a>.
+                  </div>
                 </div>
+
               </div>
+              
             </div>
           </div>
         )}
@@ -3222,6 +3416,11 @@ export default function App() {
                   Support the development of Space Station! Choose any of the following quantum financial funding packages to load premium **Space Gold (Credits)** directly into your commander ledger account.
                 </div>
 
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[10.5px] text-amber-300 font-mono flex items-center gap-2 select-none">
+                  <span>⚠️</span>
+                  <span><strong>BETA NOTICE:</strong> This is a beta version transaction. All Space Gold acquirement and testing simulations are conducted inside our active testnet.</span>
+                </div>
+
                 {/* Tiers List */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {[
@@ -3393,7 +3592,7 @@ export default function App() {
 
                     <div className="flex items-center gap-2 pt-1 font-sans">
                       <input type="checkbox" required id="secure-terms" className="rounded bg-[#05070A] border-[#1E293B]" />
-                      <label htmlFor="secure-terms" className="text-[10px] text-slate-500 cursor-pointer">I authorize this simulated space transaction process via encrypted quantum rails.</label>
+                      <label htmlFor="secure-terms" className="text-[10px] text-slate-500 cursor-pointer">I authorize this simulated space transaction process via encrypted quantum rails. I understand that this is a beta version of the transaction.</label>
                     </div>
 
                     <div className="pt-2 flex gap-3">
@@ -3417,7 +3616,7 @@ export default function App() {
                     <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#FBBF24]">Quick Sync Authorized</span>
                     <h4 className="text-sm font-bold text-white">Mobile Wallet Payment Simulation</h4>
                     <p className="text-xs text-slate-400 max-w-[360px] mx-auto leading-relaxed">
-                      Sync directly with Apple Pay or Google Pay to purchase this Space Gold block securely. No physical credit card input is required.
+                      Sync directly with Apple Pay or Google Pay to purchase this Space Gold block securely. No physical credit card input is required. (Please note: this is a beta version of the transaction.)
                     </p>
                     <button
                       type="button"
@@ -3475,7 +3674,7 @@ export default function App() {
                 <div className="space-y-1">
                   <h4 className="text-base font-bold text-white uppercase font-mono tracking-wide">Ledger Synchronization Successful!</h4>
                   <p className="text-xs text-slate-400 max-w-[380px] leading-relaxed">
-                    Transaction authorized and ledger updated. **+{selectedPaymentTier.amount.toLocaleString()} Space Gold (Credits)** loaded securely!
+                    Transaction authorized and ledger updated. **+{selectedPaymentTier.amount.toLocaleString()} Space Gold (Credits)** loaded securely! <span className="text-amber-500 font-mono">(Please note: This is a beta version of the transaction.)</span>
                   </p>
                 </div>
 

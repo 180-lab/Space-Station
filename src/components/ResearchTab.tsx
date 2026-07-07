@@ -377,7 +377,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
 
     setConfirmModal({
       title: 'CONFIRM SPACE GOLD TRANSACTION',
-      message: `Are you sure you want to spend 25 Space Gold to queue the research of "${tech.name}" to level ${targetLvl}?`,
+      message: `Are you sure you want to spend 25 Space Gold to queue the research of "${tech.name}" to level ${targetLvl}? (Please note: this is a beta version of the transaction.)`,
       onConfirm: async () => {
         setIsResearching(true);
         try {
