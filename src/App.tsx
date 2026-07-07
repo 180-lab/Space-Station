@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import welcomeBanner from './assets/images/welcome_banner_clean_1780971855115.png';
 import { 
   Alliance, 
@@ -497,6 +497,8 @@ export default function App() {
     return saved !== 'false';
   });
   const [isScrolling, setIsScrolling] = useState(false);
+  const [isHoveringFooter, setIsHoveringFooter] = useState(false);
+  const [isMouseNearBottom, setIsMouseNearBottom] = useState(false);
   const [isMobileView, setIsMobileView] = useState(() => {
     return typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
   });
@@ -625,52 +627,58 @@ export default function App() {
     document.documentElement.style.fontSize = size;
   }, [fontSizeScale]);
 
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerShowToolbar = useCallback(() => {
+    setIsScrolling(true);
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsScrolling(false);
+    }, 2500); // Hide after 2.5s of flat inactivity
+  }, []);
+
   // Monitor screen scrolling, touch gestures, and pointer position near bottom
   useEffect(() => {
-    let scrollTimeout: NodeJS.Timeout;
-
     const showTabsHandler = () => {
-      setIsScrolling(true);
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        setIsScrolling(false);
-      }, 2500); // Hide after 2.5s of flat inactivity
+      triggerShowToolbar();
     };
 
-    // If page is completely short and lacks any scroll height, keep it open so they can navigate
-    const checkScrollable = () => {
-      const isScrollable = document.documentElement.scrollHeight > window.innerHeight;
-      if (!isScrollable) {
-        setIsScrolling(true);
-      }
-    };
-
-    // Reveal toolbar if touch moves or scroll acts or mouse gets close to the bottom 80px
+    // Reveal toolbar if touch moves or scroll acts or mouse gets close to the bottom 85px
     const handlePointerMove = (e: PointerEvent) => {
-      if (e.clientY > window.innerHeight - 80) {
-        showTabsHandler();
+      if (e.clientY > window.innerHeight - 85) {
+        setIsMouseNearBottom(true);
+        triggerShowToolbar();
+      } else {
+        setIsMouseNearBottom(false);
       }
+    };
+
+    const handlePointerLeave = () => {
+      setIsMouseNearBottom(false);
     };
 
     window.addEventListener('scroll', showTabsHandler, { passive: true });
     window.addEventListener('wheel', showTabsHandler, { passive: true });
     window.addEventListener('touchmove', showTabsHandler, { passive: true });
     window.addEventListener('pointermove', handlePointerMove, { passive: true });
-    window.addEventListener('resize', checkScrollable);
+    window.addEventListener('pointerleave', handlePointerLeave, { passive: true });
 
-    // Initial load check and flash to show accessibility
-    checkScrollable();
-    showTabsHandler();
+    // Initial flash to show toolbar
+    triggerShowToolbar();
 
     return () => {
       window.removeEventListener('scroll', showTabsHandler);
       window.removeEventListener('wheel', showTabsHandler);
       window.removeEventListener('touchmove', showTabsHandler);
       window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('resize', checkScrollable);
-      clearTimeout(scrollTimeout);
+      window.removeEventListener('pointerleave', handlePointerLeave);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
     };
-  }, []);
+  }, [triggerShowToolbar]);
 
   // Smooth client-side local ticker for ticking resources in real time!
   const [localResources, setLocalResources] = useState<Record<ResourceType, number>>({
@@ -3298,7 +3306,11 @@ export default function App() {
       </main>
 
       {/* BOTTOM TAB MENU NAVIGATION PANEL (Elegant Dark Mockup matched exact style) */}
-      <footer className={`fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#0A0F1D]/95 backdrop-blur-md border-t border-[#1E293B] flex items-center shrink-0 px-2 justify-between transition-all duration-500 ease-in-out ${(!interactiveTabs || isScrolling || isMobileView) ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
+      <footer 
+        onMouseEnter={() => setIsHoveringFooter(true)}
+        onMouseLeave={() => setIsHoveringFooter(false)}
+        className={`fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#0A0F1D]/95 backdrop-blur-md border-t border-[#1E293B] flex items-center shrink-0 px-2 justify-between transition-all duration-500 ease-in-out ${(!interactiveTabs || isScrolling || isMobileView || isHoveringFooter || isMouseNearBottom) ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}
+      >
         <div className="flex-1 flex h-full">
           
           {/* Tab 1: Explore */}
@@ -3346,15 +3358,24 @@ export default function App() {
 
         </div>
 
-        {/* Right Info Section / daily reward & research center */}
-        <div className="w-72 bg-slate-900 border-l border-[#1E293B] h-full hidden md:flex items-center px-6 justify-between gap-4">
-          <div className="flex flex-col">
-            <span className="text-[9px] text-slate-500 uppercase tracking-widest font-mono">Quantum Crates</span>
-            <button 
-              onClick={handleClaimDailyReward}
-              className="text-xs font-mono font-bold text-amber-400 hover:text-amber-300 text-left cursor-pointer flex items-center gap-1 mt-0.5"
+        {/* Right Info Section / SG balance & Settings */}
+        <div className="w-72 bg-slate-900 border-l border-[#1E293B] h-full hidden md:flex items-center px-4 justify-between gap-3">
+          <div className="flex items-center justify-center">
+            <button
+              onClick={() => {
+                setSelectedPaymentTier(null);
+                setPaymentState('idle');
+                setShowPaymentModal(true);
+              }}
+              className="text-left cursor-pointer group flex items-center gap-2 select-none"
             >
-              <Gift size={12} /> Claim Hourly
+              <span className="text-base filter drop-shadow-[0_0_5px_rgba(245,158,11,0.4)] leading-none">🪙</span>
+              <div className="flex flex-col text-left">
+                <span className="text-[9px] font-bold uppercase tracking-wider font-mono text-amber-500 group-hover:text-amber-400 transition-colors leading-none">SG</span>
+                <span className="text-xs font-mono font-bold text-slate-100 group-hover:text-amber-400 transition-colors mt-0.5 leading-none">
+                  {(player?.credits !== undefined ? player.credits : 0).toLocaleString()}
+                </span>
+              </div>
             </button>
           </div>
           <button 
@@ -3368,21 +3389,40 @@ export default function App() {
         {/* Mobile Quick Action Buttons */}
         <div className="flex md:hidden items-center gap-1.5 px-2">
           <button 
-            onClick={handleClaimDailyReward}
-            className="p-2 bg-[#0A0F1D] border border-[#1E293B] rounded-xl text-amber-400 cursor-pointer text-xs"
-            title="Hourly Crates"
+            onClick={() => {
+              setSelectedPaymentTier(null);
+              setPaymentState('idle');
+              setShowPaymentModal(true);
+            }}
+            className="px-2.5 py-1 bg-[#0A0F1D]/80 border border-[#1E293B]/60 rounded-xl text-amber-400 cursor-pointer flex items-center gap-1.5 select-none h-10"
+            title="Buy Space Gold"
           >
-            <Gift size={15} />
+            <span className="text-sm leading-none">🪙</span>
+            <div className="flex flex-col text-left">
+              <span className="text-[9px] font-bold font-mono tracking-wider leading-none text-amber-500">SG</span>
+              <span className="text-[10px] font-mono font-bold text-slate-200 mt-0.5 leading-none">
+                {(player?.credits !== undefined ? player.credits : 0).toLocaleString()}
+              </span>
+            </div>
           </button>
           <button 
             onClick={() => setActiveTab('settings')}
-            className={`p-2 border rounded-xl cursor-pointer font-bold text-xs ${activeTab === 'settings' ? 'bg-cyan-500/30 border-cyan-500 text-cyan-300' : 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400'}`}
+            className={`p-2 border rounded-xl cursor-pointer font-bold text-xs h-10 w-10 flex items-center justify-center ${activeTab === 'settings' ? 'bg-cyan-500/30 border-cyan-500 text-cyan-300' : 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400'}`}
             title="Settings"
           >
             <Settings size={15} />
           </button>
         </div>
       </footer>
+
+      {/* Invisible bottom area to show/trigger navigation under dynamic auto-hide */}
+      {interactiveTabs && !isMobileView && (
+        <div 
+          onMouseEnter={triggerShowToolbar}
+          onMouseMove={triggerShowToolbar}
+          className="fixed bottom-0 left-0 right-0 h-5 z-30 pointer-events-auto bg-transparent"
+        />
+      )}
 
       {/* SECURE MOONBASE STRIPE PAYMENT MODAL */}
       {showPaymentModal && (

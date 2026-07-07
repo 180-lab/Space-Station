@@ -1195,7 +1195,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 </h4>
                                 <div className="text-[11px] text-slate-400 font-medium">
                                   {target.isHabitable ? (
-                                    <span className="text-emerald-450 font-bold uppercase tracking-wide text-[10px] text-emerald-400 font-sans">Habitable Planetary Target</span>
+                                    <span className="text-emerald-450 font-bold uppercase tracking-wide text-[10px] text-emerald-400 font-sans">Habitable Station</span>
                                   ) : (
                                     <>Commander: <button type="button" onClick={() => { if (onViewPlayerProfile && target.id) onViewPlayerProfile(target.id); }} className="text-cyan-400 font-bold font-mono hover:underline hover:text-cyan-300 transition cursor-pointer text-left">{target.username}</button></>
                                   )}
