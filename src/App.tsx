@@ -20,6 +20,7 @@ import { ExploreTab } from './components/ExploreTab';
 import { ArmyBaseTab } from './components/ArmyBaseTab';
 import { GalaxyTab } from './components/GalaxyTab';
 import { ResearchTab } from './components/ResearchTab';
+import { ChatTab } from './components/ChatTab';
 import { SettingsTab } from './components/SettingsTab';
 import { CommanderTutorial } from './components/CommanderTutorial';
 import { CommunicationsHubModal } from './components/CommunicationsHubModal';
@@ -204,6 +205,32 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [viewingPlayerId, setViewingPlayerId] = useState<string | null>(null);
 
+  // Derived or enriched chat messages with Galactic Federation welcome message injected
+  const enrichedChatMessages = React.useMemo(() => {
+    // If we have a valid player profile, ensure we inject the welcome message
+    if (!player) return chatMessages;
+    
+    // Check if the welcome message is already present in the list
+    const alreadyHasWelcome = chatMessages.some(m => m.id === 'fed_welcome');
+    if (alreadyHasWelcome) return chatMessages;
+
+    // Create a system welcome message
+    const welcomeMsg: ChatMessage = {
+      id: 'fed_welcome',
+      senderId: 'SYS',
+      senderName: 'Galactic Federation',
+      senderFaction: 'Galactic Federation',
+      senderFactionColor: '#F59E0B',
+      channel: 'global',
+      content: `Welcome to the galaxy, Commander! The Galactic Federation welcomes you to Sector Global, wishes you great success, and thanks you for joining our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the colony—each task successfully claimed rewards you with free Space Gold! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+      timestamp: Date.now() - 3600000 * 2, // 2 hours ago
+      allianceTag: null,
+      receiverId: null
+    };
+
+    return [welcomeMsg, ...chatMessages];
+  }, [chatMessages, player?.id]);
+
   // Auto-dismiss toast after 3.5 seconds
   useEffect(() => {
     if (!toast) return;
@@ -281,9 +308,22 @@ export default function App() {
   const [directMsgTargetId, setDirectMsgTargetId] = useState("");
   const [directMsgContent, setDirectMsgContent] = useState("");
 
-  // Active Screen / Navigation Tab selector: 'explore' | 'army' | 'galaxy' | 'research' | 'settings'
-  const [activeTab, setActiveTab ] = useState<'explore' | 'army' | 'galaxy' | 'research' | 'settings'>('explore');
+  // Active Screen / Navigation Tab selector: 'explore' | 'army' | 'galaxy' | 'research' | 'settings' | 'chat'
+  const [activeTab, setActiveTab ] = useState<'explore' | 'army' | 'galaxy' | 'research' | 'settings' | 'chat'>('explore');
+  const [hasUnreadChat, setHasUnreadChat] = useState<boolean>(() => {
+    const saved = localStorage.getItem('moonbase_has_unread_chat');
+    return saved === null ? true : saved === 'true';
+  });
+
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      setHasUnreadChat(false);
+      localStorage.setItem('moonbase_has_unread_chat', 'false');
+    }
+  }, [activeTab]);
+
   const [galaxyInitialSubTab, setGalaxyInitialSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>('ranking');
+  const [isDirectRadarView, setIsDirectRadarView] = useState(false);
 
   // Local reserve / created fleets state
   const [createdFleets, setCreatedFleets] = useState<CreatedFleet[]>(() => {
@@ -1107,7 +1147,7 @@ export default function App() {
           respirant: mockMines(1)
         },
         buildings: {
-          commsHub: mockBuilding(50),
+          commsHub: mockBuilding(5),
           researchCenter: mockBuilding(20),
           armyBase: mockBuilding(30),
           repository: mockBuilding(45),
@@ -3196,6 +3236,11 @@ export default function App() {
               onLeaveAlliance={handleLeaveAlliance}
               onDeclareWar={handleDeclareWar}
               onNavigateToGalaxySubTab={(sub) => {
+                if (sub === 'scanner') {
+                  setIsDirectRadarView(true);
+                } else {
+                  setIsDirectRadarView(false);
+                }
                 setGalaxyInitialSubTab(sub);
                 setActiveTab('galaxy');
               }}
@@ -3227,6 +3272,7 @@ export default function App() {
             onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
             localResources={localResources}
             isUpgrading={isUpgrading}
+            onUpgradeBuilding={handleUpgradeBuilding}
             showToast={showToast}
             onCancelFleet={handleCancelFleet}
             onRerouteFleet={handleRerouteFleet}
@@ -3240,7 +3286,7 @@ export default function App() {
             activePlanet={activePlanet}
             alliances={alliances}
             playersList={playersList}
-            chatMessages={chatMessages}
+            chatMessages={enrichedChatMessages}
             fleets={fleets}
             battleReports={battleReports}
             newsEvents={newsEvents}
@@ -3269,6 +3315,12 @@ export default function App() {
             defaultSubTab={galaxyInitialSubTab}
             localResources={localResources}
             isUpgrading={isUpgrading}
+            onUpgradeBuilding={handleUpgradeBuilding}
+            isDirectRadarView={isDirectRadarView}
+            onCloseRadarDirectView={() => {
+              setIsDirectRadarView(false);
+              setActiveTab('explore');
+            }}
           />
         )}
 
@@ -3284,6 +3336,16 @@ export default function App() {
             localResources={localResources}
             onRefreshState={fetchState}
             isUpgrading={isUpgrading}
+          />
+        )}
+
+        {activeTab === 'chat' && player && (
+          <ChatTab
+            player={player}
+            chatMessages={enrichedChatMessages}
+            alliances={alliances}
+            onSendChat={handleSendChat}
+            showToast={showToast}
           />
         )}
 
@@ -3359,14 +3421,19 @@ export default function App() {
             <span className={`text-[9px] font-bold tracking-widest ${activeTab === 'galaxy' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>RDR</span>
           </button>
 
-          {/* Tab 4: Research Center */}
+          {/* Tab 4: Global Chat */}
           <button 
-            onClick={() => setActiveTab('research')}
-            className={`flex-1 h-full flex flex-col items-center justify-center gap-1 group relative transition-colors duration-150 cursor-pointer ${activeTab === 'research' ? 'bg-cyan-500/10' : ''}`}
+            onClick={() => setActiveTab('chat')}
+            className={`flex-1 h-full flex flex-col items-center justify-center gap-1 group relative transition-colors duration-150 cursor-pointer ${activeTab === 'chat' ? 'bg-[#5bc0be]/15' : ''}`}
           >
-            {activeTab === 'research' && <div className="absolute top-0 inset-x-0 h-[3px] bg-cyan-400 shadow-[0_0_10px_#22d3ee]"></div>}
-            <span className="text-base sm:text-lg filter drop-shadow-[0_0_5px_rgba(234,179,8,0.5)] transform group-hover:scale-125 transition-transform duration-150 leading-none">🔬</span>
-            <span className={`text-[9px] font-bold tracking-widest ${activeTab === 'research' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>Res</span>
+            {activeTab === 'chat' && <div className="absolute top-0 inset-x-0 h-[3px] bg-[#5bc0be] shadow-[0_0_10px_#5bc0be]"></div>}
+            <div className="relative">
+              <span className="text-base sm:text-lg filter drop-shadow-[0_0_5px_rgba(91,192,190,0.5)] transform group-hover:scale-125 transition-transform duration-150 leading-none">💬</span>
+              {hasUnreadChat && (
+                <span className="absolute -top-1.5 -right-1.5 w-2 h-2 bg-red-500 rounded-full border border-slate-950 animate-pulse" />
+              )}
+            </div>
+            <span className={`text-[9px] font-bold tracking-widest ${activeTab === 'chat' ? 'text-white font-black' : 'text-slate-400 group-hover:text-slate-200'}`}>CHAT</span>
           </button>
 
         </div>
@@ -4515,6 +4582,10 @@ export default function App() {
           onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
           showToast={showToast}
           onRefreshState={fetchState}
+          activePlanet={activePlanet}
+          onUpgradeBuilding={handleUpgradeBuilding}
+          isUpgrading={isUpgrading}
+          serverTime={serverTime}
         />
       )}
       {appConfirmModal && (

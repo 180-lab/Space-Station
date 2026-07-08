@@ -4,7 +4,7 @@ import {
   Sparkles, ShieldAlert, Heart, Sword, Compass, Flag, Shield, Award,
   Trash2, Reply, Star, Forward, X, Mail, Settings, RefreshCw, Trophy, Radio, Target
 } from 'lucide-react';
-import { PlayerProfile, Alliance, ChatMessage, CommandMessage } from '../types';
+import { PlayerProfile, Alliance, ChatMessage, CommandMessage, ColonyPlanet, ResourceType, getUpgradeResourceCost } from '../types';
 
 interface CommunicationsHubModalProps {
   isOpen: boolean;
@@ -23,6 +23,10 @@ interface CommunicationsHubModalProps {
   onViewPlayerProfile?: (playerId: string) => void;
   showToast?: (msg: string, type: 'success' | 'error' | 'info') => void;
   onRefreshState?: () => void;
+  activePlanet?: ColonyPlanet;
+  onUpgradeBuilding?: (buildingKey: string, queue?: boolean) => Promise<any> | any;
+  isUpgrading?: boolean;
+  serverTime?: number;
 }
 
 export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
@@ -42,6 +46,10 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
   onViewPlayerProfile,
   showToast,
   onRefreshState,
+  activePlanet,
+  onUpgradeBuilding,
+  isUpgrading,
+  serverTime,
 }) => {
   // Mobile back button sync handler
   useEffect(() => {
@@ -257,8 +265,8 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
   const selfRank = getRankValue(player.allianceRole);
 
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 animate-fade-in font-mono" id="comms-hub-modal-overlay">
-      <div className="w-full max-w-4xl h-[95vh] sm:h-[85vh] bg-[#090D1A] border border-cyan-500/30 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(6,182,212,0.25)] flex flex-col relative text-left">
+    <div className="fixed inset-0 bg-[#060813] z-50 flex flex-col overflow-hidden font-mono" id="comms-hub-modal-overlay animate-fade-in">
+      <div className="flex-1 flex flex-col relative text-left">
         
         {/* Colorful top decoration */}
         <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-cyan-500 via-indigo-500 to-pink-500" />
@@ -271,17 +279,44 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-white">Station Communications Desk</h2>
-              <p className="text-[10px] text-slate-400 font-normal">Classified personal signal decoders and alliance network systems</p>
+              <p className="text-[10px] text-slate-400 font-normal font-sans">Classified personal signal decoders and alliance network systems</p>
             </div>
           </div>
-          <button 
-            type="button"
-            onClick={handleManualClose}
-            className="text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-850 border border-[#1E293B] w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition text-lg active:scale-90"
-            title="Close Communications Hub"
-          >
-            &times;
-          </button>
+          {activePlanet && activePlanet.buildings?.commsHub && activePlanet.buildings.commsHub.isUpgrading ? (
+            <div className="text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-xl font-bold font-mono animate-pulse font-sans">
+              ⏳ UPGRADING...
+            </div>
+          ) : activePlanet && activePlanet.buildings?.commsHub && activePlanet.buildings.commsHub.level >= activePlanet.buildings.commsHub.maxLevel ? (
+            <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase font-mono bg-slate-900 border border-slate-850 px-3 py-1.5 rounded-xl">
+              MAX CAP
+            </span>
+          ) : (
+            activePlanet && activePlanet.buildings?.commsHub && (
+              <button
+                type="button"
+                onClick={() => onUpgradeBuilding && onUpgradeBuilding('commsHub')}
+                disabled={isUpgrading || !(() => {
+                  const nextLvl = (activePlanet.buildings.commsHub?.level || 0) + 1;
+                  return (['water', 'plasma', 'fuel', 'food', 'respirant'] as ResourceType[]).every(rKey => {
+                    const cost = getUpgradeResourceCost('building', 'commsHub', nextLvl, rKey);
+                    return (activePlanet.resources[rKey] || 0) >= cost;
+                  });
+                })()}
+                className={`text-[10px] px-3 py-1.5 rounded-xl font-bold font-mono uppercase tracking-wider transition ${
+                  (() => {
+                    const nextLvl = (activePlanet.buildings.commsHub?.level || 0) + 1;
+                    return (['water', 'plasma', 'fuel', 'food', 'respirant'] as ResourceType[]).every(rKey => {
+                      const cost = getUpgradeResourceCost('building', 'commsHub', nextLvl, rKey);
+                      return (activePlanet.resources[rKey] || 0) >= cost;
+                    });
+                  })() ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
+                }`}
+                title={`Upgrade Comms Hub to Lv. ${(activePlanet.buildings.commsHub?.level || 0) + 1}`}
+              >
+                🚀 UPGRADE HUB (LV. {(activePlanet.buildings.commsHub?.level || 0) + 1})
+              </button>
+            )
+          )}
         </div>
 
         {/* Major Selector Tabs: Personal Messages vs Alliance Hub */}
@@ -315,6 +350,126 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
         {/* Modal Scrollable Container */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-0">
           
+          {/* Landing Page: Upgrade Communications Hub */}
+          {activePlanet && activePlanet.buildings?.commsHub && (
+            <div className="p-4 bg-slate-900/90 border border-cyan-500/20 rounded-xl space-y-3 shadow-lg relative overflow-hidden mb-6 font-mono">
+              <div className="absolute top-0 right-0 p-3 opacity-10 text-4xl">📡</div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-cyan-500/10">
+                <div>
+                  <span className="text-[10px] text-cyan-400 block uppercase font-bold tracking-wider">STRUCTURE INTEGRATION</span>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Communications Hub Core</span>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-slate-950 text-pink-400 border border-[#1E293B]">
+                      Lv. {activePlanet.buildings.commsHub.level} / {activePlanet.buildings.commsHub.maxLevel}
+                    </span>
+                  </h4>
+                </div>
+                {activePlanet.buildings.commsHub.isUpgrading ? (
+                  (() => {
+                    const getTimerStringLocal = (endTimestamp: number | null) => {
+                      if (!endTimestamp) return '';
+                      const diff = Math.max(0, endTimestamp - (serverTime || Date.now()));
+                      const secs = Math.floor(diff / 1000);
+                      const h = Math.floor(secs / 3600);
+                      const m = Math.floor((secs % 3600) / 60);
+                      const s = secs % 60;
+                      return `${h}h ${m}m ${s}s`;
+                    };
+                    return (
+                      <span className="text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-xl font-bold animate-pulse flex items-center gap-1">
+                        <span className="animate-spin text-xs">⏳</span>
+                        <span>Upgrading: {getTimerStringLocal(activePlanet.buildings.commsHub.upgradeEnd)}</span>
+                      </span>
+                    );
+                  })()
+                ) : (
+                  <span className="text-[10px] text-slate-400 font-bold bg-[#05070A] border border-[#1E293B] px-2.5 py-1 rounded-xl">
+                    STATUS: OPERATIONAL
+                  </span>
+                )}
+              </div>
+
+              {!activePlanet.buildings.commsHub.isUpgrading && activePlanet.buildings.commsHub.level < activePlanet.buildings.commsHub.maxLevel && (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-slate-400 leading-relaxed max-w-2xl font-sans">
+                    Upgrade your Communications Hub to extend signal decoders and alliance network systems. Next Level upgrade requires:
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {(['water', 'plasma', 'fuel', 'food', 'respirant'] as ResourceType[]).map((rKey) => {
+                      const nextLvl = (activePlanet.buildings.commsHub?.level || 0) + 1;
+                      const cost = getUpgradeResourceCost('building', 'commsHub', nextLvl, rKey);
+                      const currentVal = activePlanet.resources[rKey] || 0;
+                      const hasSufficient = currentVal >= cost;
+                      const rNames: Record<ResourceType, string> = {
+                        water: 'Water',
+                        plasma: 'Plasma',
+                        fuel: 'Deuterium',
+                        food: 'Food',
+                        respirant: 'Respirant O2'
+                      };
+                      const rIcons: Record<ResourceType, string> = {
+                        water: '💧',
+                        plasma: '⚡',
+                        fuel: '🔥',
+                        food: '🍏',
+                        respirant: '💨'
+                      };
+                      return (
+                        <div key={rKey} className={`p-2 rounded-lg border flex flex-col justify-center text-left ${hasSufficient ? 'bg-[#05070A]/50 border-[#1E293B]/40' : 'bg-red-950/10 border-red-500/20'}`}>
+                          <span className="text-[9px] text-slate-500 font-bold truncate">{rIcons[rKey]} {rNames[rKey]}</span>
+                          <span className={`text-[11px] font-black ${hasSufficient ? 'text-slate-300' : 'text-red-400 animate-pulse'}`}>
+                            {currentVal >= 1000000 ? `${(currentVal/1000000).toFixed(1)}M` : Math.round(currentVal).toLocaleString()} / {cost >= 1000000 ? `${(cost/1000000).toFixed(1)}M` : cost.toLocaleString()}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center justify-end gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => onUpgradeBuilding && onUpgradeBuilding('commsHub')}
+                      disabled={isUpgrading || !(() => {
+                        const nextLvl = (activePlanet.buildings.commsHub?.level || 0) + 1;
+                        return (['water', 'plasma', 'fuel', 'food', 'respirant'] as ResourceType[]).every(rKey => {
+                          const cost = getUpgradeResourceCost('building', 'commsHub', nextLvl, rKey);
+                          return (activePlanet.resources[rKey] || 0) >= cost;
+                        });
+                      })()}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition duration-150 ${
+                        (() => {
+                          const nextLvl = (activePlanet.buildings.commsHub?.level || 0) + 1;
+                          return (['water', 'plasma', 'fuel', 'food', 'respirant'] as ResourceType[]).every(rKey => {
+                            const cost = getUpgradeResourceCost('building', 'commsHub', nextLvl, rKey);
+                            return (activePlanet.resources[rKey] || 0) >= cost;
+                          });
+                        })() ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.3)] cursor-pointer' : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
+                      }`}
+                    >
+                      <span>🚀 Upgrade to Level {(activePlanet.buildings.commsHub?.level || 0) + 1}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onUpgradeBuilding && onUpgradeBuilding('commsHub', true)}
+                      disabled={isUpgrading}
+                      className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <span className="text-emerald-400">Queue Upgrade</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!activePlanet.buildings.commsHub.isUpgrading && activePlanet.buildings.commsHub.level >= activePlanet.buildings.commsHub.maxLevel && (
+                <div className="pt-2 select-none text-right flex items-center justify-between border-t border-cyan-500/10 mt-3">
+                  <span className="text-[10px] text-slate-500 font-mono uppercase font-bold">Actions & Progress Control:</span>
+                  <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase font-mono bg-slate-900 border border-slate-850 px-3 py-1.5 rounded-xl">
+                    MAX CAP
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* TAB 1: PERSONAL SECURE MESSAGES */}
           {activeTab === 'messages' && (
             <div className="space-y-4 h-full flex flex-col">
@@ -1167,6 +1322,17 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
           </div>
         );
       })()}
+
+      {/* Floating Back Button */}
+      <button
+        type="button"
+        onClick={handleManualClose}
+        className="absolute right-6 bottom-6 z-55 flex items-center justify-center gap-2.5 px-5 py-4 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_20px_rgba(6,182,212,0.6)] transition duration-150 active:scale-95 group cursor-pointer"
+        title="Back to Station"
+      >
+        <Compass size={18} className="animate-spin-slow group-hover:rotate-45 transition-transform" />
+        <span className="text-xs uppercase tracking-widest font-black hidden sm:inline font-mono">RETURN TO BASE</span>
+      </button>
 
     </div>
   );

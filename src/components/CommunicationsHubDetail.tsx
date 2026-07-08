@@ -39,17 +39,32 @@ export const CommunicationsHubDetail: React.FC<CommunicationsHubDetailProps> = (
   // Chat States
   const [chatChannel, setChatChannel] = useState<'global' | 'alliance'>('global');
   const [chatInput, setChatInput] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Alliance States
   const [allianceName, setAllianceName] = useState('');
   const [allianceTag, setAllianceTag] = useState('');
   const [showAllianceCmd, setShowAllianceCmd] = useState(true);
 
-  // Auto scroll chat to bottom when message list or channel updates
+  const scrollToBottom = (smooth = true) => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+    }
+  };
+
+  // Auto scroll chat to bottom when message list, section or channel updates
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages, chatChannel, activeSection]);
+    scrollToBottom(false);
+    const timer = setTimeout(() => scrollToBottom(false), 50);
+    return () => clearTimeout(timer);
+  }, [activeSection]);
+
+  useEffect(() => {
+    scrollToBottom(true);
+  }, [chatMessages, chatChannel]);
 
   const handleSendChatMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,14 +186,16 @@ export const CommunicationsHubDetail: React.FC<CommunicationsHubDetailProps> = (
   const activeAlliance = player.allianceId ? alliances[player.allianceId] : null;
   const selfRank = getRankValue(player.allianceRole);
 
-  // Chat filtering logic
-  const filteredChatMessages = chatMessages.filter(msg => {
-    if (chatChannel === 'global') {
-      return msg.channel === 'global';
-    } else {
-      return player.allianceId && msg.channel === 'alliance' && msg.allianceTag === activeAlliance?.tag;
-    }
-  });
+  // Chat filtering logic, sorted chronologically (oldest at the top, newest at the bottom)
+  const filteredChatMessages = [...chatMessages]
+    .filter(msg => {
+      if (chatChannel === 'global') {
+        return msg.channel === 'global';
+      } else {
+        return player.allianceId && msg.channel === 'alliance' && msg.allianceTag === activeAlliance?.tag;
+      }
+    })
+    .sort((a, b) => a.timestamp - b.timestamp);
 
   return (
     <div className="space-y-4 font-mono text-xs text-left" id="communications-hub-container">
@@ -243,34 +260,52 @@ export const CommunicationsHubDetail: React.FC<CommunicationsHubDetailProps> = (
 
           {/* Messages Console Box */}
           <div className="h-[280px] bg-[#030508]/85 border border-[#1E293B] rounded-xl flex flex-col overflow-hidden relative shadow-inner">
-            <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5">
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-3.5 space-y-2.5">
               {filteredChatMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
                   <MessageSquare size={24} className="opacity-30" />
                   <p className="text-[10px]">No recent transmissions decoded on this frequency.</p>
                 </div>
               ) : (
-                filteredChatMessages.map((msg) => (
-                  <div key={msg.id} className="p-2 border border-slate-900 rounded-lg bg-[#05070A]/50 hover:bg-[#05070A]/85 transition duration-150 leading-relaxed">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-slate-600 text-[9px]">[{new Date(msg.timestamp).toLocaleTimeString()}]</span>
-                      {msg.allianceTag && (
-                        <span className="text-yellow-400 font-bold">[{msg.allianceTag}]</span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => onViewPlayerProfile && onViewPlayerProfile(msg.senderId)}
-                        className="font-bold underline text-cyan-400 hover:text-cyan-300 cursor-pointer focus:outline-none"
-                      >
-                        {msg.senderName}
-                      </button>
-                      <span className="text-slate-500 text-[9px]">:</span>
+                filteredChatMessages.map((msg, idx) => {
+                  const senderId = msg.senderId || (msg as any).playerId;
+                  const senderName = msg.senderName || (msg as any).username;
+                  const isMe = senderId === player.id;
+                  const isSystem = senderId === 'SYS' || senderId === 'system' || senderName === 'SYS' || senderName === 'System' || senderName === 'Galactic Federation' || (senderName && senderName.includes('Galactic Federation'));
+                  const displayName = (isSystem ? 'Galactic Federation' : senderName).replace('[SYS]', '').trim();
+                  const nameColorClass = isSystem ? 'text-amber-400 animate-pulse' : (isMe ? 'text-cyan-400' : 'text-slate-400');
+
+                  return (
+                    <div 
+                      key={msg.id || idx} 
+                      className={`flex flex-col max-w-[85%] ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}
+                    >
+                      <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold mb-0.5 px-1 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => onViewPlayerProfile && onViewPlayerProfile(senderId)}
+                          className={`font-bold underline cursor-pointer focus:outline-none ${nameColorClass}`}
+                        >
+                          {displayName}
+                        </button>
+                        <span className="text-slate-600 font-normal">
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                      </div>
+                      
+                      <div className={`p-2.5 rounded-2xl text-xs leading-relaxed break-words font-medium ${
+                        isSystem
+                          ? 'bg-amber-950/20 border border-amber-500/20 text-amber-200 rounded-2xl'
+                          : isMe 
+                            ? 'bg-cyan-950/40 border border-cyan-500/25 text-cyan-200 rounded-tr-none' 
+                            : 'bg-slate-900/90 border border-[#1E293B] text-slate-300 rounded-tl-none'
+                      }`}>
+                        {msg.content}
+                      </div>
                     </div>
-                    <p className="text-slate-350 mt-0.5 pl-2 border-l border-cyan-500/40">{msg.content}</p>
-                  </div>
-                ))
+                  );
+                })
               )}
-              <div ref={messagesEndRef} />
             </div>
 
             {/* Input Form */}

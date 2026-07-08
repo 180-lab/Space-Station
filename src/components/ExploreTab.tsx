@@ -2253,32 +2253,51 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
               </div>
 
               {/* Chat list */}
-              <div className="flex-1 overflow-hidden pr-1 space-y-2.5 text-xs text-left mb-4">
+              <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 text-xs text-left mb-4">
                 {paginatedMessages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-slate-600 py-10 space-y-2">
                     <MessageSquare size={32} className="opacity-30" />
                     <p className="text-xs">No active transmissions decoded on this wavelength.</p>
                   </div>
                 ) : (
-                  paginatedMessages.map((msg) => (
-                    <div key={msg.id} className="p-3 border border-slate-900 rounded-xl bg-[#05070A]/60 hover:bg-[#05070A]/95 transition duration-150 leading-snug">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-slate-600 text-[10px]">[{new Date(msg.timestamp).toLocaleTimeString()}]</span>
-                        {msg.allianceTag && (
-                          <span className="text-yellow-400 font-bold">[{msg.allianceTag}]</span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => onViewPlayerProfile && onViewPlayerProfile(msg.senderId)}
-                          className="font-bold underline text-cyan-400 hover:text-cyan-300 cursor-pointer focus:outline-none"
-                        >
-                          {msg.senderName}
-                        </button>
-                        <span className="text-slate-500 text-[10px]">:</span>
+                  paginatedMessages.map((msg, idx) => {
+                    const senderId = msg.senderId || (msg as any).playerId;
+                    const senderName = msg.senderName || (msg as any).username;
+                    const isMe = senderId === player.id;
+                    const isSystem = senderId === 'SYS' || senderId === 'system' || senderName === 'SYS' || senderName === 'System' || senderName === 'Galactic Federation' || (senderName && senderName.includes('Galactic Federation'));
+                    const displayName = (isSystem ? 'Galactic Federation' : senderName).replace('[SYS]', '').trim();
+                    const nameColorClass = isSystem ? 'text-amber-400 animate-pulse' : (isMe ? 'text-cyan-400' : 'text-slate-400');
+
+                    return (
+                      <div 
+                        key={msg.id || idx} 
+                        className={`flex flex-col max-w-[85%] ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}
+                      >
+                        <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold mb-0.5 px-1 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => onViewPlayerProfile && onViewPlayerProfile(senderId)}
+                            className={`font-bold underline cursor-pointer focus:outline-none ${nameColorClass}`}
+                          >
+                            {displayName}
+                          </button>
+                          <span className="text-slate-600 font-normal">
+                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </span>
+                        </div>
+                        
+                        <div className={`p-2.5 rounded-2xl text-xs leading-relaxed break-words font-medium ${
+                          isSystem
+                            ? 'bg-amber-950/20 border border-amber-500/20 text-amber-200 rounded-2xl'
+                            : isMe 
+                              ? 'bg-cyan-950/40 border border-cyan-500/25 text-cyan-200 rounded-tr-none' 
+                              : 'bg-slate-900/90 border border-[#1E293B] text-slate-300 rounded-tl-none'
+                        }`}>
+                          {msg.content}
+                        </div>
                       </div>
-                      <p className="text-slate-355 mt-1 pl-2 border-l border-cyan-500/40 text-slate-300">{msg.content}</p>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ColonyPlanet, PlayerProfile, BattleReport, CreatedFleet } from '../types';
+import { ColonyPlanet, PlayerProfile, BattleReport, CreatedFleet, getUpgradeResourceCost } from '../types';
 
 import imgInterceptor from '../assets/images/defensive_interceptor_1780872114708.png';
 import imgAssaultDrone from '../assets/images/assault_drone_1780871759723.png';
@@ -73,6 +73,7 @@ interface ArmyBaseTabProps {
   onCancelFleet?: (fleetId: string) => Promise<void>;
   onRerouteFleet?: (fleetId: string, targetX: number, targetY: number, missionType?: string) => Promise<void>;
   maxCoord?: number;
+  onUpgradeBuilding?: (buildingKey: string) => void;
 }
 
 const TROOP_DETAILS = {
@@ -178,7 +179,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   showToast,
   onCancelFleet,
   onRerouteFleet,
-  maxCoord = 100
+  maxCoord = 100,
+  onUpgradeBuilding
 }) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({
     defender: 0,
@@ -745,6 +747,69 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
   return (
     <div className="space-y-1.5 pb-24">
+      {/* Army Base Upgrade Header Panel */}
+      {activePlanet.buildings?.armyBase && (
+        <div className="p-4 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="text-left font-mono">
+            <span className="text-[9px] font-bold text-cyan-400 uppercase tracking-widest block font-mono">STRUCTURE UPGRADE</span>
+            <h3 className="text-xs font-bold text-white flex items-center gap-2">
+              <span>Command War Room (Army Base)</span>
+              <span className="px-1.5 py-0.5 rounded bg-slate-950 text-pink-400 text-[9px] font-black border border-slate-800">
+                Lv. {activePlanet.buildings.armyBase.level} / {activePlanet.buildings.armyBase.maxLevel}
+              </span>
+            </h3>
+          </div>
+          {activePlanet.buildings.armyBase.level < activePlanet.buildings.armyBase.maxLevel ? (
+            activePlanet.buildings.armyBase.isUpgrading ? (
+              (() => {
+                const getTimerStringLocal = (endTimestamp: number | null) => {
+                  if (!endTimestamp) return '';
+                  const diff = Math.max(0, endTimestamp - serverTime);
+                  const secs = Math.floor(diff / 1000);
+                  const h = Math.floor(secs / 3600);
+                  const m = Math.floor((secs % 3600) / 60);
+                  const s = secs % 60;
+                  return `${h}h ${m}m ${s}s`;
+                };
+                return (
+                  <div className="text-[10px] font-mono font-bold bg-amber-500/15 border border-amber-500/30 text-amber-400 px-3 py-1.5 rounded-xl text-center animate-pulse shrink-0">
+                    ⏳ UPGRADING: {getTimerStringLocal(activePlanet.buildings.armyBase.upgradeEnd)}
+                  </div>
+                );
+              })()
+            ) : (
+              (() => {
+                const nextLvl = (activePlanet.buildings.armyBase?.level || 0) + 1;
+                const rKeys: ('water' | 'plasma' | 'fuel' | 'food' | 'respirant')[] = ['water', 'plasma', 'fuel', 'food', 'respirant'];
+                const currentResources = localResources || activePlanet.resources;
+                const hasUpgradeResources = rKeys.every(rKey => {
+                  const cost = getUpgradeResourceCost('building', 'armyBase', nextLvl, rKey);
+                  return (currentResources[rKey] || 0) >= cost;
+                });
+                return (
+                  <button
+                    type="button"
+                    onClick={() => onUpgradeBuilding && onUpgradeBuilding('armyBase')}
+                    disabled={isUpgrading || !hasUpgradeResources}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition duration-150 shrink-0 ${
+                      hasUpgradeResources 
+                        ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_10px_rgba(6,182,212,0.35)] cursor-pointer' 
+                        : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
+                    }`}
+                  >
+                    <span>🚀 Upgrade War Room to Lv. {nextLvl}</span>
+                  </button>
+                );
+              })()
+            )
+          ) : (
+            <div className="text-[10px] bg-slate-900 text-slate-500 border border-slate-800 px-2.5 py-1 rounded-lg text-center font-bold font-mono shrink-0">
+              MAX LEVEL REACHED
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Overview stats centerpiece */}
       <div className="p-6 rounded-xl border border-[#1E293B] bg-[#0A0F1D]/90 backdrop-blur-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>

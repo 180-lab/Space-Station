@@ -484,11 +484,71 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
             Upgrade your centralized Research Center structure to speed up spacecraft assembly. Complete custom tech upgrades below to command systemic combat, speed, and radar attributes.
           </p>
         </div>
-        <div className="p-4 bg-slate-950/60 border border-[#1E293B] rounded-xl flex items-center gap-3 shrink-0">
-          <span className="text-3xl">🧪</span>
-          <div className="text-left font-mono">
-            <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">LAB CAPACITY</span>
-            <span className="font-bold text-white text-base">Lv. {rc.level} / {rc.maxLevel}</span>
+        <div className="flex flex-col gap-2 shrink-0 w-full md:w-48">
+          {rc.level < rc.maxLevel ? (
+            rc.isUpgrading ? (
+              (() => {
+                const getTimerStringLocal = (endTimestamp: number | null) => {
+                  if (!endTimestamp) return '';
+                  const diff = Math.max(0, endTimestamp - serverTime);
+                  const secs = Math.floor(diff / 1000);
+                  const h = Math.floor(secs / 3600);
+                  const m = Math.floor((secs % 3600) / 60);
+                  const s = secs % 60;
+                  return `${h}h ${m}m ${s}s`;
+                };
+                return (
+                  <div className="text-[10px] font-mono font-bold bg-amber-500/15 border border-amber-500/30 text-amber-400 px-3 py-2.5 rounded-xl text-center animate-pulse">
+                    ⏳ UPGRADING: {getTimerStringLocal(rc.upgradeEnd)}
+                  </div>
+                );
+              })()
+            ) : (
+              (() => {
+                const nextRcLvl = rc.level + 1;
+                const rKeys: ResourceType[] = ['water', 'plasma', 'fuel', 'food', 'respirant'];
+                const currentResources = localResources || activePlanet.resources;
+                const rcUpgradeCost = {
+                  water: getUpgradeResourceCost('building', 'researchCenter', nextRcLvl, 'water'),
+                  plasma: getUpgradeResourceCost('building', 'researchCenter', nextRcLvl, 'plasma'),
+                  fuel: getUpgradeResourceCost('building', 'researchCenter', nextRcLvl, 'fuel'),
+                  food: getUpgradeResourceCost('building', 'researchCenter', nextRcLvl, 'food'),
+                  respirant: getUpgradeResourceCost('building', 'researchCenter', nextRcLvl, 'respirant'),
+                };
+                const hasRcUpgradeResources = rKeys.every(rKey => 
+                  (currentResources[rKey] || 0) >= rcUpgradeCost[rKey]
+                );
+                return (
+                  <button
+                    type="button"
+                    onClick={() => onUpgradeBuilding('researchCenter')}
+                    disabled={isUpgrading || !hasRcUpgradeResources}
+                    className={`w-full px-4 py-2.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider flex flex-col items-center justify-center transition duration-150 ${
+                      hasRcUpgradeResources 
+                        ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_12px_rgba(6,182,212,0.4)] cursor-pointer' 
+                        : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
+                    }`}
+                    title={`Cost: Water: ${rcUpgradeCost.water.toLocaleString()}, Plasma: ${rcUpgradeCost.plasma.toLocaleString()}, Fuel: ${rcUpgradeCost.fuel.toLocaleString()}, Food: ${rcUpgradeCost.food.toLocaleString()}, Respirant: ${rcUpgradeCost.respirant.toLocaleString()}`}
+                  >
+                    <span>🚀 Upgrade Lab</span>
+                    <span className="text-[7.5px] opacity-90 font-semibold font-sans">
+                      ({hasRcUpgradeResources ? 'Ready' : 'Insufficient Resources'})
+                    </span>
+                  </button>
+                );
+              })()
+            )
+          ) : (
+            <div className="text-[10px] bg-slate-900 text-slate-500 border border-slate-800 px-3 py-2 rounded-xl text-center font-bold">
+              MAX LEVEL ACHIEVED
+            </div>
+          )}
+          <div className="p-4 bg-slate-950/60 border border-[#1E293B] rounded-xl flex items-center gap-3">
+            <span className="text-3xl">🧪</span>
+            <div className="text-left font-mono">
+              <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">LAB CAPACITY</span>
+              <span className="font-bold text-white text-base">Lv. {rc.level} / {rc.maxLevel}</span>
+            </div>
           </div>
         </div>
       </div>

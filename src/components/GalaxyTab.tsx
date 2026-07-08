@@ -8,7 +8,9 @@ import {
   NewsEvent, 
   PlayerProfile,
   LeaderboardPlayer,
-  CreatedFleet
+  CreatedFleet,
+  ResourceType,
+  getUpgradeResourceCost
 } from '../types';
 import { 
   Radar, 
@@ -74,6 +76,9 @@ interface GalaxyTabProps {
   localResources?: Record<string, number>;
   isUpgrading?: boolean;
   maxCoord?: number;
+  onUpgradeBuilding?: (buildingKey: string, queue?: boolean) => Promise<any> | any;
+  isDirectRadarView?: boolean;
+  onCloseRadarDirectView?: () => void;
 }
 
 async function safeParseJson(res: Response): Promise<any> {
@@ -164,16 +169,23 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   defaultSubTab,
   localResources,
   isUpgrading = false,
-  maxCoord = 100
+  maxCoord = 100,
+  onUpgradeBuilding,
+  isDirectRadarView,
+  onCloseRadarDirectView
 }) => {
   // Sub-tabs
-  const [subTab, setSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>(defaultSubTab || 'ranking');
+  const [subTab, setSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>(
+    isDirectRadarView ? 'scanner' : (defaultSubTab || 'ranking')
+  );
 
   React.useEffect(() => {
-    if (defaultSubTab) {
+    if (isDirectRadarView) {
+      setSubTab('scanner');
+    } else if (defaultSubTab) {
       setSubTab(defaultSubTab);
     }
-  }, [defaultSubTab]);
+  }, [defaultSubTab, isDirectRadarView]);
 
   // Fleets Section States
   const [actionPlanetId, setActionPlanetId] = useState<string | null>(null);
@@ -198,6 +210,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   // Leaderboard States
   const [rankingMetric, setRankingMetric] = useState<'population' | 'attack' | 'defence' | 'raiders'>('population');
   const [leaderboardPage, setLeaderboardPage] = useState(1);
+  const [leaderboardSearch, setLeaderboardSearch] = useState('');
   const [showBottom10, setShowBottom10] = useState(false);
   const [showTop10, setShowTop10] = useState(false);
   const [showStandings, setShowStandings] = useState(true);
@@ -989,7 +1002,174 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           </div>
         ) : (
           <div className="space-y-1.5">
-          {/* Coordinates Search */}
+            {/* RADAR ARRAY UPGRADE MODULE CARD */}
+            {activePlanet && activePlanet.buildings.radar && (
+              <div className="p-4 bg-slate-900/90 border border-cyan-500/20 rounded-xl space-y-3 shadow-lg relative overflow-hidden mb-4 font-mono text-left">
+                <div className="absolute top-0 right-0 p-3 opacity-10 text-4xl">📡</div>
+                
+                {/* Upgrade Button above the header/level info */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-[#1E293B]/60">
+                  <span className="text-[9px] font-bold text-cyan-400 uppercase tracking-widest font-mono">RADAR CORE ACCESS</span>
+                  {activePlanet.buildings.radar.level < activePlanet.buildings.radar.maxLevel ? (
+                    activePlanet.buildings.radar.isUpgrading ? (
+                      (() => {
+                        const getTimerStringLocal = (endTimestamp: number | null) => {
+                          if (!endTimestamp) return '';
+                          const diff = Math.max(0, endTimestamp - serverTime);
+                          const secs = Math.floor(diff / 1000);
+                          const h = Math.floor(secs / 3600);
+                          const m = Math.floor((secs % 3600) / 60);
+                          const s = secs % 60;
+                          return `${h}h ${m}m ${s}s`;
+                        };
+                        return (
+                          <div className="text-[9px] font-mono font-bold bg-amber-500/15 border border-amber-500/30 text-amber-400 px-2.5 py-1 rounded-lg text-center animate-pulse shrink-0">
+                            ⏳ UPGRADING: {getTimerStringLocal(activePlanet.buildings.radar.upgradeEnd)}
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      (() => {
+                        const nextRadarLvl = (activePlanet.buildings.radar?.level || 0) + 1;
+                        const rKeys: ResourceType[] = ['water', 'plasma', 'fuel', 'food', 'respirant'];
+                        const currentResources = localResources || activePlanet.resources;
+                        const hasUpgradeResources = rKeys.every(rKey => {
+                          const cost = getUpgradeResourceCost('building', 'radar', nextRadarLvl, rKey);
+                          return (currentResources[rKey] || 0) >= cost;
+                        });
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => onUpgradeBuilding && onUpgradeBuilding('radar')}
+                            disabled={isUpgrading || !hasUpgradeResources}
+                            className={`px-3 py-1 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition duration-150 shrink-0 ${
+                              hasUpgradeResources 
+                                ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_10px_rgba(6,182,212,0.35)] cursor-pointer' 
+                                : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
+                            }`}
+                          >
+                            <span>🚀 Upgrade Radar to Lv. {nextRadarLvl}</span>
+                          </button>
+                        );
+                      })()
+                    )
+                  ) : (
+                    <div className="text-[9px] bg-slate-900 text-slate-500 border border-slate-800 px-2.5 py-1 rounded-lg text-center font-bold font-mono shrink-0">
+                      MAX LEVEL REACHED
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-cyan-500/10">
+                  <div>
+                    <span className="text-[10px] text-cyan-400 block uppercase font-bold tracking-wider">RADAR CONTROL CENTRE</span>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>Radar Array Grid</span>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-slate-950 text-pink-400 border border-[#1E293B]">
+                        Lv. {activePlanet.buildings.radar.level} / {activePlanet.buildings.radar.maxLevel}
+                      </span>
+                    </h4>
+                  </div>
+                  {activePlanet.buildings.radar.isUpgrading ? (
+                    (() => {
+                      const getTimerStringLocal = (endTimestamp: number | null) => {
+                        if (!endTimestamp) return '';
+                        const diff = Math.max(0, endTimestamp - serverTime);
+                        const secs = Math.floor(diff / 1000);
+                        const h = Math.floor(secs / 3600);
+                        const m = Math.floor((secs % 3600) / 60);
+                        const s = secs % 60;
+                        return `${h}h ${m}m ${s}s`;
+                      };
+                      return (
+                        <span className="text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-xl font-bold animate-pulse flex items-center gap-1">
+                          <span className="animate-spin text-xs">⏳</span>
+                          <span>Upgrading: {getTimerStringLocal(activePlanet.buildings.radar.upgradeEnd)}</span>
+                        </span>
+                      );
+                    })()
+                  ) : (
+                    <span className="text-[10px] text-slate-400 font-bold bg-[#05070A] border border-[#1E293B] px-2.5 py-1 rounded-xl">
+                      SCAN RADIUS: {activePlanet.buildings.radar.level} SECTORS
+                    </span>
+                  )}
+                </div>
+
+                {!activePlanet.buildings.radar.isUpgrading && activePlanet.buildings.radar.level < activePlanet.buildings.radar.maxLevel && (
+                  <div className="space-y-3">
+                    <p className="text-[11px] text-slate-400 leading-relaxed max-w-2xl font-sans">
+                      Upgrade the Radar Array to broaden scan sweeps, detect incoming space forces, and unlock outer coordinate sector details. Next Level upgrade requires:
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {(['water', 'plasma', 'fuel', 'food', 'respirant'] as ResourceType[]).map((rKey) => {
+                        const nextRadarLvl = (activePlanet.buildings.radar?.level || 0) + 1;
+                        const cost = getUpgradeResourceCost('building', 'radar', nextRadarLvl, rKey);
+                        const currentVal = (localResources ? localResources[rKey] : activePlanet.resources[rKey]) || 0;
+                        const hasSufficient = currentVal >= cost;
+                        const resNamesLocal = {
+                          water: 'Water',
+                          plasma: 'Plasma',
+                          fuel: 'Deuterium',
+                          food: 'Food',
+                          respirant: 'Respirant O2'
+                        };
+                        const resIconsLocal = {
+                          water: '💧',
+                          plasma: '⚡',
+                          fuel: '🔥',
+                          food: '🍏',
+                          respirant: '💨'
+                        };
+                        return (
+                          <div key={rKey} className={`p-2 rounded-lg border flex flex-col justify-center text-left ${hasSufficient ? 'bg-[#05070A]/50 border-[#1E293B]/40' : 'bg-red-950/10 border-red-500/20'}`}>
+                            <span className="text-[9px] text-slate-500 font-bold truncate">{resIconsLocal[rKey]} {resNamesLocal[rKey]}</span>
+                            <span className={`text-[11px] font-black ${hasSufficient ? 'text-slate-300' : 'text-red-400 animate-pulse'}`}>
+                              {currentVal >= 1000000 ? `${(currentVal/1000000).toFixed(1)}M` : Math.round(currentVal).toLocaleString()} / {cost >= 1000000 ? `${(cost/1000000).toFixed(1)}M` : cost.toLocaleString()}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center justify-end gap-2.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => onUpgradeBuilding && onUpgradeBuilding('radar')}
+                        disabled={isUpgrading || !(() => {
+                          const nextRadarLvl = (activePlanet.buildings.radar?.level || 0) + 1;
+                          return (['water', 'plasma', 'fuel', 'food', 'respirant'] as ResourceType[]).every(rKey => {
+                            const cost = getUpgradeResourceCost('building', 'radar', nextRadarLvl, rKey);
+                            const currentVal = (localResources ? localResources[rKey] : activePlanet.resources[rKey]) || 0;
+                            return currentVal >= cost;
+                          });
+                        })()}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition duration-150 ${
+                          (() => {
+                            const nextRadarLvl = (activePlanet.buildings.radar?.level || 0) + 1;
+                            return (['water', 'plasma', 'fuel', 'food', 'respirant'] as ResourceType[]).every(rKey => {
+                              const cost = getUpgradeResourceCost('building', 'radar', nextRadarLvl, rKey);
+                              const currentVal = (localResources ? localResources[rKey] : activePlanet.resources[rKey]) || 0;
+                              return currentVal >= cost;
+                            });
+                          })() ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.3)] cursor-pointer' : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
+                        }`}
+                      >
+                        <span>🚀 Upgrade Radar</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onUpgradeBuilding && onUpgradeBuilding('radar', true)}
+                        disabled={isUpgrading}
+                        className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <span className="text-emerald-400">Queue Upgrade</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Coordinates Search */}
           <form onSubmit={handleSearchSubmit} className="p-4 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="flex-1 grid grid-cols-2 gap-3 text-xs">
               <div className="flex items-center gap-2.5 bg-[#05070A] px-4 py-3 rounded-xl border border-[#1E293B] focus-within:border-cyan-500 transition-all">
@@ -1785,6 +1965,19 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 </div>
               </div>
             )}
+
+            {isDirectRadarView && onCloseRadarDirectView && (
+              <button
+                type="button"
+                onClick={onCloseRadarDirectView}
+                className="fixed right-6 sm:right-8 bottom-20 z-50 flex items-center justify-center gap-2.5 px-5 py-4 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_20px_rgba(6,182,212,0.6)] transition duration-150 active:scale-95 group cursor-pointer"
+                title="Back to Station"
+              >
+                <Compass size={18} className="animate-spin-slow group-hover:rotate-45 transition-transform" />
+                <span className="text-xs uppercase tracking-widest font-black hidden sm:inline font-mono">RETURN TO BASE</span>
+              </button>
+            )}
+
           </div>
         </div>
         )
@@ -1860,6 +2053,22 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           return a.name.localeCompare(b.name);
         });
 
+        // Filter list based on search query
+        let filteredPlayers = sortedPlayers;
+        if (leaderboardSearch.trim() !== '') {
+          filteredPlayers = sortedPlayers.filter(p => 
+            p.username.toLowerCase().includes(leaderboardSearch.toLowerCase())
+          );
+        }
+
+        let filteredAlliances = sortedAlliances;
+        if (leaderboardSearch.trim() !== '' && leaderboardType === 'alliances') {
+          filteredAlliances = sortedAlliances.filter(a => 
+            a.name.toLowerCase().includes(leaderboardSearch.toLowerCase()) || 
+            a.tag.toLowerCase().includes(leaderboardSearch.toLowerCase())
+          );
+        }
+
         // Bottom 10 vs normal paging
         const pageSize = 15;
         let displayPlayers: any[] = [];
@@ -1868,18 +2077,18 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
         if (leaderboardType === 'players') {
           if (showBottom10) {
-            displayPlayers = sortedPlayers.slice(-10);
+            displayPlayers = filteredPlayers.slice(-10);
           } else if (showTop10) {
-            displayPlayers = sortedPlayers.slice(0, 10);
+            displayPlayers = filteredPlayers.slice(0, 10);
           } else {
-            totalPages = Math.ceil(sortedPlayers.length / pageSize);
+            totalPages = Math.ceil(filteredPlayers.length / pageSize) || 1;
             const pageToUse = Math.max(1, Math.min(totalPages, leaderboardPage));
-            displayPlayers = sortedPlayers.slice((pageToUse - 1) * pageSize, pageToUse * pageSize);
+            displayPlayers = filteredPlayers.slice((pageToUse - 1) * pageSize, pageToUse * pageSize);
           }
         } else {
-          totalPages = Math.ceil(sortedAlliances.length / pageSize);
+          totalPages = Math.ceil(filteredAlliances.length / pageSize) || 1;
           const pageToUse = Math.max(1, Math.min(totalPages, leaderboardPage));
-          displayAlliances = sortedAlliances.slice((pageToUse - 1) * pageSize, pageToUse * pageSize);
+          displayAlliances = filteredAlliances.slice((pageToUse - 1) * pageSize, pageToUse * pageSize);
         }
 
         return (
@@ -2001,6 +2210,35 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     {opt.label}
                   </button>
                 ))}
+              </div>
+
+              {/* Leaderboard Search Input */}
+              <div className="relative font-mono">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Search size={14} className="text-cyan-500/60" />
+                </div>
+                <input
+                  type="text"
+                  placeholder={leaderboardType === 'players' ? "Search for a commander by name..." : "Search for an alliance by name or tag..."}
+                  value={leaderboardSearch}
+                  onChange={(e) => {
+                    setLeaderboardSearch(e.target.value);
+                    setLeaderboardPage(1);
+                  }}
+                  className="w-full bg-[#05070A]/80 border border-[#1E293B] focus:border-cyan-500/65 focus:shadow-[0_0_12px_rgba(6,182,212,0.15)] rounded-xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 transition duration-150 outline-none font-mono"
+                />
+                {leaderboardSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLeaderboardSearch('');
+                      setLeaderboardPage(1);
+                    }}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-450 hover:text-white transition text-[10px] font-bold font-mono cursor-pointer"
+                  >
+                    CLEAR
+                  </button>
+                )}
               </div>
 
               {/* Player or Alliance list table */}
@@ -2235,6 +2473,29 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     >
                       <ChevronLeft size={14} /> Prev
                     </button>
+
+                    {leaderboardType === 'players' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLeaderboardSearch('');
+                          setShowTop10(false);
+                          setShowBottom10(false);
+                          const myRankIndex = sortedPlayers.findIndex(p => p.id === player.id) + 1;
+                          if (myRankIndex > 0) {
+                            const myPage = Math.ceil(myRankIndex / 15);
+                            setLeaderboardPage(myPage);
+                            showToast?.("Command console focused on your ranking!", "success");
+                          } else {
+                            showToast?.("Unable to locate your ranking.", "error");
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-cyan-950/40 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 rounded-xl transition cursor-pointer flex items-center gap-1 font-bold text-xs uppercase tracking-wider"
+                      >
+                        🎯 Find Me
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       disabled={leaderboardPage >= totalPages}
@@ -4616,25 +4877,44 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   [...chatMessages]
                     .filter(msg => msg.channel === activeChatWindow || (activeChatWindow === 'alliance' && player.allianceId && msg.channel === 'alliance' && msg.allianceTag === alliances[player.allianceId]?.tag))
                     .reverse()
-                    .map((msg) => (
-                      <div key={msg.id} className="p-3 border border-slate-900 rounded-xl bg-[#05070A]/60 hover:bg-[#05070A]/95 transition duration-150 leading-snug">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-slate-600 text-[10px]">[{new Date(msg.timestamp).toLocaleTimeString()}]</span>
-                          {msg.allianceTag && (
-                            <span className="text-yellow-400 font-bold">[{msg.allianceTag}]</span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => onViewPlayerProfile && onViewPlayerProfile(msg.senderId)}
-                            className="font-bold underline text-cyan-400 hover:text-cyan-300 cursor-pointer focus:outline-none"
-                          >
-                            {msg.senderName}
-                          </button>
-                          <span className="text-slate-500 text-[10px]">:</span>
+                    .map((msg, idx) => {
+                      const senderId = msg.senderId || (msg as any).playerId;
+                      const senderName = msg.senderName || (msg as any).username;
+                      const isMe = senderId === player.id;
+                      const isSystem = senderId === 'SYS' || senderId === 'system' || senderName === 'SYS' || senderName === 'System' || senderName === 'Galactic Federation' || (senderName && senderName.includes('Galactic Federation'));
+                      const displayName = (isSystem ? 'Galactic Federation' : senderName).replace('[SYS]', '').trim();
+                      const nameColorClass = isSystem ? 'text-amber-400 animate-pulse' : (isMe ? 'text-cyan-400' : 'text-slate-400');
+
+                      return (
+                        <div 
+                          key={msg.id || idx} 
+                          className={`flex flex-col max-w-[85%] ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}
+                        >
+                          <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold mb-0.5 px-1 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => onViewPlayerProfile && onViewPlayerProfile(senderId)}
+                              className={`font-bold underline cursor-pointer focus:outline-none ${nameColorClass}`}
+                            >
+                              {displayName}
+                            </button>
+                            <span className="text-slate-600 font-normal">
+                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </span>
+                          </div>
+                          
+                          <div className={`p-2.5 rounded-2xl text-xs leading-relaxed break-words font-medium ${
+                            isSystem
+                              ? 'bg-amber-950/20 border border-amber-500/20 text-amber-200 rounded-2xl'
+                              : isMe 
+                                ? 'bg-cyan-950/40 border border-cyan-500/25 text-cyan-200 rounded-tr-none' 
+                                : 'bg-slate-900/90 border border-[#1E293B] text-slate-300 rounded-tl-none'
+                          }`}>
+                            {msg.content}
+                          </div>
                         </div>
-                        <p className="text-slate-350 mt-1 pl-2 border-l border-cyan-500/40">{msg.content}</p>
-                      </div>
-                    ))
+                      );
+                    })
                 )
               }
             </div>
