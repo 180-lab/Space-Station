@@ -1566,13 +1566,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     >
                                       Settle Sector
                                     </button>
-                                    <button 
-                                      type="button"
-                                      onClick={() => handleInstantColonize(target.coords.x, target.coords.y)}
-                                      className="px-4 py-2 bg-teal-950/45 border border-teal-500/40 text-teal-300 hover:bg-[#14b8a6]/15 rounded-xl font-bold transition cursor-pointer text-[11px] font-mono"
-                                    >
-                                      Instant Colonize
-                                    </button>
+
                                   </>
                                 ) : (
                                   <>
@@ -1875,13 +1869,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                           >
                                             Settle
                                           </button>
-                                          <button 
-                                            type="button"
-                                            onClick={() => handleInstantColonize(item.coords.x, item.coords.y)}
-                                            className="px-2.5 py-1 bg-teal-950/40 border border-teal-500/30 text-teal-300 hover:bg-[#14b8a6]/10 rounded-lg font-bold transition cursor-pointer text-[10px] font-mono ml-1"
-                                          >
-                                            Instant Settle
-                                          </button>
+
                                         </>
                                       ) : (
                                         <>

@@ -20,11 +20,14 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   const activeChannel = 'global';
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(20);
 
   // Filter messages to show global channel only and sort chronologically (newest at the top, oldest at the bottom)
   const filteredMessages = [...chatMessages]
     .filter(msg => msg.channel === 'global')
     .sort((a, b) => b.timestamp - a.timestamp);
+
+  const displayedMessages = filteredMessages.slice(0, visibleCount);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +60,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
       {/* Main Messages Feed Block */}
       <div className="mt-3 bg-[#0A0F1D]/60 border border-[#1E293B]/70 rounded-2xl p-4 flex flex-col relative">
         <div className="space-y-3 pr-1">
-          {filteredMessages.length === 0 ? (
+          {displayedMessages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-2 p-6">
               <span className="text-3xl">📡</span>
               <p className="text-xs text-slate-400 max-w-sm">
@@ -65,7 +68,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
               </p>
             </div>
           ) : (
-            filteredMessages.map((msg, idx) => {
+            displayedMessages.map((msg, idx) => {
               const senderId = msg.senderId || (msg as any).playerId;
               const senderName = msg.senderName || (msg as any).username;
               const isMe = senderId === player.id;
@@ -101,6 +104,19 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             })
           )}
         </div>
+
+        {filteredMessages.length > visibleCount && (
+          <div className="flex justify-center pt-2 w-full">
+            <button
+              id="btn-view-previous-messages"
+              type="button"
+              onClick={() => setVisibleCount(prev => prev + 20)}
+              className="px-4 py-2.5 bg-slate-950/80 hover:bg-slate-900 border border-[#1E293B] hover:border-cyan-500/30 text-cyan-400 text-[11px] font-bold uppercase rounded-xl transition duration-150 cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.05)] w-full text-center mt-3"
+            >
+              📥 View Previous Messages ({filteredMessages.length - visibleCount} more)
+            </button>
+          </div>
+        )}
 
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="mt-4 pt-3 border-t border-[#1E293B]/60 flex items-stretch gap-2 shrink-0">

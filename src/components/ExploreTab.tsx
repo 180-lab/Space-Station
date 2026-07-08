@@ -208,6 +208,15 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
     setIsEditingName(false);
   }, [activePlanet.id, activePlanet.name]);
 
+  const allExtractorsLevelOneOrMore = (() => {
+    const resourceKeys: ('water' | 'plasma' | 'fuel' | 'food' | 'respirant')[] = ['water', 'plasma', 'fuel', 'food', 'respirant'];
+    return resourceKeys.every(rKey => {
+      const list = activePlanet.mines[rKey];
+      if (!list || list.length === 0) return false;
+      return list.every(mine => mine.level >= 1);
+    });
+  })();
+
   // Resource sending form states
   const [showSendResources, setShowSendResources] = useState(false);
   const [transferTargetId, setTransferTargetId] = useState('');
@@ -541,8 +550,27 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   const isRespirantProductionNegative = respirantHourlyTotal < respirantConsumption;
   const isFoodProductionNegative = foodHourlyTotal < foodConsumption;
 
-  const isAnyProductionNegative = isWaterProductionNegative || isRespirantProductionNegative || isFoodProductionNegative;
-  const isDehydrated = activePlanet.resources.water < 0 || activePlanet.resources.respirant < 0 || activePlanet.resources.food < 0 || isAnyProductionNegative;
+  const netWaterProdHourly = waterHourlyTotal - waterConsumption;
+  const netRespirantProdHourly = respirantHourlyTotal - respirantConsumption;
+  const netFoodProdHourly = foodHourlyTotal - foodConsumption;
+
+  const isRedAlertActive = activePlanet.resources.water < 0 || activePlanet.resources.respirant < 0 || activePlanet.resources.food < 0;
+
+  const hoursToNegativeWater = (netWaterProdHourly < 0 && activePlanet.resources.water >= 0) 
+    ? (activePlanet.resources.water / Math.abs(netWaterProdHourly)) 
+    : Infinity;
+
+  const hoursToNegativeRespirant = (netRespirantProdHourly < 0 && activePlanet.resources.respirant >= 0) 
+    ? (activePlanet.resources.respirant / Math.abs(netRespirantProdHourly)) 
+    : Infinity;
+
+  const hoursToNegativeFood = (netFoodProdHourly < 0 && activePlanet.resources.food >= 0) 
+    ? (activePlanet.resources.food / Math.abs(netFoodProdHourly)) 
+    : Infinity;
+
+  const minHoursToNegative = Math.min(hoursToNegativeWater, hoursToNegativeRespirant, hoursToNegativeFood);
+
+  const isOrangeAlertActive = !isRedAlertActive && minHoursToNegative <= 3;
 
   // Active Fleets scanning for Alerts indicator color schemas
   const incomingAttacks = fleets.filter(
@@ -576,120 +604,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
   return (
     <div className="space-y-1.5 pb-24" id="explore-tab-view">
-      {/* 1. Station Details Header (with sector command tile text removed as requested) */}
-      <div className="relative p-6 bg-gradient-to-b from-[#0F172A] to-black border border-white/5 rounded-xl overflow-hidden flex flex-col">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(34,211,238,0.05)_0%,_transparent_70%)] pointer-events-none"></div>
-        
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex-1 min-w-0 text-left">
-            {isEditingName ? (
-              <div className="flex items-center gap-2 mt-1 max-w-md">
-                <input
-                  type="text"
-                  maxLength={30}
-                  value={newNameInput}
-                  onChange={(e) => setNewNameInput(e.target.value)}
-                  className="flex-1 px-3 py-1 bg-slate-950 border border-cyan-500/50 hover:border-cyan-500 focus:border-cyan-500 focus:outline-none text-sm text-white font-mono rounded-lg transition"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleRenameActiveStation();
-                    if (e.key === 'Escape') {
-                      setIsEditingName(false);
-                      setNewNameInput(activePlanet.name);
-                    }
-                  }}
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={handleRenameActiveStation}
-                  className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
-                  title="Save Name"
-                >
-                  <Check size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditingName(false);
-                    setNewNameInput(activePlanet.name);
-                  }}
-                  className="p-1.5 text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 rounded-lg transition cursor-pointer font-sans"
-                  title="Cancel"
-                >
-                  <span className="text-sm font-semibold select-none font-sans">✕</span>
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 mt-1 group">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">{activePlanet.name}</h2>
-                <button
-                  type="button"
-                  onClick={() => setIsEditingName(true)}
-                  className="p-1 px-2 text-[10px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/30 hover:bg-cyan-950/80 border border-cyan-500/20 hover:border-cyan-500/50 font-bold uppercase rounded-lg transition opacity-60 group-hover:opacity-100 flex items-center gap-1 cursor-pointer"
-                  title="Rename Station Base"
-                >
-                  <Edit2 size={10} /> Rename
-                </button>
-              </div>
-            )}
-            <div className="mt-2 text-xs text-slate-400 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 font-mono">
-              <span className={`inline-block w-2.5 h-2.5 rounded-full ${pulseDot} animate-pulse`} />
-              <span>Commander: <span className="text-slate-200 font-bold">{player.username}</span></span>
-              <span>&bull;</span>
-              <span>Station: <span className="text-slate-200 font-bold">{activePlanet.name}</span></span>
-              <span>&bull;</span>
-              <span>Sector Coord: <span className="text-slate-200 font-bold">[{activePlanet.sectorX}, {activePlanet.sectorY}]</span></span>
-              <span>&bull;</span>
-              <span className="text-[#FFD700] font-black bg-yellow-500/10 border border-yellow-500/30 px-2.5 py-0.5 rounded-md flex items-center gap-1 select-none shrink-0 shadow-[0_0_8px_rgba(234,179,8,0.15)]" title="Space Gold Ledger Balance">
-                <span className="text-[#FFD700] font-black text-[10px] tracking-wider font-sans">SG</span>
-                <span className="text-yellow-100 font-bold font-mono">{(player.credits !== undefined ? player.credits : 0).toLocaleString()}</span>
-              </span>
-            </div>
-
-            {player.planets.length > 1 && (
-              <div className="mt-4 pt-3.5 border-t border-white/5 flex flex-wrap items-center gap-3">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Other Stations:</span>
-                <div className="flex flex-wrap gap-2">
-                  {player.planets.filter(p => p.id !== activePlanet.id).map(pl => (
-                    <button
-                      key={pl.id}
-                      type="button"
-                      onClick={() => {
-                        if (setSelectedPlanetId) {
-                          setSelectedPlanetId(pl.id);
-                          showToast?.(`Switched active command site to ${pl.name}`, 'success');
-                        }
-                      }}
-                      className="text-[11px] font-mono px-2 py-1 bg-slate-900/60 hover:bg-slate-800 border border-white/5 hover:border-cyan-500/30 text-slate-400 hover:text-slate-200 rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
-                      title={`Click to switch to and view details of ${pl.name} [${pl.sectorX}, ${pl.sectorY}]`}
-                    >
-                      <span>{pl.name}</span>
-                      <span className="text-slate-500 text-[10px]">[{pl.sectorX}, {pl.sectorY}]</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 self-start md:self-auto">
-            {/* Active Sector Alerts indicator block */}
-            <button
-              id="alerts-hud-trigger"
-              onClick={() => setIsAlertsOpen(true)}
-              className={`p-3 border rounded-lg text-left font-mono min-w-[170px] cursor-pointer transition duration-150 hover:brightness-110 active:scale-95 flex flex-col justify-center ${alertsColor}`}
-            >
-              <span className="text-[9px] uppercase tracking-widest font-bold opacity-75">{alertsLabel}</span>
-              <span className="text-[11px] font-black uppercase mt-1 tracking-tight flex items-center gap-1.5 font-mono">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
-                {alertsValue}
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Your Resource Count */}
+      {/* Your Resource Count */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
         {[
           {
@@ -747,13 +662,38 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
           const isSelected = selectedResource === resKey;
           const info = RESOURCE_INFO[resKey];
           const mines = activePlanet.mines[resKey];
+
+          const isOtherMaxed = 
+            activePlanet.resources.plasma >= repositoryLimit &&
+            activePlanet.resources.fuel >= repositoryLimit &&
+            activePlanet.resources.food >= repositoryLimit &&
+            activePlanet.resources.respirant >= repositoryLimit;
+          
+          const totalProd = isOtherMaxed
+            ? (resKey === 'water' ? 84000 : 42000)
+            : mines.reduce((sum, m) => {
+                const isMineBoosted = m.boostedUntil && Number(m.boostedUntil) > serverTime;
+                const baseOutput = Math.round((m.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
+                const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
+                return sum + output;
+              }, 0);
+
+          let consumption = 0;
+          if (resKey === 'water') {
+            consumption = waterConsumption;
+          } else if (resKey === 'respirant') {
+            consumption = waterConsumption * 0.28;
+          } else if (resKey === 'food') {
+            consumption = waterConsumption * 0.18;
+          }
+          const netOutput = totalProd - consumption;
           
           return (
             <div
               key={resKey}
               className={`flex flex-col bg-[#0A0F1D]/60 backdrop-blur-sm border rounded-xl overflow-hidden transition-all duration-300 ${
                 isSelected 
-                  ? 'border-cyan-500/40 bg-[#0C1425]/75 shadow-[0_0_15px_rgba(34,211,238,0.12)] ring-1 ring-cyan-500/20' 
+                  ? 'col-span-2 md:col-span-6 border-cyan-500/40 bg-[#0C1425]/75 shadow-[0_0_15px_rgba(34,211,238,0.12)] ring-1 ring-cyan-500/20' 
                   : 'border-slate-800/65 hover:border-slate-700/60'
               }`}
             >
@@ -761,51 +701,93 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedResource(isSelected ? null : resKey)}
-                className={`flex flex-col w-full p-4.5 sm:p-5 text-left transition duration-150 cursor-pointer select-none border-b-2 ${
+                className={`flex w-full text-left transition duration-150 cursor-pointer select-none border-b-2 ${
                   isSelected 
-                    ? config.selectClass 
-                    : 'border-transparent hover:bg-slate-800/20'
+                    ? `${config.selectClass} flex-col sm:flex-row sm:items-center sm:justify-between p-4.5 sm:p-5 gap-3.5` 
+                    : 'border-transparent hover:bg-slate-800/20 flex-col p-4.5 sm:p-5'
                 }`}
                 title={config.tooltip}
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <config.icon size={12} className={`${config.textColor} animate-pulse`} />
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">{config.label}</span>
-                </div>
-                <span className={`text-base font-mono font-bold ${config.textColor}`}>
-                  {Math.round(localResources[resKey]).toLocaleString()}{" "}
-                  <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{formatLimit(repositoryLimit)}</span></span>
-                </span>
-                <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
-                  <div 
-                    className={`h-full ${config.progressColor} rounded-full ${config.progressShadow} transition-all duration-300`}
-                    style={{ width: `${Math.min(100, (localResources[resKey] / repositoryLimit) * 100)}%` }}
-                  />
-                </div>
-                <span className="text-[8.5px] font-mono text-slate-550 mt-1 uppercase tracking-wider block">
-                  {isSelected ? '▲ Active view' : '▼ Click to manage'}
-                </span>
+                {isSelected ? (
+                  <>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4.5 flex-1">
+                      <div className="flex items-center gap-2">
+                        <config.icon size={16} className={`${config.textColor} animate-pulse`} />
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-mono">{config.label}</span>
+                      </div>
+                      
+                      <div className="flex items-baseline gap-1.5 font-mono">
+                        <span className={`text-base font-bold ${config.textColor}`}>
+                          {Math.round(localResources[resKey]).toLocaleString()}
+                        </span>
+                        <span className="text-[10px] text-slate-550 font-normal">
+                          / <span className="text-white font-bold">{formatLimit(repositoryLimit)}</span>
+                        </span>
+                      </div>
+
+                      <div className="w-full sm:w-32 h-1 bg-slate-900 rounded-full overflow-hidden border border-white/5">
+                        <div 
+                          className={`h-full ${config.progressColor} rounded-full ${config.progressShadow} transition-all duration-300`}
+                          style={{ width: `${Math.min(100, (localResources[resKey] / repositoryLimit) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4.5 mt-2.5 sm:mt-0 font-mono text-[10px]">
+                      <div className="flex flex-col items-start sm:items-end gap-0.5">
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-500">Gross Rate:</span>
+                          <span className="text-emerald-400">+{Math.round(totalProd).toLocaleString()}/hr</span>
+                        </div>
+                        {consumption > 0 && (
+                          <div className="flex items-center gap-1 text-[9px]">
+                            <span className="text-slate-400 font-bold">Total Output (after consumption):</span>
+                            <span className={netOutput >= 0 ? "text-emerald-400 font-bold" : "text-red-400 font-bold animate-pulse"}>
+                              {netOutput >= 0 ? "+" : ""}{Math.round(netOutput).toLocaleString()}/hr
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <span className="text-[8.5px] text-slate-400 font-bold uppercase tracking-wider bg-slate-950/60 px-2 py-1 rounded border border-slate-800/80">
+                        ▲ Hide
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 mb-1">
+                      <config.icon size={12} className={`${config.textColor} animate-pulse`} />
+                      <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 font-mono">{config.label}</span>
+                    </div>
+                    <span className={`text-base font-mono font-bold ${config.textColor}`}>
+                      {Math.round(localResources[resKey]).toLocaleString()}{" "}
+                      <span className="text-[10px] text-slate-500 font-normal">/ <span className="text-white font-bold">{formatLimit(repositoryLimit)}</span></span>
+                    </span>
+                    <div className="w-full h-1 bg-slate-900 rounded-full mt-2 overflow-hidden border border-white/5">
+                      <div 
+                        className={`h-full ${config.progressColor} rounded-full ${config.progressShadow} transition-all duration-300`}
+                        style={{ width: `${Math.min(100, (localResources[resKey] / repositoryLimit) * 100)}%` }}
+                      />
+                    </div>
+                    
+                    {/* Hourly yield display */}
+                    <div className="mt-2.5 border-t border-slate-850/50 pt-2 text-[10px] font-mono leading-tight w-full flex justify-between items-center">
+                      <span className="text-slate-500">Total Output:</span>
+                      <span className={netOutput >= 0 ? "text-emerald-400 font-bold" : "text-red-400 font-bold animate-pulse"}>
+                        {netOutput >= 0 ? "+" : ""}{Math.round(netOutput).toLocaleString()}/h
+                      </span>
+                    </div>
+
+                    <span className="text-[8.5px] font-mono text-slate-500 mt-2.5 uppercase tracking-wider block font-bold">
+                      ▼ Click to manage
+                    </span>
+                  </>
+                )}
               </button>
 
               {/* Render details inline if selected */}
               {isSelected && (() => {
-                return null;
-                // Calc total production
-                const isOtherMaxed = 
-                  activePlanet.resources.plasma >= repositoryLimit &&
-                  activePlanet.resources.fuel >= repositoryLimit &&
-                  activePlanet.resources.food >= repositoryLimit &&
-                  activePlanet.resources.respirant >= repositoryLimit;
-                
-                const totalProd = isOtherMaxed
-                  ? (resKey === 'water' ? 84000 : 42000)
-                  : mines.reduce((sum, m) => {
-                      const isMineBoosted = m.boostedUntil && Number(m.boostedUntil) > serverTime;
-                      const baseOutput = Math.round((m.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
-                      const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
-                      return sum + output;
-                    }, 0);
-                    
                 return (
                   <div className="p-5 border-t border-cyan-500/20 text-left animate-fade-in bg-black/20">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-cyan-500/20 pb-3">
@@ -817,18 +799,17 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                           <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-300 font-mono">
                             {info.name} Extractors & Upgrades
                           </h3>
-                          <div className="text-xs text-slate-400 font-mono mt-1 flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-emerald-400">+{totalProd.toLocaleString()}/hr</span>
-                            {resKey === 'water' && waterConsumption > 0 && (
-                              <span className="text-red-400 font-bold border-l border-slate-700 pl-2">(-{Math.round(waterConsumption).toLocaleString()}/hr troops)</span>
+                          <div className="text-xs text-slate-450 font-mono mt-1 flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-slate-300">Base Yield: <strong className="text-emerald-400">+{totalProd.toLocaleString()}/hr</strong></span>
+                            {consumption > 0 && (
+                              <>
+                                <span className="text-red-400 font-bold border-l border-slate-700 pl-2">Troop Consumption: -{Math.round(consumption).toLocaleString()}/hr</span>
+                                <span className={`font-black border-l border-slate-700 pl-2 ${netOutput >= 0 ? "text-emerald-400" : "text-red-400 animate-pulse bg-red-950/30 px-1.5 py-0.5 rounded"}`}>
+                                  Total Output (after consumption): {netOutput >= 0 ? "+" : ""}{Math.round(netOutput).toLocaleString()}/hr
+                                </span>
+                              </>
                             )}
-                            {resKey === 'respirant' && waterConsumption > 0 && (
-                              <span className="text-red-400 font-bold border-l border-slate-700 pl-2">(-{Math.round(waterConsumption * 0.28).toLocaleString()}/hr troops)</span>
-                            )}
-                            {resKey === 'food' && waterConsumption > 0 && (
-                              <span className="text-red-400 font-bold border-l border-slate-700 pl-2">(-{Math.round(waterConsumption * 0.18).toLocaleString()}/hr troops)</span>
-                            )}
-                            <span className="text-slate-500">|</span>
+                            <span className="text-slate-500 border-l border-slate-700 pl-2">|</span>
                             <span className="text-slate-400">Max level: <strong className="text-white">{maxExtractorLevel}</strong></span>
                           </div>
                         </div>
@@ -850,31 +831,36 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         const isMineBoosted = mine.boostedUntil && Number(mine.boostedUntil) > serverTime;
                         const mineBaseOutput = Math.round((mine.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
                         const mineOutput = isMineBoosted ? Math.round(mineBaseOutput * 1.14) : mineBaseOutput;
-                        const nextMineTargetLvl = mine.level + 1;
+                        const mineQueueCount = (activePlanet.upgradeQueue || []).filter(
+                          (item: any) => item.type === 'mine' && item.key === resKey && item.mineIndex === mine.index
+                        ).length;
+                        const activeMineUpgradeCount = mine.isUpgrading ? 1 : 0;
+                        const currentTotalMineUpgrades = activeMineUpgradeCount + mineQueueCount;
+                        const nextMineTargetLvl = mine.level + currentTotalMineUpgrades + 1;
                         const nextMineUpgradeTimeMins = nextMineTargetLvl * 1;
                         const isDamaged = mine.health !== undefined && mine.health < 100;
-                        const targetLevel = mine.level + 1;
+                        const targetLevel = mine.level + currentTotalMineUpgrades + 1;
                         
                         return (
                           <div 
                             key={mine.index}
                             className="p-3.5 bg-[#05070A]/55 border border-slate-800/80 rounded-xl hover:border-slate-700/60 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3.5"
                           >
-                            <div className="space-y-1.5 flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-sm text-white font-mono">
+                            <div className="space-y-1.5 flex-1 min-w-0 font-sans">
+                              <div className="flex items-center gap-2 flex-wrap font-mono">
+                                <span className="font-bold text-sm text-white">
                                   {info.name} Pump #{mine.index + 1}
                                 </span>
-                                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-slate-900 text-[#5bc0be] border border-slate-800">
-                                  Level {mine.level} / {maxExtractorLevel}
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-900 text-[#5bc0be] border border-slate-800">
+                                  {mine.level === 0 ? 'Not Constructed' : `Level ${mine.level} / ${maxExtractorLevel}`}
                                 </span>
                                 {isMineBoosted && (
-                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse flex items-center gap-1">
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse flex items-center gap-1">
                                     <Zap size={9} /> BOOSTED ({getTimerString(mine.boostedUntil)})
                                   </span>
                                 )}
                                 {isDamaged && (
-                                  <span className="px-2 py-0.5 rounded bg-red-950/40 text-red-400 border border-red-900/30 text-[9px] font-mono font-bold animate-pulse">
+                                  <span className="px-2 py-0.5 rounded bg-red-950/40 text-red-400 border border-red-900/30 text-[9px] font-bold animate-pulse">
                                     ⚠️ DAMAGED: {mine.health}% Health
                                   </span>
                                 )}
@@ -898,11 +884,13 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                 );
                                 if (specificMineQueue.length === 0) return null;
                                 return (
-                                  <div className="mt-2 space-y-1 p-2 bg-slate-950/40 border border-[#1E293B]/60 rounded-lg max-w-sm">
-                                    <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-extrabold font-mono">Queued Upgrades:</div>
+                                  <div className="mt-2 space-y-1 p-2 bg-slate-950/40 border border-[#1E293B]/60 rounded-lg max-w-sm font-mono">
+                                    <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-extrabold">Queued Upgrades:</div>
                                     {specificMineQueue.map((q, idx) => (
-                                      <div key={idx} className="text-[10px] text-slate-400 font-mono flex items-center justify-between gap-4">
-                                        <span className="text-slate-450">↳ Upgrade to Level {q.targetLevel}</span>
+                                      <div key={idx} className="text-[10px] text-slate-400 flex items-center justify-between gap-4">
+                                        <span className="text-slate-450">
+                                          ↳ {q.targetLevel === 1 ? 'Construct to Level 1' : `Upgrade to Level ${q.targetLevel}`}
+                                        </span>
                                         <span className="text-amber-400 font-bold">⏳ {q.targetLevel * 1}m</span>
                                       </div>
                                     ))}
@@ -914,17 +902,17 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                             <div className="font-mono text-xs shrink-0">
                               {mine.isUpgrading ? (
                                 <div className="flex flex-col sm:items-end gap-1.5">
-                                  <div className="flex items-center gap-1.5 text-xs text-amber-400 font-mono">
+                                  <div className="flex items-center gap-1.5 text-xs text-amber-400">
                                     <Clock size={12} className="animate-spin" />
-                                    <span>Upgrading {getTimerString(mine.upgradeEnd)}</span>
+                                    <span>{mine.level === 0 ? 'Constructing' : 'Upgrading'} {getTimerString(mine.upgradeEnd)}</span>
                                   </div>
                                   {nextMineTargetLvl <= maxExtractorLevel && (
                                     <button 
                                       onClick={() => onUpgradeMine(resKey, mine.index, true)}
                                       disabled={isUpgrading}
-                                      className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[9px] font-bold uppercase flex items-center gap-1.5 disabled:opacity-50"
+                                      className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer text-[9px] font-bold uppercase flex items-center gap-1.5 disabled:opacity-50"
                                     >
-                                      <span className="text-emerald-400">Queue Upgrade</span>
+                                      <span className="text-emerald-400">{nextMineTargetLvl === 1 ? 'Queue Construction' : 'Queue Upgrade'}</span>
                                       <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl})</span>
                                     </button>
                                   )}
@@ -935,17 +923,34 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                 <button 
                                   onClick={() => onUpgradeMine(resKey, mine.index)}
                                   disabled={isUpgrading}
-                                  className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 border border-red-400 text-white font-mono font-black text-[10px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:scale-[1.03] disabled:opacity-50"
+                                  className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 border border-red-400 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:scale-[1.03] disabled:opacity-50"
                                 >
                                   🔧 Repair Pump
+                                </button>
+                              ) : isAnyUpgradeInProgress ? (
+                                <button 
+                                  onClick={() => onUpgradeMine(resKey, mine.index, true)}
+                                  disabled={isUpgrading}
+                                  className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 text-emerald-400 font-black text-[10px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                >
+                                  <span>{nextMineTargetLvl === 1 ? 'Queue Construction' : 'Queue Upgrade'}</span>
+                                  <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl})</span>
                                 </button>
                               ) : (
                                 <button 
                                   onClick={() => onUpgradeMine(resKey, mine.index)}
                                   disabled={isUpgrading}
-                                  className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 border border-cyan-400 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.55)] hover:scale-[1.03] disabled:opacity-50 disabled:pointer-events-none"
+                                  className={`px-4 py-2 border font-black text-[10.5px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer hover:scale-[1.03] disabled:opacity-50 disabled:pointer-events-none ${
+                                    mine.level === 0
+                                      ? 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 border-amber-400 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.55)]'
+                                      : 'bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 border-cyan-400 text-slate-950 shadow-[0_0_15px_rgba(34,211,238,0.55)]'
+                                  }`}
                                 >
-                                  ⚡ Upgrade Extractor <span className="text-slate-900 font-bold ml-1">({nextMineUpgradeTimeMins}m)</span>
+                                  {mine.level === 0 ? (
+                                    <>⚡ Construct Extractor <span className="text-slate-900 font-bold ml-1">({nextMineUpgradeTimeMins}m)</span></>
+                                  ) : (
+                                    <>⚡ Upgrade Extractor <span className="text-slate-900 font-bold ml-1">({nextMineUpgradeTimeMins}m)</span></>
+                                  )}
                                 </button>
                               )}
                             </div>
@@ -975,203 +980,22 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
         </div>
       </div>
 
-      {/* 4b. Expanded Resource Details Dropdown */}
-      {selectedResource && (() => {
-        const resKey = selectedResource;
-        const config = [
-          { key: 'water', label: 'Water (H2O)', icon: Droplet, textColor: 'text-cyan-400', progressColor: 'bg-cyan-400', progressShadow: 'shadow-[0_0_6px_#22d3ee]', selectClass: 'bg-cyan-500/10 border-cyan-400' },
-          { key: 'plasma', label: 'Plasma', icon: Zap, textColor: 'text-purple-400', progressColor: 'bg-purple-500', progressShadow: 'shadow-[0_0_6px_#a855f7]', selectClass: 'bg-purple-500/10 border-purple-500' },
-          { key: 'fuel', label: 'Fuel', icon: Flame, textColor: 'text-amber-400', progressColor: 'bg-amber-500', progressShadow: 'shadow-[0_0_6px_#fbbf24]', selectClass: 'bg-amber-500/10 border-amber-500' },
-          { key: 'food', label: 'Food', icon: Apple, textColor: 'text-emerald-400', progressColor: 'bg-emerald-500', progressShadow: 'shadow-[0_0_6px_#10b981]', selectClass: 'bg-emerald-500/10 border-emerald-500' },
-          { key: 'respirant', label: 'Respirant (O2)', icon: Wind, textColor: 'text-blue-400', progressColor: 'bg-blue-500', progressShadow: 'shadow-[0_0_6px_#3b82f6]', selectClass: 'bg-blue-500/10 border-blue-500' }
-        ].find(c => c.key === resKey)!;
-
-        const info = RESOURCE_INFO[resKey];
-        const mines = activePlanet.mines[resKey];
-        
-        const isOtherMaxed = 
-          activePlanet.resources.plasma >= repositoryLimit &&
-          activePlanet.resources.fuel >= repositoryLimit &&
-          activePlanet.resources.food >= repositoryLimit &&
-          activePlanet.resources.respirant >= repositoryLimit;
-        
-        const totalProd = isOtherMaxed
-          ? (resKey === 'water' ? 84000 : 42000)
-          : mines.reduce((sum, m) => {
-              const isMineBoosted = m.boostedUntil && Number(m.boostedUntil) > serverTime;
-              const baseOutput = Math.round((m.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
-              const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
-              return sum + output;
-            }, 0);
-
-        return (
-          <div className="relative border border-cyan-500/35 bg-[#0C1425]/95 backdrop-blur-md rounded-xl p-5 mb-6 text-left animate-fade-in shadow-[0_15px_40px_rgba(0,0,0,0.65)] ring-1 ring-cyan-500/15">
-            {/* Glowing Pointer Caret */}
-            <div 
-              className="absolute -top-1.5 h-3 w-3 rotate-45 border-l border-t border-cyan-500/35 bg-[#0C1425] transition-all duration-300 hidden md:block shadow-[-2px_-2px_4px_rgba(34,211,238,0.1)]"
-              style={{
-                left: resKey === 'water' ? '8.33%' :
-                      resKey === 'plasma' ? '25%' :
-                      resKey === 'fuel' ? '41.67%' :
-                      resKey === 'food' ? '58.33%' : '75%'
-              }}
-            />
-            
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-cyan-500/20 pb-3">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-xl border ${info.color} shadow-inner bg-black/40`}>
-                  <config.icon size={20} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-300 font-mono">
-                    {info.name} Extractors & Upgrades
-                  </h3>
-                  <div className="text-xs text-slate-400 font-mono mt-1 flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-emerald-400">+{totalProd.toLocaleString()}/hr</span>
-                    {resKey === 'water' && waterConsumption > 0 && (
-                      <span className="text-red-400 font-bold border-l border-slate-700 pl-2">(-{Math.round(waterConsumption).toLocaleString()}/hr troops)</span>
-                    )}
-                    {resKey === 'respirant' && waterConsumption > 0 && (
-                      <span className="text-red-400 font-bold border-l border-slate-700 pl-2">(-{Math.round(waterConsumption * 0.28).toLocaleString()}/hr troops)</span>
-                    )}
-                    {resKey === 'food' && waterConsumption > 0 && (
-                      <span className="text-red-400 font-bold border-l border-slate-700 pl-2">(-{Math.round(waterConsumption * 0.18).toLocaleString()}/hr troops)</span>
-                    )}
-                    <span className="text-slate-500">|</span>
-                    <span className="text-slate-400">Max level: <strong className="text-white">{maxExtractorLevel}</strong></span>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenBoostModal(resKey, -1);
-                }}
-                className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 font-mono font-black text-[10px] uppercase tracking-wider rounded-xl transition cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.4)]"
-                type="button"
-              >
-                ⚡ Boost All {info.name} (🪙 45)
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {mines.map((mine) => {
-                const isMineBoosted = mine.boostedUntil && Number(mine.boostedUntil) > serverTime;
-                const mineBaseOutput = Math.round((mine.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
-                const mineOutput = isMineBoosted ? Math.round(mineBaseOutput * 1.14) : mineBaseOutput;
-                const nextMineTargetLvl = mine.level + 1;
-                const nextMineUpgradeTimeMins = nextMineTargetLvl * 1;
-                const isDamaged = mine.health !== undefined && mine.health < 100;
-                const targetLevel = mine.level + 1;
-                
-                return (
-                  <div 
-                    key={mine.index}
-                    className="p-3.5 bg-[#05070A]/55 border border-slate-800/80 rounded-xl hover:border-slate-700/60 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3.5"
-                  >
-                    <div className="space-y-1.5 flex-1 min-w-0 font-sans">
-                      <div className="flex items-center gap-2 flex-wrap font-mono">
-                        <span className="font-bold text-sm text-white">
-                          {info.name} Pump #{mine.index + 1}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-900 text-[#5bc0be] border border-slate-800">
-                          Level {mine.level} / {maxExtractorLevel}
-                        </span>
-                        {isMineBoosted && (
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse flex items-center gap-1">
-                            <Zap size={9} /> BOOSTED ({getTimerString(mine.boostedUntil)})
-                          </span>
-                        )}
-                        {isDamaged && (
-                          <span className="px-2 py-0.5 rounded bg-red-950/40 text-red-400 border border-red-900/30 text-[9px] font-bold animate-pulse">
-                            ⚠️ DAMAGED: {mine.health}% Health
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="text-[11px] text-slate-400 font-sans leading-normal">
-                        Yield output rate: <strong className="text-emerald-400">+{mineOutput.toLocaleString()}/hr</strong> (Base: +{mineBaseOutput.toLocaleString()}/hr)
-                      </div>
-                      
-                      {mine.level < maxExtractorLevel && (
-                        isDamaged ? (
-                          <RestoreCostBar type="mine" upgradeKey={resKey} targetLevel={targetLevel} health={mine.health!} planetResources={localResources} />
-                        ) : (
-                          <UpgradeCostBar type="mine" upgradeKey={resKey} targetLevel={nextMineTargetLvl} planetResources={localResources} />
-                        )
-                      )}
-                      
-                      {(() => {
-                        const specificMineQueue = (activePlanet.upgradeQueue || []).filter(
-                          (item: any) => item.type === 'mine' && item.key === resKey && item.mineIndex === mine.index
-                        );
-                        if (specificMineQueue.length === 0) return null;
-                        return (
-                          <div className="mt-2 space-y-1 p-2 bg-slate-950/40 border border-[#1E293B]/60 rounded-lg max-w-sm">
-                            <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-extrabold font-mono">Queued Upgrades:</div>
-                            {specificMineQueue.map((q, idx) => (
-                              <div key={idx} className="text-[10px] text-slate-400 font-mono flex items-center justify-between gap-4">
-                                <span className="text-slate-450">↳ Upgrade to Level {q.targetLevel}</span>
-                                <span className="text-amber-400 font-bold">⏳ {q.targetLevel * 1}m</span>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    <div className="font-mono text-xs shrink-0">
-                      {mine.isUpgrading ? (
-                        <div className="flex flex-col sm:items-end gap-1.5">
-                          <div className="flex items-center gap-1.5 text-xs text-amber-400 font-mono">
-                            <Clock size={12} className="animate-spin" />
-                            <span>Upgrading {getTimerString(mine.upgradeEnd)}</span>
-                          </div>
-                          {nextMineTargetLvl <= maxExtractorLevel && (
-                            <button 
-                              onClick={() => onUpgradeMine(resKey, mine.index, true)}
-                              disabled={isUpgrading}
-                              className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-[#10b981]/35 rounded-xl transition duration-150 cursor-pointer font-mono text-[9px] font-bold uppercase flex items-center gap-1.5 disabled:opacity-50"
-                            >
-                              <span className="text-emerald-400">Queue Upgrade</span>
-                              <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl})</span>
-                            </button>
-                          )}
-                        </div>
-                      ) : mine.level >= maxExtractorLevel && !isDamaged ? (
-                        <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase bg-slate-900 border border-slate-850 px-2 py-1 rounded">MAX CAP</span>
-                      ) : isDamaged ? (
-                        <button 
-                          onClick={() => onUpgradeMine(resKey, mine.index)}
-                          disabled={isUpgrading}
-                          className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 border border-red-400 text-white font-mono font-black text-[10px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:scale-[1.03] disabled:opacity-50"
-                        >
-                          🔧 Repair Pump
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => onUpgradeMine(resKey, mine.index)}
-                          disabled={isUpgrading}
-                          className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 border border-cyan-400 text-slate-950 font-mono font-black text-[10.5px] uppercase tracking-wider rounded-xl transition duration-150 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.55)] hover:scale-[1.03] disabled:opacity-50 disabled:pointer-events-none"
-                        >
-                          ⚡ Upgrade Extractor <span className="text-slate-900 font-bold ml-1">({nextMineUpgradeTimeMins}m)</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
-
-      {isDehydrated && (
-        <div className="p-3 border border-red-900/50 bg-red-950/30 text-red-400 rounded-xl flex items-start gap-2.5 text-xs animate-pulse text-left" title="Critical Alert: High severity base warning">
+      {isRedAlertActive && (
+        <div className="p-3.5 border border-red-900/50 bg-red-950/30 text-red-400 rounded-xl flex items-start gap-2.5 text-xs animate-pulse text-left" title="Critical Alert: High severity base warning">
           <ShieldAlert size={16} className="shrink-0 mt-0.5 animate-bounce text-red-500" />
           <div>
             <p className="font-bold uppercase tracking-widest text-[10px]">CRITICAL NEGATIVE PRODUCTION (ATTRITION PASSIVE)</p>
-            <p className="text-red-300/80 leading-relaxed mt-0.5">Troops are suffering rapid attrition due to negative production! Upgrade resource extractors immediately built with deeper wells or dismiss excess troops.</p>
+            <p className="text-red-300/80 leading-relaxed mt-0.5">Troops are suffering rapid attrition due to negative production! Upgrade resource extractors immediately if they are maxed and you don't want to lose troops, raid the resources!</p>
+          </div>
+        </div>
+      )}
+
+      {isOrangeAlertActive && (
+        <div className="p-3.5 border border-amber-500/30 bg-amber-500/5 text-amber-500 rounded-xl flex items-start gap-2.5 text-xs animate-pulse text-left" title="Imminent Warning: Medium severity base warning">
+          <ShieldAlert size={16} className="shrink-0 mt-0.5 animate-bounce text-amber-500" />
+          <div>
+            <p className="font-bold uppercase tracking-widest text-[10px]">CRITICAL NEGATIVE PRODUCTION (ATTRITION PASSIVE)</p>
+            <p className="text-amber-300/80 leading-relaxed mt-0.5">Troops are going to suffer rapid attrition due to negative production within the next 3 hours! Upgrade resource extractors immediately if they are maxed and you don't want to lose troops, raid the resources!</p>
           </div>
         </div>
       )}
@@ -1682,6 +1506,22 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
             ({constructedBuildings.length} Facilities Built)
           </span>
         </div>
+
+        {!allExtractorsLevelOneOrMore && (
+          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-left space-y-2 font-mono">
+            <div className="flex items-center gap-2 text-red-400 text-xs font-black uppercase tracking-wider">
+              <AlertTriangle size={15} />
+              <span>Modular Base Fabrication Terminals Locked</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed font-sans">
+              Admiral, base construction facilities are off-line. <span className="text-red-400 font-bold">You cannot construct or upgrade any base facility</span> until all 5 resource extractor pumps (Water, Plasma, Fuel, Food, and Respirant) have been constructed to at least <span className="text-[#5bc0be] font-bold">Level 1</span> on this outpost.
+            </p>
+            <div className="text-[10px] text-slate-400 font-sans pt-0.5">
+              Please scroll up to the <span className="text-[#5bc0be] font-bold">Resource Extractor Outposts</span> grid and construct any missing extractor pumps first!
+            </div>
+          </div>
+        )}
+
         {showStructures && (
           <div className="space-y-4">
             {constructedBuildings.map(([bKey, val]) => {
@@ -1773,6 +1613,15 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                   {/* Expanded Building Detail Panel */}
                   {isExpanded && (
                     <div className="border-t border-[#1E293B]/60 p-4 bg-slate-950/20 space-y-4 animate-fade-in">
+                      {!allExtractorsLevelOneOrMore && (
+                        <div className="p-3 border border-red-500/20 bg-red-950/40 rounded-xl text-red-400 text-xs font-mono text-left space-y-1">
+                          <div className="font-extrabold flex items-center gap-1.5 uppercase text-[11px] tracking-wider">⚠️ EXTRACTORS REQUISITE MISSING</div>
+                          <p className="text-[10.5px] text-slate-300 font-sans leading-relaxed">
+                            All 5 resource extractor types must be at least <span className="text-[#5bc0be] font-bold">Level 1</span> before you can build or upgrade base facilities!
+                          </p>
+                        </div>
+                      )}
+
                       {isFabricatorRequiredMissing && (
                         <div className="p-3 border border-red-500/20 bg-red-950/40 rounded-xl text-red-400 text-xs font-mono text-left">
                           ⚠️ REQUIREMENT: A Fabricator at level 1 or higher is required to construct or upgrade this structure. Please construct/upgrade the Fabricator modular structure first!
@@ -2051,6 +1900,10 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                               </button>
                             )}
                           </div>
+                        ) : !allExtractorsLevelOneOrMore ? (
+                          <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-3 py-1.5 rounded" title="All 5 resource extractor pumps must be at least Level 1.">
+                            🔒 EXTRACTORS REQUISITE
+                          </span>
                         ) : isFabricatorRequiredMissing ? (
                           <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-3 py-1.5 rounded" title="Fabricator modular structure at level 1 or higher is required.">
                             🔒 FABRICATOR REQUIRED
@@ -2157,10 +2010,23 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                       <div className="border-t border-[#5bc0be]/20 p-4 bg-slate-950/40 space-y-3.5 text-left text-xs animate-fade-in">
                         <p className="text-slate-350 leading-relaxed font-sans">{info.desc}</p>
                         <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={1} planetResources={localResources} />
+
+                        {!allExtractorsLevelOneOrMore && (
+                          <div className="p-3 border border-red-500/20 bg-red-950/40 rounded-xl text-red-400 text-xs font-mono text-left space-y-1">
+                            <div className="font-extrabold flex items-center gap-1.5 uppercase tracking-wider text-[11px]">⚠️ EXTRACTORS REQUISITE MISSING</div>
+                            <p className="text-[10.5px] text-slate-300 font-sans leading-relaxed">
+                              All 5 resource extractor types must be at least <span className="text-[#5bc0be] font-bold">Level 1</span> before you can build or upgrade base facilities!
+                            </p>
+                          </div>
+                        )}
                         
                         <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-2">
                           <span className="text-[9.5px] text-slate-500 font-mono font-bold tracking-wider">REQUISITE FABRICATOR: Lv. {getRequiredFabricatorLevel(bKey)}</span>
-                          {isAnyUpgradeInProgress ? (
+                          {!allExtractorsLevelOneOrMore ? (
+                            <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-3 py-1.5 rounded" title="All 5 resource extractor pumps must be at least Level 1.">
+                              🔒 EXTRACTORS REQUISITE
+                            </span>
+                          ) : isAnyUpgradeInProgress ? (
                             <button 
                               onClick={() => onUpgradeBuilding(bKey, true)}
                               disabled={isUpgrading}

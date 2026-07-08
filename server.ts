@@ -21,7 +21,7 @@ import {
   ResourceType,
   CommandMessage,
 } from "./src/types";
-import { getUpgradeResourceCost } from "./src/gameUtils";
+import { getUpgradeResourceCost, getTaskResourceReward } from "./src/gameUtils";
 import { checkSpeedHack, redis as serverRedis } from "./antiCheat";
 import { OAuth2Client } from "google-auth-library";
 
@@ -58,24 +58,29 @@ app.use(express.json());
 
 // Anti-speed-hack and security validation layer powered by Cloud Redis
 app.use("/api", async (req, res, next) => {
-  if (req.method === "POST" || req.method === "PUT" || req.method === "DELETE") {
-    const apiPath = req.path.toLowerCase();
-    if (apiPath.includes("/login") || apiPath.includes("/register") || apiPath.includes("/auth/google") || apiPath.includes("/notifications/register-token")) {
-      return next();
-    }
+  try {
+    if (req.method === "POST" || req.method === "PUT" || req.method === "DELETE") {
+      const apiPath = (req.path || "").toLowerCase();
+      if (apiPath.includes("/login") || apiPath.includes("/register") || apiPath.includes("/auth/google") || apiPath.includes("/notifications/register-token")) {
+        return next();
+      }
 
-    const userId = req.headers["x-user-id"] as string;
-    if (userId) {
-      const isValid = await checkSpeedHack(userId, apiPath, 150);
-      if (!isValid) {
-        return res.status(429).json({ 
-          error: "Quantum anti-speed-hack mechanism active: Request rate exceeds safety parameters. Action blocked.",
-          success: false 
-        });
+      const userId = req.headers["x-user-id"] as string;
+      if (userId) {
+        const isValid = await checkSpeedHack(userId, apiPath, 150);
+        if (!isValid) {
+          return res.status(429).json({ 
+            error: "Quantum anti-speed-hack mechanism active: Request rate exceeds safety parameters. Action blocked.",
+            success: false 
+          });
+        }
       }
     }
+    next();
+  } catch (err) {
+    console.error("Anti-cheat middleware validation failed, bypassing to ensure service availability:", err);
+    next();
   }
-  next();
 });
 
 // Persistent state file
@@ -424,6 +429,9 @@ function normalizeState(s: GameState) {
       }
       if (!pl.upgradeQueue) {
         pl.upgradeQueue = [];
+      }
+      if (!pl.researchQueue) {
+        pl.researchQueue = [];
       }
 
       // Ensure all buildings are present and conform
@@ -1062,6 +1070,19 @@ function tickPlayerState(playerId: string, now: number): boolean {
             lastCompletedUpgradeTime = Math.max(lastCompletedUpgradeTime, mine.upgradeEnd);
             mine.upgradeEnd = null;
             changed = true;
+
+            // Only notify if there is no other queued item for this planet
+            if (!planet.upgradeQueue || planet.upgradeQueue.length === 0) {
+              const resNames = { water: "Water Extractor", plasma: "Plasma Extractor", fuel: "Fuel Extractor", food: "Food Extractor", respirant: "Respirant Extractor" };
+              const name = resNames[resKey as ResourceType] || `${resKey} Mine`;
+              sendNotificationWithFallback(
+                player.id,
+                mine.level === 1 ? "⚙️ Extractor Construction Completed" : "⚙️ Extractor Upgrade Completed",
+                mine.level === 1
+                  ? `${name} (Slot ${mine.index + 1}) has successfully completed construction on ${planet.name}!`
+                  : `${name} (Slot ${mine.index + 1}) has successfully completed upgrading to Level ${mine.level} on ${planet.name}!`
+              );
+            }
           }
           
           // Accumulate Resource
@@ -1173,6 +1194,17 @@ function tickPlayerState(playerId: string, now: number): boolean {
           lastCompletedUpgradeTime = Math.max(lastCompletedUpgradeTime, building.upgradeEnd);
           building.upgradeEnd = null;
           changed = true;
+
+          // Only notify if there is no other queued item for this planet
+          if (!planet.upgradeQueue || planet.upgradeQueue.length === 0) {
+            const bNames = { commsHub: "Communications Hub", researchCenter: "Research Center", armyBase: "War Room", repository: "Silo", radar: "Radar Array", supplyNexus: "Supply Nexus", fabricator: "Fabricator", bunker: "Bunker" };
+            const name = bNames[bKey as keyof typeof bNames] || bKey;
+            sendNotificationWithFallback(
+              player.id,
+              "🏗️ Station Upgrade Completed",
+              `${name} has successfully completed upgrading to Level ${building.level} on ${planet.name}!`
+            );
+          }
         }
       }
 
@@ -1191,14 +1223,28 @@ function tickPlayerState(playerId: string, now: number): boolean {
         lastCompletedUpgradeTime = Math.max(lastCompletedUpgradeTime, planet.activeResearch.endAt);
         planet.activeResearch = null;
         changed = true;
+
+        // Only notify if there is no other queued research item for this planet
+        if (!planet.researchQueue || planet.researchQueue.length === 0) {
+          const techNames = { defense_shields: "Defense Shields", manufacturing_speed: "Manufacturing Speed", troop_speed: "Troop Speed" };
+          const name = techNames[techId as keyof typeof techNames] || techId;
+          sendNotificationWithFallback(
+            player.id,
+            "🔬 Research Project Completed",
+            `${name} has successfully reached Level ${targetLvl} in the Research Center of ${planet.name}!`
+          );
+        }
       }
 
       // Sequential Upgrade Queue processor
       if (!planet.upgradeQueue) {
         planet.upgradeQueue = [];
       }
+      if (!planet.researchQueue) {
+        planet.researchQueue = [];
+      }
 
-      // Check if any upgrade is active right now
+      // Check if any building or mine is active right now
       let isUpgradeActive = false;
       for (const rKey of Object.keys(planet.mines)) {
         if (planet.mines[rKey as ResourceType].some(m => m.isUpgrading)) {
@@ -1211,11 +1257,8 @@ function tickPlayerState(playerId: string, now: number): boolean {
           isUpgradeActive = true;
         }
       }
-      if (!isUpgradeActive && planet.activeResearch) {
-        isUpgradeActive = true;
-      }
 
-      // If nothing is currently active, we start the queue sequentially!
+      // If nothing is currently active, we start the building/mine queue sequentially!
       if (!isUpgradeActive && planet.upgradeQueue.length > 0) {
         let referenceTime = lastCompletedUpgradeTime > 0 ? lastCompletedUpgradeTime : now;
         while (planet.upgradeQueue.length > 0) {
@@ -1224,67 +1267,96 @@ function tickPlayerState(playerId: string, now: number): boolean {
           let targetObj: any = null;
           let targetLvl = 1;
 
-          if (nextUp.type === 'research') {
-            targetLvl = nextUp.targetLevel;
-            durationMs = targetLvl * 60 * 1000;
+          if (nextUp.type === 'mine') {
+            targetObj = planet.mines[nextUp.key as ResourceType]?.[nextUp.mineIndex!];
+            if (targetObj) {
+              targetLvl = targetObj.level + 1;
+              durationMs = targetLvl * 60 * 1000;
+            }
+          } else if (nextUp.type === 'building') {
+            targetObj = planet.buildings[nextUp.key as keyof typeof planet.buildings];
+            if (targetObj) {
+              targetLvl = targetObj.level + 1;
+              durationMs = targetLvl * 120 * 1000;
+            }
+          }
+
+          if (targetObj) {
             const expectedEnd = referenceTime + durationMs;
             if (now >= expectedEnd) {
-              if (!player.techLevels) {
-                player.techLevels = {};
-              }
-              if (!player.techLevels[planet.id]) {
-                player.techLevels[planet.id] = {};
-              }
-              player.techLevels[planet.id][nextUp.key] = targetLvl;
+              // Finished immediately! Upgrade and continue to next item in queue
+              targetObj.level = targetLvl;
+              targetObj.isUpgrading = false;
+              targetObj.upgradeEnd = null;
               planet.upgradeQueue.shift();
               referenceTime = expectedEnd;
               changed = true;
+
+              // Send notification on final item in building/mine queue
+              if (planet.upgradeQueue.length === 0) {
+                const bNames = { commsHub: "Communications Hub", researchCenter: "Research Center", armyBase: "War Room", repository: "Silo", radar: "Radar Array", supplyNexus: "Supply Nexus", fabricator: "Fabricator", bunker: "Bunker" };
+                const resNames = { water: "Water Extractor", plasma: "Plasma Extractor", fuel: "Fuel Extractor", food: "Food Extractor", respirant: "Respirant Extractor" };
+                const name = nextUp.type === 'mine' ? (resNames[nextUp.key as ResourceType] || `${nextUp.key} Mine`) : (bNames[nextUp.key as keyof typeof bNames] || nextUp.key);
+                sendNotificationWithFallback(
+                  player.id,
+                  "🏗️ Queue Upgrades Completed",
+                  `Your construction queue has completed. Final item: '${name}' successfully reached Level ${targetLvl} on ${planet.name}!`
+                );
+              }
             } else {
-              planet.activeResearch = {
-                techId: nextUp.key,
-                targetLevel: targetLvl,
-                endAt: expectedEnd
-              };
+              // Started, in progress. Set as active and exit queue loop
+              targetObj.isUpgrading = true;
+              targetObj.upgradeEnd = expectedEnd;
               planet.upgradeQueue.shift();
               changed = true;
               break;
             }
           } else {
-            if (nextUp.type === 'mine') {
-              targetObj = planet.mines[nextUp.key as ResourceType]?.[nextUp.mineIndex!];
-              if (targetObj) {
-                targetLvl = targetObj.level + 1;
-                durationMs = targetLvl * 60 * 1000;
-              }
-            } else if (nextUp.type === 'building') {
-              targetObj = planet.buildings[nextUp.key as keyof typeof planet.buildings];
-              if (targetObj) {
-                targetLvl = targetObj.level + 1;
-                durationMs = targetLvl * 120 * 1000;
-              }
-            }
+            planet.upgradeQueue.shift(); // Invalid queue item
+          }
+        }
+      }
 
-            if (targetObj) {
-              const expectedEnd = referenceTime + durationMs;
-              if (now >= expectedEnd) {
-                // Finished immediately! Upgrade and continue to next item in queue
-                targetObj.level = targetLvl;
-                targetObj.isUpgrading = false;
-                targetObj.upgradeEnd = null;
-                planet.upgradeQueue.shift();
-                referenceTime = expectedEnd;
-                changed = true;
-              } else {
-                // Started, in progress. Set as active and exit queue loop
-                targetObj.isUpgrading = true;
-                targetObj.upgradeEnd = expectedEnd;
-                planet.upgradeQueue.shift();
-                changed = true;
-                break;
-              }
-            } else {
-              planet.upgradeQueue.shift(); // Invalid queue item
+      // Independent Sequential Research Queue processor
+      if (!planet.activeResearch && planet.researchQueue.length > 0) {
+        let referenceTime = lastCompletedUpgradeTime > 0 ? lastCompletedUpgradeTime : now;
+        while (planet.researchQueue.length > 0) {
+          const nextResearch = planet.researchQueue[0];
+          const targetLvl = nextResearch.targetLevel;
+          const durationMs = targetLvl * 60 * 1000; // 1 minute per level
+          const expectedEnd = referenceTime + durationMs;
+
+          if (now >= expectedEnd) {
+            if (!player.techLevels) {
+              player.techLevels = {};
             }
+            if (!player.techLevels[planet.id]) {
+              player.techLevels[planet.id] = {};
+            }
+            player.techLevels[planet.id][nextResearch.key] = targetLvl;
+            planet.researchQueue.shift();
+            referenceTime = expectedEnd;
+            changed = true;
+
+            // Send notification on final item in research queue
+            if (planet.researchQueue.length === 0) {
+              const techNames = { defense_shields: "Defense Shields", manufacturing_speed: "Manufacturing Speed", troop_speed: "Troop Speed" };
+              const name = techNames[nextResearch.key as keyof typeof techNames] || nextResearch.key;
+              sendNotificationWithFallback(
+                player.id,
+                "🔬 Research Queue Completed",
+                `Your research queue has completed. Final item: '${name}' successfully reached Level ${targetLvl} in the Research Center of ${planet.name}!`
+              );
+            }
+          } else {
+            planet.activeResearch = {
+              techId: nextResearch.key,
+              targetLevel: targetLvl,
+              endAt: expectedEnd
+            };
+            planet.researchQueue.shift();
+            changed = true;
+            break;
           }
         }
       }
@@ -2839,7 +2911,7 @@ app.post("/api/register", (req, res) => {
     senderFactionColor: "#7F8C8D",
     allianceTag: "SYS",
     receiverId: null,
-    content: `Welcome Commander ${username} to active duty in sector [${startX}, ${startY}]! Ensure your water production exceeds consumption!`,
+    content: `Welcome to the galaxy, ${username}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
     timestamp: Date.now()
   });
 
@@ -2948,7 +3020,7 @@ app.post("/api/auth/google", async (req, res) => {
         senderFactionColor: "#7F8C8D",
         allianceTag: "SYS",
         receiverId: null,
-        content: `Google Secure sync approved. Welcome Commander ${defaultUsername} to active space duty!`,
+        content: `Welcome to the galaxy, ${defaultUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
         timestamp: Date.now()
       });
 
@@ -3048,7 +3120,7 @@ app.post("/api/auth/google", async (req, res) => {
       senderFactionColor: "#7F8C8D",
       allianceTag: "SYS",
       receiverId: null,
-      content: `Google Secure sync approved. Welcome Commander ${defaultUsername} to active space duty!`,
+      content: `Welcome to the galaxy, ${defaultUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
       timestamp: Date.now()
     });
 
@@ -3212,7 +3284,7 @@ app.post("/api/auth/google-play", async (req, res) => {
       senderFactionColor: "#7F8C8D",
       allianceTag: "SYS",
       receiverId: null,
-      content: `Google Play Games sync established. Welcome Commander ${cleanUsername} to active space duty!`,
+      content: `Welcome to the galaxy, ${cleanUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
       timestamp: Date.now()
     });
 
@@ -3256,7 +3328,7 @@ app.post("/api/player/link-google", (req, res) => {
 app.post("/api/dev/reset-universe", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
-  if (!p.googleEmail || p.googleEmail.toLowerCase() !== 'banele180@gmail.com') {
+  if (!p.googleEmail || (p.googleEmail.toLowerCase() !== 'banele180@gmail.com' && p.googleEmail.toLowerCase() !== 'banzz1918@gmail.com')) {
     return res.status(403).json({ error: "Access Denied: Server reset is only permitted for the system administrator." });
   }
 
@@ -3521,6 +3593,17 @@ app.post("/api/upgrade/building", (req, res) => {
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
 
+  // Pre-requisite check: All resource extractor pumps must be at least Level 1
+  const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"] as const;
+  const hasAllExtractorsConstructed = resourceKeys.every(rKey => {
+    const list = planet.mines[rKey];
+    if (!list || list.length === 0) return false;
+    return list.every((mine: any) => mine.level >= 1);
+  });
+  if (!hasAllExtractorsConstructed) {
+    return res.status(400).json({ error: "🔒 Facility construction/upgrade locked: All 5 resource extractor pump types must be operational (Level 1 or higher) before any facility can be constructed or upgraded!" });
+  }
+
   const building = planet.buildings[buildingKey as keyof typeof planet.buildings] as BuildingState;
   if (!building) return res.status(404).json({ error: "Building not found" });
 
@@ -3664,18 +3747,9 @@ app.post("/api/upgrade/research/start", (req, res) => {
     return res.status(400).json({ error: "A Research Center level 1 or higher is required to start research projects." });
   }
 
-  // Check if already researching or upgrading
-  const isBuildingUpgrading = Object.values(planet.buildings).some((b: any) => b.isUpgrading);
-  let isMineUpgrading = false;
-  for (const rKey of Object.keys(planet.mines)) {
-    if (planet.mines[rKey as ResourceType].some(m => m.isUpgrading)) {
-      isMineUpgrading = true;
-      break;
-    }
-  }
-  const isAlreadyUpgrading = isBuildingUpgrading || isMineUpgrading || !!planet.activeResearch;
-  if (isAlreadyUpgrading) {
-    return res.status(400).json({ error: "Another construction project, extractor upgrade, or research project is already actively in progress on this planet." });
+  // Check if already researching (buildings and extractors are on their own parallel slot)
+  if (planet.activeResearch) {
+    return res.status(400).json({ error: "Another research project is already actively in progress on this planet." });
   }
 
   const currentLvl = Number(req.body.currentLevel) || 0;
@@ -3737,11 +3811,11 @@ app.post("/api/upgrade/research/queue", (req, res) => {
     return res.status(400).json({ error: "A Research Center level 1 or higher is required to queue research projects." });
   }
 
-  if (!planet.upgradeQueue) {
-    planet.upgradeQueue = [];
+  if (!planet.researchQueue) {
+    planet.researchQueue = [];
   }
-  if (planet.upgradeQueue.length >= 25) {
-    return res.status(400).json({ error: "Upgrade queue is full (max 25 queued upgrades allowed)!" });
+  if (planet.researchQueue.length >= 25) {
+    return res.status(400).json({ error: "Research queue is full (max 25 queued research projects allowed)!" });
   }
 
   // Cost: 25 Space Gold
@@ -3755,7 +3829,7 @@ app.post("/api/upgrade/research/queue", (req, res) => {
   if (planet.activeResearch && planet.activeResearch.techId === techId) {
     queuedCount++;
   }
-  queuedCount += planet.upgradeQueue.filter(q => q.type === 'research' && q.key === techId).length;
+  queuedCount += planet.researchQueue.filter(q => q.key === techId).length;
   const targetLevel = currentLvl + queuedCount + 1;
 
   if (targetLevel > 20) {
@@ -3791,8 +3865,8 @@ app.post("/api/upgrade/research/queue", (req, res) => {
   // Deduct Space Gold (25)
   p.credits = Math.max(0, (p.credits || 0) - 25);
 
-  // Add to upgradeQueue
-  planet.upgradeQueue.push({
+  // Add to researchQueue
+  planet.researchQueue.push({
     type: 'research',
     key: techId,
     targetLevel: targetLevel,
@@ -3808,16 +3882,19 @@ app.post("/api/upgrade/queue/cancel", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
-  const { planetId, queueIndex } = req.body;
+  const { planetId, queueIndex, queueType } = req.body;
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
 
-  if (!planet.upgradeQueue || queueIndex === undefined || queueIndex < 0 || queueIndex >= planet.upgradeQueue.length) {
+  const isResearch = queueType === 'research';
+  const queue = isResearch ? planet.researchQueue : planet.upgradeQueue;
+
+  if (!queue || queueIndex === undefined || queueIndex < 0 || queueIndex >= queue.length) {
     return res.status(400).json({ error: "Invalid queue item index." });
   }
 
   // Remove the item from queue
-  const [cancelledItem] = planet.upgradeQueue.splice(queueIndex, 1);
+  const [cancelledItem] = queue.splice(queueIndex, 1);
 
   // Return resources
   const keys: ResourceType[] = ["water", "plasma", "fuel", "food", "respirant"];
@@ -3958,6 +4035,17 @@ app.post("/api/train/troop", (req, res) => {
   const { planetId, troopId, manufacturingSpeedLevel } = req.body;
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  // Check if all extractor pumps are at least level 1
+  const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"] as const;
+  const hasAllExtractorsConstructed = resourceKeys.every(rKey => {
+    const list = planet.mines[rKey];
+    if (!list || list.length === 0) return false;
+    return list.every((mine: any) => mine.level >= 1);
+  });
+  if (!hasAllExtractorsConstructed) {
+    return res.status(400).json({ error: "🔒 Fabrication locked: All resource extractor pumps on this base must be constructed (Level 1 or higher) before you can fabricate tactical forces!" });
+  }
 
   const specs = TROOP_SPECS[troopId as keyof typeof TROOP_SPECS];
   if (!specs) return res.status(404).json({ error: "Troop spec not found" });
@@ -4944,8 +5032,28 @@ app.post("/api/fleet/unload", (req, res) => {
     return res.status(400).json({ error: "Cannot unload resources from a traveling fleet!" });
   }
 
-  const planet = p.planets.find(pl => pl.id === fleet.planetId);
-  if (!planet) return res.status(404).json({ error: "Home station not found" });
+  let planet = p.planets.find(pl => pl.id === fleet.planetId);
+  let recipientPlayer = p;
+
+  if (!planet && p.allianceId) {
+    // Check if the planet belongs to an alliance member
+    for (const otherPlayer of Object.values(state.players)) {
+      if (otherPlayer.allianceId === p.allianceId) {
+        const foundPlanet = otherPlayer.planets.find(pl => pl.id === fleet.planetId);
+        if (foundPlanet) {
+          const senderHasLvl8Nexus = p.planets.some(pl => (pl.buildings.supplyNexus?.level || 0) >= 8);
+          if (!senderHasLvl8Nexus) {
+            return res.status(400).json({ error: "You must upgrade your Supply Nexus to Level 8 or higher on your station to drop/unload resources at alliance members!" });
+          }
+          planet = foundPlanet;
+          recipientPlayer = otherPlayer;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!planet) return res.status(404).json({ error: "Destination station not found or not in your alliance!" });
 
   const cap = getRepositoryCapacity(planet.buildings.repository.level);
 
@@ -4953,9 +5061,9 @@ app.post("/api/fleet/unload", (req, res) => {
     Object.entries(fleet.resources).forEach(([resName, amt]) => {
       const amount = Number(amt) || 0;
       if (amount > 0) {
-        const current = planet.resources[resName as any] || 0;
+        const current = planet!.resources[resName as any] || 0;
         const addable = Math.min(cap - current, amount);
-        planet.resources[resName as any] = current + addable;
+        planet!.resources[resName as any] = current + addable;
         fleet.resources![resName as keyof typeof fleet.resources] = amount - addable;
       }
     });
@@ -4984,6 +5092,11 @@ app.post("/api/fleet/transfer-resources", (req, res) => {
 
   const planet = p.planets.find(pl => pl.id === fleet.planetId);
   if (!planet) return res.status(404).json({ error: "Home station not found" });
+
+  const supplyNexusLvl = planet.buildings.supplyNexus?.level || 0;
+  if (supplyNexusLvl < 5) {
+    return res.status(400).json({ error: "You must upgrade your Supply Nexus to Level 5 or higher to load/carry cargo on fleets!" });
+  }
 
   const cap = getRepositoryCapacity(planet.buildings.repository.level);
 
@@ -5996,38 +6109,18 @@ app.post("/api/tutorial/claim", (req, res) => {
     return res.status(404).json({ error: "Colony planet not found" });
   }
 
-  const rewards: Record<number, { water: number; plasma: number; fuel: number; food: number; respirant: number; credits: number }> = {
-    1: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Colonize 2nd planet
-    2: { water: 10280, plasma: 10180, fuel: 10180, food: 10180, respirant: 10180, credits: 50 },   // Rename Outpost
-    3: { water: 10180, plasma: 10180, fuel: 10180, food: 10180, respirant: 10280, credits: 50 },   // Hydrothermal pump Lvl 2
-    4: { water: 10180, plasma: 10180, fuel: 10180, food: 10280, respirant: 10180, credits: 50 },   // Air Scrubber Lvl 2
-    5: { water: 10180, plasma: 10280, fuel: 10180, food: 10180, respirant: 10180, credits: 50 },   // Food bio-synth Lvl 2
-    6: { water: 10150, plasma: 10000, fuel: 10000, food: 10200, respirant: 10100, credits: 50 },   // Plasma refinery Lvl 2
-    7: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },   // Comms Hub Activation
-    8: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },   // Expand Repository
-    9: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },   // Send Resources
-    10: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Recon fleet
-    11: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Attack Fleet
-    12: { water: 10291, plasma: 10302, fuel: 10302, food: 10302, respirant: 10302, credits: 50 },  // Production boost
-    13: { water: 11000, plasma: 11000, fuel: 11000, food: 11000, respirant: 11000, credits: 50 },  // Dual boost overdrive
-    14: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 50 },  // Fabricator Lvl 2
-    15: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Radar Array Lvl 1
-    16: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 50 },  // Sector scan
-    17: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000, credits: 50 },  // Research Center Lvl 1
-    18: { water: 12000, plasma: 12000, fuel: 12000, food: 12000, respirant: 12000, credits: 50 },  // Metallurgy level 2
-    19: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151, credits: 50 },  // Scientific tech research
-    20: { water: 12250, plasma: 10000, fuel: 10000, food: 13000, respirant: 11500, credits: 50 },  // War room level 1
-    21: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Train 15 troops
-    22: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // 5 Interceptors
-    23: { water: 12000, plasma: 12000, fuel: 12000, food: 12000, respirant: 12000, credits: 50 },  // 2 Bombers
-    24: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Private text PM
-    25: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Nexus claim
-    26: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Star Alliance
-    27: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000, credits: 50 },  // Chat broadcast
-    28: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 50 },  // Warp thruster research
-    29: { water: 11500, plasma: 11000, fuel: 12000, food: 11500, respirant: 11000, credits: 50 },  // Leaderboard payroll audit
-    30: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000, credits: 15000 }, // Settle 3rd Planet outpost!
-  };
+  const rewards: Record<number, { water: number; plasma: number; fuel: number; food: number; respirant: number; credits: number }> = {};
+  for (let i = 1; i <= 30; i++) {
+    const taskReward = getTaskResourceReward(i);
+    rewards[i] = {
+      water: taskReward.water,
+      plasma: taskReward.plasma,
+      fuel: taskReward.fuel,
+      food: taskReward.food,
+      respirant: taskReward.respirant,
+      credits: i === 30 ? 15000 : 50
+    };
+  }
 
   let rawId = taskId;
   if (rawId && typeof rawId === "object") {
@@ -6334,12 +6427,12 @@ app.post("/api/feedback/send", (req, res) => {
   res.json({ success: true, message: "Holographic telemetry transmission received by Segment Headquarters." });
 });
 
-// View feedback list privately (restricted strictly to banele180@gmail.com)
+// View feedback list privately (restricted strictly to banele180@gmail.com and banzz1918@gmail.com)
 app.post("/api/feedback/private-list", (req, res) => {
   const p = getLoggedPlayer(req);
   const { adminKey } = req.body;
   
-  const isEmailOwner = p && p.googleEmail && p.googleEmail.toLowerCase() === "banele180@gmail.com";
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
   const isValidPass = adminKey === "991807" || adminKey === "banele-admin-secret" || isEmailOwner;
 
   if (!isValidPass) {
@@ -6363,7 +6456,7 @@ app.get("/api/admin/tasks", (req, res) => {
 // Update a custom task text
 app.post("/api/admin/update-task", (req, res) => {
   const p = getLoggedPlayer(req);
-  const isEmailOwner = p && p.googleEmail && p.googleEmail.toLowerCase() === "banele180@gmail.com";
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
   if (!isEmailOwner) {
     return res.status(403).json({ error: "Access Denied. Admin privilege required." });
   }
@@ -6397,8 +6490,8 @@ app.post("/api/admin/update-task", (req, res) => {
 app.post("/api/admin/pm2-flush", (req, res) => {
   const p = getLoggedPlayer(req);
   const bodyEmail = req.body?.email || req.query?.email || req.headers["x-admin-email"];
-  const isEmailOwner = (p && p.googleEmail && p.googleEmail.toLowerCase() === "banele180@gmail.com") || 
-                       (typeof bodyEmail === "string" && bodyEmail.toLowerCase() === "banele180@gmail.com");
+  const isEmailOwner = (p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com")) || 
+                       (typeof bodyEmail === "string" && (bodyEmail.toLowerCase() === "banele180@gmail.com" || bodyEmail.toLowerCase() === "banzz1918@gmail.com"));
   
   if (!isEmailOwner) {
     return res.status(403).json({ error: "Access Denied. Admin privilege required." });

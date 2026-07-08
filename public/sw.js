@@ -23,6 +23,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SET_USER_ID') {
     const userId = event.data.userId;
+    if (event.data.isNative) {
+      isNativePlatform = true;
+    }
     event.waitUntil(
       caches.open(SESSION_CACHE_NAME).then((cache) => {
         return cache.put('/userId', new Response(userId));
@@ -36,6 +39,7 @@ self.addEventListener('message', (event) => {
 
 let pollTimeout = null;
 let knownAttackIds = new Set();
+let isNativePlatform = false;
 
 async function getUserIdFromCache() {
   try {
@@ -132,6 +136,10 @@ async function checkIncomingAttacks(userId) {
 }
 
 function startBackgroundPoll() {
+  if (!isNativePlatform) {
+    console.log('[SW] Background polling disabled on non-native platform to prevent unnecessary background requests.');
+    return;
+  }
   if (pollTimeout) return;
   
   const poll = async () => {

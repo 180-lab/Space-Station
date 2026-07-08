@@ -231,7 +231,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   // Automated trigger to decrypt private feedback signals for Commander Banele
   useEffect(() => {
     if (showFeedbackConsole) {
-      const isBaneleOwner = player.googleEmail && player.googleEmail.toLowerCase() === 'banele180@gmail.com';
+      const isBaneleOwner = player.googleEmail && (player.googleEmail.toLowerCase() === 'banele180@gmail.com' || player.googleEmail.toLowerCase() === 'banzz1918@gmail.com');
       
       if (isBaneleOwner) {
         fetchPrivateFeedbacks();
@@ -815,7 +815,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </div>
 
               {/* Account and maintenance action cards */}
-              {player.googleEmail && player.googleEmail.toLowerCase() === 'banele180@gmail.com' && (
+              {player.googleEmail && (player.googleEmail.toLowerCase() === 'banele180@gmail.com' || player.googleEmail.toLowerCase() === 'banzz1918@gmail.com') && (
                 <div className="pt-4 border-t border-[#1E293B]/60 space-y-3.5">
                   <h4 className="text-[10px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5">
                     <AlertTriangle size={12} /> RESTRICTED MAINTENANCE CODES
@@ -1093,7 +1093,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <div className="space-y-1.5 pt-1">
             {/* Conditional Layout: 2 Columns for Admin Banele, 1 Full-Width Column for regular players */}
             {(() => {
-              const isBanele = player.googleEmail && player.googleEmail.toLowerCase() === 'banele180@gmail.com';
+              const isBanele = player.googleEmail && (player.googleEmail.toLowerCase() === 'banele180@gmail.com' || player.googleEmail.toLowerCase() === 'banzz1918@gmail.com');
 
               if (isBanele) {
                 return (

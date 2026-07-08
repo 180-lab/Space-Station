@@ -84,6 +84,7 @@ export interface ColonyPlanet {
   trainingQueue: TrainingQueueItem[];
   lastSupplyNexusClaim?: number;
   upgradeQueue?: QueuedUpgrade[];
+  researchQueue?: QueuedUpgrade[];
   activeResearch?: {
     techId: string;
     targetLevel: number;

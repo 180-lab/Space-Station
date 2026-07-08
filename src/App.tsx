@@ -14,7 +14,7 @@ import {
   CreatedFleet
 } from './types';
 import { sendMobileNotification } from './lib/mobileNotifications';
-import { initializePushNotifications, setupSSEConnection } from './lib/pushNotifications';
+import { initializePushNotifications, setupSSEConnection, isNativePlatform } from './lib/pushNotifications';
 import { playAlertySound, playChilledSound, triggerNotificationAlert } from './lib/soundUtils';
 import { ExploreTab } from './components/ExploreTab';
 import { ArmyBaseTab } from './components/ArmyBaseTab';
@@ -143,7 +143,8 @@ export default function App() {
             acc.email && 
             acc.email.toLowerCase() !== 'hopeworthn1@gmail.com' && 
             acc.email.toLowerCase() !== 'lorenleehaynes@gmail.com' && 
-            acc.email.toLowerCase() !== 'banele180@gmail.com'
+            acc.email.toLowerCase() !== 'banele180@gmail.com' &&
+            acc.email.toLowerCase() !== 'banzz1918@gmail.com'
           );
           if (cleaned.length !== parsed.length) {
             localStorage.setItem('moonbase_device_google_accounts', JSON.stringify(cleaned));
@@ -222,7 +223,7 @@ export default function App() {
       senderFaction: 'Galactic Federation',
       senderFactionColor: '#F59E0B',
       channel: 'global',
-      content: `Welcome to the galaxy, Commander! The Galactic Federation welcomes you to Sector Global, wishes you great success, and thanks you for joining our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the colony—each task successfully claimed rewards you with free Space Gold! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+      content: `Welcome to the galaxy, ${player?.username || 'Commander'}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
       timestamp: Date.now() - 3600000 * 2, // 2 hours ago
       allianceTag: null,
       receiverId: null
@@ -283,7 +284,8 @@ export default function App() {
         if (navigator.serviceWorker.controller) {
           navigator.serviceWorker.controller.postMessage({
             type: 'SET_USER_ID',
-            userId: userId
+            userId: userId,
+            isNative: isNativePlatform()
           });
         }
       }
@@ -1728,6 +1730,9 @@ export default function App() {
             if (mission.missionType === 'recon') {
               localStorage.setItem(`moonbase_recon_dispatched_${player.id}`, 'true');
             }
+            if (mission.missionType === 'attack') {
+              localStorage.setItem(`moonbase_attack_dispatched_${player.id}`, 'true');
+            }
             showToast(`FLEET DEPLOYED! Mission: ${mission.missionType.toUpperCase()} dispatched.`, 'success');
             setActiveTab('galaxy'); // Swapp tab to allow monitoring of travels!
             const newMission = data.fleets?.find((f: any) => f.createdFleetId === mission.createdFleetId) 
@@ -1807,6 +1812,9 @@ export default function App() {
           setPlayer(latestPlayer);
           if (mission.missionType === 'recon') {
             localStorage.setItem(`moonbase_recon_dispatched_${player.id}`, 'true');
+          }
+          if (mission.missionType === 'attack') {
+            localStorage.setItem(`moonbase_attack_dispatched_${player.id}`, 'true');
           }
           showToast(`DISPATCHED MULTIPLE FLEETS! Created ${numFleets} distinct en-route tactical squadrons.`, 'success');
           setActiveTab('galaxy');
@@ -3215,6 +3223,9 @@ export default function App() {
               onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
               populationRank={populationRank}
               onNavigateToLeaderboard={() => {
+                if (player) {
+                  localStorage.setItem(`moonbase_payroll_checked_${player.id}`, 'true');
+                }
                 setGalaxyInitialSubTab('ranking');
                 setActiveTab('galaxy');
               }}
@@ -3371,6 +3382,9 @@ export default function App() {
               setShowPaymentModal(true);
             }}
             onNavigateToLeaderboard={() => {
+              if (player) {
+                localStorage.setItem(`moonbase_payroll_checked_${player.id}`, 'true');
+              }
               setGalaxyInitialSubTab('ranking');
               setActiveTab('galaxy');
             }}
@@ -3844,7 +3858,7 @@ export default function App() {
         const factionColor = targetPlayer.factionColor || '#22d3ee';
         const targetAlliance = targetPlayer.allianceId ? alliances[targetPlayer.allianceId] : null;
 
-        const isAdmin = !!(player?.googleEmail && player.googleEmail.toLowerCase() === 'banele180@gmail.com');
+        const isAdmin = !!(player?.googleEmail && (player.googleEmail.toLowerCase() === 'banele180@gmail.com' || player.googleEmail.toLowerCase() === 'banzz1918@gmail.com'));
         const isSelf = player?.id === targetPlayer.id;
         const isAllianceMember = !!(player?.allianceId && targetPlayer.allianceId === player.allianceId);
         const canSeeStations = isAdmin || isSelf || isAllianceMember;

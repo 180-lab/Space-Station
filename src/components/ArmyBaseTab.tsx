@@ -193,6 +193,15 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
   const filteredBattleReports = battleReports.filter(r => r.isRecon !== true && r.isMove !== true);
 
+  const allExtractorsLevelOneOrMore = (() => {
+    const resourceKeys: ('water' | 'plasma' | 'fuel' | 'food' | 'respirant')[] = ['water', 'plasma', 'fuel', 'food', 'respirant'];
+    return resourceKeys.every(rKey => {
+      const list = activePlanet.mines[rKey];
+      if (!list || list.length === 0) return false;
+      return list.every(mine => mine.level >= 1);
+    });
+  })();
+
   // Rerouting inputs state
   const [reroutingFleetId, setReroutingFleetId] = useState<string | null>(null);
   const [rerouteX, setRerouteX] = useState<string>('');
@@ -1196,7 +1205,38 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
             </h3>
           </div>
 
-          {showBuildForces && (
+          {!allExtractorsLevelOneOrMore ? (
+            <div className="p-8 border border-red-500/20 bg-[#0A0F1D]/80 backdrop-blur-md rounded-2xl text-center space-y-4 max-w-2xl mx-auto my-6 font-mono">
+              <div className="p-4 rounded-full bg-red-500/10 text-red-400 w-16 h-16 flex items-center justify-center mx-auto border border-red-500/35 shadow-lg">
+                <Wrench size={28} className="animate-pulse" />
+              </div>
+              <h3 className="text-base font-extrabold text-white uppercase tracking-wider">⚠️ Fabrication Terminal Locked</h3>
+              <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto font-sans">
+                Before physical fabrication of tactical space forces can be initialized, you must construct and operationalize <span className="text-cyan-400 font-bold">all 5 resource extractor types</span> (Water, Plasma, Fuel, Food, and Respirant) to at least <span className="text-[#5bc0be] font-bold">Level 1</span> on this outpost.
+              </p>
+              <div className="p-4 bg-black/40 rounded-xl border border-white/5 space-y-2.5 text-left max-w-sm mx-auto text-[11px]">
+                <div className="text-slate-400 uppercase tracking-widest font-black text-[9px] mb-1">Extractor Status Check:</div>
+                {(['water', 'plasma', 'fuel', 'food', 'respirant'] as const).map(rKey => {
+                  const mName = rKey.charAt(0).toUpperCase() + rKey.slice(1);
+                  const list = activePlanet.mines[rKey];
+                  const hasMinLvl = list && list.length > 0 && list.every(mine => mine.level >= 1);
+                  return (
+                    <div key={rKey} className="flex items-center justify-between">
+                      <span className="text-slate-400 font-bold">{mName} Extractor:</span>
+                      {hasMinLvl ? (
+                        <span className="text-emerald-400 font-bold">● Operational (Lv. {list[0].level})</span>
+                      ) : (
+                        <span className="text-red-400 font-bold animate-pulse">○ Not Operational (Lv. {list && list[0] ? list[0].level : 0})</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-slate-500 italic pt-1 font-sans">
+                Tip: Navigate to the XPL (Explore) tab to construct your missing extractor outposts first!
+              </p>
+            </div>
+          ) : showBuildForces && (
             <div className="grid grid-cols-1 gap-5">
               {(Object.entries(TROOP_DETAILS) as [string, any][]).map(([tId, details]) => {
                 const Icon = details.icon;
@@ -1774,14 +1814,27 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                             <div className="pt-1.5 border-t border-[#1E293B]/60 text-left">
                               <div className="flex justify-between items-center mb-1">
                                 <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider font-mono">📦 Carried Cargo:</span>
-                                <button
-                                  type="button"
-                                  disabled={isUnloading === fleet.id || fleet.isTraveling}
-                                  onClick={() => handleManualUnload(fleet)}
-                                  className="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-50 text-amber-400 border border-amber-500/25 rounded text-[8px] font-bold uppercase transition cursor-pointer"
-                                >
-                                  {isUnloading === fleet.id ? 'Unloading...' : 'Unload All'}
-                                </button>
+                                {(() => {
+                                  const isAlliancePlanet = fleet.planetId !== activePlanet.id && !player.planets.some(pl => pl.id === fleet.planetId);
+                                  const hasLvl8Nexus = player.planets.some(pl => (pl.buildings.supplyNexus?.level || 0) >= 8);
+                                  if (isAlliancePlanet && !hasLvl8Nexus) {
+                                    return (
+                                      <span className="text-[8px] font-bold text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/20 px-1 py-0.5 rounded">
+                                        Lvl 8 Nexus Required
+                                      </span>
+                                    );
+                                  }
+                                  return (
+                                    <button
+                                      type="button"
+                                      disabled={isUnloading === fleet.id || fleet.isTraveling}
+                                      onClick={() => handleManualUnload(fleet)}
+                                      className="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-50 text-amber-400 border border-amber-500/25 rounded text-[8px] font-bold uppercase transition cursor-pointer"
+                                    >
+                                      {isUnloading === fleet.id ? 'Unloading...' : 'Unload All'}
+                                    </button>
+                                  );
+                                })()}
                               </div>
                               <div className="grid grid-cols-2 gap-1 text-[9px] font-mono text-amber-200 bg-amber-950/10 p-1.5 border border-amber-500/10 rounded-lg">
                                 {Object.entries(fleet.resources).map(([res, val]) => {
@@ -1799,49 +1852,60 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                           )}
 
                           {!fleet.isTraveling && (
-                            <div className="mt-1 pb-1 text-left">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (managingCargoFleetId === fleet.id) {
-                                    setManagingCargoFleetId(null);
-                                  } else {
-                                    setManagingCargoFleetId(fleet.id);
-                                    setCargoTransfers({
-                                      water: 0,
-                                      plasma: 0,
-                                      fuel: 0,
-                                      food: 0,
-                                      respirant: 0
-                                    });
-                                  }
-                                }}
-                                className={`w-full py-1 text-[9.5px] font-bold uppercase rounded font-mono transition duration-150 cursor-pointer flex items-center justify-center gap-1 ${
-                                  managingCargoFleetId === fleet.id
-                                    ? 'bg-slate-800 text-slate-300'
-                                    : 'bg-emerald-950/30 text-emerald-400 hover:bg-emerald-900/20 border border-emerald-500/20 hover:border-emerald-500/40'
-                                }`}
-                              >
-                                <span>🚚</span>
-                                <span>{managingCargoFleetId === fleet.id ? 'CLOSE CARGO MANAGER' : 'MANAGE CARGO TRANSFERS'}</span>
-                              </button>
+                            <div className="mt-1 pb-1 text-left font-mono">
+                              {(() => {
+                                const supplyNexusLvl = activePlanet.buildings.supplyNexus?.level || 0;
+                                if (supplyNexusLvl < 5) {
+                                  return (
+                                    <div className="text-[9px] text-amber-500 bg-amber-950/10 border border-amber-500/10 rounded p-1.5 text-center mt-1">
+                                      ⚠️ Supply Nexus Lvl 5 required to load or carry cargo on fleets (Current: Lvl {supplyNexusLvl})
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (managingCargoFleetId === fleet.id) {
+                                          setManagingCargoFleetId(null);
+                                        } else {
+                                          setManagingCargoFleetId(fleet.id);
+                                          setCargoTransfers({
+                                            water: 0,
+                                            plasma: 0,
+                                            fuel: 0,
+                                            food: 0,
+                                            respirant: 0
+                                          });
+                                        }
+                                      }}
+                                      className={`w-full py-1 text-[9.5px] font-bold uppercase rounded font-mono transition duration-150 cursor-pointer flex items-center justify-center gap-1 ${
+                                        managingCargoFleetId === fleet.id
+                                          ? 'bg-slate-800 text-slate-300'
+                                          : 'bg-emerald-950/30 text-emerald-400 hover:bg-emerald-900/20 border border-emerald-500/20 hover:border-emerald-500/40'
+                                      }`}
+                                    >
+                                      <span>🚚</span>
+                                      <span>{managingCargoFleetId === fleet.id ? 'CLOSE CARGO MANAGER' : 'MANAGE CARGO TRANSFERS'}</span>
+                                    </button>
 
-                              {managingCargoFleetId === fleet.id && (
-                                <div className="p-2 border border-emerald-500/20 bg-emerald-950/10 rounded-lg space-y-2.5 mt-2 font-sans">
-                                  <div className="flex justify-between items-center border-b border-emerald-500/10 pb-1">
-                                    <span className="text-[9.5px] font-bold text-emerald-400 uppercase font-mono">Cargo Logistics Center</span>
-                                    <span className="text-[8.5px] font-mono text-slate-400">
-                                      Cap: {(() => {
-                                        let cap = 0;
-                                        Object.entries(fleet.troops).forEach(([tId, qty]) => {
-                                          const spec = TROOP_DETAILS[tId as keyof typeof TROOP_DETAILS];
-                                          if (spec) cap += (Number(qty) || 0) * spec.carry;
-                                        });
-                                        const currentTotal = Object.values(fleet.resources || {}).reduce<number>((sum, v) => sum + (Number(v) || 0), 0);
-                                        return `${currentTotal.toLocaleString()} / ${cap.toLocaleString()}`;
-                                      })()}
-                                    </span>
-                                  </div>
+                                    {managingCargoFleetId === fleet.id && (
+                                      <div className="p-2 border border-emerald-500/20 bg-emerald-950/10 rounded-lg space-y-2.5 mt-2 font-sans text-left">
+                                        <div className="flex justify-between items-center border-b border-emerald-500/10 pb-1">
+                                          <span className="text-[9.5px] font-bold text-emerald-400 uppercase font-mono">Cargo Logistics Center</span>
+                                          <span className="text-[8.5px] font-mono text-slate-400">
+                                            Cap: {(() => {
+                                              let cap = 0;
+                                              Object.entries(fleet.troops).forEach(([tId, qty]) => {
+                                                const spec = TROOP_DETAILS[tId as keyof typeof TROOP_DETAILS];
+                                                if (spec) cap += (Number(qty) || 0) * spec.carry;
+                                              });
+                                              const currentTotal = Object.values(fleet.resources || {}).reduce<number>((sum, v) => sum + (Number(v) || 0), 0);
+                                              return `${currentTotal.toLocaleString()} / ${cap.toLocaleString()}`;
+                                            })()}
+                                          </span>
+                                        </div>
 
                                   <div className="space-y-2">
                                     {['water', 'plasma', 'fuel', 'food', 'respirant'].map((resKey) => {
@@ -1929,8 +1993,11 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                   </button>
                                 </div>
                               )}
-                            </div>
-                          )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
 
                           {fleet.isTraveling ? (
                             <div className="mt-2.5 pt-2 text-center text-[10px] font-mono text-amber-400 bg-amber-950/15 border border-amber-550/20 rounded py-1.5 leading-tight">

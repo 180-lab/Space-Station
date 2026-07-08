@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PlayerProfile, ColonyPlanet, ResourceType } from '../types';
+import { getTaskResourceReward } from '../gameUtils';
 
 interface CommanderTutorialProps {
   player: PlayerProfile;
@@ -94,14 +95,14 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     },
     {
       id: 2,
-      title: '🏷️ Rename Your Colony Station',
-      shortDesc: 'Establish your brand across the cosmos by customizing your new station designation.',
-      requirementHtml: 'Rename your colony station <strong>anything other than the default names</strong> (Colony Station, Default Base, etc.)',
-      hint: 'Under the XPL (Explore) Tab, click on your station name at the top page or the "Rename Planet" button, type a majestic sovereign name of your choice, and click save.',
-      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Look next to your station overview stats at the top of the interface.<br/>3. Click the <strong>pencil/edit icon</strong> or <strong>"Rename Station"</strong> button.<br/>4. Type a custom name and click <strong>"Save Name"</strong>.',
-      commanderTip: 'Look at the very top of the Station Overview on the XPL tab.',
-      congratsMessage: '🏷️ MAGNIFICENT DESIGNATION CHOSEN! Your space colony station is now officially chartered under a majestic custom name!',
-      encouragementQuote: 'Brilliant! A space empire represents its leader - choose a label that reflects your galactic legacy.',
+      title: '🏗️ Construct All Resource Extractors',
+      shortDesc: 'Construct at least one active extractor of every resource type to establish full production capabilities.',
+      requirementHtml: 'Have <strong>at least one constructed extractor (Level 1 or higher)</strong> for each of the 5 resource types: Water, Plasma, Fuel, Food, and Respirant.',
+      hint: 'Under the XPL tab, scroll down to Resource Extractor Outposts. Identify any resource class with level 0 pumps, and click the yellow "Construct Extractor" button.',
+      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Scroll down below the active building lists to the <strong>"RESOURCE EXTRACTOR OUTPOSTS"</strong> grid.<br/>3. Locate resource classes with level 0 pumps (Not Constructed).<br/>4. Click the yellow <strong>"Construct Extractor"</strong> button to send a pump unit to Level 1.',
+      commanderTip: 'Under the XPL tab -> Resource Extractor Outposts, make sure every resource class has at least 1 level 1 or higher extractor pump.',
+      congratsMessage: '🏗️ ALL RESOURCE EXTRACTORS ESTABLISHED! Your colony now has a complete array of resource extraction lines running, securing constant automated passive yields!',
+      encouragementQuote: 'Amazing engineering, Admiral! Having all 5 resource extraction systems running is the key to a fully self-sustaining starbase.',
       targetTab: 'explore',
       rewards: {
         resources: { water: 10280, plasma: 10180, fuel: 10180, food: 10180, respirant: 10180 },
@@ -222,15 +223,15 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     },
     {
       id: 10,
-      title: '🛰️ Deep Space Recon Scout',
-      shortDesc: 'Deploy stealth scanner drones to explore surrounding sectors.',
-      requirementHtml: 'Dispatch a <strong>Recon scout mission fleet</strong> to any sector coordinate node.',
-      hint: 'Train a Recon Drone under the CMD tab, open the RDR (Galaxy) tab, select a coordinate node, set mission type to "Recon", and dispatch.',
-      howToGetThere: '1. Draft a scout drone or fighter in the <strong>CMD</strong> tab.<br/>2. Navigate to the <strong>RDR</strong> tab scanner.<br/>3. Click any coordinate, pick <strong>"Deploy Fleet / Settle"</strong>, change the mission type to <strong>"Recon"</strong>, allocate a ship, and click Deploy.',
-      commanderTip: 'RDR tab -> Sector Node Coordinates -> Deploy Fleet (Set Mission: RECON).',
-      congratsMessage: '🛰️ SCOUT PROBES LAUNCHED! Cloaked scouting wings successfully breached orbit, mapping coordinate structures without triggering defensive arrays!',
-      encouragementQuote: 'Superb tactical wisdom! Recon scout flights reveal precise troop composition, cargo loads, and structures of foreign hostiles.',
-      targetTab: 'galaxy',
+      title: '⚙️ Queue an Extractor Upgrade',
+      shortDesc: 'Plan your extractor operations by adding a resource extractor upgrade to your construction queue.',
+      requirementHtml: 'Have <strong>at least 1 extractor upgrade queued</strong> in your construction queue.',
+      hint: 'Go to the XPL (Explore) tab, click on any resource card (like Water or Plasma) to reveal its active extractor units, then click the yellow "Add to Queue (15 Gold)" button for that extractor slot.',
+      howToGetThere: '1. Navigate to the <strong>XPL</strong> tab.<br/>2. Click any of the active resource cards at the top of your extractor panel (e.g., Ice Water, Plasma Core).<br/>3. Click <strong>"Add to Queue"</strong> under any of the listed slots.',
+      commanderTip: 'XPL tab -> Click resource card -> Extractor slots list -> Add to Queue.',
+      congratsMessage: '⚙️ EXTRACTOR QUEUE ACTIVATED! You have successfully queued a resource extractor upgrade project!',
+      encouragementQuote: 'Wonderful planning! Extractor queues ensure your planetary output rates scale sequentially while you command the skies.',
+      targetTab: 'explore',
       rewards: {
         resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
         credits: 5000,
@@ -354,9 +355,9 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       title: '🧬 Science Research Level 2',
       shortDesc: 'Enhance structural integrity or harvester siphons to Level 2 inside science labs.',
       requirementHtml: 'Upgrade <strong>any research technology node to Level 2 or higher</strong>.',
-      hint: 'Inside the Res tab, find any technology project you have already started and upgrade it to Level 2 or higher.',
-      howToGetThere: '1. Navigate to the <strong>Res</strong> tab.<br/>2. Review started projects (e.g., Mineral Siphons, Defence Shields, Speed Thrusters).<br/>3. Ensure you have the materials and trigger <strong>"Start Quantum Research"</strong> to reach Level 2.',
-      commanderTip: 'Res tab -> Science Project Upgrades List.',
+      hint: 'Under the XPL tab, click on your Research Center building under base infrastructure to open the Research lab, find any technology project, and upgrade it to Level 2 or higher.',
+      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Scroll down to base infrastructure buildings and click on the <strong>Research Center</strong> (or open its management screen).<br/>3. Review started projects (e.g., Mineral Siphons, Defence Shields, Warp Thrusters).<br/>4. Ensure you have the materials and trigger <strong>"Start Quantum Research"</strong> to reach Level 2.',
+      commanderTip: 'XPL tab -> Base Buildings -> Research Center -> Science Project Upgrades List.',
       congratsMessage: '🧬 PHYSICAL BLUEPRINTS OPTIMIZED! Permanent global technology upgrades successfully calibrated to Level 2!',
       encouragementQuote: 'Magnificent intellect! Technology upgrades offer static multipliers that make all your fleets and buildings perform better on every world.',
       targetTab: 'research',
@@ -369,10 +370,10 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       id: 19,
       title: '🔬 Start a Research Project',
       shortDesc: 'Perform active tech development inside your science Research tab.',
-      requirementHtml: 'Start or complete <strong>any quantum scientific technology research project</strong> inside the Res tab.',
-      hint: 'Go to the Res tab, ensure your Research Center space building is built, and authorize a technology project like "Manufacturing Speed Upgrade" or "Defense Shields".',
-      howToGetThere: '1. Open the <strong>Res</strong> tab.<br/>2. Identify available techs like <strong>Defense Shields</strong> or <strong>Manufacturing Speed Upgrade</strong>.<br/>3. Click the cyan <strong>"START QUANTUM RESEARCH"</strong> button corresponding to your choice.',
-      commanderTip: 'Res tab -> Tech Nodes Grid under Research Center stats.',
+      requirementHtml: 'Start or complete <strong>any quantum scientific technology research project</strong> inside the Research lab.',
+      hint: 'Go to the XPL tab, click on your Research Center building under base infrastructure to open the Research lab, and authorize a technology project like "Manufacturing Speed Upgrade" or "Defense Shields".',
+      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Scroll down to base infrastructure buildings and click on the <strong>Research Center</strong> structure.<br/>3. Under the Research lab screen, identify available techs like <strong>Defense Shields</strong> or <strong>Manufacturing Speed Upgrade</strong>.<br/>4. Click the cyan <strong>"START QUANTUM RESEARCH"</strong> button corresponding to your choice.',
+      commanderTip: 'XPL tab -> Base Buildings -> Research Center -> Tech Nodes Grid.',
       congratsMessage: '🔬 RESEARCH BLUEPRINTS LOADED! Scientists verify telemetry files are successfully running simulation algorithms inside the labs!',
       encouragementQuote: 'Truly magnificent! Science yields passive permanent boosts that affect all troop movement, defenses, and building production!',
       targetTab: 'research',
@@ -514,9 +515,9 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       title: '🛰️ Warp Thruster Speed Tech',
       shortDesc: 'Increase thruster acceleration curves to speed up travel and strike times.',
       requirementHtml: 'Upgrade the <strong>Warp Thruster technology node</strong> to Level 1 or higher.',
-      hint: 'Warp Thrusters are researched in the Res tab. Upgrade your research building, then find "Troop & Fleet Speed Upgrade (Warp Thrusters)" and click authorize.',
-      howToGetThere: '1. Open the <strong>Res</strong> tab.<br/>2. Identify <strong>Troop & Fleet Speed Upgrade (Warp Thrusters)</strong> tech.<br/>3. Confirm you have sufficient resources and click the blue <strong>"START QUANTUM RESEARCH"</strong> button corresponding to it.',
-      commanderTip: 'Res tab -> Troops Speed & Warp Thrusters tech row.',
+      hint: 'Warp Thrusters are researched in the Research lab. Open the XPL tab, click on your Research Center building under base infrastructure, locate "Troop & Fleet Speed Upgrade (Warp Thrusters)" under tech nodes, and start researching.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab and click on your <strong>Research Center</strong> building.<br/>2. Locate the <strong>Troop & Fleet Speed Upgrade (Warp Thrusters)</strong> tech row.<br/>3. Confirm you have sufficient resources and click the blue <strong>"START QUANTUM RESEARCH"</strong> button corresponding to it.',
+      commanderTip: 'XPL tab -> Research Center -> Troops Speed & Warp Thrusters tech row.',
       congratsMessage: '🛰️ HYPER-ACCELERATION ACHIEVED! Warp cores are successfully burning, speeding up overall fleet travel and reconnaissance times across sectors!',
       encouragementQuote: 'Astonishing development, Admiral! Moving fleets at hyper-speeds ensures you catch threats off guard.',
       targetTab: 'research',
@@ -546,7 +547,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       title: '👑 Settle a 3rd Colony Station',
       shortDesc: 'Colonize your 3rd distinct planetary outpost to secure an official 3-planet cosmic system!',
       requirementHtml: 'Acquire <strong>at least 3 colonized starbase stations</strong> under your royal empire command.',
-      hint: 'Produce a second Settlement Ship inside CMD tab. Sweep the map inside the RDR tab to discover another habitable star coordinate, click it, select Settle, assign the Settlement Ship, and click Deploy!',
+      hint: 'Produce another Settlement Ship inside the CMD tab. Sweep the map inside the RDR tab to discover another habitable star coordinate, click it, select "Settle on Planet", assign the Settlement Ship, and click Deploy!',
       howToGetThere: '1. Open the <strong>CMD</strong> tab.<br/>2. Draft another <strong>Settlement Ship</strong>.<br/>3. Navigate to the <strong>RDR</strong> tab map scan.<br/>4. Locate another green <strong>Habitable Planet</strong>, click coordinates, select <strong>"Settle on Planet"</strong>, allocate the settlement unit, and click dispatch.',
       commanderTip: 'RDR tab -> locate a third green habitable node coordinate and settle!',
       congratsMessage: '👑 HAIL VICTORIOUS GRAND SOVEREIGN EMPEROR! You have colonized 3 unique star systems and successfully finished all aspects of space command!',
@@ -575,12 +576,14 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
         encouragementQuote: custom.encouragementQuote || t.encouragementQuote,
       };
     }
-    const creditsReward = base.id === 30 ? 1500 : 50;
+
+    const upgradedResources = getTaskResourceReward(t.id);
+
     return {
       ...base,
       rewards: {
-        ...base.rewards,
-        credits: creditsReward
+        resources: upgradedResources,
+        credits: 50
       }
     };
   });
@@ -599,16 +602,15 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       case 1:
         return player.planets.length >= 2;
       case 2:
-        const curName = checkTargetPlanet.name ? checkTargetPlanet.name.trim() : '';
         return (
-          curName.length > 0 &&
-          curName !== 'Colony Station' &&
-          curName !== 'Default Base' &&
-          curName !== 'My Home Base' &&
-          curName !== 'Colony Station 1' &&
-          curName !== 'Colony Station 2' &&
-          curName !== 'Colony Station 3' &&
-          !curName.toLowerCase().includes('new outpost')
+          (
+            checkTargetPlanet.mines.water?.some((m) => m.level >= 1) &&
+            checkTargetPlanet.mines.plasma?.some((m) => m.level >= 1) &&
+            checkTargetPlanet.mines.fuel?.some((m) => m.level >= 1) &&
+            checkTargetPlanet.mines.food?.some((m) => m.level >= 1) &&
+            checkTargetPlanet.mines.respirant?.some((m) => m.level >= 1)
+          ) ||
+          completedList.includes(2)
         );
       case 3:
         return checkTargetPlanet.mines.water.some((m) => m.level >= 2);
@@ -629,7 +631,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
         );
       case 10:
         return (
-          localStorage.getItem(`moonbase_recon_dispatched_${player.id}`) === 'true' ||
+          (checkTargetPlanet.upgradeQueue && checkTargetPlanet.upgradeQueue.some((q) => q.type === 'mine')) ||
           completedList.includes(10)
         );
       case 11:

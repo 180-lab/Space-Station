@@ -360,8 +360,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
     if (activePlanet.activeResearch && activePlanet.activeResearch.techId === techId) {
       queuedCount++;
     }
-    if (activePlanet.upgradeQueue) {
-      queuedCount += activePlanet.upgradeQueue.filter(q => q.type === 'research' && q.key === techId).length;
+    if (activePlanet.researchQueue) {
+      queuedCount += activePlanet.researchQueue.filter(q => q.key === techId).length;
     }
     const targetLvl = currentLvl + queuedCount + 1;
 
@@ -422,7 +422,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
         },
         body: JSON.stringify({
           planetId: activePlanet.id,
-          queueIndex: index
+          queueIndex: index,
+          queueType: 'research'
         })
       });
       const data = await res.json();
@@ -690,15 +691,14 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
             </div>
 
             {/* Active and Queued Upgrades Dashboard inside Research Tab */}
-            {activePlanet.upgradeQueue && activePlanet.upgradeQueue.some(q => q.type === 'research') && (
-              <div className="mb-4 p-4.5 bg-[#0D1527] border border-[#1E293B]/60 rounded-xl space-y-3 shadow-inner">
+            {activePlanet.researchQueue && activePlanet.researchQueue.length > 0 && (
+              <div className="mb-4 p-4.5 bg-[#0D1527] border border-[#1E293B]/60 rounded-xl space-y-3 shadow-inner text-left">
                 <span className="text-[10px] text-cyan-400 font-mono font-bold uppercase tracking-wider block">
                   📍 Active Research Queue Pipeline
                 </span>
                 <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                  {activePlanet.upgradeQueue
+                  {activePlanet.researchQueue
                     .map((q, idx) => ({ q, idx }))
-                    .filter(item => item.q.type === 'research')
                     .map(({ q, idx }, visualIdx) => {
                       const costRefund = Math.round((q.spaceGoldCost || 25) * 0.6);
                       return (
@@ -742,8 +742,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
                 if (activeResearch && activeResearch.techId === tech.id) {
                   queuedCount++;
                 }
-                if (activePlanet.upgradeQueue) {
-                  queuedCount += activePlanet.upgradeQueue.filter(q => q.type === 'research' && q.key === tech.id).length;
+                if (activePlanet.researchQueue) {
+                  queuedCount += activePlanet.researchQueue.filter(q => q.key === tech.id).length;
                 }
                 const targetLvl = currentLvl + queuedCount + 1;
 
@@ -839,24 +839,9 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
         )
       )}
 
-      {/* Polish Settings Footer with Logout */}
-      <div className="p-4 bg-[#0A0F1D]/50 border border-[#1E293B]/60 rounded-xl flex items-center justify-between text-[11px] text-slate-500 max-w-lg mx-auto">
-        <span className="font-mono">Security gateway terminal online</span>
-        <button
-          onClick={() => {
-            setConfirmModal({
-              title: 'CONFIRM SESSION DE-SYNCHRONIZATION',
-              message: 'Are you sure you want to log out of your session? Your current account session reference will be purged from LocalStorage and you will be re-routed to registration.',
-              onConfirm: () => {
-                localStorage.removeItem('moonbase_userId');
-                window.location.reload();
-              }
-            });
-          }}
-          className="text-red-400 hover:text-red-300 underline font-mono flex items-center gap-1 font-bold cursor-pointer"
-        >
-          <LogOut size={12} /> Logout
-        </button>
+      {/* Polish Settings Footer */}
+      <div className="p-4 bg-[#0A0F1D]/50 border border-[#1E293B]/60 rounded-xl flex items-center justify-center text-[11px] text-slate-500 max-w-lg mx-auto">
+        <span className="font-mono text-slate-500">Security gateway terminal online</span>
       </div>
       {confirmModal && (
         <div id="research-confirm-modal-overlay" className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
