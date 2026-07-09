@@ -428,12 +428,12 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
       const boostPct = Math.max(0, Math.min(35, (troopSpeedLevel - 1) * (35 / 19))) / 100;
       const speedMultiplier = 1.0 + boostPct;
       const speedMap: Record<string, number> = {
-        defender: 7.0,
-        attacker: 11.662,
-        tank: 3.5,
-        looter: 23.331,
-        drone: 17.5,
-        settlementShip: 4.662
+        defender: 75.0,
+        attacker: 85.0,
+        tank: 40.0,
+        looter: 110.0,
+        drone: 80.0,
+        settlementShip: 25.0
       };
       const selectedTroops = selectedReserveFleetId !== 'manual'
         ? (() => {
@@ -447,7 +447,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             return sp < slowest ? sp : slowest;
           }, 100)) * speedMultiplier
         : 100;
-      const travelTimeMs = slowestTroopSpeed > 0 ? Math.round((distance / slowestTroopSpeed) * 60000) : 0;
+      const travelTimeMs = slowestTroopSpeed > 0 ? Math.round((distance / slowestTroopSpeed) * 3600000) : 0;
       const defaultLanding = Date.now() + travelTimeMs + 5 * 60 * 1000; // travel duration + 5 minutes
       
       const date = new Date(defaultLanding);
@@ -965,12 +965,27 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   // Leaderboard formatting helpers
   const rankedState = Object.values(alliances) as Alliance[];  return (
     <div className="space-y-1.5 pb-24 font-mono">
-      {/* Visual Navigation Pill Bars as a 2-rowed layout assembly to fit mobile viewports exactly */}
-      {subTab !== 'scanner' && (
+      {/* Visual Navigation Pill Bars or Header depending on Radar View vs Galaxy view */}
+      {isDirectRadarView ? (
+        <div className="flex items-center justify-between bg-[#0A0F1D]/90 backdrop-blur-sm p-4 rounded-xl border border-[#1E293B] shrink-0 font-mono text-xs">
+          <div className="flex items-center gap-2.5 text-cyan-400 font-bold tracking-wider uppercase">
+            <Compass size={15} className="animate-spin-slow text-cyan-400" />
+            <span>Planetary Radar Array: Tactical Sector Scan</span>
+          </div>
+          {onCloseRadarDirectView && (
+            <button
+              onClick={onCloseRadarDirectView}
+              className="text-slate-400 hover:text-cyan-400 font-bold text-[10px] uppercase tracking-wider transition-colors duration-150 cursor-pointer border border-[#1E293B] hover:border-cyan-500/30 px-2.5 py-1 rounded-lg bg-slate-950/40"
+            >
+              Back [X]
+            </button>
+          )}
+        </div>
+      ) : (
         <div className="grid grid-cols-2 gap-1 bg-[#0A0F1D] p-1.5 rounded-xl border border-[#1E293B] shrink-0 text-[10px] sm:text-xs">
           <button 
             onClick={() => setSubTab('ranking')}
-            className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'ranking' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+            className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'ranking' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white cursor-pointer'}`}
             title="Sovereignty Leaderboard: inspect combined firepower rank standings of galactic alliances"
           >
             <Trophy size={13} title="Trophy award leader prize" />
@@ -978,7 +993,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           </button>
           <button 
             onClick={() => setSubTab('news')}
-            className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'news' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
+            className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'news' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-[#22d3ee]/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white cursor-pointer'}`}
             title="Sector DEC_REPORTS: review decrypted battle reports and public newsletters feed"
           >
             <Radio size={13} title="Radio waves beacon transceiver" />
@@ -4384,12 +4399,12 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   const speedMultiplier = 1.0 + boostPct;
 
                   const speedMap: Record<string, number> = {
-                    defender: 7.0,
-                    attacker: 11.662,
-                    tank: 3.5,
-                    looter: 23.331,
-                    drone: 17.5,
-                    settlementShip: 4.662
+                    defender: 75.0,
+                    attacker: 85.0,
+                    tank: 40.0,
+                    looter: 110.0,
+                    drone: 80.0,
+                    settlementShip: 25.0
                   };
 
                   const selectedTroops = selectedReserveFleetId !== 'manual'
@@ -4406,7 +4421,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                       }, 100)) * speedMultiplier
                     : 100;
 
-                  const travelTimeMs = slowestTroopSpeed > 0 ? Math.round((distance / slowestTroopSpeed) * 60000) : 0;
+                  const travelTimeMs = slowestTroopSpeed > 0 ? Math.round((distance / slowestTroopSpeed) * 3600000) : 0;
                   const travelSeconds = Math.floor(travelTimeMs / 1000);
                   const hours = Math.floor(travelSeconds / 3600);
                   const minutes = Math.floor((travelSeconds % 3600) / 60);

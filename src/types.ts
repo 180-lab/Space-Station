@@ -122,6 +122,7 @@ export interface PlayerProfile {
   fcmToken?: string;
   createdFleets?: CreatedFleet[];
   autoUnloadResources?: boolean;
+  welcomeMessageSent?: boolean;
 }
 
 export interface CommandMessage {

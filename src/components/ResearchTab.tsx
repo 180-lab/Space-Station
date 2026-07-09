@@ -32,6 +32,7 @@ interface ResearchTabProps {
   localResources?: Record<ResourceType, number>;
   onRefreshState?: () => void;
   isUpgrading?: boolean;
+  onReturnToBase?: () => void;
 }
 
 interface TechDef {
@@ -163,7 +164,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   setTheme,
   localResources,
   onRefreshState,
-  isUpgrading = false
+  isUpgrading = false,
+  onReturnToBase
 }) => {
   const rc = activePlanet.buildings.researchCenter;
   const targetLvl = rc.level + 1;
@@ -874,6 +876,18 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {onReturnToBase && (
+        <button
+          type="button"
+          onClick={onReturnToBase}
+          className="fixed right-6 sm:right-8 bottom-20 z-50 flex items-center justify-center gap-2.5 px-5 py-4 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_20px_rgba(6,182,212,0.6)] transition duration-150 active:scale-95 group cursor-pointer animate-bounce"
+          title="Back to Station Base"
+        >
+          <Compass size={18} className="animate-spin-slow group-hover:rotate-45 transition-transform" />
+          <span className="text-xs uppercase tracking-widest font-black inline font-mono">RETURN TO BASE</span>
+        </button>
       )}
     </div>
   );

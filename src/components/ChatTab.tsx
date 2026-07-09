@@ -8,13 +8,15 @@ interface ChatTabProps {
   alliances: Record<string, Alliance>;
   onSendChat: (channel: 'global' | 'alliance' | 'private', content: string, receiverId?: string) => Promise<any> | any;
   showToast: (message: string, type: 'success' | 'error' | 'info') => void;
+  onViewPlayerProfile?: (playerId: string) => void;
 }
 
 export const ChatTab: React.FC<ChatTabProps> = ({
   player,
   chatMessages,
   onSendChat,
-  showToast
+  showToast,
+  onViewPlayerProfile
 }) => {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -96,9 +98,19 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                       className={`flex flex-col max-w-[85%] ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}
                     >
                       <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold mb-0.5 px-1">
-                        <span className={nameColorClass}>
-                          {displayName}
-                        </span>
+                        {isSystem ? (
+                          <span className={nameColorClass}>
+                            {displayName}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onViewPlayerProfile && onViewPlayerProfile(senderId)}
+                            className={`${nameColorClass} hover:underline cursor-pointer font-bold focus:outline-none`}
+                          >
+                            {displayName}
+                          </button>
+                        )}
                         <span className="text-slate-600 font-normal font-sans">
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </span>
@@ -212,9 +224,19 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                       className={`flex flex-col max-w-[85%] ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}
                     >
                       <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold mb-0.5 px-1 font-mono">
-                        <span className={nameColorClass}>
-                          {displayName}
-                        </span>
+                        {isSystem ? (
+                          <span className={nameColorClass}>
+                            {displayName}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onViewPlayerProfile && onViewPlayerProfile(senderId)}
+                            className={`${nameColorClass} hover:underline cursor-pointer font-bold focus:outline-none`}
+                          >
+                            {displayName}
+                          </button>
+                        )}
                         <span className="text-slate-600 font-normal font-sans">
                           {new Date(msg.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                         </span>

@@ -112,6 +112,12 @@ async function safeParseJson(res: Response, isHealthCheck = false): Promise<any>
   }
 }
 
+const getRepositoryCapacity = (level: number): number => {
+  if (level <= 1) return 10000;
+  if (level >= 45) return 5000000;
+  return Math.round(10000 * Math.pow(500, (level - 1) / 44));
+};
+
 export default function App() {
   // Authentication & player session
   const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('moonbase_userId'));
@@ -180,6 +186,7 @@ export default function App() {
   };
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showExitPopup, setShowExitPopup] = useState(false);
   const [selectedPaymentTier, setSelectedPaymentTier] = useState<{ amount: number; label: string; price: string; desc: string; bonus?: string } | null>(null);
   const [paymentState, setPaymentState] = useState<'idle' | 'input' | 'processing' | 'success'>('idle');
   const [paymentStepsLog, setPaymentStepsLog] = useState<string>('');
@@ -516,6 +523,97 @@ export default function App() {
   const [settleFleetId, setSettleFleetId] = useState<string | null>(null);
   const [customColonyName, setCustomColonyName] = useState('');
 
+  // Intercept mobile back button / swipe gesture to implement exit-twice double confirm
+  const popstateRef = useRef({
+    showPaymentModal,
+    viewingPlayerId,
+    showCommsHubModal,
+    showCommDeck,
+    showInitialStationNaming,
+    activeTab
+  });
+
+  useEffect(() => {
+    popstateRef.current = {
+      showPaymentModal,
+      viewingPlayerId,
+      showCommsHubModal,
+      showCommDeck,
+      showInitialStationNaming,
+      activeTab
+    };
+  }, [showPaymentModal, viewingPlayerId, showCommsHubModal, showCommDeck, showInitialStationNaming, activeTab]);
+
+  useEffect(() => {
+    // Push dummy state to enable popstate interception
+    window.history.pushState({ page: 'game' }, '');
+
+    let lastBackTime = 0;
+    let timer: any;
+
+    const handlePopState = (event: PopStateEvent) => {
+      const current = popstateRef.current;
+      
+      // Check if any modal is open and close it first
+      if (current.showPaymentModal) {
+        setShowPaymentModal(false);
+        window.history.pushState({ page: 'game' }, '');
+        return;
+      }
+      if (current.viewingPlayerId) {
+        setViewingPlayerId(null);
+        window.history.pushState({ page: 'game' }, '');
+        return;
+      }
+      if (current.showCommsHubModal) {
+        setShowCommsHubModal(false);
+        window.history.pushState({ page: 'game' }, '');
+        return;
+      }
+      if (current.showCommDeck) {
+        setShowCommDeck(false);
+        window.history.pushState({ page: 'game' }, '');
+        return;
+      }
+      if (current.showInitialStationNaming) {
+        setShowInitialStationNaming(false);
+        window.history.pushState({ page: 'game' }, '');
+        return;
+      }
+      
+      // If activeTab is not explore, navigate back to explore
+      if (current.activeTab !== 'explore') {
+        setActiveTab('explore');
+        window.history.pushState({ page: 'game' }, '');
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastBackTime < 2500) {
+        // Second back button or swipe within 2.5 seconds -> exit
+        showToast("Exiting game...", "info");
+        window.history.go(-2);
+      } else {
+        // First back -> warn the user and push state again
+        lastBackTime = now;
+        setShowExitPopup(true);
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          setShowExitPopup(false);
+        }, 2500);
+
+        // Re-push history state to stay in the app and allow next intercept
+        window.history.pushState({ page: 'game' }, '');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      clearTimeout(timer);
+    };
+  }, []);
+
   // Set initial selected planet or sync when planets lists scale
   useEffect(() => {
     if (player && player.planets && player.planets.length > 0) {
@@ -817,7 +915,7 @@ export default function App() {
     const planet = player.planets.find(pl => pl.id === selectedPlanetId) || player.planets[0];
     if (!planet) return;
 
-    const capacity = Math.round(10000 * Math.pow(500, (planet.buildings.repository.level - 1) / 44));
+    const capacity = getRepositoryCapacity(planet.buildings.repository.level);
     const isOtherMaxed = 
       planet.resources.plasma >= capacity &&
       planet.resources.fuel >= capacity &&
@@ -858,7 +956,7 @@ export default function App() {
 
     const ticker = setInterval(() => {
       setLocalResources(prev => {
-        const capacity = Math.round(10000 * Math.pow(500, (planet.buildings.repository.level - 1) / 44));
+        const capacity = getRepositoryCapacity(planet.buildings.repository.level);
         const updated = { ...prev };
         (Object.keys(updated) as ResourceType[]).forEach(res => {
           const newVal = prev[res] + resourceDeltaPer100ms[res];
@@ -1734,6 +1832,8 @@ export default function App() {
               localStorage.setItem(`moonbase_attack_dispatched_${player.id}`, 'true');
             }
             showToast(`FLEET DEPLOYED! Mission: ${mission.missionType.toUpperCase()} dispatched.`, 'success');
+            setIsDirectRadarView(true);
+            setGalaxyInitialSubTab('scanner');
             setActiveTab('galaxy'); // Swapp tab to allow monitoring of travels!
             const newMission = data.fleets?.find((f: any) => f.createdFleetId === mission.createdFleetId) 
               || (data.fleets && data.fleets[data.fleets.length - 1]);
@@ -1817,6 +1917,8 @@ export default function App() {
             localStorage.setItem(`moonbase_attack_dispatched_${player.id}`, 'true');
           }
           showToast(`DISPATCHED MULTIPLE FLEETS! Created ${numFleets} distinct en-route tactical squadrons.`, 'success');
+          setIsDirectRadarView(true);
+          setGalaxyInitialSubTab('scanner');
           setActiveTab('galaxy');
         } else {
           showToast(errorMsg || 'Failed to dispatch plural fleets', 'error');
@@ -2784,7 +2886,7 @@ export default function App() {
   // Loaded active interface
   const activePlanet = player?.planets?.find(pl => pl.id === selectedPlanetId) || player?.planets?.[0];
   const repositoryLimit = activePlanet?.buildings?.repository
-    ? Math.round(10000 * Math.pow(500, (activePlanet.buildings.repository.level - 1) / 44))
+    ? getRepositoryCapacity(activePlanet.buildings.repository.level)
     : 10000;
 
   return (
@@ -2903,6 +3005,7 @@ export default function App() {
           <div 
             onClick={() => {
               setGalaxyInitialSubTab('ranking');
+              setIsDirectRadarView(false);
               setActiveTab('galaxy');
             }}
             className="flex flex-col items-end gap-0.5 font-mono cursor-pointer group hover:opacity-90 transition-all text-right"
@@ -3226,6 +3329,7 @@ export default function App() {
                 if (player) {
                   localStorage.setItem(`moonbase_payroll_checked_${player.id}`, 'true');
                 }
+                setIsDirectRadarView(false);
                 setGalaxyInitialSubTab('ranking');
                 setActiveTab('galaxy');
               }}
@@ -3347,6 +3451,7 @@ export default function App() {
             localResources={localResources}
             onRefreshState={fetchState}
             isUpgrading={isUpgrading}
+            onReturnToBase={() => setActiveTab('explore')}
           />
         )}
 
@@ -3357,6 +3462,7 @@ export default function App() {
             alliances={alliances}
             onSendChat={handleSendChat}
             showToast={showToast}
+            onViewPlayerProfile={(pId) => setViewingPlayerId(pId)}
           />
         )}
 
@@ -3385,6 +3491,7 @@ export default function App() {
               if (player) {
                 localStorage.setItem(`moonbase_payroll_checked_${player.id}`, 'true');
               }
+              setIsDirectRadarView(false);
               setGalaxyInitialSubTab('ranking');
               setActiveTab('galaxy');
             }}
@@ -3426,12 +3533,13 @@ export default function App() {
           <button 
             onClick={() => {
               setGalaxyInitialSubTab('ranking');
+              setIsDirectRadarView(false);
               setActiveTab('galaxy');
             }}
             className={`flex-1 h-full flex flex-col items-center justify-center gap-1 border-r border-[#1E293B] group relative transition-colors duration-150 cursor-pointer ${activeTab === 'galaxy' ? 'bg-cyan-500/10' : ''}`}
           >
             {activeTab === 'galaxy' && <div className="absolute top-0 inset-x-0 h-[3px] bg-cyan-400 shadow-[0_0_10px_#22d3ee]"></div>}
-            <span className="text-base sm:text-lg filter drop-shadow-[0_0_5px_rgba(168,85,247,0.5)] transform group-hover:scale-125 transition-transform duration-150 leading-none">📡</span>
+            <span className="text-base sm:text-lg filter drop-shadow-[0_0_5px_rgba(168,85,247,0.5)] transform group-hover:scale-125 transition-transform duration-150 leading-none">🌀</span>
             <span className={`text-[9px] font-bold tracking-widest ${activeTab === 'galaxy' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>GLXY</span>
           </button>
 
@@ -3520,8 +3628,14 @@ export default function App() {
 
       {/* SECURE MOONBASE STRIPE PAYMENT MODAL */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-[#05070A]/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-[#0A0F1D] border border-cyan-500/20 rounded-2xl shadow-[0_0_60px_rgba(34,211,238,0.1)] p-6 font-sans text-slate-100 flex flex-col relative overflow-hidden">
+        <div 
+          onClick={() => setShowPaymentModal(false)}
+          className="fixed inset-0 bg-[#05070A]/95 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-2xl bg-[#0A0F1D] border border-cyan-500/20 rounded-2xl shadow-[0_0_60px_rgba(34,211,238,0.1)] p-6 font-sans text-slate-100 flex flex-col relative overflow-hidden cursor-default"
+          >
             
             {/* Glowing effect inside modal */}
             <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl pointer-events-none"></div>
@@ -3589,6 +3703,16 @@ export default function App() {
                       </div>
                     </button>
                   ))}
+                </div>
+
+                <div className="pt-4 border-t border-[#1E293B]/60 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(false)}
+                    className="w-full sm:w-auto px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-[#1E293B] font-mono text-xs font-bold uppercase tracking-wider rounded-xl transition cursor-pointer"
+                  >
+                    Close / Return to Game
+                  </button>
                 </div>
               </div>
             )}
@@ -3832,6 +3956,19 @@ export default function App() {
             )}
 
           </div>
+        </div>
+      )}
+
+      {/* DOUBLE EXIT CONFIRMATION POPUP FOR MOBILE/PWA BACK GESTURES */}
+      {showExitPopup && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-sm bg-slate-950/95 border border-[#1E293B] rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.15)] p-4 font-mono text-center animate-bounce">
+          <div className="flex items-center justify-center gap-2 text-cyan-400 mb-1">
+            <span className="text-sm">⚠️</span>
+            <span className="text-xs font-bold uppercase tracking-wider">EXIT COMMAND DETECTED</span>
+          </div>
+          <p className="text-[10.5px] text-slate-300 font-sans leading-relaxed">
+            Please **swipe back again** or **press back once more** to leave the game (depending on your phone's navigation settings).
+          </p>
         </div>
       )}
 

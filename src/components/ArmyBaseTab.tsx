@@ -580,12 +580,12 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
       const boostPct = Math.max(0, Math.min(35, (troopSpeedLevel - 1) * (35 / 19))) / 100;
       const speedMultiplier = 1.0 + boostPct;
       const speedMap: Record<string, number> = {
-        defender: 7.0,
-        attacker: 11.662,
-        tank: 3.5,
-        looter: 23.331,
-        drone: 17.5,
-        settlementShip: 4.662
+        defender: 75.0,
+        attacker: 85.0,
+        tank: 40.0,
+        looter: 110.0,
+        drone: 80.0,
+        settlementShip: 25.0
       };
       const selectedTroops = Object.entries(fleet.troops).filter(([_, qty]) => (Number(qty) || 0) > 0);
       const slowestTroopSpeed = selectedTroops.length > 0
@@ -594,7 +594,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
             return sp < slowest ? sp : slowest;
           }, 100)) * speedMultiplier
         : 100;
-      const travelTimeMs = slowestTroopSpeed > 0 ? Math.round((distance / slowestTroopSpeed) * 60000) : 0;
+      const travelTimeMs = slowestTroopSpeed > 0 ? Math.round((distance / slowestTroopSpeed) * 3600000) : 0;
       const defaultLanding = Date.now() + travelTimeMs + 5 * 60 * 1000; // travel duration + 5 minutes
       
       const date = new Date(defaultLanding);
@@ -1355,6 +1355,24 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                               );
                             })()}
                           </div>
+                          <div className="flex items-center justify-between border-b border-white/5 pb-1.5 font-sans sm:font-mono font-bold col-span-1 sm:col-span-2">
+                            <span className="text-slate-500">Speed Specification:</span>
+                            {(() => {
+                              const troopSpeeds: Record<string, string> = {
+                                defender: '75 SM/H',
+                                attacker: '85 SM/H',
+                                tank: '40 SM/H',
+                                looter: '110 SM/H',
+                                drone: '80 SM/H',
+                                settlementShip: '25 SM/H'
+                              };
+                              return (
+                                <span className="text-pink-400 font-bold">
+                                  {troopSpeeds[tId] || 'N/A'}
+                                </span>
+                              );
+                            })()}
+                          </div>
                         </div>
 
                         {/* Unit construction cost per ship */}
@@ -2089,12 +2107,12 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                     const boostPct = Math.max(0, Math.min(35, (troopSpeedLevel - 1) * (35 / 19))) / 100;
                                     const speedMultiplier = 1.0 + boostPct;
                                     const speedMap: Record<string, number> = {
-                                      defender: 7.0,
-                                      attacker: 11.662,
-                                      tank: 3.5,
-                                      looter: 23.331,
-                                      drone: 17.5,
-                                      settlementShip: 4.662
+                                      defender: 75.0,
+                                      attacker: 85.0,
+                                      tank: 40.0,
+                                      looter: 110.0,
+                                      drone: 80.0,
+                                      settlementShip: 25.0
                                     };
                                     const selectedTroops = Object.entries(fleet.troops).filter(([_, qty]) => (Number(qty) || 0) > 0);
                                     const slowestTroopSpeed = selectedTroops.length > 0
@@ -2103,7 +2121,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                           return sp < slowest ? sp : slowest;
                                         }, 100)) * speedMultiplier
                                       : 100;
-                                    const travelTimeMs = slowestTroopSpeed > 0 ? Math.round((distance / slowestTroopSpeed) * 60000) : 0;
+                                    const travelTimeMs = slowestTroopSpeed > 0 ? Math.round((distance / slowestTroopSpeed) * 3600000) : 0;
 
                                     const formatDateTimeLocalHelper = (timestamp: number) => {
                                       const d = new Date(timestamp);

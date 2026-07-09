@@ -189,12 +189,12 @@ function findClusterCoordinate(targetX: number, targetY: number): { x: number; y
 
 // Default Troop Specifications
 const TROOP_SPECS = {
-  defender: { name: "Interceptor", defenceHp: 18, attackHp: 10, carry: 600, speed: 7.0, waterConsumption: 1.0 },
-  attacker: { name: "Assault Drone", defenceHp: 9, attackHp: 30, carry: 400, speed: 11.662, waterConsumption: 2.0 },
-  tank: { name: "Disrupter", defenceHp: 5, attackHp: 5, carry: 0, speed: 3.5, waterConsumption: 4.0 },
-  looter: { name: "Matter Extractor", defenceHp: 4, attackHp: 4, carry: 1000, speed: 23.331, waterConsumption: 3.0 },
-  drone: { name: "Missile Launcher", defenceHp: 120, attackHp: 120, carry: 200, speed: 17.5, waterConsumption: 0.4 },
-  settlementShip: { name: "Settlement Ship", defenceHp: 50, attackHp: 0, carry: 5000, speed: 4.662, waterConsumption: 5.0 }
+  defender: { name: "Interceptor", defenceHp: 18, attackHp: 10, carry: 600, speed: 75.0, waterConsumption: 1.0 },
+  attacker: { name: "Assault Drone", defenceHp: 9, attackHp: 30, carry: 400, speed: 85.0, waterConsumption: 2.0 },
+  tank: { name: "Disrupter", defenceHp: 5, attackHp: 5, carry: 0, speed: 40.0, waterConsumption: 4.0 },
+  looter: { name: "Matter Extractor", defenceHp: 4, attackHp: 4, carry: 1000, speed: 110.0, waterConsumption: 3.0 },
+  drone: { name: "Missile Launcher", defenceHp: 120, attackHp: 120, carry: 200, speed: 80.0, waterConsumption: 0.4 },
+  settlementShip: { name: "Settlement Ship", defenceHp: 50, attackHp: 0, carry: 5000, speed: 25.0, waterConsumption: 5.0 }
 };
 
 // Help helper for repository capacity
@@ -1179,15 +1179,7 @@ function tickPlayerState(playerId: string, now: number): boolean {
           }
           const accumulated = hourlyProd * deltaHours;
           
-          if (resKey === "water") {
-            // Water production from mine
-            planet.resources.water += accumulated;
-          } else {
-            planet.resources[resKey as ResourceType] = Math.min(
-              storageLimit,
-              planet.resources[resKey as ResourceType] + accumulated
-            );
-          }
+          planet.resources[resKey as ResourceType] += accumulated;
         });
       }
 
@@ -1201,8 +1193,8 @@ function tickPlayerState(playerId: string, now: number): boolean {
       planet.resources.food = planet.resources.food - foodConsumed;
 
       // Calculate total hourly production from mines to see if production is negative
-      const hourlyMinesProd = { water: 0, respirant: 0, food: 0 };
-      for (const resKey of ["water", "respirant", "food"]) {
+      const hourlyMinesProd = { water: 0, plasma: 0, fuel: 0, respirant: 0, food: 0 };
+      for (const resKey of ["water", "plasma", "fuel", "respirant", "food"]) {
         const mines = planet.mines[resKey as ResourceType] || [];
         const isOtherMaxed = 
           planet.resources.plasma >= storageLimit &&
@@ -1216,7 +1208,7 @@ function tickPlayerState(playerId: string, now: number): boolean {
           if (isMineBoosted) {
             hourlyProd = hourlyProd * 1.14;
           }
-          hourlyMinesProd[resKey as "water" | "respirant" | "food"] += hourlyProd;
+          hourlyMinesProd[resKey as ResourceType] += hourlyProd;
         });
       }
 
@@ -1224,9 +1216,7 @@ function tickPlayerState(playerId: string, now: number): boolean {
       const netRespirantProdHourly = hourlyMinesProd.respirant - (waterConsumptionPerHour * 0.28);
       const netFoodProdHourly = hourlyMinesProd.food - (waterConsumptionPerHour * 0.18);
 
-      const isAnyProdNegative = (netWaterProdHourly < 0) || (netRespirantProdHourly < 0) || (netFoodProdHourly < 0);
-
-      // Produce negatively: let them go negative if net rate is negative, otherwise clamp at 0
+      // Produce negatively: let them go negative if net rate is negative, otherwise clamp at 0 and storageLimit
       if (netWaterProdHourly < 0) {
         planet.resources.water = Math.min(storageLimit, planet.resources.water);
       } else {
@@ -1244,6 +1234,9 @@ function tickPlayerState(playerId: string, now: number): boolean {
       } else {
         planet.resources.food = Math.max(0, Math.min(storageLimit, planet.resources.food));
       }
+
+      planet.resources.plasma = Math.max(0, Math.min(storageLimit, planet.resources.plasma));
+      planet.resources.fuel = Math.max(0, Math.min(storageLimit, planet.resources.fuel));
 
       const triggerAttrition = (planet.resources.water < 0) || (planet.resources.respirant < 0) || (planet.resources.food < 0);
 
@@ -2197,7 +2190,7 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
             const sp = TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.speed || 5;
             return sp < slowest ? sp : slowest;
           }, 100);
-        const travelTimeMs = Math.round((totalDist / slowestTroopSpeed) * 60000);
+        const travelTimeMs = Math.round((totalDist / slowestTroopSpeed) * 3600000);
         
         remainingFleets.push({
           ...fleet,
@@ -2323,7 +2316,7 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
     const boostPct = Math.max(0, Math.min(35, (speedLvl - 1) * (35 / 19))) / 100;
     const multiplier = 1.0 + boostPct;
     const speed = TROOP_SPECS.drone.speed * multiplier;
-    const travelTimeMs = Math.round((totalDist / speed) * 60000); // Minutes to ms
+    const travelTimeMs = Math.round((totalDist / speed) * 3600000); // Hours to ms
 
     remainingFleets.push({
       ...fleet,
@@ -2631,8 +2624,8 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
           return sp < slowest ? sp : slowest;
         }, 100)) * multiplier;
 
-      // Travel time formula (seconds)
-      const travelTimeMs = Math.round((totalDist / slowestTroopSpeed) * 60000);
+      // Travel time formula (minutes to ms)
+      const travelTimeMs = Math.round((totalDist / slowestTroopSpeed) * 3600000);
 
       remainingFleets.push({
         ...fleet,
@@ -2667,7 +2660,7 @@ function runAISimulatedActivity(now: number) {
       const missionType = Math.random() > 0.4 ? "attack" : "recon";
       const totalDist = Math.hypot(targetP.sectorX - p.sectorX, targetP.sectorY - p.sectorY);
       const fleetSpeed = missionType === "recon" ? 75 : 40;
-      const travelTimeMs = Math.round((totalDist / fleetSpeed) * 60000);
+      const travelTimeMs = Math.round((totalDist / fleetSpeed) * 3600000);
 
       const mission: FleetMission = {
         id: `fleet_${Math.random().toString(36).substr(2, 9)}`,
@@ -2982,18 +2975,21 @@ app.post("/api/register", (req, res) => {
   });
 
   // Welcome message in global chat
-  state.chatMessages.push({
-    id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
-    channel: "global",
-    senderId: "system",
-    senderName: "CENTRAL COMMAND",
-    senderFaction: "System",
-    senderFactionColor: "#7F8C8D",
-    allianceTag: "SYS",
-    receiverId: null,
-    content: `Welcome to the galaxy Beta Test, ${username}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
-    timestamp: Date.now()
-  });
+  if (!newPlayer.welcomeMessageSent) {
+    newPlayer.welcomeMessageSent = true;
+    state.chatMessages.push({
+      id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
+      channel: "global",
+      senderId: "system",
+      senderName: "CENTRAL COMMAND",
+      senderFaction: "System",
+      senderFactionColor: "#7F8C8D",
+      allianceTag: "SYS",
+      receiverId: null,
+      content: `Welcome to the galaxy Beta Test, ${username}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+      timestamp: Date.now()
+    });
+  }
 
   saveState();
   res.json({ player: newPlayer });
@@ -3091,18 +3087,21 @@ app.post("/api/auth/google", async (req, res) => {
       });
 
       // Welcome message in global chat
-      state.chatMessages.push({
-        id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
-        channel: "global",
-        senderId: "system",
-        senderName: "CENTRAL COMMAND",
-        senderFaction: "System",
-        senderFactionColor: "#7F8C8D",
-        allianceTag: "SYS",
-        receiverId: null,
-        content: `Welcome to the galaxy Beta Test, ${defaultUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
-        timestamp: Date.now()
-      });
+      if (!newPlayer.welcomeMessageSent) {
+        newPlayer.welcomeMessageSent = true;
+        state.chatMessages.push({
+          id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
+          channel: "global",
+          senderId: "system",
+          senderName: "CENTRAL COMMAND",
+          senderFaction: "System",
+          senderFactionColor: "#7F8C8D",
+          allianceTag: "SYS",
+          receiverId: null,
+          content: `Welcome to the galaxy Beta Test, ${defaultUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+          timestamp: Date.now()
+        });
+      }
 
       saveState();
       return res.json({ player: newPlayer, isNew: true });
@@ -3191,18 +3190,21 @@ app.post("/api/auth/google", async (req, res) => {
     });
 
     // Welcome message in global chat
-    state.chatMessages.push({
-      id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
-      channel: "global",
-      senderId: "system",
-      senderName: "CENTRAL COMMAND",
-      senderFaction: "System",
-      senderFactionColor: "#7F8C8D",
-      allianceTag: "SYS",
-      receiverId: null,
-      content: `Welcome to the galaxy Beta Test, ${defaultUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
-      timestamp: Date.now()
-    });
+    if (!newPlayer.welcomeMessageSent) {
+      newPlayer.welcomeMessageSent = true;
+      state.chatMessages.push({
+        id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
+        channel: "global",
+        senderId: "system",
+        senderName: "CENTRAL COMMAND",
+        senderFaction: "System",
+        senderFactionColor: "#7F8C8D",
+        allianceTag: "SYS",
+        receiverId: null,
+        content: `Welcome to the galaxy Beta Test, ${defaultUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+        timestamp: Date.now()
+      });
+    }
 
     // Save database to disk
     saveState();
@@ -3355,18 +3357,21 @@ app.post("/api/auth/google-play", async (req, res) => {
     });
 
     // Welcome message in global chat
-    state.chatMessages.push({
-      id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
-      channel: "global",
-      senderId: "system",
-      senderName: "CENTRAL COMMAND",
-      senderFaction: "System",
-      senderFactionColor: "#7F8C8D",
-      allianceTag: "SYS",
-      receiverId: null,
-      content: `Welcome to the galaxy Beta Test, ${cleanUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
-      timestamp: Date.now()
-    });
+    if (!newPlayer.welcomeMessageSent) {
+      newPlayer.welcomeMessageSent = true;
+      state.chatMessages.push({
+        id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
+        channel: "global",
+        senderId: "system",
+        senderName: "CENTRAL COMMAND",
+        senderFaction: "System",
+        senderFactionColor: "#7F8C8D",
+        allianceTag: "SYS",
+        receiverId: null,
+        content: `Welcome to the galaxy Beta Test, ${cleanUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+        timestamp: Date.now()
+      });
+    }
 
     // Save database to disk
     saveState();
@@ -4638,7 +4643,7 @@ app.post("/api/fleet/send", (req, res) => {
       return sp < slowest ? sp : slowest;
     }, 100)) * speedMultiplier;
 
-  const travelTimeMs = Math.round((dist / slowestTroopSpeed) * 60000);
+  const travelTimeMs = Math.round((dist / slowestTroopSpeed) * 3600000);
 
   let resolvedTargetId = targetId || null;
   let resolvedTargetName = targetName || `Sector [${targetX}, ${targetY}]`;
@@ -4974,7 +4979,7 @@ app.post("/api/fleet/reroute", (req, res) => {
       return sp < slowest ? sp : slowest;
     }, 100)) * speedMultiplier;
 
-  const travelTimeMs = Math.round((dist / slowestTroopSpeed) * 60000);
+  const travelTimeMs = Math.round((dist / slowestTroopSpeed) * 3600000);
   const now = Date.now();
 
   // If the fleet was landed, its new starting point for the next jump is where it landed
@@ -5058,7 +5063,7 @@ app.post("/api/fleet/cancel", (req, res) => {
         return sp < slowest ? sp : slowest;
       }, 100)) * speedMultiplier;
 
-    const travelTimeMs = Math.round((dist / slowestTroopSpeed) * 60000);
+    const travelTimeMs = Math.round((dist / slowestTroopSpeed) * 3600000);
 
     fleet.isReturning = true;
     fleet.isWaitingToSettle = false;

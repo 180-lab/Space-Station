@@ -152,6 +152,12 @@ const BUILDING_INFO: Record<string, { name: string; desc: string; icon: string }
   bunker: { name: 'Bunker', desc: 'Secure reinforced deep underground bunker. Ends at level 25. Protects and saves up to 500,000 resources of each type from raids when maxed.', icon: '🛡️' }
 };
 
+const getRepositoryCapacity = (level: number): number => {
+  if (level <= 1) return 10000;
+  if (level >= 45) return 5000000;
+  return Math.round(10000 * Math.pow(500, (level - 1) / 44));
+};
+
 export const ExploreTab: React.FC<ExploreTabProps> = ({ 
   player, 
   activePlanet, 
@@ -417,7 +423,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
     }
   };
 
-  const repositoryLimit = Math.round(10000 * Math.pow(500, (activePlanet.buildings.repository.level - 1) / 44));
+  const repositoryLimit = getRepositoryCapacity(activePlanet.buildings.repository.level);
 
   const activePlanetIndex = player.planets.findIndex(p => p.id === activePlanet.id);
   const maxExtractorLevel = activePlanetIndex === 0 ? 25 : activePlanetIndex === 1 ? 20 : 15;
@@ -438,7 +444,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
   // Check if any resources are low
   const getResourceProduction = (resKey: 'water' | 'respirant' | 'food') => {
-    const repositoryLimit = Math.round(10000 * Math.pow(500, (activePlanet.buildings.repository.level - 1) / 44));
+    const repositoryLimit = getRepositoryCapacity(activePlanet.buildings.repository.level);
     const isOtherMaxed = 
       activePlanet.resources.plasma >= repositoryLimit &&
       activePlanet.resources.fuel >= repositoryLimit &&
