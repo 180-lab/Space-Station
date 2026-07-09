@@ -844,7 +844,7 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: ALLIANCE HUB (IDENTICAL TO OLD RDR SYSTEM) */}
+          {/* TAB 2: ALLIANCE HUB */}
           {activeTab === 'alliance' && (
             <div className="space-y-4 font-mono text-xs">
               {activeAlliance ? (

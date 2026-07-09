@@ -989,185 +989,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
       {/* SUB TAB 1: RADAR SCANNER */}
       {subTab === 'scanner' && (
-        activePlanet.buildings.radar?.level === 0 ? (
-          <div className="p-8 border border-red-500/20 bg-[#0A0F1D]/80 backdrop-blur-md rounded-2xl text-center space-y-4 max-w-xl mx-auto shadow-xl font-mono mt-4">
-            <div className="text-4xl text-red-100">📡</div>
-            <h3 className="text-sm font-extrabold text-red-400 uppercase tracking-widest">
-              RADAR ARRAY OFFLINE
-            </h3>
-            <p className="text-xs text-slate-350 font-sans leading-relaxed">
-              This secondary colony station does not possess an active Radar system. 
-              Navigate to your <strong>Established Structures</strong> or <strong>Unlocked Blueprints</strong> in the station commands tab to construct a Radar Array first before scanning nearby star sectors.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            {/* RADAR ARRAY UPGRADE MODULE CARD */}
-            {activePlanet && activePlanet.buildings.radar && (
-              <div className="p-4 bg-slate-900/90 border border-cyan-500/20 rounded-xl space-y-3 shadow-lg relative overflow-hidden mb-4 font-mono text-left">
-                <div className="absolute top-0 right-0 p-3 opacity-10 text-4xl">📡</div>
-                
-                {/* Upgrade Button above the header/level info */}
-                <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-[#1E293B]/60">
-                  <span className="text-[9px] font-bold text-cyan-400 uppercase tracking-widest font-mono">RADAR CORE ACCESS</span>
-                  {activePlanet.buildings.radar.level < activePlanet.buildings.radar.maxLevel ? (
-                    activePlanet.buildings.radar.isUpgrading ? (
-                      (() => {
-                        const getTimerStringLocal = (endTimestamp: number | null) => {
-                          if (!endTimestamp) return '';
-                          const diff = Math.max(0, endTimestamp - serverTime);
-                          const secs = Math.floor(diff / 1000);
-                          const h = Math.floor(secs / 3600);
-                          const m = Math.floor((secs % 3600) / 60);
-                          const s = secs % 60;
-                          return `${h}h ${m}m ${s}s`;
-                        };
-                        return (
-                          <div className="text-[9px] font-mono font-bold bg-amber-500/15 border border-amber-500/30 text-amber-400 px-2.5 py-1 rounded-lg text-center animate-pulse shrink-0">
-                            ⏳ UPGRADING: {getTimerStringLocal(activePlanet.buildings.radar.upgradeEnd)}
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      (() => {
-                        const nextRadarLvl = (activePlanet.buildings.radar?.level || 0) + 1;
-                        const rKeys: ResourceType[] = ['water', 'plasma', 'fuel', 'food', 'respirant'];
-                        const currentResources = localResources || activePlanet.resources;
-                        const hasUpgradeResources = rKeys.every(rKey => {
-                          const cost = getUpgradeResourceCost('building', 'radar', nextRadarLvl, rKey);
-                          return (currentResources[rKey] || 0) >= cost;
-                        });
-                        return (
-                          <button
-                            type="button"
-                            onClick={() => onUpgradeBuilding && onUpgradeBuilding('radar')}
-                            disabled={isUpgrading || !hasUpgradeResources}
-                            className={`px-3 py-1 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition duration-150 shrink-0 ${
-                              hasUpgradeResources 
-                                ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_10px_rgba(6,182,212,0.35)] cursor-pointer' 
-                                : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
-                            }`}
-                          >
-                            <span>🚀 Upgrade Radar to Lv. {nextRadarLvl}</span>
-                          </button>
-                        );
-                      })()
-                    )
-                  ) : (
-                    <div className="text-[9px] bg-slate-900 text-slate-500 border border-slate-800 px-2.5 py-1 rounded-lg text-center font-bold font-mono shrink-0">
-                      MAX LEVEL REACHED
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-cyan-500/10">
-                  <div>
-                    <span className="text-[10px] text-cyan-400 block uppercase font-bold tracking-wider">RADAR CONTROL CENTRE</span>
-                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                      <span>Radar Array Grid</span>
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-slate-950 text-pink-400 border border-[#1E293B]">
-                        Lv. {activePlanet.buildings.radar.level} / {activePlanet.buildings.radar.maxLevel}
-                      </span>
-                    </h4>
-                  </div>
-                  {activePlanet.buildings.radar.isUpgrading ? (
-                    (() => {
-                      const getTimerStringLocal = (endTimestamp: number | null) => {
-                        if (!endTimestamp) return '';
-                        const diff = Math.max(0, endTimestamp - serverTime);
-                        const secs = Math.floor(diff / 1000);
-                        const h = Math.floor(secs / 3600);
-                        const m = Math.floor((secs % 3600) / 60);
-                        const s = secs % 60;
-                        return `${h}h ${m}m ${s}s`;
-                      };
-                      return (
-                        <span className="text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-xl font-bold animate-pulse flex items-center gap-1">
-                          <span className="animate-spin text-xs">⏳</span>
-                          <span>Upgrading: {getTimerStringLocal(activePlanet.buildings.radar.upgradeEnd)}</span>
-                        </span>
-                      );
-                    })()
-                  ) : (
-                    <span className="text-[10px] text-slate-400 font-bold bg-[#05070A] border border-[#1E293B] px-2.5 py-1 rounded-xl">
-                      SCAN RADIUS: {activePlanet.buildings.radar.level} SECTORS
-                    </span>
-                  )}
-                </div>
-
-                {!activePlanet.buildings.radar.isUpgrading && activePlanet.buildings.radar.level < activePlanet.buildings.radar.maxLevel && (
-                  <div className="space-y-3">
-                    <p className="text-[11px] text-slate-400 leading-relaxed max-w-2xl font-sans">
-                      Upgrade the Radar Array to broaden scan sweeps, detect incoming space forces, and unlock outer coordinate sector details. Next Level upgrade requires:
-                    </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                      {(['water', 'plasma', 'fuel', 'food', 'respirant'] as ResourceType[]).map((rKey) => {
-                        const nextRadarLvl = (activePlanet.buildings.radar?.level || 0) + 1;
-                        const cost = getUpgradeResourceCost('building', 'radar', nextRadarLvl, rKey);
-                        const currentVal = (localResources ? localResources[rKey] : activePlanet.resources[rKey]) || 0;
-                        const hasSufficient = currentVal >= cost;
-                        const resNamesLocal = {
-                          water: 'Water',
-                          plasma: 'Plasma',
-                          fuel: 'Deuterium',
-                          food: 'Food',
-                          respirant: 'Respirant O2'
-                        };
-                        const resIconsLocal = {
-                          water: '💧',
-                          plasma: '⚡',
-                          fuel: '🔥',
-                          food: '🍏',
-                          respirant: '💨'
-                        };
-                        return (
-                          <div key={rKey} className={`p-2 rounded-lg border flex flex-col justify-center text-left ${hasSufficient ? 'bg-[#05070A]/50 border-[#1E293B]/40' : 'bg-red-950/10 border-red-500/20'}`}>
-                            <span className="text-[9px] text-slate-500 font-bold truncate">{resIconsLocal[rKey]} {resNamesLocal[rKey]}</span>
-                            <span className={`text-[11px] font-black ${hasSufficient ? 'text-slate-300' : 'text-red-400 animate-pulse'}`}>
-                              {currentVal >= 1000000 ? `${(currentVal/1000000).toFixed(1)}M` : Math.round(currentVal).toLocaleString()} / {cost >= 1000000 ? `${(cost/1000000).toFixed(1)}M` : cost.toLocaleString()}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex items-center justify-end gap-2.5 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => onUpgradeBuilding && onUpgradeBuilding('radar')}
-                        disabled={isUpgrading || !(() => {
-                          const nextRadarLvl = (activePlanet.buildings.radar?.level || 0) + 1;
-                          return (['water', 'plasma', 'fuel', 'food', 'respirant'] as ResourceType[]).every(rKey => {
-                            const cost = getUpgradeResourceCost('building', 'radar', nextRadarLvl, rKey);
-                            const currentVal = (localResources ? localResources[rKey] : activePlanet.resources[rKey]) || 0;
-                            return currentVal >= cost;
-                          });
-                        })()}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition duration-150 ${
-                          (() => {
-                            const nextRadarLvl = (activePlanet.buildings.radar?.level || 0) + 1;
-                            return (['water', 'plasma', 'fuel', 'food', 'respirant'] as ResourceType[]).every(rKey => {
-                              const cost = getUpgradeResourceCost('building', 'radar', nextRadarLvl, rKey);
-                              const currentVal = (localResources ? localResources[rKey] : activePlanet.resources[rKey]) || 0;
-                              return currentVal >= cost;
-                            });
-                          })() ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.3)] cursor-pointer' : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
-                        }`}
-                      >
-                        <span>🚀 Upgrade Radar</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onUpgradeBuilding && onUpgradeBuilding('radar', true)}
-                        disabled={isUpgrading}
-                        className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        <span className="text-emerald-400">Queue Upgrade</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+        <div className="space-y-1.5">
 
             {/* Coordinates Search */}
           <form onSubmit={handleSearchSubmit} className="p-4 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -1200,7 +1022,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
               title="Search Sector: trigger planetary radar sweep"
             >
               <Search size={14} title="Search magnifying glass icon" />
-              <span>SCAN SECTORS (Radius {activePlanet.buildings.radar.level})</span>
+              <span>SCAN SECTORS</span>
             </button>
           </form>
 
@@ -1239,7 +1061,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
               className="flex items-center justify-between cursor-pointer hover:bg-[#1E293B]/45 p-2 rounded-lg transition"
             >
               <h3 className="text-sm font-bold uppercase tracking-widest text-[#22d3ee] flex items-center gap-2 font-mono glow-cyan">
-                <Radar size={16} className="text-cyan-400 animate-spin-slow shrink-0 animate-pulse" /> RADAR
+                <Radar size={16} className="text-cyan-400 animate-spin-slow shrink-0 animate-pulse" /> GALAXY SIGNATURES
               </h3>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-slate-500 font-mono font-bold">({scanResults.length} SIGNATURES ARCHIVED)</span>
@@ -1522,9 +1344,9 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   <span className="font-bold text-emerald-400 text-xs">{target.isHabitable ? "Carbon-Based Biosphere" : `${target.scores.population.toLocaleString()} citizens`}</span>
                                 </div>
                                 <div className="p-2.5 bg-[#030508]/60 border border-[#161E2E] rounded-xl font-mono">
-                                  <span className="text-slate-500 block text-[9px] uppercase tracking-wider">Radar Connection Reach</span>
-                                  <span className={`font-bold text-xs ${targetDist <= activePlanet.buildings.radar.level * 10 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                    {targetDist <= activePlanet.buildings.radar.level * 10 ? `TRACKED (${Math.round((targetDist/(activePlanet.buildings.radar.level * 10))*100)}% reach)` : 'OUTSIDE ACTIVE RADIUS'}
+                                  <span className="text-slate-500 block text-[9px] uppercase tracking-wider">Galaxy Tracking Signal</span>
+                                  <span className="font-bold text-xs text-emerald-400">
+                                    TRACKED (100% reach)
                                   </span>
                                 </div>
                               </div>
@@ -1968,7 +1790,6 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
           </div>
         </div>
-        )
       )}
 
       {/* SUB TAB 2: LEADERBOARD */}

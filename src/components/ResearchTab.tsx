@@ -113,7 +113,7 @@ const FAQS = [
   },
   {
     q: "Where can I locate foreign sector coordinate targets?",
-    a: "Navigate to the RDR (Galaxy) Tab or the Sovereignty page, run telemetry radar sweeps to scan, or enter target coordinate vectors directly to discover habitable nodes or other bases."
+    a: "Navigate to the GLXY (Galaxy) Tab or the Sovereignty page, run telemetry radar sweeps to scan, or enter target coordinate vectors directly to discover habitable nodes or other bases."
   },
   {
     q: "How does battle plunder work?",
