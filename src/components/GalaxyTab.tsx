@@ -466,7 +466,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [allianceBannerSymbol, setAllianceBannerSymbol] = useState('▲');
   const [allianceBannerColor, setAllianceBannerColor] = useState('#FF007A');
 
-  // Collapsible States for DEC_LINKS and radar folder
+  // Collapsible States for DEC_REPORTS and radar folder
   const [isCombatOpen, setIsCombatOpen] = useState(false);
   const [isIntelOpen, setIsIntelOpen] = useState(false);
   const [isRadarFolderOpen, setIsRadarFolderOpen] = useState(true);
@@ -979,10 +979,10 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           <button 
             onClick={() => setSubTab('news')}
             className={`py-3 px-1 truncate rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all duration-150 ${subTab === 'news' ? 'bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 shadow-[0_0_12px_rgba(34,211,238,0.15)]' : 'text-slate-400 hover:text-white'}`}
-            title="Sector DEC_LINKS: review decrypted battle reports and public newsletters feed"
+            title="Sector DEC_REPORTS: review decrypted battle reports and public newsletters feed"
           >
             <Radio size={13} title="Radio waves beacon transceiver" />
-            <span>DEC_LINKS</span>
+            <span>DEC_REPORTS</span>
           </button>
         </div>
       )}
@@ -2782,7 +2782,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           )}
           </div>
 
-          {/* Tactical Decrypted Feed (DEC links) */}
+          {/* Tactical Decrypted Feed (DEC reports) */}
           <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4">
             <button
               onClick={() => setShowDecFeed(!showDecFeed)}
@@ -2790,7 +2790,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
               type="button"
             >
               <h3 className="text-sm font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2 font-mono">
-                <Radio size={16} className="text-emerald-500 animate-pulse" /> Decrypted Direct Comms Links (DEC Feed)
+                <Radio size={16} className="text-emerald-500 animate-pulse" /> Decrypted Direct Comms Reports (DEC Feed)
                 {showDecFeed ? (
                   <ChevronUp size={12} className="text-red-500" />
                 ) : (
@@ -2802,7 +2802,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             {showDecFeed && (
               <>
                 <p className="text-[11px] text-slate-500 font-sans leading-relaxed">
-              Scanned dec links directly patched into your Communications Hub. Access real-time intelligence telemetry and recent military engagement transmissions here.
+              Scanned dec reports directly patched into your Communications Hub. Access real-time intelligence telemetry and recent military engagement transmissions here.
             </p>
 
             {battleReports.length === 0 ? (
@@ -2813,7 +2813,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Recon Scans column */}
                 <div className="space-y-2.5">
-                  <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest block font-mono">📡 Intelligence Dec Links (Scans)</span>
+                  <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest block font-mono">📡 Intelligence Dec Reports (Scans)</span>
                   <div className="space-y-2 max-h-[255px] overflow-y-auto pr-1">
                     {battleReports.filter(r => r.isRecon === true).length === 0 ? (
                       <p className="text-slate-600 text-[11px] italic font-sans py-2 font-mono">No active scout reports decrypted.</p>
@@ -2828,7 +2828,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               className="w-full text-left flex items-center justify-between text-[11px] text-slate-300 font-bold hover:text-white transition cursor-pointer"
                             >
                               <span className="truncate pr-2">
-                                🛰️ <span className="text-cyan-400 font-mono underline hover:text-cyan-300">DEC-LINK_SCAN_POS_{report.defenderCoords.x}_{report.defenderCoords.y}</span>
+                                🛰️ <span className="text-cyan-400 font-mono underline hover:text-cyan-300">DEC-REPORT_SCAN_POS_{report.defenderCoords.x}_{report.defenderCoords.y}</span>
                               </span>
                               <span className="text-[9px] text-[#5bc0be] bg-[#5bc0be]/10 px-1.5 py-0.5 rounded border border-[#5bc0be]/20 shrink-0">
                                 {isExpanded ? 'CLOSE' : 'DECRYPT'}
@@ -2857,7 +2857,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
                 {/* Combat Engagements column */}
                 <div className="space-y-2.5">
-                  <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest block font-mono">⚔️ Tactical Combat Dec Links</span>
+                  <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest block font-mono">⚔️ Tactical Combat Dec Reports</span>
                   <div className="space-y-2 max-h-[255px] overflow-y-auto pr-1">
                     {battleReports.filter(r => r.isRecon !== true && r.isMove !== true).length === 0 ? (
                       <p className="text-slate-600 text-[11px] italic font-sans py-2 font-mono">No military encounters decrypted.</p>
@@ -2882,7 +2882,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               className="w-full text-left flex items-center justify-between text-[11px] text-slate-300 font-bold hover:text-white transition cursor-pointer"
                             >
                               <span className="truncate pr-2">
-                                ⚔️ <span className="text-red-400 font-mono underline hover:text-red-300">DEC-LINK_ENGAGE_SEC_{report.defenderCoords.x}_{report.defenderCoords.y}</span>
+                                ⚔️ <span className="text-red-400 font-mono underline hover:text-red-300">DEC-REPORT_ENGAGE_SEC_{report.defenderCoords.x}_{report.defenderCoords.y}</span>
                               </span>
                               <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded border shrink-0 font-bold ${outcome === 'WINNER' || outcome.includes('WINNER') ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-red-400 bg-red-500/10 border-red-500/20'}`}>
                                 {isExpanded ? 'CLOSE' : outcome}

@@ -223,7 +223,7 @@ export default function App() {
       senderFaction: 'Galactic Federation',
       senderFactionColor: '#F59E0B',
       channel: 'global',
-      content: `Welcome to the galaxy, ${player?.username || 'Commander'}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+      content: `Welcome to the galaxy Beta Test, ${player?.username || 'Commander'}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
       timestamp: Date.now() - 3600000 * 2, // 2 hours ago
       allianceTag: null,
       receiverId: null

@@ -2058,32 +2058,6 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
         )}
       </div>
 
-      {/* TACTICAL NETWORK TRANSCEIVER */}
-      <div id="tactical-network-transceiver-box" className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl flex flex-col items-center justify-center text-center py-10 space-y-4 font-mono">
-        <div className="w-12 h-12 rounded-full border border-cyan-500/20 bg-cyan-500/5 flex items-center justify-center text-cyan-400">
-          <Radio size={20} className="animate-pulse" />
-        </div>
-        <div>
-          <h4 className="font-bold text-slate-200 text-sm uppercase tracking-wider">Tactical Network Transceiver</h4>
-          <p className="text-xs text-slate-500 max-w-sm mt-1 leading-relaxed font-sans font-normal">
-            Secure deep space transceiver wavelengths. Connect to the outer-rim sector communications grid to transmit or receive orbital signals.
-          </p>
-        </div>
-        <div className="pt-2">
-          <button 
-            type="button"
-            onClick={() => {
-              setIsChatOpen(true);
-              setChatPage(0);
-            }}
-            className="px-6 py-3 bg-cyan-950/20 hover:bg-cyan-500/10 text-cyan-400 hover:text-cyan-300 border border-cyan-500/25 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 mx-auto"
-          >
-            <MessageSquare size={13} />
-            Open Global Chat
-          </button>
-        </div>
-      </div>
-
       {/* GLOBAL CHAT MODAL OVERLAY */}
       {isChatOpen && (() => {
         const globalMessages = chatMessages ? [...chatMessages].filter(msg => msg.channel === 'global').reverse() : [];

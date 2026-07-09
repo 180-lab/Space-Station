@@ -625,8 +625,74 @@ async function loadState() {
   }
 }
 
+// Search concentric rings for closest vacant coordinate
+function findNearestUnoccupiedCoordinate(targetX: number, targetY: number): { x: number; y: number } {
+  const limit = getCurrentMapLimits();
+  
+  // Search concentric rings starting from d = 0, up to 2 * limit
+  for (let d = 0; d <= limit * 2; d++) {
+    for (let dx = -d; dx <= d; dx++) {
+      const dy1 = d - Math.abs(dx);
+      const dy2 = -dy1;
+      const candidateYVals = dy1 === dy2 ? [dy1] : [dy1, dy2];
+      
+      for (const dy of candidateYVals) {
+        const cx = targetX + dx;
+        const cy = targetY + dy;
+        
+        // Ensure within boundaries
+        if (cx < 0 || cx > limit || cy < 0 || cy > limit) {
+          continue;
+        }
+        
+        // Check if overlap with any player's planet
+        let overlap = false;
+        if (state && state.players) {
+          for (const player of Object.values(state.players)) {
+            if (player && player.planets) {
+              if (player.planets.some(pl => pl.sectorX === cx && pl.sectorY === cy)) {
+                overlap = true;
+                break;
+              }
+            }
+          }
+        }
+        
+        if (!overlap) {
+          return { x: cx, y: cy };
+        }
+      }
+    }
+  }
+  
+  return { x: targetX, y: targetY }; // fallback
+}
+
 // Create initial planet
 function createInitialPlanet(name: string, sectorX: number, sectorY: number, isFirstStation: boolean = false): ColonyPlanet {
+  let finalX = sectorX;
+  let finalY = sectorY;
+
+  // Check if (sectorX, sectorY) is occupied by any player's planet
+  let occupied = false;
+  if (state && state.players) {
+    for (const player of Object.values(state.players)) {
+      if (player && player.planets) {
+        if (player.planets.some(pl => pl.sectorX === sectorX && pl.sectorY === sectorY)) {
+          occupied = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (occupied) {
+    const nearest = findNearestUnoccupiedCoordinate(sectorX, sectorY);
+    finalX = nearest.x;
+    finalY = nearest.y;
+    console.log(`[Collision Resolver] Coordinate [${sectorX}, ${sectorY}] is already occupied. Placing ${name} at nearest unoccupied coordinate [${finalX}, ${finalY}].`);
+  }
+
   const createMines = (count: number): MineState[] => {
     return Array.from({ length: count }, (_, i) => ({
       index: i,
@@ -640,8 +706,8 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number, isF
   return {
     id: `planet_${Math.random().toString(36).substr(2, 9)}`,
     name: name,
-    sectorX,
-    sectorY,
+    sectorX: finalX,
+    sectorY: finalY,
     skinId: "default",
     mines: {
       water: createMines(6),
@@ -765,10 +831,24 @@ function ensureMinimumHabitablePlanets() {
   }
   
   const limit = getCurrentMapLimits();
-  // Filter out any uncolonized habitable planets that are outside the current map limit
+  // Filter out any uncolonized habitable planets that are outside the current map limit OR overlap with an existing station
   state.habitablePlanets = state.habitablePlanets.filter(p => {
     if (p.isColonized) return true;
-    return p.coords.x <= limit && p.coords.y <= limit;
+    if (p.coords.x > limit || p.coords.y > limit) return false;
+
+    // Check if overlap with any player's station/planet
+    let overlap = false;
+    if (state && state.players) {
+      for (const player of Object.values(state.players)) {
+        if (player && player.planets) {
+          if (player.planets.some(pl => pl.sectorX === p.coords.x && pl.sectorY === p.coords.y)) {
+            overlap = true;
+            break;
+          }
+        }
+      }
+    }
+    return !overlap;
   });
   
   const uncolonized = state.habitablePlanets.filter(p => !p.isColonized);
@@ -2911,7 +2991,7 @@ app.post("/api/register", (req, res) => {
     senderFactionColor: "#7F8C8D",
     allianceTag: "SYS",
     receiverId: null,
-    content: `Welcome to the galaxy, ${username}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+    content: `Welcome to the galaxy Beta Test, ${username}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
     timestamp: Date.now()
   });
 
@@ -3020,7 +3100,7 @@ app.post("/api/auth/google", async (req, res) => {
         senderFactionColor: "#7F8C8D",
         allianceTag: "SYS",
         receiverId: null,
-        content: `Welcome to the galaxy, ${defaultUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+        content: `Welcome to the galaxy Beta Test, ${defaultUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
         timestamp: Date.now()
       });
 
@@ -3120,7 +3200,7 @@ app.post("/api/auth/google", async (req, res) => {
       senderFactionColor: "#7F8C8D",
       allianceTag: "SYS",
       receiverId: null,
-      content: `Welcome to the galaxy, ${defaultUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+      content: `Welcome to the galaxy Beta Test, ${defaultUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
       timestamp: Date.now()
     });
 
@@ -3284,7 +3364,7 @@ app.post("/api/auth/google-play", async (req, res) => {
       senderFactionColor: "#7F8C8D",
       allianceTag: "SYS",
       receiverId: null,
-      content: `Welcome to the galaxy, ${cleanUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+      content: `Welcome to the galaxy Beta Test, ${cleanUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
       timestamp: Date.now()
     });
 
@@ -4695,20 +4775,16 @@ app.post("/api/fleet/settle", (req, res) => {
   const targetX = fleet.targetCoords.x;
   const targetY = fleet.targetCoords.y;
 
+  const newPlanet = createInitialPlanet(planetName, targetX, targetY);
+  const finalX = newPlanet.sectorX;
+  const finalY = newPlanet.sectorY;
+
   if (state.habitablePlanets) {
-    const hp = state.habitablePlanets.find(item => item.coords.x === targetX && item.coords.y === targetY);
+    const hp = state.habitablePlanets.find(item => item.coords.x === finalX && item.coords.y === finalY);
     if (hp) {
-      if (hp.isColonized) {
-        const alreadyMine = p.planets.some(pl => pl.sectorX === targetX && pl.sectorY === targetY);
-        if (!alreadyMine) {
-          return res.status(400).json({ error: "These coordinates have already been colonized by another commander!" });
-        }
-      }
       hp.isColonized = true;
     }
   }
-
-  const newPlanet = createInitialPlanet(planetName, targetX, targetY);
   
   // Put surviving/colonizing troops into this planet
   Object.entries(fleet.troops).forEach(([tId, count]) => {
@@ -4721,7 +4797,7 @@ app.post("/api/fleet/settle", (req, res) => {
   state.newsEvents.unshift({
     id: `news_${Math.random().toString(36).substr(2, 9)}`,
     title: "Planet Settled",
-    content: `${p.username} has established a new settled research colony at sector [${targetX}, ${targetY}]!`,
+    content: `${p.username} has established a new settled research colony at sector [${finalX}, ${finalY}]!`,
     type: "discovery",
     timestamp: Date.now()
   });

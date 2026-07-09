@@ -1,5 +1,20 @@
 import Redis from "ioredis";
 
+// Local cache for non-blocking fallback checks when Redis is offline or slow
+const localCache = new Map<string, number>();
+
+// Clean up old fallback entries periodically to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of localCache.entries()) {
+    if (now - val > 15000) {
+      localCache.delete(key);
+    }
+  }
+}, 30000);
+
+let isRedisHealthy = false;
+
 // Hardcoded Cloud Redis credentials configured permanently
 // Disabling offline queue and configuring a fast connection timeout to avoid hanging the API server
 export const redis = new Redis({
@@ -8,16 +23,39 @@ export const redis = new Redis({
   password: 'i73aF6P0isDnIWJTBq4X9Rw1oANUV9Ie',
   lazyConnect: true, // Non-blocking lazy connection
   maxRetriesPerRequest: 1, // Fail fast on requests if connection drops
-  connectTimeout: 2000, // Timeout connection after 2 seconds
-  enableOfflineQueue: true, // Allow commands to queue while connection is establishing
+  connectTimeout: 1500, // Timeout connection after 1.5 seconds
+  enableOfflineQueue: false, // DO NOT queue commands when connection is down - fail fast
+  retryStrategy(times) {
+    // Limit retries to avoid endless connection attempts and log spam if Redis is permanently down in this environment
+    if (times > 3) {
+      return null; // Stop retrying
+    }
+    return Math.min(times * 200, 1000);
+  }
 });
 
 redis.on("connect", () => {
-  console.log("Successfully connected to Cloud Redis database at note-believe-rosegold-84519.db.redis.io");
+  console.log("Connecting to Cloud Redis...");
+});
+
+redis.on("ready", () => {
+  isRedisHealthy = true;
+  console.log("Successfully connected and ready on Cloud Redis database.");
 });
 
 redis.on("error", (error) => {
-  console.error("Cloud Redis connection or operation error:", error);
+  isRedisHealthy = false;
+  // Log once as a warning instead of spamming full error stack traces on every single request
+  console.warn("Cloud Redis is offline (using high-performance in-memory fallback):", error.message);
+});
+
+redis.on("close", () => {
+  isRedisHealthy = false;
+});
+
+redis.on("end", () => {
+  isRedisHealthy = false;
+  console.log("Redis connection retry attempts exhausted. Operating permanently in-memory fallback mode.");
 });
 
 /**
@@ -44,9 +82,23 @@ export async function checkSpeedHack(userId: string, actionPath: string, minInte
   const redisKey = `anticheat:speed:${userId}:${actionPath}`;
   const now = Date.now();
 
+  // If Redis is not healthy or not ready, immediately use the local in-memory fallback (0ms latency)
+  if (!isRedisHealthy || redis.status !== "ready") {
+    const lastTime = localCache.get(redisKey);
+    if (lastTime) {
+      const diff = now - lastTime;
+      if (diff < minIntervalMs) {
+        console.warn(`[Anti-Speed-Hack] [Local Cache] Blocked rapid request from user ${userId} on ${actionPath} (Interval: ${diff}ms)`);
+        return false;
+      }
+    }
+    localCache.set(redisKey, now);
+    return true;
+  }
+
   try {
-    // Retrieve the timestamp of the last executed request from Cloud Redis with a strict 800ms timeout
-    const lastTimeStr = await withTimeout(redis.get(redisKey), 800);
+    // Retrieve the timestamp of the last executed request from Cloud Redis with a strict 400ms timeout
+    const lastTimeStr = await withTimeout(redis.get(redisKey), 400);
     
     if (lastTimeStr) {
       const lastTime = parseInt(lastTimeStr, 10);
@@ -58,12 +110,26 @@ export async function checkSpeedHack(userId: string, actionPath: string, minInte
       }
     }
 
-    // Update with current timestamp and set a TTL of 5000ms, with a strict 800ms timeout
-    await withTimeout(redis.set(redisKey, now.toString(), "PX", 5000), 800);
+    // Update with current timestamp and set a TTL of 5000ms, with a strict 400ms timeout
+    await withTimeout(redis.set(redisKey, now.toString(), "PX", 5000), 400);
+    
+    // Also mirror to local cache for safety
+    localCache.set(redisKey, now);
     return true;
   } catch (err) {
     // Fallback to allow requests in case of a Redis network issue, ensuring high availability
-    console.error("Anti-cheat Redis check failed, falling back to permissive allow:", err);
+    isRedisHealthy = false;
+    
+    // Perform local in-memory validation
+    const lastTime = localCache.get(redisKey);
+    if (lastTime) {
+      const diff = now - lastTime;
+      if (diff < minIntervalMs) {
+        return false;
+      }
+    }
+    localCache.set(redisKey, now);
     return true;
   }
 }
+

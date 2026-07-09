@@ -98,6 +98,11 @@ try {
           backendUrl = '';
         }
 
+        // Robust validation: If backendUrl is set but is not a valid absolute HTTP/HTTPS URL, clear it to avoid "Failed to fetch" relative routing errors.
+        if (backendUrl && !backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
+          backendUrl = '';
+        }
+
         const cleanBase = backendUrl.replace(/\/+$/, '');
         const prefixMatch = (!backendUrl && typeof window !== 'undefined') ? window.location.pathname.match(/^\/(\d+)(?:\/|$)/) : null;
         const prefix = prefixMatch ? `/${prefixMatch[1]}` : '';
