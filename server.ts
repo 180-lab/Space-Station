@@ -3011,6 +3011,24 @@ app.post("/api/login", (req, res) => {
   res.json({ player });
 });
 
+// Check Google email endpoint
+app.post("/api/auth/check-email", (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Email is required." });
+  }
+  
+  const player = Object.values(state.players).find(
+    p => p.googleEmail && p.googleEmail.toLowerCase() === email.toLowerCase()
+  );
+  
+  if (player) {
+    return res.json({ exists: true, username: player.username });
+  } else {
+    return res.json({ exists: false });
+  }
+});
+
 // Google Authentication secure endpoint
 app.post("/api/auth/google", async (req, res) => {
   const { idToken, email, username, faction } = req.body;

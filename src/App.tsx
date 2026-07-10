@@ -135,6 +135,11 @@ export default function App() {
   // Google Sign-In & Payments Dialog states
   const [showGoogleDialog, setShowGoogleDialog] = useState(false);
   const [googleDialogMode, setGoogleDialogMode] = useState<'choose' | 'add'>('choose');
+  const [googleFlowStep, setGoogleFlowStep] = useState<'email' | 'register'>('email');
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [googleRegFaction, setGoogleRegFaction] = useState('Solar Federation');
+  const [gisLoaded, setGisLoaded] = useState(false);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const [newAccountEmail, setNewAccountEmail] = useState('');
   const [newAccountName, setNewAccountName] = useState('');
   const [showGPGSSimulator, setShowGPGSSimulator] = useState(false);
@@ -200,6 +205,149 @@ export default function App() {
       addDeviceGoogleAccount(player.googleEmail, player.username);
     }
   }, [player]);
+
+  // Dynamically load Google Identity Services SDK if Client ID is configured
+  useEffect(() => {
+    if (!googleClientId) return;
+
+    // Check if script already exists
+    if ((window as any).google?.accounts?.id) {
+      setGisLoaded(true);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      setGisLoaded(true);
+    };
+    script.onerror = () => {
+      console.error('Failed to load Google Identity Services client script.');
+    };
+    document.body.appendChild(script);
+  }, [googleClientId]);
+
+  // Hook to render and handle the REAL Google button when GIS is loaded and configured
+  useEffect(() => {
+    const mainBtnEl = document.getElementById('main-google-signin-button');
+    if (mainBtnEl && gisLoaded && googleClientId) {
+      try {
+        (window as any).google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: async (response: any) => {
+            const idToken = response.credential;
+            if (!idToken) return;
+            
+            showToast('Decrypting Google quantum signature key with gateway...', 'info');
+            try {
+              const res = await fetch('/api/auth/google', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  idToken,
+                  faction: googleRegFaction
+                })
+              });
+              const data = await safeParseJson(res);
+              if (res.ok) {
+                localStorage.setItem('moonbase_userId', data.player.id);
+                setUserId(data.player.id);
+                setPlayer(data.player);
+                addDeviceGoogleAccount(data.player.googleEmail || '', data.player.username);
+                showToast(`Access granted! Welcome, Commander ${data.player.username}.`, 'success');
+                setShowGoogleDialog(false);
+                if (data.isNew) {
+                  setInitialStationName(`${data.player.username}'s Station`);
+                  setShowInitialStationNaming(true);
+                }
+              } else {
+                showToast(data.error || 'Identity keys verification rejected.', 'error');
+              }
+            } catch (err) {
+              showToast('Quantum transmission gateway was interrupted.', 'error');
+            }
+          }
+        });
+
+        (window as any).google.accounts.id.renderButton(
+          mainBtnEl,
+          { 
+            theme: 'outline', 
+            size: 'large', 
+            width: mainBtnEl.offsetWidth || 310,
+            text: 'signup_with',
+            shape: 'rectangular'
+          }
+        );
+      } catch (err) {
+        console.error('Error rendering primary GIS button:', err);
+      }
+    }
+  }, [gisLoaded, googleClientId, userId, player]);
+
+  // Hook to render real Google Sign-In button inside the popup dialog
+  useEffect(() => {
+    const popupBtnEl = document.getElementById('popup-real-google-signin-button');
+    if (popupBtnEl && gisLoaded && googleClientId && showGoogleDialog && googleDialogMode === 'add') {
+      try {
+        (window as any).google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: async (response: any) => {
+            const idToken = response.credential;
+            if (!idToken) return;
+            
+            showToast('Decrypting Google credentials with gateway...', 'info');
+            try {
+              const res = await fetch('/api/auth/google', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  idToken,
+                  faction: googleRegFaction
+                })
+              });
+              const data = await safeParseJson(res);
+              if (res.ok) {
+                localStorage.setItem('moonbase_userId', data.player.id);
+                setUserId(data.player.id);
+                setPlayer(data.player);
+                addDeviceGoogleAccount(data.player.googleEmail || '', data.player.username);
+                showToast(`Access granted! Welcome, Commander ${data.player.username}.`, 'success');
+                setShowGoogleDialog(false);
+                if (data.isNew) {
+                  setInitialStationName(`${data.player.username}'s Station`);
+                  setShowInitialStationNaming(true);
+                }
+              } else {
+                showToast(data.error || 'Google token validation rejected.', 'error');
+              }
+            } catch (err) {
+              showToast('Quantum transmission gateway was interrupted.', 'error');
+            }
+          }
+        });
+
+        (window as any).google.accounts.id.renderButton(
+          popupBtnEl,
+          { 
+            theme: 'filled_blue', 
+            size: 'large', 
+            width: popupBtnEl.offsetWidth || 280,
+            text: 'continue_with',
+            shape: 'rectangular'
+          }
+        );
+      } catch (err) {
+        console.error('Error rendering popup GIS button:', err);
+      }
+    }
+  }, [gisLoaded, googleClientId, showGoogleDialog, googleDialogMode, googleRegFaction]);
   const [appConfirmModal, setAppConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [playersList, setPlayersList] = useState<LeaderboardPlayer[]>([]);
   const [alliances, setAlliances] = useState<Record<string, Alliance>>({});
@@ -216,7 +364,7 @@ export default function App() {
   // Derived or enriched chat messages with Galactic Federation welcome message injected
   const enrichedChatMessages = React.useMemo(() => {
     // If we have a valid player profile, ensure we inject the welcome message
-    if (!player) return chatMessages;
+    if (!player || player.welcomeMessageSent) return chatMessages;
     
     // Check if the welcome message is already present in the list
     const alreadyHasWelcome = chatMessages.some(m => m.id === 'fed_welcome');
@@ -1456,7 +1604,7 @@ export default function App() {
   };
 
   // Auth: Google Sign-In
-  const handleGoogleSignIn = async (email: string, selectName?: string) => {
+  const handleGoogleSignIn = async (email: string, selectName?: string, selectFaction?: string) => {
     try {
       const res = await fetch('/api/auth/google', {
         method: 'POST',
@@ -1466,7 +1614,7 @@ export default function App() {
         body: JSON.stringify({
           email,
           username: selectName,
-          faction
+          faction: selectFaction || faction
         })
       });
       const data = await safeParseJson(res);
@@ -2512,26 +2660,33 @@ export default function App() {
           </div>
 
           {/* Branded Google Login button */}
-          <button 
-            type="button"
-            onClick={() => {
-              if (deviceGoogleAccounts && deviceGoogleAccounts.length > 0) {
-                setGoogleDialogMode('choose');
-              } else {
-                setGoogleDialogMode('add');
-              }
-              setShowGoogleDialog(true);
-            }}
-            className="w-full py-3 px-4 bg-white hover:bg-slate-100 text-[#1F2937] font-bold text-xs tracking-wider uppercase rounded-xl flex items-center justify-center gap-3 active:scale-[0.98] transition duration-150 cursor-pointer shadow-md"
-          >
-            <svg className="w-4 h-4 text-rose-500" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-              <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.13-.07-.25-.15-.35-.22" fill="#FBBC05" />
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
-            </svg>
-            <span>Continue with Google Account</span>
-          </button>
+          {googleClientId && gisLoaded ? (
+            <div className="w-full flex justify-center py-1">
+              <div id="main-google-signin-button" className="w-full min-h-[44px] flex justify-center"></div>
+            </div>
+          ) : (
+            <button 
+              type="button"
+              onClick={() => {
+                if (deviceGoogleAccounts && deviceGoogleAccounts.length > 0) {
+                  setGoogleDialogMode('choose');
+                } else {
+                  setGoogleDialogMode('add');
+                }
+                setGoogleFlowStep('email');
+                setShowGoogleDialog(true);
+              }}
+              className="w-full py-3 px-4 bg-white hover:bg-slate-100 text-[#1F2937] font-bold text-xs tracking-wider uppercase rounded-xl flex items-center justify-center gap-3 active:scale-[0.98] transition duration-150 cursor-pointer shadow-md"
+            >
+              <svg className="w-4 h-4 text-rose-500" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.13-.07-.25-.15-.35-.22" fill="#FBBC05" />
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+              </svg>
+              <span>Continue with Google Account</span>
+            </button>
+          )}
 
           {/* Branded Google Play Games Login button */}
           <button 
@@ -2717,68 +2872,167 @@ export default function App() {
                     </div>
                   ) : (
                     /* ADD ACCOUNT MODE (Beautiful Google-style sign in inputs) */
-                    <form 
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        if (!newAccountEmail || !newAccountEmail.includes('@')) {
-                          showToast('Please enter a valid Google email address.', 'error');
-                          return;
-                        }
-                        const name = newAccountName.trim() || newAccountEmail.split('@')[0];
-                        await handleGoogleSignIn(newAccountEmail, name);
-                      }}
-                      className="space-y-6"
-                    >
-                      <div className="space-y-5">
-                        <div>
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2 font-mono">
-                            GOOGLE EMAIL ADDRESS
-                          </label>
-                          <input
-                            type="email"
-                            required
-                            value={newAccountEmail}
-                            onChange={(e) => setNewAccountEmail(e.target.value)}
-                            placeholder="e.g. commander.sol@gmail.com"
-                            className="w-full px-4 py-3 bg-[#05070A] border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder-gray-500 text-slate-100 shadow-inner"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2 font-mono">
-                            COMMANDER DISPLAY NAME
-                          </label>
-                          <input
-                            type="text"
-                            value={newAccountName}
-                            onChange={(e) => setNewAccountName(e.target.value)}
-                            placeholder="Choose your callsign (optional)"
-                            className="w-full px-4 py-3 bg-[#05070A] border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder-gray-500 text-slate-100 shadow-inner"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Actions row */}
-                      <div className="flex items-center justify-between pt-4">
-                        {deviceGoogleAccounts && deviceGoogleAccounts.length > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => setGoogleDialogMode('choose')}
-                            className="text-xs font-bold font-mono text-blue-600 hover:text-blue-700 uppercase tracking-wider cursor-pointer"
-                          >
-                            &larr; Back to accounts
-                          </button>
-                        ) : (
-                          <div /> // empty spacer when there's no back option
-                        )}
-                        <button
-                          type="submit"
-                          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition shadow-md cursor-pointer"
+                    <div className="space-y-6">
+                      {googleFlowStep === 'email' ? (
+                        <form 
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            if (!newAccountEmail || !newAccountEmail.includes('@')) {
+                              showToast('Please enter a valid Google email address.', 'error');
+                              return;
+                            }
+                            setIsCheckingEmail(true);
+                            try {
+                              const res = await fetch(`/api/auth/check-email?email=${encodeURIComponent(newAccountEmail)}`);
+                              const data = await safeParseJson(res);
+                              if (res.ok && data.exists) {
+                                showToast('Google credential match! Establishing uplink...', 'success');
+                                await handleGoogleSignIn(newAccountEmail);
+                              } else {
+                                // Transition to profile registration screen
+                                setNewAccountName(newAccountEmail.split('@')[0]);
+                                setGoogleFlowStep('register');
+                              }
+                            } catch (err) {
+                              showToast('Security gateway communication error.', 'error');
+                            } finally {
+                              setIsCheckingEmail(false);
+                            }
+                          }}
+                          className="space-y-6"
                         >
-                          Next
-                        </button>
-                      </div>
-                    </form>
+                          <div className="space-y-5">
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2 font-mono">
+                                GOOGLE EMAIL ADDRESS
+                              </label>
+                              <input
+                                type="email"
+                                required
+                                value={newAccountEmail}
+                                onChange={(e) => setNewAccountEmail(e.target.value)}
+                                placeholder="e.g. commander.sol@gmail.com"
+                                className="w-full px-4 py-3 bg-[#05070A] border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder-gray-500 text-slate-100 shadow-inner"
+                              />
+                            </div>
+                          </div>
+
+                          {googleClientId && gisLoaded && (
+                            <div className="py-2 border-t border-b border-gray-100 flex flex-col items-center justify-center gap-2">
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Or Use Fast Sync</span>
+                              <div id="popup-real-google-signin-button" className="min-h-[40px]"></div>
+                            </div>
+                          )}
+
+                          {/* Actions row */}
+                          <div className="flex items-center justify-between pt-4">
+                            {deviceGoogleAccounts && deviceGoogleAccounts.length > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => setGoogleDialogMode('choose')}
+                                className="text-xs font-bold font-mono text-blue-600 hover:text-blue-700 uppercase tracking-wider cursor-pointer"
+                              >
+                                &larr; Back to accounts
+                              </button>
+                            ) : (
+                              <div /> // empty spacer when there's no back option
+                            )}
+                            <button
+                              type="submit"
+                              disabled={isCheckingEmail}
+                              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition shadow-md cursor-pointer disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
+                            >
+                              {isCheckingEmail ? (
+                                <>
+                                  <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                  <span>Checking...</span>
+                                </>
+                              ) : (
+                                <span>Next</span>
+                              )}
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        /* Step 2: Register Commander Profile */
+                        <form
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            if (!newAccountName.trim()) {
+                              showToast('Please choose a Commander callsign.', 'error');
+                              return;
+                            }
+                            setIsCheckingEmail(true);
+                            try {
+                              await handleGoogleSignIn(newAccountEmail, newAccountName.trim(), googleRegFaction);
+                            } finally {
+                              setIsCheckingEmail(false);
+                            }
+                          }}
+                          className="space-y-6"
+                        >
+                          <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-800 leading-relaxed font-medium">
+                            🛸 <strong>New Registry Detected:</strong> This Google account has no linked Space Station. Choose your custom callsign and select your faction to join the server!
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 font-mono">
+                                COMMANDER CALLSIGN
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={newAccountName}
+                                onChange={(e) => setNewAccountName(e.target.value)}
+                                placeholder="e.g. Commander Sol"
+                                className="w-full px-4 py-3 bg-[#05070A] border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder-gray-500 text-slate-100 shadow-inner"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 font-mono">
+                                COALITION FACTION ALIGNMENT
+                              </label>
+                              <select
+                                value={googleRegFaction}
+                                onChange={(e) => setGoogleRegFaction(e.target.value)}
+                                className="w-full px-4 py-3 bg-[#05070A] border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-100 shadow-inner cursor-pointer font-bold"
+                              >
+                                <option value="Solar Federation" className="bg-slate-900 text-amber-400 font-bold">Solar Federation (Core Defense)</option>
+                                <option value="Nexus Syndicate" className="bg-slate-900 text-purple-400 font-bold">Nexus Syndicate (Cyber Trade)</option>
+                                <option value="Eclipse Vanguard" className="bg-slate-900 text-rose-400 font-bold">Eclipse Vanguard (Dark Sovereignty)</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Actions row */}
+                          <div className="flex items-center justify-between pt-4">
+                            <button
+                              type="button"
+                              onClick={() => setGoogleFlowStep('email')}
+                              className="text-xs font-bold font-mono text-blue-600 hover:text-blue-700 uppercase tracking-wider cursor-pointer"
+                            >
+                              &larr; Back to Email
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={isCheckingEmail}
+                              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition shadow-md cursor-pointer disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2 animate-pulse"
+                            >
+                              {isCheckingEmail ? (
+                                <>
+                                  <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                  <span>Establishing Base...</span>
+                                </>
+                              ) : (
+                                <span>Create Commander Registry</span>
+                              )}
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
                   )}
 
                   {/* Google Legal Disclaimer matching screenshot */}
