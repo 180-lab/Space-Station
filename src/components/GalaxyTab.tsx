@@ -229,6 +229,40 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [radarRadius, setRadarRadius] = useState(1);
   const [isScanning, setIsScanning] = useState(false);
 
+  const [isTyping, setIsTyping] = useState(false);
+
+  React.useEffect(() => {
+    const handleFocusIn = () => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.hasAttribute('contenteditable')
+      )) {
+        setIsTyping(true);
+      }
+    };
+    const handleFocusOut = () => {
+      setTimeout(() => {
+        const activeEl = document.activeElement;
+        if (!activeEl || (
+          activeEl.tagName !== 'INPUT' && 
+          activeEl.tagName !== 'TEXTAREA' && 
+          !activeEl.hasAttribute('contenteditable')
+        )) {
+          setIsTyping(false);
+        }
+      }, 50);
+    };
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
+
   // Manage Alliance states
   const [showManageAlliance, setShowManageAlliance] = useState(false);
   const [allianceHighlightText, setAllianceHighlightText] = useState('');
@@ -831,8 +865,10 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   // Alliance create submit
   const handleCreateAllianceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!allianceName.trim() || !allianceTag.trim()) return;
-    onCreateAlliance(allianceName, allianceTag, allianceBannerColor, allianceBannerSymbol);
+    if (!allianceName.trim()) return;
+    // Auto generate unique 4 character tag from name under the hood
+    const generatedTag = (allianceName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 4) || Math.random().toString(36).substring(2, 6)).toUpperCase();
+    onCreateAlliance(allianceName, generatedTag, allianceBannerColor, allianceBannerSymbol);
     setAllianceName('');
     setAllianceTag('');
   };
@@ -1345,7 +1381,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   {target.isHabitable ? (
                                     <span className="font-bold text-emerald-400 text-xs uppercase text-emerald-450">Uncharted Planet</span>
                                   ) : target.allianceTag ? (
-                                    <span className="font-bold text-yellow-400 text-xs">[{target.allianceTag}] alliance member</span>
+                                    <span className="font-bold text-yellow-400 text-xs">alliance member</span>
                                   ) : (
                                     <span className="text-slate-400 text-xs italic">Unaligned Commander</span>
                                   )}
@@ -1667,7 +1703,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                         </div>
                                         {item.allianceTag && (
                                           <p className="text-[9px] text-yellow-450 font-mono font-bold uppercase">
-                                            [{item.allianceTag}] member
+                                            alliance member
                                           </p>
                                         )}
                                       </div>
@@ -1791,7 +1827,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
               </div>
             )}
 
-            {isDirectRadarView && onCloseRadarDirectView && (
+            {isDirectRadarView && onCloseRadarDirectView && !isTyping && (
               <button
                 type="button"
                 onClick={onCloseRadarDirectView}
@@ -2140,7 +2176,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     <thead>
                       <tr className="border-b border-[#1E293B]/70 text-slate-500 pb-2">
                         <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">RANK</th>
-                        <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">ALLIANCE [TAG]</th>
+                        <th className="py-3 px-4 text-left font-bold tracking-wider whitespace-nowrap">ALLIANCE</th>
                         <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">MEMBERS</th>
                         {rankingMetric === 'population' && <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">POPULATION</th>}
                         {rankingMetric === 'attack' && <th className="py-3 px-4 text-right font-bold tracking-wider whitespace-nowrap">ATTACK POINTS</th>}
@@ -2173,7 +2209,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                       style={{ backgroundColor: all.bannerColor || '#5bc0be' }}
                                     />
                                     <span className="font-bold text-[#5bc0be] hover:text-cyan-300">
-                                      {all.name} <span className="text-slate-500 font-mono">[{all.tag}]</span>
+                                      {all.name}
                                     </span>
                                     {isYourAlliance && <span className="text-[10px] text-cyan-400 font-mono font-normal ml-1">(YOURS)</span>}
                                   </div>
@@ -2384,7 +2420,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   <ShieldAlert size={36} className="mx-auto text-red-400 animate-pulse" />
                   <h3 className="text-sm font-bold text-red-400 uppercase tracking-widest">ACCESS LEVEL DENIED</h3>
                   <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                    You are currently registered as a <span className="font-bold text-yellow-400 uppercase">Recruit</span> in [{alliances[player.allianceId]?.tag || 'Alliance'}]. 
+                    You are currently registered as a <span className="font-bold text-yellow-400 uppercase">Recruit</span> in {alliances[player.allianceId]?.name || 'Alliance'}. 
                     Recruits are restricted from viewing classified military declarations, active war councils, 
                     the alliance roster list, or participating in communications. 
                   </p>
@@ -2396,7 +2432,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 <div className="p-4 bg-[#05070A]/95 rounded-xl border border-[#1E293B] space-y-6 font-mono text-xs">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                      <span className="font-bold text-lg text-yellow-400 tracking-tight">[{alliances[player.allianceId]?.tag}] {alliances[player.allianceId]?.name}</span>
+                      <span className="font-bold text-lg text-yellow-400 tracking-tight">{alliances[player.allianceId]?.name}</span>
                       <p className="text-[11px] text-slate-500 mt-1">Founding Archon: {alliances[player.allianceId]?.leaderName}</p>
                     </div>
                     <span className="px-3.5 py-1 rounded-full text-[10px] font-bold font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 w-fit">
@@ -2553,14 +2589,6 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           onChange={(e) => setAllianceName(e.target.value)}
                           className="w-full px-4 py-2.5 bg-[#0A0F1D] border border-[#1E293B] text-white rounded-xl focus:outline-none focus:border-cyan-500 uppercase font-mono"
                         />
-                        <input 
-                          type="text" 
-                          placeholder="TAG (max 4 chars)"
-                          maxLength={4}
-                          value={allianceTag}
-                          onChange={(e) => setAllianceTag(e.target.value)}
-                          className="w-full px-4 py-2.5 bg-[#0A0F1D] border border-[#1E293B] text-white rounded-xl focus:outline-none focus:border-cyan-500 uppercase font-mono"
-                        />
                       </div>
                       <button 
                         type="submit"
@@ -2587,8 +2615,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           return (
                             <div key={alliance.id} className="p-2.5 border border-[#1E293B] bg-[#0A0F1D] rounded-xl flex items-center justify-between">
                               <div>
-                                <span className="font-bold text-yellow-400">[{alliance.tag}]</span>
-                                <span className="text-slate-350 ml-2 font-bold uppercase">{alliance.name}</span>
+                                <span className="text-slate-350 font-bold uppercase">{alliance.name}</span>
                               </div>
                               {alreadyApplied ? (
                                 <span className="px-3 py-1.5 bg-slate-800 text-slate-400 text-[10px] font-bold font-mono tracking-widest uppercase border border-slate-700 rounded-lg">
@@ -5229,8 +5256,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
       {showManageAlliance && (() => {
         const activeAlliance = alliances[player.allianceId || ''];
         return (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-4xl bg-[#090D1A] border border-cyan-500/30 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(6,182,212,0.25)] flex flex-col h-[85vh] font-sans text-left relative">
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-0 md:p-4 animate-fade-in">
+          <div className="w-full h-full md:h-[85vh] max-w-4xl bg-[#090D1A] border-0 md:border border-cyan-500/30 md:rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(6,182,212,0.25)] flex flex-col font-sans text-left relative">
             
             {/* Header decor */}
             <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-cyan-500 via-sky-400 to-indigo-500" />
@@ -5240,7 +5267,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
               <div>
                 <span className="text-[10px] text-cyan-400 font-bold tracking-widest uppercase block mb-1">STRATEGIC OPERATIONS DIRECTORY</span>
                 <h3 className="text-sm sm:text-base font-black font-mono text-white tracking-tight flex items-center gap-2">
-                  🛡️ [{activeAlliance?.tag}] {activeAlliance?.name} COCKPIT
+                  🛡️ {activeAlliance?.name} COCKPIT
                 </h3>
               </div>
               

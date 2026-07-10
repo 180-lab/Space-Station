@@ -216,6 +216,40 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
   const [isResearching, setIsResearching] = useState(false);
 
+  const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    const handleFocusIn = () => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.hasAttribute('contenteditable')
+      )) {
+        setIsTyping(true);
+      }
+    };
+    const handleFocusOut = () => {
+      setTimeout(() => {
+        const activeEl = document.activeElement;
+        if (!activeEl || (
+          activeEl.tagName !== 'INPUT' && 
+          activeEl.tagName !== 'TEXTAREA' && 
+          !activeEl.hasAttribute('contenteditable')
+        )) {
+          setIsTyping(false);
+        }
+      }, 50);
+    };
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
+
   // Synchronize state when active planet changes, player's server-side tech levels, etc.
   useEffect(() => {
     const isFirstPlanet = player.planets[0]?.id === activePlanet.id;
@@ -878,7 +912,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
         </div>
       )}
 
-      {onReturnToBase && (
+      {onReturnToBase && !isTyping && (
         <button
           type="button"
           onClick={onReturnToBase}

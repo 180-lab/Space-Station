@@ -88,6 +88,40 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
     return () => clearInterval(interval);
   }, []);
 
+  const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    const handleFocusIn = () => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.hasAttribute('contenteditable')
+      )) {
+        setIsTyping(true);
+      }
+    };
+    const handleFocusOut = () => {
+      setTimeout(() => {
+        const activeEl = document.activeElement;
+        if (!activeEl || (
+          activeEl.tagName !== 'INPUT' && 
+          activeEl.tagName !== 'TEXTAREA' && 
+          !activeEl.hasAttribute('contenteditable')
+        )) {
+          setIsTyping(false);
+        }
+      }, 50);
+    };
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
+
   // Personal Messages Sub-Tabs
   const [commDeckTab, setCommDeckTab] = useState<'incoming' | 'saved' | 'sent' | 'compose'>('incoming');
   const [directMsgTargetId, setDirectMsgTargetId] = useState('');
@@ -231,12 +265,14 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
 
   const handleCreateAllianceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!allianceName.trim() || !allianceTag.trim()) {
-      showToast?.('Please specify both name and tag.', 'error');
+    if (!allianceName.trim()) {
+      showToast?.('Please specify an alliance name.', 'error');
       return;
     }
+    // Auto generate unique 4 character tag from name under the hood
+    const generatedTag = (allianceName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 4) || Math.random().toString(36).substring(2, 6)).toUpperCase();
     try {
-      await onCreateAlliance(allianceName, allianceTag, '#22d3ee', '🛡️');
+      await onCreateAlliance(allianceName, generatedTag, '#22d3ee', '🛡️');
       setAllianceName('');
       setAllianceTag('');
     } catch (err) {
@@ -330,35 +366,91 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
         </div>
 
         {/* Major Selector Tabs: Personal Messages vs Alliance Hub */}
-        <div className="flex border-b border-[#1E293B]/60 bg-black/25">
+        <div className="p-4 bg-slate-950/80 border-b border-[#1E293B]/80 grid grid-cols-1 md:grid-cols-2 gap-4">
           <button
             type="button"
             onClick={() => setActiveTab('messages')}
-            className={`flex-1 py-3 text-center text-xs font-bold tracking-wider uppercase border-b-2 flex items-center justify-center gap-2 transition cursor-pointer ${
+            className={`relative p-5 rounded-xl border font-mono text-left transition duration-200 cursor-pointer overflow-hidden group ${
               activeTab === 'messages'
-                ? 'border-cyan-500 text-cyan-400 bg-cyan-500/5 font-black'
-                : 'border-transparent text-slate-400 hover:text-white'
+                ? 'bg-gradient-to-r from-emerald-950/40 to-cyan-950/40 border-emerald-500/65 shadow-[0_0_25px_rgba(16,185,129,0.15)]'
+                : 'bg-[#03060c] border-[#1E293B] hover:border-emerald-500/40 hover:bg-[#070d17]'
             }`}
           >
-            <Mail size={14} />
-            <span>PERSONAL MESSAGES ({player.commandMessages?.filter(m => !m.isSent && !m.isRead).length || 0})</span>
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition duration-300 text-3xl">✉️</div>
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-lg border transition ${
+                activeTab === 'messages' 
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)]' 
+                  : 'bg-slate-900 border-[#1E293B] text-slate-400 group-hover:text-emerald-400'
+              }`}>
+                <Mail size={18} className={activeTab === 'messages' ? 'animate-bounce' : ''} />
+              </div>
+              <div>
+                <span className="text-[9px] uppercase tracking-widest text-emerald-500/80 font-black block">SECURE SIGNAL DECK</span>
+                <span className={`text-sm tracking-wide font-black uppercase ${
+                  activeTab === 'messages' ? 'text-emerald-400' : 'text-slate-300'
+                }`}>
+                  Personal Messages
+                </span>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                    player.commandMessages?.filter(m => !m.isSent && !m.isRead).length
+                      ? 'bg-red-500/20 text-red-400 border border-red-500/30 font-black animate-pulse'
+                      : 'bg-slate-900 text-slate-500 border border-slate-800'
+                  }`}>
+                    {player.commandMessages?.filter(m => !m.isSent && !m.isRead).length || 0} UNREAD CHANNELS
+                  </span>
+                </div>
+              </div>
+            </div>
+            {activeTab === 'messages' && (
+              <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-emerald-500 to-cyan-500" />
+            )}
           </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('alliance')}
-            className={`flex-1 py-3 text-center text-xs font-bold tracking-wider uppercase border-b-2 flex items-center justify-center gap-2 transition cursor-pointer ${
+            className={`relative p-5 rounded-xl border font-mono text-left transition duration-200 cursor-pointer overflow-hidden group ${
               activeTab === 'alliance'
-                ? 'border-cyan-500 text-cyan-400 bg-cyan-500/5 font-black'
-                : 'border-transparent text-slate-400 hover:text-white'
+                ? 'bg-gradient-to-r from-cyan-950/40 to-blue-950/40 border-cyan-500/65 shadow-[0_0_25px_rgba(6,182,212,0.15)]'
+                : 'bg-[#03060c] border-[#1E293B] hover:border-cyan-500/40 hover:bg-[#070d17]'
             }`}
           >
-            <Users size={14} />
-            <span>ALLIANCE HUB</span>
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition duration-300 text-3xl">👥</div>
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-lg border transition ${
+                activeTab === 'alliance' 
+                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)]' 
+                  : 'bg-slate-900 border-[#1E293B] text-slate-400 group-hover:text-cyan-400'
+              }`}>
+                <Users size={18} className={activeTab === 'alliance' ? 'animate-pulse' : ''} />
+              </div>
+              <div>
+                <span className="text-[9px] uppercase tracking-widest text-cyan-500/80 font-black block">COALITION NETWORK</span>
+                <span className={`text-sm tracking-wide font-black uppercase ${
+                  activeTab === 'alliance' ? 'text-cyan-400' : 'text-slate-300'
+                }`}>
+                  Alliance Hub
+                </span>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 border border-slate-800 rounded-full font-bold">
+                    {activeAlliance ? `${activeAlliance.name}` : 'UNALIGNED COMMANDER'}
+                  </span>
+                </div>
+              </div>
+            </div>
+            {activeTab === 'alliance' && (
+              <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-cyan-500 to-blue-500" />
+            )}
           </button>
         </div>
 
         {/* Modal Scrollable Container */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-0">
+        <div 
+          className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-0"
+          style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        >
           
           {/* Landing Page: Upgrade Communications Hub */}
           {activePlanet && activePlanet.buildings?.commsHub && (
@@ -863,7 +955,7 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                   <div className="p-4 bg-[#05070A]/95 rounded-xl border border-[#1E293B] space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <span className="font-bold text-lg text-yellow-400 tracking-tight">[{activeAlliance.tag}] {activeAlliance.name}</span>
+                        <span className="font-bold text-lg text-yellow-400 tracking-tight">{activeAlliance.name}</span>
                         <p className="text-[11px] text-slate-500 mt-0.5">Founding Archon: {activeAlliance.leaderName}</p>
                       </div>
                       <div className="flex gap-2">
@@ -1003,14 +1095,6 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                           onChange={(e) => setAllianceName(e.target.value)}
                           className="w-full px-3 py-2 bg-[#0A0F1D] border border-[#1E293B] text-white rounded-lg focus:outline-none focus:border-cyan-500 uppercase font-mono text-xs"
                         />
-                        <input 
-                          type="text" 
-                          placeholder="TAG (max 4 characters)"
-                          maxLength={4}
-                          value={allianceTag}
-                          onChange={(e) => setAllianceTag(e.target.value)}
-                          className="w-full px-3 py-2 bg-[#0A0F1D] border border-[#1E293B] text-white rounded-lg focus:outline-none focus:border-cyan-500 uppercase font-mono text-xs"
-                        />
                       </div>
                       <button 
                         type="submit"
@@ -1043,8 +1127,7 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                             return (
                               <div key={alliance.id} className="p-2 border border-[#1E293B] bg-[#0A0F1D] rounded-lg flex items-center justify-between gap-1.5">
                                 <div className="truncate">
-                                  <span className="font-bold text-yellow-400">[{alliance.tag}]</span>
-                                  <span className="text-slate-350 ml-1.5 font-bold uppercase truncate">{alliance.name}</span>
+                                  <span className="text-slate-350 font-bold uppercase truncate">{alliance.name}</span>
                                 </div>
                                 {alreadyApplied ? (
                                   <span className="px-2.5 py-1 bg-slate-800 text-slate-400 text-[9px] font-bold tracking-wider uppercase border border-slate-700 rounded-lg shrink-0">
@@ -1081,8 +1164,8 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
         if (!activeAlliance) return null;
 
         return (
-          <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-4xl bg-[#090D1A] border border-cyan-500/30 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(6,182,212,0.25)] flex flex-col h-[85vh] relative text-left">
+          <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-0 md:p-4 animate-fade-in">
+            <div className="w-full h-full md:h-[85vh] max-w-4xl bg-[#090D1A] border-0 md:border border-cyan-500/30 md:rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(6,182,212,0.25)] flex flex-col relative text-left">
               
               <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-cyan-500 via-sky-400 to-indigo-500" />
               
@@ -1092,7 +1175,7 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                   <span className="text-2xl">⚙&zwj;⚙</span>
                   <div>
                     <h3 className="text-xs font-black uppercase tracking-widest text-[#00F0FF]">
-                      Sovereignty Operations Console: [{activeAlliance.tag}] {activeAlliance.name}
+                      Sovereignty Operations Console: {activeAlliance.name}
                     </h3>
                     <p className="text-[10px] uppercase text-slate-500">
                       Coordinating highlights logs, fleet troop readiness, and live telemetry reports
@@ -1133,7 +1216,10 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
               </div>
 
               {/* Modal Content - Scrollable Main space */}
-              <div className="flex-1 overflow-y-auto p-6 font-mono text-xs space-y-5 bg-[#04060b]/30">
+              <div 
+                className="flex-1 overflow-y-auto p-6 font-mono text-xs space-y-5 bg-[#04060b]/30"
+                style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+              >
 
                 {/* TAB 1: HIGHLIGHTS NOTES */}
                 {activeReportsTab === 'highlights' && (
@@ -1479,21 +1565,36 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                 )}
 
               </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-black/40 border-t border-[#1E293B]/70 flex justify-between items-center text-[10px] text-slate-500 font-mono">
+                <span>SECURE ALLIANCE OPERATIONS PORTAL ACTIVATED</span>
+                <button
+                  type="button"
+                  onClick={() => setShowManageAlliance(false)}
+                  className="px-5 py-2.5 bg-cyan-950/20 hover:bg-cyan-500/20 border border-cyan-500/25 text-cyan-400 hover:text-cyan-300 font-bold font-mono text-[10.5px] uppercase tracking-widest rounded-xl transition cursor-pointer"
+                >
+                  Exit Cockpit
+                </button>
+              </div>
+
             </div>
           </div>
         );
       })()}
 
       {/* Floating Back Button */}
-      <button
-        type="button"
-        onClick={handleManualClose}
-        className="fixed right-6 bottom-6 z-[60] flex items-center justify-center gap-2.5 px-5 py-4 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_20px_rgba(6,182,212,0.6)] transition duration-150 active:scale-95 group cursor-pointer"
-        title="Back to Station"
-      >
-        <Compass size={18} className="animate-spin-slow group-hover:rotate-45 transition-transform" />
-        <span className="text-xs uppercase tracking-widest font-black hidden sm:inline font-mono">RETURN TO BASE</span>
-      </button>
+      {!isTyping && (
+        <button
+          type="button"
+          onClick={handleManualClose}
+          className="fixed right-6 bottom-6 z-[60] flex items-center justify-center gap-2.5 px-5 py-4 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_20px_rgba(6,182,212,0.6)] transition duration-150 active:scale-95 group cursor-pointer"
+          title="Back to Station"
+        >
+          <Compass size={18} className="animate-spin-slow group-hover:rotate-45 transition-transform" />
+          <span className="text-xs uppercase tracking-widest font-black hidden sm:inline font-mono">RETURN TO BASE</span>
+        </button>
+      )}
 
     </div>
   );

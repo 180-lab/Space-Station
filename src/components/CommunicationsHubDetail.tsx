@@ -75,12 +75,14 @@ export const CommunicationsHubDetail: React.FC<CommunicationsHubDetailProps> = (
 
   const handleCreateAllianceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!allianceName.trim() || !allianceTag.trim()) {
-      showToast?.('Please specify both name and tag.', 'error');
+    if (!allianceName.trim()) {
+      showToast?.('Please specify an alliance name.', 'error');
       return;
     }
+    // Auto generate unique 4 character tag from name under the hood
+    const generatedTag = (allianceName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 4) || Math.random().toString(36).substring(2, 6)).toUpperCase();
     try {
-      await onCreateAlliance(allianceName, allianceTag, '#f43f5e', '🛡️');
+      await onCreateAlliance(allianceName, generatedTag, '#f43f5e', '🛡️');
       setAllianceName('');
       setAllianceTag('');
     } catch (err) {
@@ -200,30 +202,69 @@ export const CommunicationsHubDetail: React.FC<CommunicationsHubDetailProps> = (
   return (
     <div className="space-y-4 font-mono text-xs text-left" id="communications-hub-container">
       {/* Visual Section Navigation */}
-      <div className="flex border-b border-[#1E293B]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-950/80 border border-[#1E293B]/70 rounded-xl">
         <button
           type="button"
           onClick={() => setActiveSection('messages')}
-          className={`flex-1 py-2.5 text-center font-bold tracking-wider uppercase border-b-2 flex items-center justify-center gap-1.5 transition-all duration-150 cursor-pointer ${
+          className={`relative p-4 rounded-xl border font-mono text-left transition duration-200 cursor-pointer overflow-hidden group ${
             activeSection === 'messages'
-              ? 'border-cyan-500 text-cyan-400 bg-cyan-500/5'
-              : 'border-transparent text-slate-400 hover:text-white'
+              ? 'bg-gradient-to-r from-emerald-950/30 to-cyan-950/30 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+              : 'bg-[#03060c] border-[#1E293B] hover:border-emerald-500/30 hover:bg-[#070d17]'
           }`}
         >
-          <MessageSquare size={13} />
-          <span>MESSAGES</span>
+          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition duration-300 text-2xl">✉️</div>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg border transition ${
+              activeSection === 'messages' 
+                ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)]' 
+                : 'bg-slate-900 border-[#1E293B] text-slate-400 group-hover:text-emerald-400'
+            }`}>
+              <MessageSquare size={15} className={activeSection === 'messages' ? 'animate-bounce' : ''} />
+            </div>
+            <div>
+              <span className="text-[8px] uppercase tracking-widest text-emerald-500/80 font-black block">TRANSMISSIONS</span>
+              <span className={`text-xs tracking-wide font-black uppercase ${
+                activeSection === 'messages' ? 'text-emerald-400' : 'text-slate-300'
+              }`}>
+                Secure Messages
+              </span>
+            </div>
+          </div>
+          {activeSection === 'messages' && (
+            <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-emerald-500 to-cyan-500" />
+          )}
         </button>
+
         <button
           type="button"
           onClick={() => setActiveSection('alliance')}
-          className={`flex-1 py-2.5 text-center font-bold tracking-wider uppercase border-b-2 flex items-center justify-center gap-1.5 transition-all duration-150 cursor-pointer ${
+          className={`relative p-4 rounded-xl border font-mono text-left transition duration-200 cursor-pointer overflow-hidden group ${
             activeSection === 'alliance'
-              ? 'border-cyan-500 text-cyan-400 bg-cyan-500/5'
-              : 'border-transparent text-slate-400 hover:text-white'
+              ? 'bg-gradient-to-r from-cyan-950/30 to-blue-950/30 border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+              : 'bg-[#03060c] border-[#1E293B] hover:border-cyan-500/30 hover:bg-[#070d17]'
           }`}
         >
-          <Users size={13} />
-          <span>ALLIANCE HUB</span>
+          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition duration-300 text-2xl">👥</div>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg border transition ${
+              activeSection === 'alliance' 
+                ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)]' 
+                : 'bg-slate-900 border-[#1E293B] text-slate-400 group-hover:text-cyan-400'
+            }`}>
+              <Users size={15} className={activeSection === 'alliance' ? 'animate-pulse' : ''} />
+            </div>
+            <div>
+              <span className="text-[8px] uppercase tracking-widest text-cyan-500/80 font-black block">COALITION HUB</span>
+              <span className={`text-xs tracking-wide font-black uppercase ${
+                activeSection === 'alliance' ? 'text-cyan-400' : 'text-slate-300'
+              }`}>
+                Alliance Desk
+              </span>
+            </div>
+          </div>
+          {activeSection === 'alliance' && (
+            <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-cyan-500 to-blue-500" />
+          )}
         </button>
       </div>
 
@@ -253,7 +294,7 @@ export const CommunicationsHubDetail: React.FC<CommunicationsHubDetailProps> = (
                     : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                 }`}
               >
-                🛡️ ALLIANCE CHAT [{activeAlliance?.tag || 'ALLY'}]
+                🛡️ ALLIANCE CHAT
               </button>
             )}
           </div>
@@ -337,7 +378,7 @@ export const CommunicationsHubDetail: React.FC<CommunicationsHubDetailProps> = (
               <div className="p-4 bg-[#05070A]/95 rounded-xl border border-[#1E293B] space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
-                    <span className="font-bold text-base text-yellow-400 tracking-tight">[{activeAlliance.tag}] {activeAlliance.name}</span>
+                    <span className="font-bold text-base text-yellow-400 tracking-tight">{activeAlliance.name}</span>
                     <p className="text-[10px] text-slate-500 mt-0.5">Founding Archon: {activeAlliance.leaderName}</p>
                   </div>
                   <div className="flex gap-2">
@@ -457,14 +498,6 @@ export const CommunicationsHubDetail: React.FC<CommunicationsHubDetailProps> = (
                       onChange={(e) => setAllianceName(e.target.value)}
                       className="w-full px-3 py-2 bg-[#0A0F1D] border border-[#1E293B] text-white rounded-lg focus:outline-none focus:border-cyan-500 uppercase font-mono"
                     />
-                    <input 
-                      type="text" 
-                      placeholder="TAG (max 4 chars)"
-                      maxLength={4}
-                      value={allianceTag}
-                      onChange={(e) => setAllianceTag(e.target.value)}
-                      className="w-full px-3 py-2 bg-[#0A0F1D] border border-[#1E293B] text-white rounded-lg focus:outline-none focus:border-cyan-500 uppercase font-mono"
-                    />
                   </div>
                   <button 
                     type="submit"
@@ -496,8 +529,7 @@ export const CommunicationsHubDetail: React.FC<CommunicationsHubDetailProps> = (
                         return (
                           <div key={alliance.id} className="p-2 border border-[#1E293B] bg-[#0A0F1D] rounded-lg flex items-center justify-between gap-1">
                             <div className="truncate">
-                              <span className="font-bold text-yellow-400">[{alliance.tag}]</span>
-                              <span className="text-slate-350 ml-1.5 font-bold uppercase truncate">{alliance.name}</span>
+                              <span className="text-slate-350 font-bold uppercase truncate">{alliance.name}</span>
                             </div>
                             {alreadyApplied ? (
                               <span className="px-2 py-1 bg-slate-800 text-slate-400 text-[8.5px] font-bold tracking-widest uppercase border border-slate-700 rounded">
