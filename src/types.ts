@@ -267,6 +267,14 @@ export interface BattleReport {
     food: number;
     respirant: number;
   };
+  dockedReserveFleets?: {
+    id: string;
+    name: string;
+    ownerId: string;
+    ownerName: string;
+    allianceId: string | null;
+    troops: Record<string, number>;
+  }[];
 }
 
 export interface NewsEvent {

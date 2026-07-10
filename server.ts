@@ -4449,6 +4449,26 @@ app.post("/api/galaxy/intelligence", (req, res) => {
         respirant: targetPlanet.mines?.respirant?.map((m: any) => m.level) || []
       },
       troops: targetPlanet.troops,
+      dockedReserveFleets: (() => {
+        const fleetsList: any[] = [];
+        Object.values(state.players).forEach(pObj => {
+          if (pObj.createdFleets) {
+            pObj.createdFleets.forEach(cf => {
+              if (cf.planetId === targetPlanet.id && (!cf.isTraveling || !cf.activeMissionId)) {
+                fleetsList.push({
+                  id: cf.id,
+                  name: cf.name,
+                  ownerId: pObj.id,
+                  ownerName: pObj.username,
+                  allianceId: pObj.allianceId,
+                  troops: cf.troops
+                });
+              }
+            });
+          }
+        });
+        return fleetsList;
+      })(),
       resources: targetPlanet.resources,
       lastActive: targetUser.lastActive || now - 600000
     };
@@ -4485,6 +4505,26 @@ app.post("/api/galaxy/intelligence", (req, res) => {
     attackerInitialTroops: { drone: 1 },
     attackerLosses: { drone: 0 },
     defenderInitialTroops: targetPlanet ? { ...targetPlanet.troops } : { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+    dockedReserveFleets: targetPlanet ? (() => {
+      const fleetsList: any[] = [];
+      Object.values(state.players).forEach(pObj => {
+        if (pObj.createdFleets) {
+          pObj.createdFleets.forEach(cf => {
+            if (cf.planetId === targetPlanet.id && (!cf.isTraveling || !cf.activeMissionId)) {
+              fleetsList.push({
+                id: cf.id,
+                name: cf.name,
+                ownerId: pObj.id,
+                ownerName: pObj.username,
+                allianceId: pObj.allianceId,
+                troops: cf.troops
+              });
+            }
+          });
+        }
+      });
+      return fleetsList;
+    })() : undefined,
     defenderLosses: { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
     winner: "attacker",
     resourcesStolen: { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 },

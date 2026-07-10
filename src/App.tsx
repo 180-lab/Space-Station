@@ -827,6 +827,9 @@ export default function App() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [newNameInput, setNewNameInput] = useState('');
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [isAlertsHUDMinimized, setIsAlertsHUDMinimized] = useState(false);
+  const [minimizeAlertsIncoming, setMinimizeAlertsIncoming] = useState(false);
+  const [minimizeAlertsMoving, setMinimizeAlertsMoving] = useState(false);
 
   // Sync newNameInput when activePlanet changes in App
   useEffect(() => {
@@ -5111,6 +5114,42 @@ export default function App() {
             pulseDot = 'bg-amber-500 shadow-[0_0_8px_#f59e0b]';
           }
 
+          if (isAlertsHUDMinimized) {
+            return (
+              <div id="alerts-modal-minimized" className="fixed bottom-4 right-4 z-50 p-4 bg-[#090D1A]/95 border-2 border-cyan-500/50 rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.3)] flex flex-col max-w-xs font-mono animate-fade-in text-left text-xs">
+                <div className="flex items-center justify-between gap-3 pb-1.5 border-b border-[#1E293B]">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded-full ${pulseDot} animate-pulse`} />
+                    <span className="font-black text-white text-[10px] tracking-wider uppercase">RADAR HUD ACTIVE</span>
+                  </div>
+                  <button 
+                    onClick={() => setIsAlertsHUDMinimized(false)}
+                    className="text-cyan-400 hover:text-white font-bold px-1.5 py-0.5 border border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/10 rounded text-[9px]"
+                    title="Maximize Transit Radar"
+                  >
+                    EXPAND 🔼
+                  </button>
+                </div>
+                <div className="text-[10px] text-slate-400 space-y-1 pt-1.5">
+                  <p className="flex justify-between">
+                    <span>Hostile Inbounds:</span>
+                    <span className={`font-bold ${incomingAttacks.length > 0 ? 'text-red-400 animate-pulse' : 'text-slate-500'}`}>{incomingAttacks.length}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span>Active Transits:</span>
+                    <span className={`font-bold ${movingForces.length > 0 ? 'text-amber-400' : 'text-slate-500'}`}>{movingForces.length}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsAlertsOpen(false)}
+                  className="w-full mt-2 py-1 bg-slate-900 border border-slate-800 text-[9px] hover:text-white transition uppercase font-bold text-slate-500 rounded cursor-pointer"
+                >
+                  Close HUD
+                </button>
+              </div>
+            );
+          }
+
           return (
             <div id="alerts-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
               <div className="relative w-full max-w-2xl bg-[#090D1A] border border-[#1E293B] rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
@@ -5126,213 +5165,238 @@ export default function App() {
                       <p className="text-[9px] text-slate-400 uppercase mt-0.5 font-bold">Space Station Command &bull; Coordinate Transit Scanner</p>
                     </div>
                   </div>
-                  <button
-                    id="close-alerts-top"
-                    onClick={() => setIsAlertsOpen(false)}
-                    className="text-slate-400 hover:text-white font-mono text-xs uppercase tracking-widest cursor-pointer border border-[#1E293B] px-2.5 py-1 rounded-lg bg-white/[0.02] hover:bg-white/[0.05]"
-                  >
-                    Close HUD
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      id="minimize-alerts-hud"
+                      onClick={() => setIsAlertsHUDMinimized(true)}
+                      className="text-cyan-400 hover:text-cyan-300 font-mono text-xs uppercase tracking-widest cursor-pointer border border-cyan-500/30 px-2.5 py-1 rounded-lg bg-cyan-500/5 hover:bg-cyan-500/10"
+                    >
+                      Minimize 🔽
+                    </button>
+                    <button
+                      id="close-alerts-top"
+                      onClick={() => setIsAlertsOpen(false)}
+                      className="text-slate-400 hover:text-white font-mono text-xs uppercase tracking-widest cursor-pointer border border-[#1E293B] px-2.5 py-1 rounded-lg bg-white/[0.02] hover:bg-white/[0.05]"
+                    >
+                      Close HUD
+                    </button>
+                  </div>
                 </div>
 
                 {/* Content Body */}
                 <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-[250px] font-mono text-left text-xs text-slate-350">
                   
                   {/* 1. Red Section: Incoming Attack Alerts */}
-                  <div>
-                    <h4 className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3 flex items-center gap-1.5 border-b border-red-950 pb-1.5">
-                      <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                      [!] HOSTILE INVASION TROOPS DETECTED
-                    </h4>
+                  <div className="space-y-3 border border-red-500/10 rounded-xl p-3 bg-[#020408]/40">
+                    <div 
+                      onClick={() => setMinimizeAlertsIncoming(!minimizeAlertsIncoming)}
+                      className="flex items-center justify-between cursor-pointer select-none pb-1.5 border-b border-red-950/40 font-mono"
+                    >
+                      <h4 className="text-[10px] font-bold text-red-500 uppercase tracking-widest flex items-center gap-1.5">
+                        <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                        [!] HOSTILE INVASION TROOPS DETECTED ({incomingAttacks.length})
+                      </h4>
+                      <span className="text-slate-500 font-mono text-[10px]">{minimizeAlertsIncoming ? 'EXPAND 🔽' : 'MINIMIZE 🔼'}</span>
+                    </div>
 
-                    {incomingAttacks.length === 0 ? (
-                      <p className="text-xs text-slate-500 italic px-3 py-2 bg-slate-950/20 border border-slate-900 rounded-lg">No incoming hostile troops detected. Sector perimeter secure.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {incomingAttacks.map((fleet) => {
-                          const secondsLeft = Math.max(0, Math.floor((fleet.arrivesAt - serverTime) / 1000));
-                          return (
-                            <div key={fleet.id} className="p-4 border border-red-500/20 bg-red-950/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs w-full overflow-hidden break-words">
-                              <div className="space-y-1 min-w-0 flex-1">
-                                <p className="font-bold text-red-400 uppercase tracking-wider">
-                                  Raider Sender:{" "}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setViewingPlayerId(fleet.senderId);
-                                      setIsAlertsOpen(false);
-                                    }}
-                                    className="font-bold text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer focus:outline-none"
-                                  >
-                                    {fleet.senderName}
-                                  </button>
-                                </p>
-                                <p className="text-slate-400 font-mono">Target Coordinates: <span className="text-white">[{fleet.targetCoords.x}, {fleet.targetCoords.y}]</span></p>
-                                
-                                {/* Always show troop composition and HP in incoming alerts */}
-                                {(() => {
-                                  const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
-                                  const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
-                                  let inboundDefHp = 0;
-                                  let inboundAtkHp = 0;
-                                  Object.entries(fleet.troops || {}).forEach(([k, q]) => {
-                                    const qNum = Number(q) || 0;
-                                    inboundDefHp += qNum * (defHpMap[k] || 0);
-                                    inboundAtkHp += qNum * (atkHpMap[k] || 0);
-                                  });
-                                  const inboundTotalHp = inboundDefHp + inboundAtkHp;
+                    {!minimizeAlertsIncoming && (
+                      incomingAttacks.length === 0 ? (
+                        <p className="text-xs text-slate-500 italic px-3 py-2 bg-slate-950/20 border border-slate-900 rounded-lg">No incoming hostile troops detected. Sector perimeter secure.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {incomingAttacks.map((fleet) => {
+                            const secondsLeft = Math.max(0, Math.floor((fleet.arrivesAt - serverTime) / 1000));
+                            return (
+                              <div key={fleet.id} className="p-4 border border-red-500/20 bg-red-950/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs w-full overflow-hidden break-words">
+                                <div className="space-y-1 min-w-0 flex-1">
+                                  <p className="font-bold text-red-400 uppercase tracking-wider">
+                                    Raider Sender:{" "}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setViewingPlayerId(fleet.senderId);
+                                        setIsAlertsOpen(false);
+                                      }}
+                                      className="font-bold text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer focus:outline-none"
+                                    >
+                                      {fleet.senderName}
+                                    </button>
+                                  </p>
+                                  <p className="text-slate-400 font-mono">Target Coordinates: <span className="text-white">[{fleet.targetCoords.x}, {fleet.targetCoords.y}]</span></p>
+                                  
+                                  {/* Always show troop composition and HP in incoming alerts */}
+                                  {(() => {
+                                    const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
+                                    const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
+                                    let inboundDefHp = 0;
+                                    let inboundAtkHp = 0;
+                                    Object.entries(fleet.troops || {}).forEach(([k, q]) => {
+                                      const qNum = Number(q) || 0;
+                                      inboundDefHp += qNum * (defHpMap[k] || 0);
+                                      inboundAtkHp += qNum * (atkHpMap[k] || 0);
+                                    });
+                                    const inboundTotalHp = inboundDefHp + inboundAtkHp;
 
-                                  return (
-                                    <div className="text-[10px] text-slate-400 font-mono bg-black/40 p-2.5 rounded border border-red-500/15 mt-1.5 space-y-1">
-                                      <div className="flex justify-between font-bold text-red-400">
-                                        <span>🚨 INCOMING STRIKE FORCE:</span>
-                                        <span>❤️ COMBAT HP: {inboundTotalHp.toLocaleString()}</span>
+                                    return (
+                                      <div className="text-[10px] text-slate-400 font-mono bg-black/40 p-2.5 rounded border border-red-500/15 mt-1.5 space-y-1">
+                                        <div className="flex justify-between font-bold text-red-400">
+                                          <span>🚨 INCOMING STRIKE FORCE:</span>
+                                          <span>❤️ COMBAT HP: {inboundTotalHp.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5 text-slate-300 mt-1">
+                                          {Object.entries(fleet.troops || {}).filter(([_, qty]) => (qty as number) > 0).map(([tId, qty]) => {
+                                            const label = tId === 'defender' ? 'Interceptor' : tId === 'attacker' ? 'Attacker' : tId === 'tank' ? 'Disrupter' : tId === 'looter' ? 'Matter Extractor' : tId === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                            return (
+                                              <span key={tId} className="bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded text-[9px] uppercase font-bold text-red-300">{qty}x {label}</span>
+                                            );
+                                          })}
+                                        </div>
                                       </div>
-                                      <div className="flex flex-wrap gap-1.5 text-slate-300 mt-1">
-                                        {Object.entries(fleet.troops || {}).filter(([_, qty]) => (qty as number) > 0).map(([tId, qty]) => {
-                                          const label = tId === 'defender' ? 'Interceptor' : tId === 'attacker' ? 'Attacker' : tId === 'tank' ? 'Disrupter' : tId === 'looter' ? 'Matter Extractor' : tId === 'drone' ? 'Assault Drone' : 'Settlement Ship';
-                                          return (
-                                            <span key={tId} className="bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded text-[9px] uppercase font-bold text-red-300">{qty}x {label}</span>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
+                                    );
+                                  })()}
+                                </div>
+                                <div className="text-left sm:text-right shrink-0 mt-2 sm:mt-0 border-t border-red-950/40 sm:border-0 pt-2 sm:pt-0">
+                                  <span className="text-red-500 font-bold block tracking-widest text-sm animate-pulse">{secondsLeft}s</span>
+                                  <span className="text-[9px] text-slate-500 block uppercase font-bold mt-0.5">Until strike</span>
+                                </div>
                               </div>
-                              <div className="text-left sm:text-right shrink-0 mt-2 sm:mt-0 border-t border-red-950/40 sm:border-0 pt-2 sm:pt-0">
-                                <span className="text-red-500 font-bold block tracking-widest text-sm animate-pulse">{secondsLeft}s</span>
-                                <span className="text-[9px] text-slate-500 block uppercase font-bold mt-0.5">Until strike</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      )
                     )}
                   </div>
 
                   {/* 2. Orange Section: Moving Fleets */}
-                  <div>
-                    <h4 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-3 flex items-center gap-1.5 border-b border-amber-950 pb-1.5">
-                      <span className="inline-block w-2 h-1.5 rounded bg-amber-500 animate-pulse" />
-                      [~] ACTIVE SENDER OPERATIONS TRANSIT
-                    </h4>
+                  <div className="space-y-3 border border-amber-500/10 rounded-xl p-3 bg-[#020408]/40">
+                    <div 
+                      onClick={() => setMinimizeAlertsMoving(!minimizeAlertsMoving)}
+                      className="flex items-center justify-between cursor-pointer select-none pb-1.5 border-b border-amber-950/40 font-mono"
+                    >
+                      <h4 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1.5">
+                        <span className="inline-block w-2 h-1.5 rounded bg-amber-500 animate-pulse" />
+                        [~] ACTIVE SENDER OPERATIONS TRANSIT ({movingForces.length})
+                      </h4>
+                      <span className="text-slate-500 font-mono text-[10px]">{minimizeAlertsMoving ? 'EXPAND 🔽' : 'MINIMIZE 🔼'}</span>
+                    </div>
 
-                    {movingForces.length === 0 ? (
-                      <p className="text-xs text-slate-500 italic px-3 py-2 bg-slate-950/20 border border-slate-900 rounded-lg">All active troops are currently safely locked in command ship hangar bays.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {movingForces.map((fleet) => {
-                          const secondsLeft = Math.max(0, Math.floor((fleet.arrivesAt - serverTime) / 1000));
-                          const isReturn = fleet.isReturning;
-                          const isWaiting = fleet.isWaitingToSettle;
-                          return (
-                            <div 
-                              key={fleet.id} 
-                              onClick={() => {
-                                if (isWaiting) {
-                                  handleStartSettleFlow(fleet.id);
-                                  setIsAlertsOpen(false);
-                                }
-                              }}
-                              className={`p-4 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs transition duration-150 w-full overflow-hidden break-words ${
-                                isWaiting 
-                                  ? 'border-emerald-500/40 bg-emerald-950/25 cursor-pointer hover:border-emerald-400 hover:bg-emerald-950/35 shadow-[0_0_10px_rgba(16,185,129,0.15)]'
-                                  : 'border-amber-500/10 bg-amber-955 bg-amber-950/10'
-                              }`}
-                            >
-                              <div className="space-y-1 font-mono min-w-0 flex-1">
-                                <p className="font-bold uppercase tracking-wider flex items-center flex-wrap gap-1.5 text-slate-150">
-                                  <span className={isWaiting ? 'text-emerald-400' : 'text-amber-400'}>
-                                    Mission: {isWaiting ? 'Settle (Arrived)' : (fleet.missionType === 'colonize' ? 'Settle' : fleet.missionType)} 
-                                  </span>
-                                  <span className={`text-[9.5px] px-1.5 py-0.2 border rounded-full font-bold uppercase shrink-0 ${
-                                    isWaiting ? 'border-emerald-500/30 text-emerald-300 bg-emerald-950/40' :
-                                    isReturn ? 'border-amber-500/30 text-amber-300 bg-amber-950/40' : 
-                                    'border-blue-500/30 text-blue-300 bg-blue-950/40'
-                                  }`}>
-                                    {isWaiting ? 'Ready' : isReturn ? 'Returning' : 'Inbound'}
-                                  </span>
-                                  {fleet.isTimed && (
-                                    <span className="text-[9.5px] px-1.5 py-0.2 border border-purple-500/30 text-purple-300 bg-purple-950/40 rounded-full font-bold uppercase shrink-0">
-                                      ⏱️ Timed Landing
+                    {!minimizeAlertsMoving && (
+                      movingForces.length === 0 ? (
+                        <p className="text-xs text-slate-500 italic px-3 py-2 bg-slate-950/20 border border-slate-900 rounded-lg">All active troops are currently safely locked in command ship hangar bays.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {movingForces.map((fleet) => {
+                            const secondsLeft = Math.max(0, Math.floor((fleet.arrivesAt - serverTime) / 1000));
+                            const isReturn = fleet.isReturning;
+                            const isWaiting = fleet.isWaitingToSettle;
+                            return (
+                              <div 
+                                key={fleet.id} 
+                                onClick={() => {
+                                  if (isWaiting) {
+                                    handleStartSettleFlow(fleet.id);
+                                    setIsAlertsOpen(false);
+                                  }
+                                }}
+                                className={`p-4 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs transition duration-150 w-full overflow-hidden break-words ${
+                                  isWaiting 
+                                    ? 'border-emerald-500/40 bg-emerald-950/25 cursor-pointer hover:border-emerald-400 hover:bg-emerald-950/35 shadow-[0_0_10px_rgba(16,185,129,0.15)]'
+                                    : 'border-amber-500/10 bg-amber-955 bg-amber-950/10'
+                                }`}
+                              >
+                                <div className="space-y-1 font-mono min-w-0 flex-1">
+                                  <p className="font-bold uppercase tracking-wider flex items-center flex-wrap gap-1.5 text-slate-150">
+                                    <span className={isWaiting ? 'text-emerald-400' : 'text-amber-400'}>
+                                      Mission: {isWaiting ? 'Settle (Arrived)' : (fleet.missionType === 'colonize' ? 'Settle' : fleet.missionType)} 
                                     </span>
-                                  )}
-                                </p>
-                                <p className="text-slate-400 leading-normal break-all">Target Sector: <span className="text-slate-200">{fleet.targetName} Coordinates [{fleet.targetCoords.x}, {fleet.targetCoords.y}]</span></p>
+                                    <span className={`text-[9.5px] px-1.5 py-0.2 border rounded-full font-bold uppercase shrink-0 ${
+                                      isWaiting ? 'border-emerald-500/30 text-emerald-300 bg-emerald-950/40' :
+                                      isReturn ? 'border-amber-500/30 text-amber-300 bg-amber-950/40' : 
+                                      'border-blue-500/30 text-blue-300 bg-blue-950/40'
+                                    }`}>
+                                      {isWaiting ? 'Ready' : isReturn ? 'Returning' : 'Inbound'}
+                                    </span>
+                                    {fleet.isTimed && (
+                                      <span className="text-[9.5px] px-1.5 py-0.2 border border-purple-500/30 text-purple-300 bg-purple-950/40 rounded-full font-bold uppercase shrink-0">
+                                        ⏱️ Timed Landing
+                                      </span>
+                                    )}
+                                  </p>
+                                  <p className="text-slate-400 leading-normal break-all">Target Sector: <span className="text-slate-200">{fleet.targetName} Coordinates [{fleet.targetCoords.x}, {fleet.targetCoords.y}]</span></p>
 
-                                {/* Action Buttons Inside Alert Item */}
-                                {!isReturn && (
-                                  <div className="pt-2 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
-                                    {isWaiting ? (
-                                      <>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            handleStartSettleFlow(fleet.id);
-                                            setIsAlertsOpen(false);
-                                          }}
-                                          className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold uppercase text-[9px] rounded cursor-pointer transition"
-                                        >
-                                          🚀 Establish Colony
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleCancelFleet(fleet.id)}
-                                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-350 border border-slate-700 font-bold uppercase text-[9px] rounded cursor-pointer transition"
-                                        >
-                                          ↩ Recall Troops
-                                        </button>
-                                      </>
-                                    ) : (
-                                      (() => {
-                                        const totalDuration = fleet.arrivesAt - fleet.startedAt;
-                                        const elapsed = serverTime - fleet.startedAt;
-                                        const progressPercent = totalDuration > 0 ? (elapsed / totalDuration) * 100 : 0;
-                                        const isAttack = fleet.missionType === 'attack';
-                                        const cannotRecallAttack = isAttack && progressPercent > 45;
-
-                                        return (
+                                  {/* Action Buttons Inside Alert Item */}
+                                  {!isReturn && (
+                                    <div className="pt-2 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+                                      {isWaiting ? (
+                                        <>
                                           <button
                                             type="button"
-                                            disabled={cannotRecallAttack}
-                                            onClick={() => handleCancelFleet(fleet.id)}
-                                            className={`px-2.5 py-1 font-bold uppercase text-[9px] rounded transition border ${
-                                              cannotRecallAttack
-                                                ? 'bg-red-950/40 text-red-500 border-red-950 cursor-not-allowed'
-                                                : 'bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 cursor-pointer'
-                                            }`}
+                                            onClick={() => {
+                                              handleStartSettleFlow(fleet.id);
+                                              setIsAlertsOpen(false);
+                                            }}
+                                            className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold uppercase text-[9px] rounded cursor-pointer transition"
                                           >
-                                            {cannotRecallAttack ? `🚫 Recall Locked (${Math.round(progressPercent)}%)` : '🛑 Abort Mission'}
+                                            🚀 Establish Colony
                                           </button>
-                                        );
-                                      })()
-                                    )}
+                                          <button
+                                            type="button"
+                                            onClick={() => handleCancelFleet(fleet.id)}
+                                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-350 border border-slate-700 font-bold uppercase text-[9px] rounded cursor-pointer transition"
+                                          >
+                                            ↩ Recall Troops
+                                          </button>
+                                        </>
+                                      ) : (
+                                        (() => {
+                                          const totalDuration = fleet.arrivesAt - fleet.startedAt;
+                                          const elapsed = serverTime - fleet.startedAt;
+                                          const progressPercent = totalDuration > 0 ? (elapsed / totalDuration) * 100 : 0;
+                                          const isAttack = fleet.missionType === 'attack';
+                                          const cannotRecallAttack = isAttack && progressPercent > 45;
+
+                                          return (
+                                            <button
+                                              type="button"
+                                              disabled={cannotRecallAttack}
+                                              onClick={() => handleCancelFleet(fleet.id)}
+                                              className={`px-2.5 py-1 font-bold uppercase text-[9px] rounded transition border ${
+                                                cannotRecallAttack
+                                                  ? 'bg-red-950/40 text-red-500 border-red-950 cursor-not-allowed'
+                                                  : 'bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 cursor-pointer'
+                                              }`}
+                                            >
+                                              {cannotRecallAttack ? `🚫 Recall Locked (${Math.round(progressPercent)}%)` : '🛑 Abort Mission'}
+                                            </button>
+                                          );
+                                        })()
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                {!isWaiting && (
+                                  <div className="text-left sm:text-right shrink-0 mt-2 sm:mt-0 border-t border-slate-800 sm:border-0 pt-2 sm:pt-0 font-mono">
+                                    <span className="text-amber-400 font-bold block tracking-wider text-sm">
+                                      {(() => {
+                                        if (secondsLeft <= 0) return "Arrived";
+                                        const h = Math.floor(secondsLeft / 3600);
+                                        const m = Math.floor((secondsLeft % 3600) / 60);
+                                        const s = secondsLeft % 60;
+                                        if (h > 0) return `${h}h ${m}m ${s}s`;
+                                        if (m > 0) return `${m}m ${s}s`;
+                                        return `${s}s`;
+                                      })()}
+                                    </span>
+                                    <span className="text-[9px] text-slate-500 block uppercase font-bold mt-0.5">
+                                      Time Remaining
+                                    </span>
                                   </div>
                                 )}
                               </div>
-                              {!isWaiting && (
-                                <div className="text-left sm:text-right shrink-0 mt-2 sm:mt-0 border-t border-slate-800 sm:border-0 pt-2 sm:pt-0 font-mono">
-                                  <span className="text-amber-400 font-bold block tracking-wider text-sm">
-                                    {(() => {
-                                      if (secondsLeft <= 0) return "Arrived";
-                                      const h = Math.floor(secondsLeft / 3600);
-                                      const m = Math.floor((secondsLeft % 3600) / 60);
-                                      const s = secondsLeft % 60;
-                                      if (h > 0) return `${h}h ${m}m ${s}s`;
-                                      if (m > 0) return `${m}m ${s}s`;
-                                      return `${s}s`;
-                                    })()}
-                                  </span>
-                                  <span className="text-[9px] text-slate-500 block uppercase font-bold mt-0.5">
-                                    Time Remaining
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      )
                     )}
                   </div>
 

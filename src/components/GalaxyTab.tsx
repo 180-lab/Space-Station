@@ -281,6 +281,12 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   });
   const [scanningFleetIds, setScanningFleetIds] = useState<Record<string, boolean>>({});
 
+  // Minimization and collapsibility states for fleet radar transits and situation room
+  const [isSituationScannersMinimized, setIsSituationScannersMinimized] = useState(false);
+  const [isOutgoingAttacksMinimized, setIsOutgoingAttacksMinimized] = useState(false);
+  const [isIncomingAttacksMinimized, setIsIncomingAttacksMinimized] = useState(false);
+  const [isMemberMovingTroopsMinimized, setIsMemberMovingTroopsMinimized] = useState<Record<string, boolean>>({});
+
   const handleRunIntelReport = async (fleetId: string, tx: number, ty: number) => {
     if ((player.credits || 0) < 50) {
       showToast?.("Insufficient Space Gold. Gathering intelligence report requires 50 Space Gold.", "error");
@@ -3469,55 +3475,167 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               {(() => {
                                 const targetX = report.defenderCoords.x;
                                 const targetY = report.defenderCoords.y;
+                                const targetCommanderId = report.defenderId;
+                                const activeAlliance = player.allianceId ? alliances[player.allianceId] : null;
+                                const allianceMemberIds = activeAlliance ? activeAlliance.members.map(m => m.playerId) : [player.id];
+
                                 const planetFleets = (fleets || []).filter(
                                   f => (f.targetCoords.x === targetX && f.targetCoords.y === targetY) ||
                                        (f.senderCoords.x === targetX && f.senderCoords.y === targetY)
                                 );
-                                if (planetFleets.length === 0) return null;
 
                                 const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
                                 const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
 
+                                // Separate fleets into Enemy Moving Troops vs Defending Reinforcements In-Transit
+                                const movingEnemyTroops = planetFleets.filter(f => {
+                                  const isEnemySender = f.senderId !== player.id && !allianceMemberIds.includes(f.senderId);
+                                  const isHostileAttack = isEnemySender && f.missionType === 'attack';
+                                  const isEnemyTargetCommander = targetCommanderId && f.senderId === targetCommanderId && !allianceMemberIds.includes(f.senderId) && f.missionType === 'attack';
+                                  return isHostileAttack || isEnemyTargetCommander;
+                                });
+
+                                const defendingInTransitTroops = planetFleets.filter(f => {
+                                  const isTargetingThisPlanet = f.targetCoords.x === targetX && f.targetCoords.y === targetY && !f.isReturning;
+                                  const isAllianceOrPlayerSender = f.senderId === player.id || allianceMemberIds.includes(f.senderId);
+                                  return isTargetingThisPlanet && isAllianceOrPlayerSender;
+                                });
+
+                                // Find alliance docked reserve fleets on this planet
+                                const allianceDockedReserveFleets = (report.dockedReserveFleets || []).filter((df: any) => {
+                                  return df.ownerId === player.id || allianceMemberIds.includes(df.ownerId);
+                                });
+
+                                const isOwnerInAlliance = targetCommanderId === player.id || allianceMemberIds.includes(targetCommanderId || '');
+
+                                const renderFleetItem = (f: any, isEnemy: boolean) => {
+                                  const isHostile = isEnemy || (f.senderId !== player.id && f.missionType === 'attack');
+
+                                  // Calculate HP
+                                  let movingDefHp = 0;
+                                  let movingAtkHp = 0;
+                                  const movingTroopsList: string[] = [];
+                                  Object.entries(f.troops || {}).forEach(([k, qty]) => {
+                                    const q = Number(qty) || 0;
+                                    if (q > 0) {
+                                      movingDefHp += q * (defHpMap[k] || 0);
+                                      movingAtkHp += q * (atkHpMap[k] || 0);
+                                      const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                      movingTroopsList.push(`${q}x ${label}`);
+                                    }
+                                  });
+                                  const movingTotalHp = movingDefHp + movingAtkHp;
+                                  const colorClass = isHostile ? "text-rose-400 bg-rose-950/10 border-rose-500/10" : "text-emerald-400 bg-emerald-500/5 border-emerald-500/10";
+
+                                  return (
+                                    <div key={f.id} className={`p-2 rounded border text-[9px] font-mono space-y-0.5 ${colorClass}`}>
+                                      <div className="flex justify-between font-bold">
+                                        <span>{isHostile ? '⚠️ HOSTILE' : '🚀 FRIENDLY'} {f.missionType.toUpperCase()} ({f.isReturning ? 'Returning' : 'In Transit'})</span>
+                                        <span>❤️ {movingTotalHp.toLocaleString()} HP</span>
+                                      </div>
+                                      <div className="text-slate-400 text-[8.5px]">
+                                        [{f.senderCoords.x}, {f.senderCoords.y}] &rarr; [{f.targetCoords.x}, {f.targetCoords.y}] • ETA: {new Date(f.arrivesAt).toLocaleTimeString()}
+                                      </div>
+                                      <div className="text-slate-350 font-sans mt-0.5">
+                                        <strong className="text-slate-500 font-mono text-[8.5px]">Troops:</strong> {movingTroopsList.join(', ')}
+                                      </div>
+                                    </div>
+                                  );
+                                };
+
                                 return (
-                                  <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl space-y-2 font-mono text-[11px]">
-                                    <p className="font-bold text-[10px] text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                                      🚀 Scanned Moving Troops In Transit ({planetFleets.length}):
-                                    </p>
-                                    <div className="space-y-2">
-                                      {planetFleets.map((f) => {
-                                        const isHostile = f.senderId !== player.id && f.missionType === 'attack';
-
-                                        // Calculate HP
-                                        let movingDefHp = 0;
-                                        let movingAtkHp = 0;
-                                        const movingTroopsList: string[] = [];
-                                        Object.entries(f.troops || {}).forEach(([k, qty]) => {
-                                          const q = Number(qty) || 0;
-                                          if (q > 0) {
-                                            movingDefHp += q * (defHpMap[k] || 0);
-                                            movingAtkHp += q * (atkHpMap[k] || 0);
-                                            const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
-                                            movingTroopsList.push(`${q}x ${label}`);
-                                          }
-                                        });
-                                        const movingTotalHp = movingDefHp + movingAtkHp;
-                                        const colorClass = isHostile ? "text-rose-400 bg-rose-950/10 border-rose-500/10" : "text-amber-400 bg-amber-500/5 border-amber-500/10";
-
-                                        return (
-                                          <div key={f.id} className={`p-2 rounded border text-[9px] font-mono space-y-0.5 ${colorClass}`}>
-                                            <div className="flex justify-between font-bold">
-                                              <span>{isHostile ? '⚠️ HOSTILE' : '🚀 FRIENDLY'} {f.missionType.toUpperCase()} ({f.isReturning ? 'Returning' : 'In Transit'})</span>
-                                              <span>❤️ {movingTotalHp.toLocaleString()} HP</span>
+                                  <div className="space-y-3 p-3 bg-[#0A0F1D]/60 border border-white/5 rounded-xl font-mono text-[11px]">
+                                    {/* 1. Stationed Alliance Forces Section */}
+                                    <div className="space-y-1.5 p-2 bg-[#0c1322] border border-blue-500/15 rounded-lg text-[9px]">
+                                      <p className="font-bold text-[10px] text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                                        🛡️ ALLIANCE TROOPS STATIONED ON BASE ({isOwnerInAlliance ? 1 : 0 + allianceDockedReserveFleets.length})
+                                      </p>
+                                      
+                                      <div className="space-y-2">
+                                        {isOwnerInAlliance && (
+                                          <div className="p-2 bg-blue-950/20 border border-blue-500/20 rounded space-y-1.5">
+                                            <div className="flex justify-between items-center text-[9px] font-bold text-blue-300 uppercase font-mono">
+                                              <span>⭐ Primary Station Garrison (Alliance Owner)</span>
                                             </div>
-                                            <div className="text-slate-400 text-[8.5px]">
-                                              [{f.senderCoords.x}, {f.senderCoords.y}] &rarr; [{f.targetCoords.x}, {f.targetCoords.y}] • ETA: {new Date(f.arrivesAt).toLocaleTimeString()}
-                                            </div>
-                                            <div className="text-slate-350 font-sans mt-0.5">
-                                              <strong className="text-slate-500 font-mono text-[8.5px]">Troops:</strong> {movingTroopsList.join(', ')}
+                                            <div className="grid grid-cols-2 gap-1 text-[8.5px] font-mono">
+                                              {Object.entries(report.defenderInitialTroops || {}).map(([k, qty]) => {
+                                                const q = Number(qty) || 0;
+                                                if (q === 0) return null;
+                                                const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                                return (
+                                                  <div key={k} className="p-1 bg-black/30 border border-white/5 rounded flex justify-between items-center">
+                                                    <span className="text-slate-400">{label}</span>
+                                                    <span className="font-extrabold text-blue-300">{q}</span>
+                                                  </div>
+                                                );
+                                              })}
                                             </div>
                                           </div>
-                                        );
-                                      })}
+                                        )}
+
+                                        {allianceDockedReserveFleets.length > 0 && (
+                                          <div className="space-y-1">
+                                            <p className="text-[8.5px] font-bold text-blue-400 uppercase tracking-wider font-mono px-1">Docked Alliance Reserve Fleets:</p>
+                                            {allianceDockedReserveFleets.map((df: any) => {
+                                              const troopDetails: string[] = [];
+                                              Object.entries(df.troops || {}).forEach(([k, qty]) => {
+                                                const q = Number(qty) || 0;
+                                                if (q > 0) {
+                                                  const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                                  troopDetails.push(`${q}x ${label}`);
+                                                }
+                                              });
+                                              return (
+                                                <div key={df.id} className="p-2 bg-blue-950/10 border border-blue-500/10 rounded text-[8.5px] font-mono space-y-0.5">
+                                                  <div className="flex justify-between font-bold text-blue-300">
+                                                    <span>🚢 Reserve: {df.name}</span>
+                                                    <span className="text-slate-400">Owner: {df.ownerName}</span>
+                                                  </div>
+                                                  <p className="text-slate-400 leading-relaxed"><strong className="text-blue-400 font-bold">Troops:</strong> {troopDetails.join(', ') || 'No ships docked.'}</p>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+
+                                        {!isOwnerInAlliance && allianceDockedReserveFleets.length === 0 && (
+                                          <div className="p-2 bg-slate-950/20 border border-slate-900 rounded text-slate-500 italic text-[9px] font-mono text-center">
+                                            No alliance units stationed on this base.
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* 2. In-Transit Reinforcements Section */}
+                                    <div className="space-y-1.5 pt-1.5 border-t border-white/5">
+                                      <p className="font-bold text-[10px] text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                                        🚀 SCAN DETECTED: IN-TRANSIT DEFENDING REINFORCEMENTS ({defendingInTransitTroops.length})
+                                      </p>
+                                      {defendingInTransitTroops.length === 0 ? (
+                                        <div className="p-2 bg-slate-950/20 border border-slate-900 rounded text-slate-500 italic text-[9px]">
+                                          No defending reinforcement fleets currently in transit.
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-1.5">
+                                          {defendingInTransitTroops.map(f => renderFleetItem(f, false))}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* 3. Moving Enemy Troops Section */}
+                                    <div className="space-y-1.5 pt-1.5 border-t border-white/5">
+                                      <p className="font-bold text-[10px] text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                                        ⚠️ SCAN DETECTED: MOVING ENEMY TROOPS ({movingEnemyTroops.length})
+                                      </p>
+                                      {movingEnemyTroops.length === 0 ? (
+                                        <div className="p-2 bg-slate-950/20 border border-slate-900 rounded text-slate-500 italic text-[9px]">
+                                          No hostile enemy troop movements detected in orbit.
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-1.5">
+                                          {movingEnemyTroops.map(f => renderFleetItem(f, true))}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -5060,6 +5178,198 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                       </div>
                     </div>
 
+                    {/* Scanned Moving Troops In Transit */}
+                    {(() => {
+                      const targetX = intelReport.coords.x;
+                      const targetY = intelReport.coords.y;
+                      const targetCommanderId = intelReport.commanderId;
+                      const activeAlliance = player.allianceId ? alliances[player.allianceId] : null;
+                      const allianceMemberIds = activeAlliance ? activeAlliance.members.map(m => m.playerId) : [player.id];
+
+                      const planetFleets = (fleets || []).filter(
+                        f => (f.targetCoords.x === targetX && f.targetCoords.y === targetY) ||
+                             (f.senderCoords.x === targetX && f.senderCoords.y === targetY)
+                      );
+
+                      const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
+                      const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
+
+                      // Separate fleets into Enemy Moving Troops vs Defending Reinforcements In-Transit
+                      const movingEnemyTroops = planetFleets.filter(f => {
+                        const isEnemySender = f.senderId !== player.id && !allianceMemberIds.includes(f.senderId);
+                        const isHostileAttack = isEnemySender && f.missionType === 'attack';
+                        const isEnemyTargetCommander = targetCommanderId && f.senderId === targetCommanderId && !allianceMemberIds.includes(f.senderId) && f.missionType === 'attack';
+                        return isHostileAttack || isEnemyTargetCommander;
+                      });
+
+                      const defendingInTransitTroops = planetFleets.filter(f => {
+                        const isTargetingThisPlanet = f.targetCoords.x === targetX && f.targetCoords.y === targetY && !f.isReturning;
+                        const isAllianceOrPlayerSender = f.senderId === player.id || allianceMemberIds.includes(f.senderId);
+                        return isTargetingThisPlanet && isAllianceOrPlayerSender;
+                      });
+
+                      // Find alliance docked reserve fleets on this planet
+                      const allianceDockedReserveFleets = (intelReport.dockedReserveFleets || []).filter((df: any) => {
+                        return df.ownerId === player.id || allianceMemberIds.includes(df.ownerId);
+                      });
+
+                      const isOwnerInAlliance = targetCommanderId === player.id || allianceMemberIds.includes(targetCommanderId || '');
+
+                      const renderFleetCard = (f: any, isEnemy: boolean) => {
+                        const isHostile = isEnemy || (f.senderId !== player.id && f.missionType === 'attack');
+
+                        // Calculate HP
+                        let movingDefHp = 0;
+                        let movingAtkHp = 0;
+                        const movingTroopsList: { label: string; qty: number; color: string }[] = [];
+                        Object.entries(f.troops || {}).forEach(([k, qty]) => {
+                          const q = Number(qty) || 0;
+                          if (q > 0) {
+                            movingDefHp += q * (defHpMap[k] || 0);
+                            movingAtkHp += q * (atkHpMap[k] || 0);
+                            const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                            const troopColor = 
+                              k === 'defender' ? 'text-emerald-400' :
+                              k === 'attacker' ? 'text-orange-400' :
+                              k === 'tank' ? 'text-blue-400' :
+                              k === 'looter' ? 'text-cyan-400' :
+                              k === 'drone' ? 'text-purple-400' :
+                              'text-teal-400';
+                            movingTroopsList.push({ label, qty: q, color: troopColor });
+                          }
+                        });
+                        const movingTotalHp = movingDefHp + movingAtkHp;
+                        const colorClass = isHostile 
+                          ? "border-rose-500/25 bg-rose-950/10 text-rose-300 shadow-[0_0_15px_rgba(239,68,68,0.05)]" 
+                          : "border-emerald-500/25 bg-emerald-950/10 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.05)]";
+
+                        return (
+                          <div key={f.id} className={`p-4 rounded-xl border text-[11px] font-mono space-y-2.5 transition-all ${colorClass}`}>
+                            <div className="flex justify-between items-center font-bold pb-1.5 border-b border-white/5">
+                              <span className="flex items-center gap-1.5">
+                                {isHostile ? '⚠️ HOSTILE' : '🚀 FRIENDLY'} {f.missionType.toUpperCase()}
+                                <span className="text-[9px] font-normal opacity-75">({f.isReturning ? 'Returning' : 'In Transit'})</span>
+                              </span>
+                              <span className="text-white bg-black/30 px-2 py-0.5 rounded text-[10px]">❤️ {movingTotalHp.toLocaleString()} HP</span>
+                            </div>
+                            <div className="text-slate-400 text-[10px] space-y-1">
+                              <p>• <span className="font-bold text-slate-300">Course:</span> [{f.senderCoords.x}, {f.senderCoords.y}] ({f.senderName}) &rarr; [{f.targetCoords.x}, {f.targetCoords.y}] ({f.targetName})</p>
+                              <p>• <span className="font-bold text-slate-300">Arrival ETA:</span> {new Date(f.arrivesAt).toLocaleTimeString()}</p>
+                            </div>
+                            <div className="pt-1.5 border-t border-white/5">
+                              <strong className="text-slate-400 block mb-1 text-[10px] uppercase tracking-wider font-bold">Troops Manifest:</strong>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                {movingTroopsList.map((tr) => (
+                                  <div key={tr.label} className="bg-black/20 p-1.5 border border-white/5 rounded flex justify-between items-center">
+                                    <span className="text-slate-400">{tr.label}</span>
+                                    <span className={`font-extrabold ${tr.color}`}>{tr.qty}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      };
+
+                      return (
+                        <div className="space-y-4 border-t border-[#1E293B]/60 pt-4">
+                          {/* 1. Stationed Alliance Forces Section */}
+                          <div className="space-y-3 bg-[#0c1322] border border-blue-500/15 p-3.5 rounded-xl">
+                            <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1 font-mono flex items-center gap-1.5">
+                              <span>🛡️</span> ALLIANCE TROOPS STATIONED ON BASE ({isOwnerInAlliance ? 1 : 0 + allianceDockedReserveFleets.length})
+                            </h4>
+                            
+                            <div className="space-y-2.5">
+                              {isOwnerInAlliance && (
+                                <div className="p-3 bg-blue-950/20 border border-blue-500/20 rounded-xl space-y-2">
+                                  <div className="flex justify-between items-center text-[10px] font-bold text-blue-300 uppercase font-mono">
+                                    <span>⭐ Primary Station Garrison (Alliance Owner)</span>
+                                    <span className="bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded text-[9px] font-normal">Active Guard</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[9px] font-mono">
+                                    {Object.entries(intelReport.troops || {}).map(([k, qty]) => {
+                                      const q = Number(qty) || 0;
+                                      if (q === 0) return null;
+                                      const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                      return (
+                                        <div key={k} className="p-1 bg-black/30 border border-white/5 rounded flex justify-between items-center">
+                                          <span className="text-slate-400">{label}</span>
+                                          <span className="font-extrabold text-blue-300">{q}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {allianceDockedReserveFleets.length > 0 && (
+                                <div className="space-y-2">
+                                  <p className="text-[9px] font-bold text-blue-400 uppercase tracking-wider font-mono px-1">Docked Alliance Reserve Fleets:</p>
+                                  {allianceDockedReserveFleets.map((df: any) => {
+                                    const troopDetails: string[] = [];
+                                    Object.entries(df.troops || {}).forEach(([k, qty]) => {
+                                      const q = Number(qty) || 0;
+                                      if (q > 0) {
+                                        const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                        troopDetails.push(`${q}x ${label}`);
+                                      }
+                                    });
+                                    return (
+                                      <div key={df.id} className="p-2.5 bg-blue-950/10 border border-blue-500/10 rounded-lg text-[9.5px] font-mono space-y-1">
+                                        <div className="flex justify-between font-bold text-blue-300 text-[10px]">
+                                          <span>🚢 Reserve Fleet: {df.name}</span>
+                                          <span className="text-slate-400">Owner: {df.ownerName}</span>
+                                        </div>
+                                        <p className="text-slate-400 leading-relaxed"><strong className="text-blue-400 font-bold">Troops:</strong> {troopDetails.join(', ') || 'No ships docked.'}</p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {!isOwnerInAlliance && allianceDockedReserveFleets.length === 0 && (
+                                <div className="p-3 bg-slate-950/20 border border-slate-900 rounded-lg text-slate-500 italic text-[10px] font-mono text-center">
+                                  No alliance reserve fleets or primary garrison units stationed on this base.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 2. In-Transit Reinforcements Section */}
+                          <div className="space-y-3">
+                            <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1 font-mono flex items-center gap-1.5">
+                              <span>🚀</span> SCAN DETECTED: IN-TRANSIT DEFENDING REINFORCEMENTS ({defendingInTransitTroops.length})
+                            </h4>
+                            {defendingInTransitTroops.length === 0 ? (
+                              <div className="p-3 bg-slate-950/20 border border-slate-900 rounded-lg text-slate-500 italic text-[10px] font-mono">
+                                No defending reinforcement fleets currently in transit.
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {defendingInTransitTroops.map(f => renderFleetCard(f, false))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3. Moving Enemy Troops Section */}
+                          <div className="space-y-3">
+                            <h4 className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1 font-mono flex items-center gap-1.5">
+                              <span>⚠️</span> SCAN DETECTED: MOVING ENEMY TROOPS ({movingEnemyTroops.length})
+                            </h4>
+                            {movingEnemyTroops.length === 0 ? (
+                              <div className="p-3 bg-slate-950/20 border border-slate-900 rounded-lg text-slate-500 italic text-[10px] font-mono">
+                                No hostile enemy troop movements detected in orbit.
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {movingEnemyTroops.map(f => renderFleetCard(f, true))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Integrated Interactive Buildings List (Works like Explore Tab dropdowns) */}
                     {(() => {
                       const reportBuildings = intelReport.buildings || { fabricator: 1, commsHub: 1, radar: 1, repository: 1, researchCenter: 1, armyBase: 1, supplyNexus: 1 };
@@ -5644,41 +5954,51 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
                                           return (
                                             <div className="border-t border-[#1E293B]/40 pt-4.5 mt-3.5 px-4 pb-4">
-                                              <span className="text-[9.5px] text-amber-400 font-bold uppercase tracking-wider block mb-2 flex items-center gap-1 font-mono">
-                                                📡 ACTIVE IN-TRANSIT TROOP MOVEMENTS ({memberMovingFleets.length})
-                                              </span>
-                                              <div className="space-y-2 font-mono">
-                                                {memberMovingFleets.map((fleet) => {
-                                                  let movingDefHp = 0;
-                                                  let movingAtkHp = 0;
-                                                  const movingTroopsList: string[] = [];
-                                                  Object.entries(fleet.troops || {}).forEach(([k, qty]) => {
-                                                    const q = Number(qty) || 0;
-                                                    if (q > 0) {
-                                                      movingDefHp += q * (defHpMap[k] || 0);
-                                                      movingAtkHp += q * (atkHpMap[k] || 0);
-                                                      const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
-                                                      movingTroopsList.push(`${q}x ${label}`);
-                                                    }
-                                                  });
-                                                  const movingTotalHp = movingDefHp + movingAtkHp;
-                                                  return (
-                                                    <div key={fleet.id} className="p-2.5 bg-amber-500/5 border border-amber-500/15 rounded-lg space-y-1 text-[10px]">
-                                                      <div className="flex justify-between font-bold text-amber-300">
-                                                        <span className="capitalize">🚀 Mission: {fleet.missionType} {fleet.isReturning ? '(Returning)' : ''}</span>
-                                                        <span className="text-cyan-400">❤️ {movingTotalHp.toLocaleString()} HP Moving</span>
-                                                      </div>
-                                                      <div className="text-[9px] text-slate-400">
-                                                        Origin [{fleet.senderCoords.x}, {fleet.senderCoords.y}] &rarr; Dest: {fleet.targetName} [{fleet.targetCoords.x}, {fleet.targetCoords.y}]
-                                                      </div>
-                                                      <div className="text-[9.5px] text-slate-300 mt-1 flex flex-wrap gap-1">
-                                                        <span className="text-slate-500 font-bold">Troops:</span>
-                                                        <span className="font-extrabold text-slate-200">{movingTroopsList.join(', ')}</span>
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                })}
+                                              <div 
+                                                onClick={() => setIsMemberMovingTroopsMinimized(prev => ({ ...prev, [mbr.playerId]: !prev[mbr.playerId] }))}
+                                                className="flex justify-between items-center cursor-pointer select-none mb-2 border-b border-[#1E293B]/30 pb-1"
+                                              >
+                                                <span className="text-[9.5px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1 font-mono">
+                                                  📡 ACTIVE IN-TRANSIT TROOP MOVEMENTS ({memberMovingFleets.length})
+                                                </span>
+                                                <span className="text-[9px] text-slate-500 font-mono">
+                                                  {isMemberMovingTroopsMinimized[mbr.playerId] ? 'EXPAND 🔽' : 'MINIMIZE 🔼'}
+                                                </span>
                                               </div>
+                                              {!isMemberMovingTroopsMinimized[mbr.playerId] && (
+                                                <div className="space-y-2 font-mono">
+                                                  {memberMovingFleets.map((fleet) => {
+                                                    let movingDefHp = 0;
+                                                    let movingAtkHp = 0;
+                                                    const movingTroopsList: string[] = [];
+                                                    Object.entries(fleet.troops || {}).forEach(([k, qty]) => {
+                                                      const q = Number(qty) || 0;
+                                                      if (q > 0) {
+                                                        movingDefHp += q * (defHpMap[k] || 0);
+                                                        movingAtkHp += q * (atkHpMap[k] || 0);
+                                                        const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                                        movingTroopsList.push(`${q}x ${label}`);
+                                                      }
+                                                    });
+                                                    const movingTotalHp = movingDefHp + movingAtkHp;
+                                                    return (
+                                                      <div key={fleet.id} className="p-2.5 bg-amber-500/5 border border-amber-500/15 rounded-lg space-y-1 text-[10px]">
+                                                        <div className="flex justify-between font-bold text-amber-300">
+                                                          <span className="capitalize">🚀 Mission: {fleet.missionType} {fleet.isReturning ? '(Returning)' : ''}</span>
+                                                          <span className="text-cyan-400">❤️ {movingTotalHp.toLocaleString()} HP Moving</span>
+                                                        </div>
+                                                        <div className="text-[9px] text-slate-400">
+                                                          Origin [{fleet.senderCoords.x}, {fleet.senderCoords.y}] &rarr; Dest: {fleet.targetName} [{fleet.targetCoords.x}, {fleet.targetCoords.y}]
+                                                        </div>
+                                                        <div className="text-[9.5px] text-slate-300 mt-1 flex flex-wrap gap-1">
+                                                          <span className="text-slate-500 font-bold">Troops:</span>
+                                                          <span className="font-extrabold text-slate-200">{movingTroopsList.join(', ')}</span>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              )}
                                             </div>
                                           );
                                         })()}
@@ -5749,118 +6069,148 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 return (
                   <div className="space-y-6">
                     <div className="p-4 bg-red-950/10 border border-red-500/15 rounded-xl">
-                      <h4 className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <Radio size={14} className="animate-pulse" /> DEPLOYED TACTICAL SITUATION SCANNERS
-                      </h4>
-                      <p className="text-[11px] text-slate-400 leading-relaxed font-sans font-normal mt-0.5">
-                        Central warfare computer resolving target coordinates for overall alliance defensive alarms. Tracks ongoing offensive siege attacks by any alliance members (Offensive Command) and hostile incoming strikes aiming coordinates of any of our members (Defensive Action Alarms) in real-time.
-                      </p>
+                      <div 
+                        onClick={() => setIsSituationScannersMinimized(!isSituationScannersMinimized)}
+                        className="flex justify-between items-center cursor-pointer select-none"
+                      >
+                        <h4 className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5 font-mono">
+                          <Radio size={14} className="animate-pulse" /> DEPLOYED TACTICAL SITUATION SCANNERS
+                        </h4>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {isSituationScannersMinimized ? 'EXPAND 🔽' : 'MINIMIZE 🔼'}
+                        </span>
+                      </div>
+                      {!isSituationScannersMinimized && (
+                        <p className="text-[11px] text-slate-400 leading-relaxed font-sans font-normal mt-2">
+                          Central warfare computer resolving target coordinates for overall alliance defensive alarms. Tracks ongoing offensive siege attacks by any alliance members (Offensive Command) and hostile incoming strikes aiming coordinates of any of our members (Defensive Action Alarms) in real-time.
+                        </p>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       
                       {/* Left: Offensive operations */}
                       <div className="space-y-3.5">
-                        <h4 className="text-xs font-bold text-amber-400 uppercase tracking-widest border-b border-amber-950 pb-2 flex items-center gap-1.5">
-                          ☄️ ACTIVE OUTGOING offensive operations ({offensiveMissions.length})
-                        </h4>
-                        {offensiveMissions.length === 0 ? (
-                          <div className="p-5 border border-[#1E293B] bg-[#030508]/40 rounded-xl text-center text-slate-500 text-[10.5px] italic">
-                            No outgoing siege troops active. Coordinate outer rim targeting in sector map.
-                          </div>
-                        ) : (
+                        <div 
+                          onClick={() => setIsOutgoingAttacksMinimized(!isOutgoingAttacksMinimized)}
+                          className="flex justify-between items-center cursor-pointer select-none border-b border-amber-950 pb-2"
+                        >
+                          <h4 className="text-xs font-bold text-amber-400 uppercase tracking-widest flex items-center gap-1.5 font-mono">
+                            ☄️ ACTIVE OUTGOING offensive operations ({offensiveMissions.length})
+                          </h4>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {isOutgoingAttacksMinimized ? 'EXPAND 🔽' : 'MINIMIZE 🔼'}
+                          </span>
+                        </div>
+                        {!isOutgoingAttacksMinimized && (
                           <div className="space-y-3">
-                            {offensiveMissions.map((fleet) => {
-                              const secLeft = Math.max(0, Math.floor((fleet.arrivesAt - serverTime) / 1000));
-                              return (
-                                <div key={fleet.id} className="p-4 bg-amber-950/10 border border-amber-500/20 rounded-xl space-y-2">
-                                  <div className="flex justify-between items-start gap-2 flex-wrap">
-                                    <div>
-                                      <p className="font-bold text-slate-200">
-                                        Commander:{" "}
-                                        <button
-                                          type="button"
-                                          onClick={() => onViewPlayerProfile && onViewPlayerProfile(fleet.senderId)}
-                                          className="text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer font-bold focus:outline-none"
-                                        >
-                                          {fleet.senderName}
-                                        </button>
-                                      </p>
-                                      <p className="text-[10px] text-slate-500 mt-0.5">Origin: [{fleet.senderCoords.x}, {fleet.senderCoords.y}]</p>
+                            {offensiveMissions.length === 0 ? (
+                              <div className="p-5 border border-[#1E293B] bg-[#030508]/40 rounded-xl text-center text-slate-500 text-[10.5px] italic">
+                                No outgoing siege troops active. Coordinate outer rim targeting in sector map.
+                              </div>
+                            ) : (
+                              offensiveMissions.map((fleet) => {
+                                const secLeft = Math.max(0, Math.floor((fleet.arrivesAt - serverTime) / 1000));
+                                return (
+                                  <div key={fleet.id} className="p-4 bg-amber-950/10 border border-amber-500/20 rounded-xl space-y-2">
+                                    <div className="flex justify-between items-start gap-2 flex-wrap">
+                                      <div>
+                                        <p className="font-bold text-slate-200">
+                                          Commander:{" "}
+                                          <button
+                                            type="button"
+                                            onClick={() => onViewPlayerProfile && onViewPlayerProfile(fleet.senderId)}
+                                            className="text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer font-bold focus:outline-none"
+                                          >
+                                            {fleet.senderName}
+                                          </button>
+                                        </p>
+                                        <p className="text-[10px] text-slate-500 mt-0.5">Origin: [{fleet.senderCoords.x}, {fleet.senderCoords.y}]</p>
+                                      </div>
+                                      <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] uppercase font-bold rounded">
+                                        {fleet.isReturning ? 'Returning Home' : 'Attacking Outward'}
+                                      </span>
                                     </div>
-                                    <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] uppercase font-bold rounded">
-                                      {fleet.isReturning ? 'Returning Home' : 'Attacking Outward'}
-                                    </span>
-                                  </div>
 
-                                  <div className="p-2 bg-[#020305] border border-[#1E293B]/60 rounded-lg text-[10.5px]">
-                                    <p className="text-slate-400">Target Coordinates: <span className="text-white font-bold">[{fleet.targetCoords.x}, {fleet.targetCoords.y}]</span> ({fleet.targetName})</p>
-                                    <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-tight">
-                                      Troops: {Object.entries(fleet.troops).filter(([_, q]) => (q as number) > 0).map(([k, q]) => `${q}x ${k}`).join(', ')}
-                                    </p>
-                                  </div>
+                                    <div className="p-2 bg-[#020305] border border-[#1E293B]/60 rounded-lg text-[10.5px]">
+                                      <p className="text-slate-400">Target Coordinates: <span className="text-white font-bold">[{fleet.targetCoords.x}, {fleet.targetCoords.y}]</span> ({fleet.targetName})</p>
+                                      <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-tight">
+                                        Troops: {Object.entries(fleet.troops).filter(([_, q]) => (q as number) > 0).map(([k, q]) => `${q}x ${k}`).join(', ')}
+                                      </p>
+                                    </div>
 
-                                  <div className="flex justify-between items-center text-[10px] pt-1">
-                                    <span className="text-slate-505 uppercase">TELEMETRY LOCK RECON</span>
-                                    <span className="text-amber-400 font-extrabold animate-pulse">{secLeft}s left to destination</span>
+                                    <div className="flex justify-between items-center text-[10px] pt-1">
+                                      <span className="text-slate-505 uppercase">TELEMETRY LOCK RECON</span>
+                                      <span className="text-amber-400 font-extrabold animate-pulse">{secLeft}s left to destination</span>
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })
+                            )}
                           </div>
                         )}
                       </div>
 
                       {/* Right: Defensive alarms */}
                       <div className="space-y-3.5">
-                        <h4 className="text-xs font-bold text-red-400 uppercase tracking-widest border-b border-red-950 pb-2 flex items-center gap-1.5">
-                          🚨 INCOMING SYSTEM THREAT COVENANTS ({defensiveMissions.length})
-                        </h4>
-                        {defensiveMissions.length === 0 ? (
-                          <div className="p-5 border border-emerald-900/10 bg-emerald-950/5 rounded-xl text-center text-emerald-500/80 text-[10.5px] italic">
-                            🛡️ Perimeter secure. Zero hostile fleets mapping coordinates!
-                          </div>
-                        ) : (
+                        <div 
+                          onClick={() => setIsIncomingAttacksMinimized(!isIncomingAttacksMinimized)}
+                          className="flex justify-between items-center cursor-pointer select-none border-b border-red-950 pb-2"
+                        >
+                          <h4 className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5 font-mono">
+                            🚨 INCOMING SYSTEM THREAT COVENANTS ({defensiveMissions.length})
+                          </h4>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {isIncomingAttacksMinimized ? 'EXPAND 🔽' : 'MINIMIZE 🔼'}
+                          </span>
+                        </div>
+                        {!isIncomingAttacksMinimized && (
                           <div className="space-y-3">
-                            {defensiveMissions.map((fleet) => {
-                              const secLeft = Math.max(0, Math.floor((fleet.arrivesAt - serverTime) / 1000));
-                              return (
-                                <div key={fleet.id} className="p-4 bg-red-950/15 border border-red-500/30 rounded-xl space-y-2">
-                                  <div className="flex justify-between items-start gap-2 flex-wrap">
-                                    <div>
-                                      <p className="font-bold text-red-400 uppercase tracking-wider animate-pulse flex items-center gap-1">
-                                        <span>⚠️ HOSTILE ASSAULT FROM:</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => onViewPlayerProfile && onViewPlayerProfile(fleet.senderId)}
-                                          className="text-white hover:text-red-300 hover:underline cursor-pointer font-bold focus:outline-none"
-                                        >
-                                          {fleet.senderName}
-                                        </button>
-                                      </p>
-                                      <p className="text-[10px] text-slate-500 mt-0.5">Origin Grid: [{fleet.senderCoords.x}, {fleet.senderCoords.y}]</p>
+                            {defensiveMissions.length === 0 ? (
+                              <div className="p-5 border border-emerald-900/10 bg-emerald-950/5 rounded-xl text-center text-emerald-500/80 text-[10.5px] italic">
+                                🛡️ Perimeter secure. Zero hostile fleets mapping coordinates!
+                              </div>
+                            ) : (
+                              defensiveMissions.map((fleet) => {
+                                const secLeft = Math.max(0, Math.floor((fleet.arrivesAt - serverTime) / 1000));
+                                return (
+                                  <div key={fleet.id} className="p-4 bg-red-950/15 border border-red-500/30 rounded-xl space-y-2">
+                                    <div className="flex justify-between items-start gap-2 flex-wrap">
+                                      <div>
+                                        <p className="font-bold text-red-400 uppercase tracking-wider animate-pulse flex items-center gap-1">
+                                          <span>⚠️ HOSTILE ASSAULT FROM:</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => onViewPlayerProfile && onViewPlayerProfile(fleet.senderId)}
+                                            className="text-white hover:text-red-300 hover:underline cursor-pointer font-bold focus:outline-none"
+                                          >
+                                            {fleet.senderName}
+                                          </button>
+                                        </p>
+                                        <p className="text-[10px] text-slate-500 mt-0.5">Origin Grid: [{fleet.senderCoords.x}, {fleet.senderCoords.y}]</p>
+                                      </div>
+                                      <span className="px-2 py-0.5 bg-red-500/20 border border-red-500/40 text-red-400 text-[9px] uppercase font-bold rounded">
+                                        CRITICAL DIRECT THREAT
+                                      </span>
                                     </div>
-                                    <span className="px-2 py-0.5 bg-red-500/20 border border-red-500/40 text-red-400 text-[9px] uppercase font-bold rounded">
-                                      CRITICAL DIRECT THREAT
-                                    </span>
-                                  </div>
 
-                                  <div className="p-2 bg-[#020305] border border-red-900/30 rounded-lg text-[10.5px]">
-                                    <p className="text-slate-350 text-slate-300">
-                                      Target Coordinate: <span className="text-red-400 font-extrabold">[{fleet.targetCoords.x}, {fleet.targetCoords.y}]</span> ({fleet.targetName})
-                                    </p>
-                                    <p className="text-[10px] text-slate-500 mt-0.5 font-bold uppercase">
-                                      Payload: {Object.entries(fleet.troops).filter(([_, q]) => (q as number) > 0).map(([k, q]) => `${q}x ${k}`).join(', ')}
-                                    </p>
-                                  </div>
+                                    <div className="p-2 bg-[#020305] border border-red-900/30 rounded-lg text-[10.5px]">
+                                      <p className="text-slate-350 text-slate-300">
+                                        Target Coordinate: <span className="text-red-400 font-extrabold">[{fleet.targetCoords.x}, {fleet.targetCoords.y}]</span> ({fleet.targetName})
+                                      </p>
+                                      <p className="text-[10px] text-slate-500 mt-0.5 font-bold uppercase">
+                                        Payload: {Object.entries(fleet.troops).filter(([_, q]) => (q as number) > 0).map(([k, q]) => `${q}x ${k}`).join(', ')}
+                                      </p>
+                                    </div>
 
-                                  <div className="flex justify-between items-center text-[10.5px] pt-1">
-                                    <span className="text-red-500 font-black animate-pulse">ALARM DETECTION</span>
-                                    <span className="text-red-400 font-black animate-pulse bg-red-950/30 border border-red-500/25 px-2 py-0.5 rounded">{secLeft}s left</span>
+                                    <div className="flex justify-between items-center text-[10.5px] pt-1">
+                                      <span className="text-red-500 font-black animate-pulse">ALARM DETECTION</span>
+                                      <span className="text-red-400 font-black animate-pulse bg-red-950/30 border border-red-500/25 px-2 py-0.5 rounded">{secLeft}s left</span>
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })
+                            )}
                           </div>
                         )}
                       </div>

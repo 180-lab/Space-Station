@@ -199,6 +199,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   const [chatInput, setChatInput] = useState('');
   const [chatPage, setChatPage] = useState(0);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [isAlertsHUDMinimized, setIsAlertsHUDMinimized] = useState(false);
+  const [minimizeAlertsIncoming, setMinimizeAlertsIncoming] = useState(false);
+  const [minimizeAlertsMoving, setMinimizeAlertsMoving] = useState(false);
   
   const [isEditingName, setIsEditingName] = useState(false);
   const [newNameInput, setNewNameInput] = useState(activePlanet.name);
@@ -2228,8 +2231,45 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
       })()}
 
       {/* Tactical Alerts Modal Overlay */}
-      {isAlertsOpen && (
-        <div id="alerts-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      {isAlertsOpen && (() => {
+        if (isAlertsHUDMinimized) {
+          return (
+            <div id="alerts-modal-minimized" className="fixed bottom-4 right-4 z-50 p-4 bg-[#090D1A]/95 border-2 border-cyan-500/50 rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.3)] flex flex-col max-w-xs font-mono animate-fade-in text-left text-xs">
+              <div className="flex items-center justify-between gap-3 pb-1.5 border-b border-[#1E293B]">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2.5 h-2.5 rounded-full ${pulseDot} animate-pulse`} />
+                  <span className="font-black text-white text-[10px] tracking-wider uppercase">RADAR HUD ACTIVE</span>
+                </div>
+                <button 
+                  onClick={() => setIsAlertsHUDMinimized(false)}
+                  className="text-cyan-400 hover:text-white font-bold px-1.5 py-0.5 border border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/10 rounded text-[9px] cursor-pointer"
+                  title="Maximize Transit Radar"
+                >
+                  EXPAND 🔼
+                </button>
+              </div>
+              <div className="text-[10px] text-slate-400 space-y-1 pt-1.5">
+                <p className="flex justify-between">
+                  <span>Hostile Inbounds:</span>
+                  <span className={`font-bold ${incomingAttacks.length > 0 ? 'text-red-400 animate-pulse' : 'text-slate-500'}`}>{incomingAttacks.length}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span>Active Transits:</span>
+                  <span className={`font-bold ${movingForces.length > 0 ? 'text-amber-400' : 'text-slate-500'}`}>{movingForces.length}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setIsAlertsOpen(false)}
+                className="w-full mt-2 py-1 bg-slate-900 border border-slate-800 text-[9px] hover:text-white transition uppercase font-bold text-slate-500 rounded cursor-pointer"
+              >
+                Close HUD
+              </button>
+            </div>
+          );
+        }
+
+        return (
+          <div id="alerts-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className="relative w-full max-w-2xl bg-[#090D1A] border border-[#1E293B] rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
             {/* Holographic scanner top overlay */}
             <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-cyan-500 via-amber-500 to-red-500"></div>
@@ -2243,29 +2283,45 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                   <p className="text-[9px] text-slate-400 uppercase mt-0.5 font-bold">Space Station Command &bull; Coordinate Transit Scanner</p>
                 </div>
               </div>
-              <button
-                id="close-alerts-top"
-                onClick={() => setIsAlertsOpen(false)}
-                className="text-slate-400 hover:text-white font-mono text-xs uppercase tracking-widest cursor-pointer border border-[#1E293B] px-2.5 py-1 rounded-lg bg-white/[0.02] hover:bg-white/[0.05]"
-              >
-                Close HUD
-              </button>
+              <div className="flex gap-2">
+                <button
+                  id="minimize-alerts-hud"
+                  onClick={() => setIsAlertsHUDMinimized(true)}
+                  className="text-cyan-400 hover:text-cyan-300 font-mono text-xs uppercase tracking-widest cursor-pointer border border-cyan-500/30 px-2.5 py-1 rounded-lg bg-cyan-500/5 hover:bg-cyan-500/10 font-bold"
+                >
+                  Minimize 🔽
+                </button>
+                <button
+                  id="close-alerts-top"
+                  onClick={() => setIsAlertsOpen(false)}
+                  className="text-slate-400 hover:text-white font-mono text-xs uppercase tracking-widest cursor-pointer border border-[#1E293B] px-2.5 py-1 rounded-lg bg-white/[0.02] hover:bg-white/[0.05]"
+                >
+                  Close HUD
+                </button>
+              </div>
             </div>
 
             {/* Content Body */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-[250px] font-mono">
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-[250px] font-mono text-left">
               
               {/* 1. Red Section: Incoming Attack Alerts */}
-              <div>
-                <h4 className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-3 flex items-center gap-1.5 border-b border-red-950 pb-1.5">
-                  <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                  [!] HOSTILE INVASION TROOPS DETECTED
-                </h4>
+              <div className="space-y-3 border border-red-500/10 rounded-xl p-3 bg-[#020408]/40">
+                <div 
+                  onClick={() => setMinimizeAlertsIncoming(!minimizeAlertsIncoming)}
+                  className="flex items-center justify-between cursor-pointer select-none pb-1.5 border-b border-red-950/40"
+                >
+                  <h4 className="text-[10px] font-bold text-red-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                    [!] HOSTILE INVASION TROOPS DETECTED ({incomingAttacks.length})
+                  </h4>
+                  <span className="text-slate-500 font-mono text-[10px]">{minimizeAlertsIncoming ? 'EXPAND 🔽' : 'MINIMIZE 🔼'}</span>
+                </div>
 
-                {incomingAttacks.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic px-3 py-2 bg-slate-950/20 border border-slate-900 rounded-lg">No incoming hostile troops detected. Sector perimeter secure.</p>
-                ) : (
-                  <div className="space-y-3">
+                {!minimizeAlertsIncoming && (
+                  incomingAttacks.length === 0 ? (
+                    <p className="text-xs text-slate-500 italic px-3 py-2 bg-slate-950/20 border border-slate-900 rounded-lg">No incoming hostile troops detected. Sector perimeter secure.</p>
+                  ) : (
+                    <div className="space-y-3">
                     {incomingAttacks.map((fleet) => {
                       const secondsLeft = Math.max(0, Math.floor((fleet.arrivesAt - serverTime) / 1000));
                       return (
@@ -2294,20 +2350,27 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                       );
                     })}
                   </div>
-                )}
+                ))}
               </div>
 
               {/* 2. Orange Section: Moving Fleets */}
-              <div>
-                <h4 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-3 flex items-center gap-1.5 border-b border-amber-950 pb-1.5">
-                  <span className="inline-block w-2 h-1.5 rounded bg-amber-500 animate-pulse" />
-                  [~] ACTIVE SENDER OPERATIONS TRANSIT
-                </h4>
+              <div className="space-y-3 border border-amber-500/10 rounded-xl p-3 bg-[#020408]/40">
+                <div 
+                  onClick={() => setMinimizeAlertsMoving(!minimizeAlertsMoving)}
+                  className="flex items-center justify-between cursor-pointer select-none pb-1.5 border-b border-amber-950/40"
+                >
+                  <h4 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-1.5 rounded bg-amber-500 animate-pulse" />
+                    [~] ACTIVE SENDER OPERATIONS TRANSIT ({movingForces.length})
+                  </h4>
+                  <span className="text-slate-500 font-mono text-[10px]">{minimizeAlertsMoving ? 'EXPAND 🔽' : 'MINIMIZE 🔼'}</span>
+                </div>
 
-                {movingForces.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic px-3 py-2 bg-slate-950/20 border border-slate-900 rounded-lg">All active troops are currently safely locked in command ship hangar bays.</p>
-                ) : (
-                  <div className="space-y-3">
+                {!minimizeAlertsMoving && (
+                  movingForces.length === 0 ? (
+                    <p className="text-xs text-slate-500 italic px-3 py-2 bg-slate-950/20 border border-slate-900 rounded-lg">All active troops are currently safely locked in command ship hangar bays.</p>
+                  ) : (
+                    <div className="space-y-3">
                     {movingForces.map((fleet) => {
                       const secondsLeft = Math.max(0, Math.floor((fleet.arrivesAt - serverTime) / 1000));
                       const isReturn = fleet.isReturning;
@@ -2368,7 +2431,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                       );
                     })}
                   </div>
-                )}
+                ))}
               </div>
 
               {/* 3. Green Base Status Summary */}
@@ -2397,7 +2460,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
             </div>
           </div>
         </div>
-      )}
+      ); })()}
 
       {/* 4. Production Boost Modal Backdrop & Panel */}
       {showBoostModal && (
