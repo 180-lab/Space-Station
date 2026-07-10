@@ -26,7 +26,7 @@ import { checkSpeedHack, redis as serverRedis } from "./antiCheat";
 import { OAuth2Client } from "google-auth-library";
 
 const app = express();
-const PORT = process.env.NODE_ENV === "production" ? (process.env.PORT ? parseInt(process.env.PORT) : 3000) : 3000;
+const PORT = 3000;
 
 // Auto-heal incoming proxy subpaths (e.g. /7/api/state -> /api/state) to prevent SPA fallback issues
 app.use((req, res, next) => {
@@ -5370,11 +5370,14 @@ app.post("/api/chat/send", (req, res) => {
   const { channel, content, receiverId } = req.body;
   if (!content) return res.status(400).json({ error: "Message content required" });
 
+  const email = (p.googleEmail || "").toLowerCase();
+  const isAdmin = email === "banele180@gmail.com" || email === "banzz1918@gmail.com";
+
   const message: ChatMessage = {
     id: `chat_${Math.random().toString(36).substr(2, 9)}`,
     channel,
     senderId: p.id,
-    senderName: p.username,
+    senderName: isAdmin ? "Galactic Federation" : p.username,
     senderFaction: p.faction,
     senderFactionColor: p.factionColor,
     allianceTag: p.allianceId ? state.alliances[p.allianceId]?.tag : null,
@@ -6036,7 +6039,12 @@ app.get("/api/alliance/member-reports", (req, res) => {
     };
   });
 
-  res.json({ success: true, members: reports });
+  const allianceMemberIds = alliance.members.map(mbr => mbr.playerId);
+  const relevantBattleReports = (state.battleReports || []).filter(report => 
+    allianceMemberIds.includes(report.attackerId) || allianceMemberIds.includes(report.defenderId)
+  );
+
+  res.json({ success: true, members: reports, battleReports: relevantBattleReports });
 });
 
 // Quantum target send resources

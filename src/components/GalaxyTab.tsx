@@ -271,6 +271,50 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [loadingReports, setLoadingReports] = useState(false);
   const [activeReportsTab, setActiveReportsTab] = useState<'highlights' | 'troops' | 'situation' | 'activity'>('highlights');
   const [expandedMemberPlanets, setExpandedMemberPlanets] = useState<Record<string, boolean>>({});
+  const [readIntelFleets, setReadIntelFleets] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(`read_intel_fleets_${player.id}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+  const [scanningFleetIds, setScanningFleetIds] = useState<Record<string, boolean>>({});
+
+  const handleRunIntelReport = async (fleetId: string, tx: number, ty: number) => {
+    if ((player.credits || 0) < 50) {
+      showToast?.("Insufficient Space Gold. Gathering intelligence report requires 50 Space Gold.", "error");
+      return;
+    }
+
+    setScanningFleetIds(prev => ({ ...prev, [fleetId]: true }));
+    try {
+      const res = await fetch('/api/galaxy/intelligence', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ targetX: tx, targetY: ty })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReadIntelFleets(prev => {
+          const u = { ...prev, [fleetId]: true };
+          localStorage.setItem(`read_intel_fleets_${player.id}`, JSON.stringify(u));
+          return u;
+        });
+        showToast?.("Intelligence scan generated successfully. Telemetry decrypted.", "success");
+        if (onRefreshState) onRefreshState();
+      } else {
+        showToast?.(data.error || "Failed to decrypt intelligence coordinates.", "error");
+      }
+    } catch (err) {
+      showToast?.("Signal distortion. Could not contact intelligence satellite.", "error");
+    } finally {
+      setScanningFleetIds(prev => ({ ...prev, [fleetId]: false }));
+    }
+  };
 
   const handleOpenManageAlliance = () => {
     setShowManageAlliance(true);
@@ -2496,7 +2540,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                       const activeRank = getRankValue(player.allianceRole);
 
                       return (
-                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                        <div className="space-y-2">
                           {activeAlliance.members.map((mbr) => {
                             const mbrRank = getRankValue(mbr.role);
                             const isSelf = mbr.playerId === player.id;
@@ -3420,6 +3464,64 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   </div>
                                 </div>
                               </div>
+
+                              {/* Scanned Moving Troops In Transit */}
+                              {(() => {
+                                const targetX = report.defenderCoords.x;
+                                const targetY = report.defenderCoords.y;
+                                const planetFleets = (fleets || []).filter(
+                                  f => (f.targetCoords.x === targetX && f.targetCoords.y === targetY) ||
+                                       (f.senderCoords.x === targetX && f.senderCoords.y === targetY)
+                                );
+                                if (planetFleets.length === 0) return null;
+
+                                const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
+                                const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
+
+                                return (
+                                  <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl space-y-2 font-mono text-[11px]">
+                                    <p className="font-bold text-[10px] text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                                      🚀 Scanned Moving Troops In Transit ({planetFleets.length}):
+                                    </p>
+                                    <div className="space-y-2">
+                                      {planetFleets.map((f) => {
+                                        const isHostile = f.senderId !== player.id && f.missionType === 'attack';
+
+                                        // Calculate HP
+                                        let movingDefHp = 0;
+                                        let movingAtkHp = 0;
+                                        const movingTroopsList: string[] = [];
+                                        Object.entries(f.troops || {}).forEach(([k, qty]) => {
+                                          const q = Number(qty) || 0;
+                                          if (q > 0) {
+                                            movingDefHp += q * (defHpMap[k] || 0);
+                                            movingAtkHp += q * (atkHpMap[k] || 0);
+                                            const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                            movingTroopsList.push(`${q}x ${label}`);
+                                          }
+                                        });
+                                        const movingTotalHp = movingDefHp + movingAtkHp;
+                                        const colorClass = isHostile ? "text-rose-400 bg-rose-950/10 border-rose-500/10" : "text-amber-400 bg-amber-500/5 border-amber-500/10";
+
+                                        return (
+                                          <div key={f.id} className={`p-2 rounded border text-[9px] font-mono space-y-0.5 ${colorClass}`}>
+                                            <div className="flex justify-between font-bold">
+                                              <span>{isHostile ? '⚠️ HOSTILE' : '🚀 FRIENDLY'} {f.missionType.toUpperCase()} ({f.isReturning ? 'Returning' : 'In Transit'})</span>
+                                              <span>❤️ {movingTotalHp.toLocaleString()} HP</span>
+                                            </div>
+                                            <div className="text-slate-400 text-[8.5px]">
+                                              [{f.senderCoords.x}, {f.senderCoords.y}] &rarr; [{f.targetCoords.x}, {f.targetCoords.y}] • ETA: {new Date(f.arrivesAt).toLocaleTimeString()}
+                                            </div>
+                                            <div className="text-slate-350 font-sans mt-0.5">
+                                              <strong className="text-slate-500 font-mono text-[8.5px]">Troops:</strong> {movingTroopsList.join(', ')}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
 
                               {/* Buildings Dropdown collapsible (works like explore tab) */}
                               {(() => {
@@ -5382,127 +5484,245 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                       No troop assets harvested or loaded.
                     </p>
                   ) : (
-                    <div className="space-y-4.5">
-                      {allianceMemberReports.map((mbr) => {
-                        const totalTroopsCount = mbr.planets?.reduce((acc: any, p: any) => {
-                          const tr = p.troops || {};
-                          return {
-                            defender: acc.defender + (tr.defender || 0),
-                            attacker: acc.attacker + (tr.attacker || 0),
-                            tank: acc.tank + (tr.tank || 0),
-                            looter: acc.looter + (tr.looter || 0),
-                            drone: acc.drone + (tr.drone || 0),
-                            settlementShip: acc.settlementShip + (tr.settlementShip || 0)
-                          };
-                        }, { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 }) || { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+                    <div className="space-y-4">
+                      {(() => {
+                        const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
+                        const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
 
-                        const grandTotal = Object.values(totalTroopsCount || {}).reduce((a: any, b: any) => a + b, 0) as number;
-                        const isExpanded = expandedMemberPlanets[mbr.playerId];
+                        let allianceTotalDefHp = 0;
+                        let allianceTotalAtkHp = 0;
+                        const allianceTotalTroops = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+
+                        allianceMemberReports.forEach((mbr) => {
+                          mbr.planets?.forEach((planet: any) => {
+                            const troops = planet.troops || {};
+                            Object.entries(troops).forEach(([k, qty]) => {
+                              const q = Number(qty) || 0;
+                              allianceTotalDefHp += q * (defHpMap[k] || 0);
+                              allianceTotalAtkHp += q * (atkHpMap[k] || 0);
+                              if (k in allianceTotalTroops) {
+                                allianceTotalTroops[k as keyof typeof allianceTotalTroops] += q;
+                              }
+                            });
+                          });
+                        });
 
                         return (
-                          <div key={mbr.playerId} className="border border-[#1E293B] rounded-xl bg-[#030508]/70 overflow-hidden">
-                            {/* Member header card */}
-                            <div className="p-4 bg-slate-950/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1E293B]/60">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                  <button
-                                    type="button"
-                                    onClick={() => onViewPlayerProfile && onViewPlayerProfile(mbr.playerId)}
-                                    className="font-black text-cyan-400 hover:text-cyan-300 text-sm tracking-tight hover:underline cursor-pointer focus:outline-none"
+                          <div className="space-y-4.5">
+                            {allianceMemberReports.map((mbr) => {
+                              let memberTotalDefHp = 0;
+                              let memberTotalAtkHp = 0;
+                              const totalTroopsCount = mbr.planets?.reduce((acc: any, p: any) => {
+                                const tr = p.troops || {};
+                                return {
+                                  defender: acc.defender + (tr.defender || 0),
+                                  attacker: acc.attacker + (tr.attacker || 0),
+                                  tank: acc.tank + (tr.tank || 0),
+                                  looter: acc.looter + (tr.looter || 0),
+                                  drone: acc.drone + (tr.drone || 0),
+                                  settlementShip: acc.settlementShip + (tr.settlementShip || 0)
+                                };
+                              }, { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 }) || { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+
+                              mbr.planets?.forEach((planet: any) => {
+                                const troops = planet.troops || {};
+                                Object.entries(troops).forEach(([k, qty]) => {
+                                  const q = Number(qty) || 0;
+                                  memberTotalDefHp += q * (defHpMap[k] || 0);
+                                  memberTotalAtkHp += q * (atkHpMap[k] || 0);
+                                });
+                              });
+
+                              const grandTotal = Object.values(totalTroopsCount || {}).reduce((a: any, b: any) => a + b, 0) as number;
+                              const isExpanded = !!expandedMemberPlanets[mbr.playerId];
+                              const totalHpValue = memberTotalDefHp + memberTotalAtkHp;
+
+                              return (
+                                <div key={mbr.playerId} className="border border-[#1E293B] rounded-xl bg-[#030508]/70 overflow-hidden">
+                                  {/* Member header card - Entirely clickable to expand/collapse */}
+                                  <div 
+                                    onClick={() => setExpandedMemberPlanets(prev => ({ ...prev, [mbr.playerId]: !isExpanded }))}
+                                    className="p-4 bg-slate-950/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1E293B]/60 cursor-pointer select-none hover:bg-slate-900 transition"
                                   >
-                                    {mbr.username}
-                                  </button>
-                                  <span className="px-1.5 py-0.2 bg-slate-800 rounded text-[9px] text-slate-400 uppercase font-bold">{mbr.role}</span>
-                                </div>
-                                <p className="text-[10px] text-slate-500 mt-0.5">
-                                  Planetary Holdings: <strong className="text-slate-350">{mbr.planets?.length || 0} Colony bases</strong> • Combined Force: <strong className="text-cyan-400">{grandTotal} Troops</strong>
-                                </p>
-                              </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-slate-500">{isExpanded ? '🔽' : '▶️'}</span>
+                                        <span className="font-black text-cyan-400 hover:text-cyan-300 text-sm tracking-tight hover:underline">
+                                          {mbr.username}
+                                        </span>
+                                        <span className="px-1.5 py-0.2 bg-slate-800 rounded text-[9px] text-slate-400 uppercase font-bold">{mbr.role}</span>
+                                      </div>
+                                      <p className="text-[10px] text-slate-500 mt-0.5">
+                                        Planetary Holdings: <strong className="text-slate-350">{mbr.planets?.length || 0} Colony bases</strong> • Combined Force: <strong className="text-cyan-400">{grandTotal} Troops</strong>
+                                      </p>
+                                    </div>
 
-                              <button
-                                type="button"
-                                onClick={() => setExpandedMemberPlanets(prev => ({ ...prev, [mbr.playerId]: !isExpanded }))}
-                                className="px-3 py-1.5 bg-[#0C1222] hover:bg-slate-900 border border-[#1E293B] text-slate-400 hover:text-white rounded-lg transition font-mono font-bold text-[10px] uppercase flex items-center gap-1.5 cursor-pointer ml-auto sm:ml-0"
-                              >
-                                {isExpanded ? 'Hide Bases 🔼' : 'Expand Bases 🔽'}
-                              </button>
-                            </div>
-
-                            {/* Total summary summary bar */}
-                            <div className="px-4 py-2 bg-slate-950/20 border-b border-[#1E293B]/40 flex flex-wrap gap-x-4 gap-y-1 text-[10.5px] text-slate-400">
-                              <span className="font-bold uppercase text-[9px] text-slate-500 tracking-wider">Total Combined Force Layout:</span>
-                              <span>🛡️ Def: <strong className="text-cyan-400">{totalTroopsCount.defender}</strong></span>
-                              <span>⚔️ Int: <strong className="text-red-400">{totalTroopsCount.attacker}</strong></span>
-                              <span>💣 Tan: <strong className="text-amber-400">{totalTroopsCount.tank}</strong></span>
-                              <span>🚛 Loo: <strong className="text-emerald-400">{totalTroopsCount.looter}</strong></span>
-                              <span>🛰️ Dro: <strong className="text-purple-400">{totalTroopsCount.drone}</strong></span>
-                              <span>🚀 Set: <strong className="text-teal-400">{totalTroopsCount.settlementShip}</strong></span>
-                            </div>
-
-                            {/* List of planets if expanded */}
-                            {isExpanded && (
-                              <div className="p-4 bg-black/45 space-y-3 font-mono text-[11px] border-t border-[#1E293B]/30">
-                                {mbr.planets && mbr.planets.length > 0 ? (
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                                    {mbr.planets.map((planet: any) => {
-                                      const plTroops = planet.troops || {};
-                                      return (
-                                        <div key={planet.id} className="p-3 bg-[#090D1A]/95 border border-[#1E293B]/60 rounded-xl space-y-2 text-left">
-                                          <div className="flex justify-between items-center pb-1.5 border-b border-[#1E293B]/40">
-                                            <span className="font-bold text-slate-200">{planet.name}</span>
-                                            <span className="text-cyan-400 font-bold bg-cyan-950/35 border border-cyan-500/25 px-1.5 py-0.5 rounded text-[9.5px]">COORD [{planet.sectorX}, {planet.sectorY}]</span>
-                                          </div>
-                                          
-                                          {/* Troops breakdown */}
-                                          <div className="grid grid-cols-3 gap-x-1.5 gap-y-2 text-[10.5px] pt-1">
-                                            <div className="flex flex-col">
-                                              <span className="text-slate-500 text-[9px] uppercase font-bold">Interceptors</span>
-                                              <span className="text-cyan-400 font-extrabold">{plTroops.defender || 0}</span>
-                                            </div>
-                                            <div className="flex flex-col">
-                                              <span className="text-red-400 text-[9px] uppercase font-bold">Assault Drones</span>
-                                              <span className="text-red-400 font-extrabold">{plTroops.attacker || 0}</span>
-                                            </div>
-                                            <div className="flex flex-col">
-                                              <span className="text-amber-500 text-[9px] uppercase font-bold">Disrupters</span>
-                                              <span className="text-amber-400 font-extrabold">{plTroops.tank || 0}</span>
-                                            </div>
-                                            <div className="flex flex-col">
-                                              <span className="text-emerald-500 text-[9px] uppercase font-bold">Extractors</span>
-                                              <span className="text-emerald-400 font-extrabold">{plTroops.looter || 0}</span>
-                                            </div>
-                                            <div className="flex flex-col">
-                                              <span className="text-purple-500 text-[9px] uppercase font-bold">Missile Launchers</span>
-                                              <span className="text-purple-400 font-extrabold">{plTroops.drone || 0}</span>
-                                            </div>
-                                            <div className="flex flex-col">
-                                              <span className="text-teal-500 text-[9px] uppercase font-bold">Settle Ships</span>
-                                              <span className="text-teal-400 font-extrabold">{plTroops.settlementShip || 0}</span>
-                                            </div>
-                                          </div>
-
-                                          {/* Resources breakdown */}
-                                          <div className="pt-2 border-t border-[#1E293B]/20 flex justify-between gap-1 flex-wrap text-[9px] text-slate-500 font-bold">
-                                            <span>💧 {Math.floor(planet.resources?.water || 0).toLocaleString()}</span>
-                                            <span>⚡ {Math.floor(planet.resources?.plasma || 0).toLocaleString()}</span>
-                                            <span>🔥 {Math.floor(planet.resources?.fuel || 0).toLocaleString()}</span>
-                                            <span>🥗 {Math.floor(planet.resources?.food || 0).toLocaleString()}</span>
-                                            <span>💨 {Math.floor(planet.resources?.respirant || 0).toLocaleString()}</span>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
+                                    <div className="text-right flex items-center gap-3 font-mono">
+                                      <div className="text-[11px] font-black text-cyan-400">
+                                        ❤️ {totalHpValue.toLocaleString()} HP
+                                      </div>
+                                    </div>
                                   </div>
-                                ) : (
-                                  <p className="text-[10.5px] text-slate-600 italic px-2">No planetary stations detected for this user commander.</p>
-                                )}
-                              </div>
-                            )}
 
+                                  {isExpanded && (
+                                    <div className="animate-fade-in bg-black/25">
+                                      {/* Total summary summary bar */}
+                                      <div className="px-4 py-2.5 bg-slate-950/20 border-b border-[#1E293B]/40 flex flex-wrap gap-x-4 gap-y-1 text-[10.5px] text-slate-400 font-mono">
+                                        <span className="font-bold uppercase text-[9px] text-slate-500 tracking-wider">Garrison Breakdown:</span>
+                                        <span>🛡️ Def: <strong className="text-cyan-400">{totalTroopsCount.defender}</strong></span>
+                                        <span>⚔️ Int: <strong className="text-red-400">{totalTroopsCount.attacker}</strong></span>
+                                        <span>💣 Tan: <strong className="text-amber-400">{totalTroopsCount.tank}</strong></span>
+                                        <span>🚛 Loo: <strong className="text-emerald-400">{totalTroopsCount.looter}</strong></span>
+                                        <span>🛰️ Dro: <strong className="text-purple-400">{totalTroopsCount.drone}</strong></span>
+                                        <span>🚀 Set: <strong className="text-teal-400">{totalTroopsCount.settlementShip}</strong></span>
+                                      </div>
+
+                                      <div className="px-4 py-2 bg-[#020304]/60 border-b border-[#1E293B]/30 grid grid-cols-2 gap-2 text-[10px] font-mono">
+                                        <div className="text-blue-400 font-bold">🛡️ MEMBER DEF HP: {memberTotalDefHp.toLocaleString()}</div>
+                                        <div className="text-orange-400 font-bold text-right">⚔️ MEMBER ATK HP: {memberTotalAtkHp.toLocaleString()}</div>
+                                      </div>
+
+                                      {/* List of planets if expanded */}
+                                      <div className="p-4 bg-black/45 space-y-3 font-mono text-[11px]">
+                                        {mbr.planets && mbr.planets.length > 0 ? (
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                            {mbr.planets.map((planet: any) => {
+                                              const plTroops = planet.troops || {};
+                                              return (
+                                                <div key={planet.id} className="p-3 bg-[#090D1A]/95 border border-[#1E293B]/60 rounded-xl space-y-2 text-left">
+                                                  <div className="flex justify-between items-center pb-1.5 border-b border-[#1E293B]/40">
+                                                    <span className="font-bold text-slate-200">{planet.name}</span>
+                                                    <span className="text-cyan-400 font-bold bg-cyan-950/35 border border-cyan-500/25 px-1.5 py-0.5 rounded text-[9.5px]">COORD [{planet.sectorX}, {planet.sectorY}]</span>
+                                                  </div>
+                                                  
+                                                  {/* Troops breakdown */}
+                                                  <div className="grid grid-cols-3 gap-x-1.5 gap-y-2 text-[10.5px] pt-1">
+                                                    <div className="flex flex-col">
+                                                      <span className="text-slate-500 text-[9px] uppercase font-bold">Interceptors</span>
+                                                      <span className="text-cyan-400 font-extrabold">{plTroops.defender || 0}</span>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                      <span className="text-red-400 text-[9px] uppercase font-bold">Assault Drones</span>
+                                                      <span className="text-red-400 font-extrabold">{plTroops.attacker || 0}</span>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                      <span className="text-amber-500 text-[9px] uppercase font-bold">Disrupters</span>
+                                                      <span className="text-amber-400 font-extrabold">{plTroops.tank || 0}</span>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                      <span className="text-emerald-500 text-[9px] uppercase font-bold">Extractors</span>
+                                                      <span className="text-emerald-400 font-extrabold">{plTroops.looter || 0}</span>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                      <span className="text-purple-500 text-[9px] uppercase font-bold">Missile Launchers</span>
+                                                      <span className="text-purple-400 font-extrabold">{plTroops.drone || 0}</span>
+                                                    </div>
+                                                  </div>
+
+                                                  {/* Resources breakdown */}
+                                                  <div className="pt-2 border-t border-[#1E293B]/20 flex justify-between gap-1 flex-wrap text-[9px] text-slate-500 font-bold">
+                                                    <span>💧 {Math.floor(planet.resources?.water || 0).toLocaleString()}</span>
+                                                    <span>⚡ {Math.floor(planet.resources?.plasma || 0).toLocaleString()}</span>
+                                                    <span>🔥 {Math.floor(planet.resources?.fuel || 0).toLocaleString()}</span>
+                                                    <span>🥗 {Math.floor(planet.resources?.food || 0).toLocaleString()}</span>
+                                                    <span>💨 {Math.floor(planet.resources?.respirant || 0).toLocaleString()}</span>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <p className="text-[10.5px] text-slate-600 italic px-2">No planetary stations detected for this user commander.</p>
+                                        )}
+
+                                        {/* Active Fleet Movements */}
+                                        {(() => {
+                                          const memberMovingFleets = (fleets || []).filter(
+                                            f => f.senderId === mbr.playerId
+                                          );
+                                          if (memberMovingFleets.length === 0) return null;
+
+                                          return (
+                                            <div className="border-t border-[#1E293B]/40 pt-4.5 mt-3.5 px-4 pb-4">
+                                              <span className="text-[9.5px] text-amber-400 font-bold uppercase tracking-wider block mb-2 flex items-center gap-1 font-mono">
+                                                📡 ACTIVE IN-TRANSIT TROOP MOVEMENTS ({memberMovingFleets.length})
+                                              </span>
+                                              <div className="space-y-2 font-mono">
+                                                {memberMovingFleets.map((fleet) => {
+                                                  let movingDefHp = 0;
+                                                  let movingAtkHp = 0;
+                                                  const movingTroopsList: string[] = [];
+                                                  Object.entries(fleet.troops || {}).forEach(([k, qty]) => {
+                                                    const q = Number(qty) || 0;
+                                                    if (q > 0) {
+                                                      movingDefHp += q * (defHpMap[k] || 0);
+                                                      movingAtkHp += q * (atkHpMap[k] || 0);
+                                                      const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                                      movingTroopsList.push(`${q}x ${label}`);
+                                                    }
+                                                  });
+                                                  const movingTotalHp = movingDefHp + movingAtkHp;
+                                                  return (
+                                                    <div key={fleet.id} className="p-2.5 bg-amber-500/5 border border-amber-500/15 rounded-lg space-y-1 text-[10px]">
+                                                      <div className="flex justify-between font-bold text-amber-300">
+                                                        <span className="capitalize">🚀 Mission: {fleet.missionType} {fleet.isReturning ? '(Returning)' : ''}</span>
+                                                        <span className="text-cyan-400">❤️ {movingTotalHp.toLocaleString()} HP Moving</span>
+                                                      </div>
+                                                      <div className="text-[9px] text-slate-400">
+                                                        Origin [{fleet.senderCoords.x}, {fleet.senderCoords.y}] &rarr; Dest: {fleet.targetName} [{fleet.targetCoords.x}, {fleet.targetCoords.y}]
+                                                      </div>
+                                                      <div className="text-[9.5px] text-slate-300 mt-1 flex flex-wrap gap-1">
+                                                        <span className="text-slate-500 font-bold">Troops:</span>
+                                                        <span className="font-extrabold text-slate-200">{movingTroopsList.join(', ')}</span>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {/* Consolidated Team Aggregates Card at the bottom */}
+                            <div className="p-4 bg-gradient-to-r from-purple-950/20 to-indigo-950/20 border border-purple-500/30 rounded-xl space-y-3 shadow-2xl relative overflow-hidden mt-6">
+                              <h5 className="text-[11px] font-black text-purple-400 uppercase tracking-widest flex items-center gap-1.5">
+                                📊 TEAM TOTAL WEAPONRY & GARRISON SUMMARY
+                              </h5>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                {[
+                                  { k: 'drone', label: 'Assault Drone', icon: '⚔️', color: 'text-rose-400' },
+                                  { k: 'defender', label: 'Interceptor', icon: '🛡️', color: 'text-cyan-400' },
+                                  { k: 'tank', label: 'Disrupter', icon: '🤖', color: 'text-amber-400' },
+                                  { k: 'looter', label: 'Matter Extractor', icon: '🛸', color: 'text-emerald-400' },
+                                  { k: 'settlementShip', label: 'Settlement Ship', icon: '🚀', color: 'text-teal-400' }
+                                ].map((tr) => (
+                                  <div key={tr.k} className="p-2 rounded-lg bg-[#020304]/90 border border-purple-500/10 flex items-center justify-between font-mono text-[11px]">
+                                    <div className="flex flex-col">
+                                      <span className="text-[9px] text-slate-500 font-bold">{tr.icon} {tr.label}</span>
+                                      <span className={`text-xs font-black ${tr.color}`}>{(allianceTotalTroops[tr.k as keyof typeof allianceTotalTroops] || 0).toLocaleString()}</span>
+                                    </div>
+                                  </div>
+                                ))}
+
+                                {/* HP pools */}
+                                <div className="p-2 rounded-lg bg-[#020304]/95 border border-purple-500/20 flex flex-col justify-center font-mono col-span-2 md:col-span-1">
+                                  <span className="text-[9px] text-slate-500 font-bold">Consolidated HP Pools</span>
+                                  <div className="space-y-0.5 text-[10px] font-bold">
+                                    <div className="text-blue-400">🛡️ DEF HP: {allianceTotalDefHp.toLocaleString()}</div>
+                                    <div className="text-orange-400">⚔️ ATK HP: {allianceTotalAtkHp.toLocaleString()}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         );
-                      })}
+                      })()}
                     </div>
                   )}
                 </div>

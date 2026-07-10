@@ -297,15 +297,38 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
   const fabLevel = activePlanet.buildings.fabricator?.level || 0;
 
-  const constructedBuildings = Object.entries(activePlanet.buildings).filter(([bKey, val]: [string, any]) => {
-    const isQueued = activePlanet.upgradeQueue?.some((item: any) => item.type === 'building' && item.key === bKey);
-    return val.level > 0 || val.isUpgrading || isQueued;
-  });
+  const BUILDING_SORT_ORDER = [
+    'fabricator',
+    'commsHub',
+    'radar',
+    'armyBase',
+    'researchCenter',
+    'supplyNexus',
+    'repository',
+    'bunker'
+  ];
 
-  const unconstructedBuildings = Object.entries(activePlanet.buildings).filter(([bKey, val]: [string, any]) => {
-    const isQueued = activePlanet.upgradeQueue?.some((item: any) => item.type === 'building' && item.key === bKey);
-    return val.level === 0 && !val.isUpgrading && !isQueued;
-  });
+  const sortBuildings = (a: [string, any], b: [string, any]) => {
+    const indexA = BUILDING_SORT_ORDER.indexOf(a[0]);
+    const indexB = BUILDING_SORT_ORDER.indexOf(b[0]);
+    const valA = indexA === -1 ? 999 : indexA;
+    const valB = indexB === -1 ? 999 : indexB;
+    return valA - valB;
+  };
+
+  const constructedBuildings = Object.entries(activePlanet.buildings)
+    .filter(([bKey, val]: [string, any]) => {
+      const isQueued = activePlanet.upgradeQueue?.some((item: any) => item.type === 'building' && item.key === bKey);
+      return val.level > 0 || val.isUpgrading || isQueued;
+    })
+    .sort(sortBuildings);
+
+  const unconstructedBuildings = Object.entries(activePlanet.buildings)
+    .filter(([bKey, val]: [string, any]) => {
+      const isQueued = activePlanet.upgradeQueue?.some((item: any) => item.type === 'building' && item.key === bKey);
+      return val.level === 0 && !val.isUpgrading && !isQueued;
+    })
+    .sort(sortBuildings);
 
   const visibleBlueprints = unconstructedBuildings.filter(([bKey]) => {
     const reqLvl = getRequiredFabricatorLevel(bKey);

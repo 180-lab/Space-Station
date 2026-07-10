@@ -202,38 +202,78 @@ export const CommunicationsHubDetail: React.FC<CommunicationsHubDetailProps> = (
   return (
     <div className="space-y-4 font-mono text-xs text-left" id="communications-hub-container">
       {/* Visual Section Navigation */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-950/80 border border-[#1E293B]/70 rounded-xl">
+      <div className={`grid grid-cols-1 ${player.allianceId ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3 p-3 bg-slate-950/80 border border-[#1E293B]/70 rounded-xl`}>
         <button
           type="button"
-          onClick={() => setActiveSection('messages')}
+          onClick={() => {
+            setActiveSection('messages');
+            setChatChannel('global');
+          }}
           className={`relative p-4 rounded-xl border font-mono text-left transition duration-200 cursor-pointer overflow-hidden group ${
-            activeSection === 'messages'
+            activeSection === 'messages' && chatChannel === 'global'
               ? 'bg-gradient-to-r from-emerald-950/30 to-cyan-950/30 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
               : 'bg-[#03060c] border-[#1E293B] hover:border-emerald-500/30 hover:bg-[#070d17]'
           }`}
         >
-          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition duration-300 text-2xl">✉️</div>
+          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition duration-300 text-2xl">🌐</div>
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg border transition ${
-              activeSection === 'messages' 
+              activeSection === 'messages' && chatChannel === 'global'
                 ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)]' 
                 : 'bg-slate-900 border-[#1E293B] text-slate-400 group-hover:text-emerald-400'
             }`}>
-              <MessageSquare size={15} className={activeSection === 'messages' ? 'animate-bounce' : ''} />
+              <Radio size={15} className={activeSection === 'messages' && chatChannel === 'global' ? 'animate-bounce' : ''} />
             </div>
             <div>
-              <span className="text-[8px] uppercase tracking-widest text-emerald-500/80 font-black block">TRANSMISSIONS</span>
+              <span className="text-[8px] uppercase tracking-widest text-emerald-500/80 font-black block">GLOBAL FREQUENCY</span>
               <span className={`text-xs tracking-wide font-black uppercase ${
-                activeSection === 'messages' ? 'text-emerald-400' : 'text-slate-300'
+                activeSection === 'messages' && chatChannel === 'global' ? 'text-emerald-400' : 'text-slate-300'
               }`}>
-                Secure Messages
+                Global Chat
               </span>
             </div>
           </div>
-          {activeSection === 'messages' && (
+          {activeSection === 'messages' && chatChannel === 'global' && (
             <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-emerald-500 to-cyan-500" />
           )}
         </button>
+
+        {player.allianceId && (
+          <button
+            type="button"
+            onClick={() => {
+              setActiveSection('messages');
+              setChatChannel('alliance');
+            }}
+            className={`relative p-4 rounded-xl border font-mono text-left transition duration-200 cursor-pointer overflow-hidden group ${
+              activeSection === 'messages' && chatChannel === 'alliance'
+                ? 'bg-gradient-to-r from-amber-950/30 to-yellow-950/30 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.1)]'
+                : 'bg-[#03060c] border-[#1E293B] hover:border-yellow-500/30 hover:bg-[#070d17]'
+            }`}
+          >
+            <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition duration-300 text-2xl">💬</div>
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg border transition ${
+                activeSection === 'messages' && chatChannel === 'alliance'
+                  ? 'bg-yellow-500/20 border-yellow-400 text-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.3)]'
+                  : 'bg-slate-900 border-[#1E293B] text-slate-400 group-hover:text-yellow-450'
+              }`}>
+                <MessageSquare size={15} className={activeSection === 'messages' && chatChannel === 'alliance' ? 'animate-bounce' : ''} />
+              </div>
+              <div>
+                <span className="text-[8px] uppercase tracking-widest text-yellow-500/80 font-black block">ALLIANCE CHANNEL</span>
+                <span className={`text-xs tracking-wide font-black uppercase ${
+                  activeSection === 'messages' && chatChannel === 'alliance' ? 'text-yellow-400' : 'text-slate-300'
+                }`}>
+                  Alliance Chat
+                </span>
+              </div>
+            </div>
+            {activeSection === 'messages' && chatChannel === 'alliance' && (
+              <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-yellow-500 to-amber-500" />
+            )}
+          </button>
+        )}
 
         <button
           type="button"
@@ -407,10 +447,22 @@ export const CommunicationsHubDetail: React.FC<CommunicationsHubDetailProps> = (
 
                 {/* Roster directory */}
                 <div className="space-y-2">
-                  <h4 className="text-[10px] font-bold text-sky-450 uppercase tracking-widest flex items-center gap-1.5">
-                    👥 ALLIANCE ROSTER ({activeAlliance.members?.length || 0})
-                  </h4>
-                  <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-bold text-sky-450 uppercase tracking-widest flex items-center gap-1.5">
+                      👥 ALLIANCE ROSTER DIRECTORY ({activeAlliance.members?.length || 0})
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveSection('messages');
+                        setChatChannel('alliance');
+                      }}
+                      className="px-3 py-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-[10px] font-extrabold uppercase tracking-wider rounded-lg transition hover:shadow-[0_0_12px_rgba(34,211,238,0.5)] flex items-center gap-1 cursor-pointer font-mono"
+                    >
+                      <MessageSquare size={11} /> Alliance Chat 💬
+                    </button>
+                  </div>
+                  <div className="space-y-1.5">
                     {activeAlliance.members?.map((mbr) => {
                       const mbrRank = getRankValue(mbr.role);
                       const isSelf = mbr.playerId === player.id;

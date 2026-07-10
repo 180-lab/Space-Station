@@ -199,6 +199,7 @@ export default function App() {
 
   // Synced state from server
   const [player, setPlayer] = useState<PlayerProfile | null>(null);
+  const [showLeaveAllianceConfirm, setShowLeaveAllianceConfirm] = useState(false);
 
   useEffect(() => {
     if (player && player.googleEmail) {
@@ -1524,6 +1525,28 @@ export default function App() {
       }
     } catch (err: any) {
       consecutiveErrorsRef.current += 1;
+      
+      // Attempt to load cached state on network failure so user isn't blocked from seeing their station
+      const cachedStateStr = localStorage.getItem('moonbase_cached_mmo_state');
+      if (cachedStateStr) {
+        try {
+          const cachedData = JSON.parse(cachedStateStr);
+          if (cachedData && cachedData.player) {
+            setPlayer(cachedData.player);
+            setPlayersList(cachedData.playersList || []);
+            setAlliances(cachedData.alliances || {});
+            setChatMessages(cachedData.chatMessages || []);
+            setFleets(cachedData.fleets || []);
+            setBattleReports(cachedData.battleReports || []);
+            setNewsEvents(cachedData.newsEvents || []);
+            setServerTime(Date.now());
+            setCustomTasks(cachedData.customTasks || {});
+          }
+        } catch (e) {
+          // Ignore cache parse errors
+        }
+      }
+
       if (consecutiveErrorsRef.current >= 12) {
         setConnectionError(err?.message || 'Gateway connection error');
       }
@@ -2279,6 +2302,10 @@ export default function App() {
   };
 
   const handleLeaveAlliance = async () => {
+    setShowLeaveAllianceConfirm(true);
+  };
+
+  const executeLeaveAlliance = async () => {
     if (!player) return;
     try {
       const res = await fetch('/api/alliance/leave', {
@@ -4213,6 +4240,42 @@ export default function App() {
         </div>
       )}
 
+      {/* LEAVE ALLIANCE DIRECTIVE CONFIRMATION POPUP */}
+      {showLeaveAllianceConfirm && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#090D1A] border border-rose-500/30 rounded-xl p-6 shadow-[0_0_50px_rgba(239,68,68,0.15)] text-left font-mono text-xs space-y-4">
+            <h3 className="text-sm font-black uppercase text-rose-500 tracking-wider flex items-center gap-2">
+              🚨 FACTION SEPARATION DIRECTIVE
+            </h3>
+            <p className="text-slate-300 font-sans leading-relaxed text-[11px]">
+              You are about to renounce your faction oath and leave your current Alliance. This action is irreversible. All alliance chat access, troop garrison reports, and mutual defense protocols will be severed immediately.
+            </p>
+            <p className="text-slate-450 font-bold uppercase text-[9px] tracking-wider animate-pulse text-center">
+              Are you sure you want to proceed with leaving the alliance?
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLeaveAllianceConfirm(false)}
+                className="px-4 py-2 border border-[#1E293B] text-slate-400 hover:text-white rounded-lg uppercase tracking-wider font-bold transition text-[10px] cursor-pointer"
+              >
+                Cancel Separation
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowLeaveAllianceConfirm(false);
+                  await executeLeaveAlliance();
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg uppercase tracking-wider font-black transition text-[10px] shadow-[0_0_15px_rgba(220,38,38,0.4)] cursor-pointer"
+              >
+                Confirm Leave 🚪
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* DOUBLE EXIT CONFIRMATION POPUP FOR MOBILE/PWA BACK GESTURES */}
       {showExitPopup && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-sm bg-slate-950/95 border border-[#1E293B] rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.15)] p-4 font-mono text-center animate-bounce">
@@ -5105,9 +5168,37 @@ export default function App() {
                                   </button>
                                 </p>
                                 <p className="text-slate-400 font-mono">Target Coordinates: <span className="text-white">[{fleet.targetCoords.x}, {fleet.targetCoords.y}]</span></p>
-                                <p className="text-[10px] text-slate-500 font-mono">
-                                  Troop Speeds: {Object.entries(fleet.troops).filter(([_, qty]) => (qty as number) > 0).map(([tId, qty]) => `${qty}x ${tId}`).join(', ')}
-                                </p>
+                                
+                                {/* Always show troop composition and HP in incoming alerts */}
+                                {(() => {
+                                  const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
+                                  const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
+                                  let inboundDefHp = 0;
+                                  let inboundAtkHp = 0;
+                                  Object.entries(fleet.troops || {}).forEach(([k, q]) => {
+                                    const qNum = Number(q) || 0;
+                                    inboundDefHp += qNum * (defHpMap[k] || 0);
+                                    inboundAtkHp += qNum * (atkHpMap[k] || 0);
+                                  });
+                                  const inboundTotalHp = inboundDefHp + inboundAtkHp;
+
+                                  return (
+                                    <div className="text-[10px] text-slate-400 font-mono bg-black/40 p-2.5 rounded border border-red-500/15 mt-1.5 space-y-1">
+                                      <div className="flex justify-between font-bold text-red-400">
+                                        <span>🚨 INCOMING STRIKE FORCE:</span>
+                                        <span>❤️ COMBAT HP: {inboundTotalHp.toLocaleString()}</span>
+                                      </div>
+                                      <div className="flex flex-wrap gap-1.5 text-slate-300 mt-1">
+                                        {Object.entries(fleet.troops || {}).filter(([_, qty]) => (qty as number) > 0).map(([tId, qty]) => {
+                                          const label = tId === 'defender' ? 'Interceptor' : tId === 'attacker' ? 'Attacker' : tId === 'tank' ? 'Disrupter' : tId === 'looter' ? 'Matter Extractor' : tId === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                          return (
+                                            <span key={tId} className="bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded text-[9px] uppercase font-bold text-red-300">{qty}x {label}</span>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                               <div className="text-left sm:text-right shrink-0 mt-2 sm:mt-0 border-t border-red-950/40 sm:border-0 pt-2 sm:pt-0">
                                 <span className="text-red-500 font-bold block tracking-widest text-sm animate-pulse">{secondsLeft}s</span>
