@@ -4976,6 +4976,7 @@ export default function App() {
           player={player}
           alliances={alliances}
           playersList={playersList}
+          fleets={fleets}
           onSendMessage={handleSendMessage}
           onToggleMessageRead={handleToggleMessageRead}
           onToggleSaveMessage={handleToggleSaveMessage}

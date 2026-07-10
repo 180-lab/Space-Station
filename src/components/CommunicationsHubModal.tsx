@@ -4,7 +4,7 @@ import {
   Sparkles, ShieldAlert, Heart, Sword, Compass, Flag, Shield, Award,
   Trash2, Reply, Star, Forward, X, Mail, Settings, RefreshCw, Trophy, Radio, Target
 } from 'lucide-react';
-import { PlayerProfile, Alliance, ChatMessage, CommandMessage, ColonyPlanet, ResourceType, getUpgradeResourceCost } from '../types';
+import { PlayerProfile, Alliance, ChatMessage, CommandMessage, ColonyPlanet, ResourceType, getUpgradeResourceCost, FleetMission } from '../types';
 
 interface CommunicationsHubModalProps {
   isOpen: boolean;
@@ -12,6 +12,7 @@ interface CommunicationsHubModalProps {
   player: PlayerProfile;
   alliances: Record<string, Alliance>;
   playersList: PlayerProfile[];
+  fleets?: FleetMission[];
   onSendMessage: (receiverId: string, content: string) => Promise<void>;
   onToggleMessageRead: (messageId: string, isRead: boolean) => Promise<void>;
   onToggleSaveMessage: (messageId: string, isSaved: boolean) => Promise<void>;
@@ -35,6 +36,7 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
   player,
   alliances,
   playersList,
+  fleets = [],
   onSendMessage,
   onToggleMessageRead,
   onToggleSaveMessage,
@@ -77,6 +79,14 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
   };
 
   const [activeTab, setActiveTab] = useState<'messages' | 'alliance'>('messages');
+  const [localTick, setLocalTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLocalTick(t => t + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Personal Messages Sub-Tabs
   const [commDeckTab, setCommDeckTab] = useState<'incoming' | 'saved' | 'sent' | 'compose'>('incoming');
@@ -904,7 +914,7 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                       <h4 className="text-[10px] font-bold text-sky-400 uppercase tracking-widest flex items-center gap-1.5">
                         👥 ALLIANCE ROSTER DIRECTORY ({activeAlliance.members?.length || 0})
                       </h4>
-                      <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                      <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1" style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
                         {activeAlliance.members?.map((mbr) => {
                           const mbrRank = getRankValue(mbr.role);
                           const isSelf = mbr.playerId === player.id;
@@ -1192,7 +1202,7 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                     <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl space-y-1.5">
                       <h4 className="text-xs font-bold text-purple-400 uppercase tracking-widest">🎖️ MEMBERS TROOP READINESS</h4>
                       <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-                        Consolidated active-duty military logistics. Inspect troop counts across establishing stations to coordinate multi-star base defense or coordinate joint planetary conquest operations.
+                        Consolidated active-duty military logistics. Inspect aggregated troop counts and defensive shield and strike capacities across all stations for each alliance member.
                       </p>
                     </div>
 
@@ -1202,81 +1212,203 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                       <div className="py-12 text-center text-slate-500 border border-dashed border-[#1E293B] rounded-xl">No member troop profiles currently synced.</div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {allianceMemberReports.map((member) => (
-                          <div key={member.playerId} className="p-4 bg-[#05070A]/90 border border-[#1E293B] rounded-xl space-y-3 shadow-lg relative overflow-hidden hover:border-[#1E293B]*1.5 transition">
-                            <div className="flex items-center justify-between border-b border-[#1E293B]/70 pb-2.5">
-                              <div>
-                                <span className="font-extrabold text-[#00F0FF]">{member.username}</span>
-                                <span className={`ml-2 px-1.5 py-0.2 rounded text-[8px] font-bold border ${getRankColor(member.role)}`}>
-                                  {getRankLabel(member.role)}
-                                </span>
+                        {allianceMemberReports.map((member) => {
+                          const defHpMap: Record<string, number> = { defender: 18, attacker: 9, tank: 5, looter: 4, drone: 120, settlementShip: 50 };
+                          const atkHpMap: Record<string, number> = { defender: 10, attacker: 30, tank: 5, looter: 4, drone: 120, settlementShip: 0 };
+
+                          let totalDefHp = 0;
+                          let totalAtkHp = 0;
+                          const totalTroops = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+
+                          member.planets?.forEach((planet: any) => {
+                            const troops = planet.troops || {};
+                            Object.entries(troops).forEach(([k, qty]) => {
+                              const q = Number(qty) || 0;
+                              totalDefHp += q * (defHpMap[k] || 0);
+                              totalAtkHp += q * (atkHpMap[k] || 0);
+                              if (k in totalTroops) {
+                                totalTroops[k as keyof typeof totalTroops] += q;
+                              }
+                            });
+                          });
+
+                          const totalHpValue = totalDefHp + totalAtkHp;
+
+                          return (
+                            <div key={member.playerId} className="p-4 bg-[#05070A]/90 border border-[#1E293B] rounded-xl space-y-3.5 shadow-lg relative overflow-hidden hover:border-cyan-500/30 transition">
+                              <div className="flex items-center justify-between border-b border-[#1E293B]/70 pb-2.5">
+                                <div>
+                                  <span className="font-extrabold text-[#00F0FF]">{member.username}</span>
+                                  <span className={`ml-2 px-1.5 py-0.2 rounded text-[8px] font-bold border ${getRankColor(member.role)}`}>
+                                    {getRankLabel(member.role)}
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-[10px] font-black text-cyan-400 font-mono">
+                                    ❤️ TOTAL HP: {totalHpValue.toLocaleString()}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Combat HP stats breakdown */}
+                              <div className="grid grid-cols-2 gap-2 bg-[#020304]/60 p-2 rounded-lg border border-[#1E293B]/40 font-mono text-[9.5px]">
+                                <div className="text-blue-400 font-bold flex items-center gap-1">
+                                  🛡️ DEF HP: {totalDefHp.toLocaleString()}
+                                </div>
+                                <div className="text-orange-400 font-bold flex items-center gap-1 justify-end">
+                                  ⚔️ ATK HP: {totalAtkHp.toLocaleString()}
+                                </div>
+                              </div>
+
+                              {/* Aggregated Troops List */}
+                              <div className="space-y-1.5">
+                                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Aggregated Troop Garrison</span>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[10px]">
+                                  {[
+                                    { k: 'drone', label: 'Assault Drone', icon: '⚔️' },
+                                    { k: 'defender', label: 'Interceptor', icon: '🛡️' },
+                                    { k: 'tank', label: 'Disrupter', icon: '🤖' },
+                                    { k: 'looter', label: 'Matter Extractor', icon: '🛸' },
+                                    { k: 'settlementShip', label: 'Settlement Ship', icon: '🚀' }
+                                  ].map((tr) => (
+                                    <div key={tr.k} className="p-1.5 rounded-md bg-[#020304]/80 border border-[#1E293B]/30 flex flex-col justify-center">
+                                      <span className="text-[9px] text-slate-500 font-bold truncate">{tr.icon} {tr.label}</span>
+                                      <span className="text-xs font-black text-white mt-0.5">{(totalTroops[tr.k as keyof typeof totalTroops] || 0).toLocaleString()}</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             </div>
-
-                            {/* Stations Roster details */}
-                            <div className="space-y-2 text-[11px]">
-                              {member.planets?.map((planet: any) => {
-                                const isExpanded = expandedMemberPlanets[`${member.playerId}_${planet.id}`];
-                                return (
-                                  <div key={planet.id} className="border border-[#1E293B]/40 bg-[#020304]/60 rounded-lg overflow-hidden">
-                                    <button
-                                      type="button"
-                                      onClick={() => setExpandedMemberPlanets(prev => ({
-                                        ...prev,
-                                        [`${member.playerId}_${planet.id}`]: !isExpanded
-                                      }))}
-                                      className="w-full px-3 py-2 flex items-center justify-between bg-[#04060b] hover:bg-[#070c14]/80 transition text-slate-300 font-bold"
-                                    >
-                                      <span>🌌 {planet.name} ({planet.x}, {planet.y})</span>
-                                      {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                                    </button>
-
-                                    {isExpanded && (
-                                      <div className="p-3 bg-black/30 border-t border-[#1E293B]/30 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                        {[
-                                          { k: 'drone', label: 'Assault Drone', icon: '⚔️' },
-                                          { k: 'defender', label: 'Interceptor', icon: '🛡️' },
-                                          { k: 'tank', label: 'Disrupter', icon: '🤖' },
-                                          { k: 'looter', label: 'Matter Extractor', icon: '🛸' },
-                                          { k: 'settlementShip', label: 'Settlement Ship', icon: '🚀' }
-                                        ].map((tr) => (
-                                          <div key={tr.k} className="p-1.5 rounded-md bg-[#020304]/80 border border-[#1E293B]/30 flex flex-col justify-center">
-                                            <span className="text-[9px] text-slate-500 font-bold truncate">{tr.icon} {tr.label}</span>
-                                            <span className="text-xs font-black text-white mt-1">{(planet.troops?.[tr.k] || 0).toLocaleString()}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* TAB 3: SITUATION ROOM */}
-                {activeReportsTab === 'situation' && (
-                  <div className="space-y-4">
-                    <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl space-y-1.5">
-                      <h4 className="text-xs font-bold text-red-400 uppercase tracking-widest">📡 SITUATION ROOM (WAR PLANS)</h4>
-                      <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-                        Live military intelligence desk monitoring active hostile alliances, war declarations, and diplomatic status updates.
-                      </p>
-                    </div>
+                {activeReportsTab === 'situation' && (() => {
+                  const allianceMemberIds = activeAlliance.members?.map(m => m.playerId) || [];
+                  const activeFleets = fleets || [];
 
-                    <div className="p-6 bg-black/40 border border-[#1E293B] rounded-xl text-center space-y-2 text-slate-400 font-sans">
-                      <ShieldAlert size={36} className="mx-auto text-cyan-500 opacity-60" />
-                      <p className="font-bold text-slate-200">NO DEPLOYED WAR PLANS DETECTED</p>
-                      <p className="text-xs max-w-sm mx-auto leading-relaxed text-slate-500">
-                        The alliance is currently at peaceful standoff levels. No active hostile war declarations recorded on this sector grid.
-                      </p>
+                  // Outgoing attacks: missionType is 'attack', sender is in our alliance
+                  const outgoingAttacks = activeFleets.filter(f => 
+                    f.missionType === 'attack' && allianceMemberIds.includes(f.senderId)
+                  );
+
+                  // Incoming attacks: missionType is 'attack', target is in our alliance, sender is NOT in our alliance
+                  const incomingAttacks = activeFleets.filter(f => 
+                    f.missionType === 'attack' && f.targetId && allianceMemberIds.includes(f.targetId) && !allianceMemberIds.includes(f.senderId)
+                  );
+
+                  const formatTimeLeft = (arrivesAt: number) => {
+                    const diff = Math.max(0, Math.round((arrivesAt - Date.now()) / 1000));
+                    if (diff === 0) return "ARRIVED / COLLIDING";
+                    const h = Math.floor(diff / 3600);
+                    const m = Math.floor((diff % 3600) / 60);
+                    const s = diff % 60;
+                    return `${h > 0 ? h + 'h ' : ''}${m}m ${s}s`;
+                  };
+
+                  return (
+                    <div className="space-y-5">
+                      <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl space-y-1.5">
+                        <h4 className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
+                          📡 SITUATION ROOM (WAR PLANS & LIVE FLEET MOVEMENTS)
+                        </h4>
+                        <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
+                          Live tactical defense desk monitoring active hostile attacks on alliance members and outgoing offensive operations.
+                        </p>
+                      </div>
+
+                      {/* INCOMING ATTACKS SECTION */}
+                      <div className="space-y-3">
+                        <h5 className="text-[10px] font-black uppercase text-rose-500 tracking-wider flex items-center gap-2 font-mono">
+                          🚨 INCOMING HOSTILE STRIKE FLEETS ({incomingAttacks.length})
+                        </h5>
+                        
+                        {incomingAttacks.length === 0 ? (
+                          <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl text-center text-emerald-400 font-sans text-xs">
+                            ✓ No hostile inbound strike vectors detected targeting alliance stations.
+                          </div>
+                        ) : (
+                          <div className="space-y-2.5">
+                            {incomingAttacks.map(f => (
+                              <div key={f.id} className="p-3 bg-rose-950/15 border border-rose-500/30 rounded-xl space-y-2 relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-rose-500" />
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                                  <div>
+                                    <span className="text-rose-400 font-extrabold uppercase font-mono">HOSTILE ATTACK TRANSIT</span>
+                                    <div className="text-slate-300 font-sans mt-0.5">
+                                      <strong className="text-rose-300">{f.senderName}</strong> [{f.senderCoords.x}, {f.senderCoords.y}] &rarr; <strong className="text-cyan-300">{f.targetName}</strong> [{f.targetCoords.x}, {f.targetCoords.y}]
+                                    </div>
+                                  </div>
+                                  <div className="text-right sm:text-right flex flex-col items-end">
+                                    <span className="text-rose-400 font-mono font-black animate-pulse">{formatTimeLeft(f.arrivesAt)}</span>
+                                    <span className="text-[9px] text-slate-500 font-mono uppercase">ETA: {new Date(f.arrivesAt).toLocaleTimeString()}</span>
+                                  </div>
+                                </div>
+                                <div className="p-2 bg-black/40 rounded border border-rose-500/10 text-[10px] space-y-1">
+                                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[8px]">Inbound Fleet Armaments:</span>
+                                  <div className="grid grid-cols-3 gap-1">
+                                    {Object.entries(f.troops || {}).filter(([_, q]) => (Number(q) || 0) > 0).map(([k, q]) => (
+                                      <div key={k} className="text-slate-300 font-mono">
+                                        • <span className="capitalize">{k}</span>: <span className="font-bold text-rose-300">{q}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* OUTGOING ATTACKS SECTION */}
+                      <div className="space-y-3">
+                        <h5 className="text-[10px] font-black uppercase text-cyan-400 tracking-wider flex items-center gap-2 font-mono">
+                          ⚔️ OUTGOING ALLIANCE ATTACK FLEETS ({outgoingAttacks.length})
+                        </h5>
+
+                        {outgoingAttacks.length === 0 ? (
+                          <div className="p-4 bg-slate-950/40 border border-[#1E293B] rounded-xl text-center text-slate-500 font-sans text-xs">
+                            No offensive strike fleets currently in transit.
+                          </div>
+                        ) : (
+                          <div className="space-y-2.5">
+                            {outgoingAttacks.map(f => (
+                              <div key={f.id} className="p-3 bg-cyan-950/15 border border-cyan-500/30 rounded-xl space-y-2 relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500" />
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                                  <div>
+                                    <span className="text-cyan-400 font-extrabold uppercase font-mono">OFFENSIVE OPERATION IN PROGRESS</span>
+                                    <div className="text-slate-300 font-sans mt-0.5">
+                                      <strong className="text-cyan-300">{f.senderName}</strong> [{f.senderCoords.x}, {f.senderCoords.y}] &rarr; <strong className="text-rose-300">{f.targetName}</strong> [{f.targetCoords.x}, {f.targetCoords.y}]
+                                    </div>
+                                  </div>
+                                  <div className="text-right sm:text-right flex flex-col items-end">
+                                    <span className="text-cyan-400 font-mono font-black">{formatTimeLeft(f.arrivesAt)}</span>
+                                    <span className="text-[9px] text-slate-500 font-mono uppercase">ETA: {new Date(f.arrivesAt).toLocaleTimeString()}</span>
+                                  </div>
+                                </div>
+                                <div className="p-2 bg-black/40 rounded border border-cyan-500/10 text-[10px] space-y-1">
+                                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[8px]">Fleet Composition:</span>
+                                  <div className="grid grid-cols-3 gap-1">
+                                    {Object.entries(f.troops || {}).filter(([_, q]) => (Number(q) || 0) > 0).map(([k, q]) => (
+                                      <div key={k} className="text-slate-300 font-mono">
+                                        • <span className="capitalize">{k}</span>: <span className="font-bold text-cyan-300">{q}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* TAB 4: PLAYER ACTIVITY ROSTER */}
                 {activeReportsTab === 'activity' && (
@@ -1295,20 +1427,49 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                         <span className="text-right">TELEMETRY DECRYPTION</span>
                       </div>
                       <div className="divide-y divide-[#1E293B]/40 max-h-[400px] overflow-y-auto">
-                        {activeAlliance.members?.map((m) => {
+                        {allianceMemberReports.map((m) => {
                           const isSelf = m.playerId === player.id;
+                          const lastActiveTime = m.lastActive || Date.now() - 600000;
+                          const elapsedMs = Date.now() - lastActiveTime;
+                          const isActive = elapsedMs <= 5 * 60 * 1000; // 5 minutes
+
+                          let telemetryStatus = "";
+                          let dotColor = "bg-slate-500";
+                          let textColor = "text-slate-400";
+                          
+                          if (isActive) {
+                            telemetryStatus = "ACTIVE NOW";
+                            dotColor = "bg-emerald-400 animate-pulse";
+                            textColor = "text-emerald-400 font-extrabold";
+                          } else {
+                            const minutesAgo = Math.floor(elapsedMs / 60000);
+                            if (minutesAgo < 60) {
+                              telemetryStatus = `ACTIVE ${minutesAgo}m AGO`;
+                            } else {
+                              const hoursAgo = Math.floor(minutesAgo / 60);
+                              if (hoursAgo < 24) {
+                                telemetryStatus = `ACTIVE ${hoursAgo}h AGO`;
+                              } else {
+                                telemetryStatus = `ACTIVE ON ${new Date(lastActiveTime).toLocaleDateString()}`;
+                              }
+                            }
+                            dotColor = "bg-amber-500";
+                            textColor = "text-amber-500 font-bold";
+                          }
+
                           return (
                             <div key={m.playerId} className="px-4 py-3 grid grid-cols-3 items-center hover:bg-slate-900/10">
                               <span className="font-bold text-white flex items-center gap-1.5">
-                                <span className={`w-1.5 h-1.5 rounded-full ${isSelf ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                                <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
                                 {m.username}
+                                {isSelf && <span className="text-[7px] text-emerald-400 border border-emerald-500/20 bg-emerald-500/5 rounded px-1 ml-1 font-bold">YOU</span>}
                               </span>
                               <span className="text-center">
                                 <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-bold border ${getRankColor(m.role)}`}>
                                   {getRankLabel(m.role)}
                                 </span>
                               </span>
-                              <span className="text-right text-[10px] text-emerald-400 font-bold">ONLINE (SYNCED)</span>
+                              <span className={`text-right text-[10px] font-mono ${textColor}`}>{telemetryStatus}</span>
                             </div>
                           );
                         })}
@@ -1327,7 +1488,7 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
       <button
         type="button"
         onClick={handleManualClose}
-        className="absolute right-6 bottom-6 z-55 flex items-center justify-center gap-2.5 px-5 py-4 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_20px_rgba(6,182,212,0.6)] transition duration-150 active:scale-95 group cursor-pointer"
+        className="fixed right-6 bottom-6 z-[60] flex items-center justify-center gap-2.5 px-5 py-4 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_20px_rgba(6,182,212,0.6)] transition duration-150 active:scale-95 group cursor-pointer"
         title="Back to Station"
       >
         <Compass size={18} className="animate-spin-slow group-hover:rotate-45 transition-transform" />
