@@ -3603,7 +3603,20 @@ app.all("/api/state", (req, res) => {
   res.json({
     player: p,
     alliances: state.alliances,
-    chatMessages: state.chatMessages,
+    chatMessages: state.chatMessages.map(msg => {
+      const senderPlayer = state.players[msg.senderId];
+      if (senderPlayer && senderPlayer.googleEmail) {
+        const email = senderPlayer.googleEmail.toLowerCase();
+        if (email === "banele180@gmail.com" || email === "banzz1918@gmail.com") {
+          return {
+            ...msg,
+            senderName: "Galactic Federation",
+            senderFaction: "System"
+          };
+        }
+      }
+      return msg;
+    }),
     fleets: relevantFleets,
     battleReports: state.battleReports.filter(r => r.attackerId === p.id || r.defenderId === p.id),
     newsEvents: state.newsEvents,
