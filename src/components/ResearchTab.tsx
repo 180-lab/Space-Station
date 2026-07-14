@@ -73,84 +73,44 @@ const TECHS: TechDef[] = [
 
 const FAQS = [
   {
-    q: "How do I acquire new stations/colonies?",
-    a: "Build a Settlement Ship in the War Room (CMD tab) and dispatch it to an uncolonized coordinate in the Galaxy Map. Once it arrives, load that planet in your Sector Hub to materialize your new outpost."
+    q: "What is the core objective of the game?",
+    a: "Your objective is to build a mighty space-faring empire. You extract 5 essential resources (Water, Plasma, Fuel, Food, and Respirant), upgrade local facilities on your outposts, research global technologies, build fleets of space warships, and expand by colonizing habitable planets across the galaxy."
   },
   {
-    q: "What happens if my resources run negative?",
-    a: "Negative resource production (especially Water, Food, O2) will trigger troop attrition, causing your active garrison defense forces to starve and slowly perish over time."
+    q: "How do I colonize a new habitable planet or station?",
+    a: "First, build exactly one (1) Settlement Ship in your War Room (CMD tab). Next, select your Radar Array under your Explore Tab and run a sector scan on your target coordinate to discover if it contains a habitable planet or station. Once scanned, go to the Galaxy Map (GLXY tab), choose 'Colonize' as your mission, and launch your Settlement Ship. Upon arrival, it settles and materializes your new colony!"
   },
   {
-    q: "How does troop water, respirant and food consumption work?",
-    a: "Each active trooper continuously consumes Water, Respirant (O2), and Food. Larger garrisons require higher level local extractors or active production boosters to sustain without causing dehydration."
+    q: "What are the rules for cancelling or rerouting an attack fleet?",
+    a: "Strategic timing is critical: you can only abort/cancel or reroute an 'Attack' fleet during the first 45% of its journey. As soon as the fleet crosses the 45% travel mark, its quantum hyper-drives lock in—making it impossible to either cancel or reroute the squadron!"
   },
   {
-    q: "How do I expand my resource storage limits?",
-    a: "Upgrade the Silo facility in your established structures. Each upgrade level expands your maximum warehouse limit for all local resources."
+    q: "Why is my troop garrison size decreasing on its own?",
+    a: "Every soldier in your active garrison continuously consumes Water, Food, and Respirant (O2). If your local hourly production of these resources drops below zero and runs dry, your troops suffer severe attrition, slowly starving and dehydrating over time. Ensure your life-support extractors are upgraded or boosted!"
   },
   {
-    q: "How can I speed up research and manufacturing?",
-    a: "Researching the 'Manufacturing Speed Upgrade' accelerates troop training times. Complete upgrades in your Research laboratories or level up the Fabricator to speed up constructions."
+    q: "How does resource plunder and combat work?",
+    a: "When you launch a successful offensive strike and defeat the defender's garrison, your surviving ships plunder a high fraction of all five stored resources (including water!) up to their carrying capacity, exceeding whatever resources are protected by their defensive Bunker."
   },
   {
-    q: "What is structural combat defense vs strike firepower?",
-    a: "Structural Defense HP determines how much damage your garrisons can absorb, and strike firepower determines how much damage they deal when defending against incoming hostiles."
+    q: "Are research technology upgrades shared across my colonies?",
+    a: "No. Each space station and colony outpost works independently based on its own local Research Center's upgrades. You must research technology projects (like Defense Shields, Manufacturing Speed, or Troop Speed) separately at each individual station to unlock those benefits locally."
   },
   {
-    q: "Are technology level upgrades global?",
-    a: "Yes! All scientific breakthroughs completed inside your Research terminal command interface apply as permanent global passive multipliers to all your current and future station bases."
-  },
-  {
-    q: "Can I rename my space station outpost?",
-    a: "Absolutely. Navigate to the XPL (Explore) Tab, click on your facility name or the 'Rename' button at the top header, type a majestic sovereign name of your choice, and confirm."
-  },
-  {
-    q: "How do I activate extraction overdrive production boosts?",
-    a: "Click 'BOOST PRODUCTION' at the top of the XPL (Explore) Tab (above the resources listings) to temporarily buy a 1.14x (14%) resource extraction factor booster for credits."
-  },
-  {
-    q: "How do Alliance systems work?",
-    a: "Alliances unite commanders. You can search, join, or register your own alliance brand under the Leaderboard or Settings configurations to establish protective defensive grids."
-  },
-  {
-    q: "Where can I locate foreign sector coordinate targets?",
-    a: "Navigate to the GLXY (Galaxy) Tab or the Sovereignty page, run telemetry radar sweeps to scan, or enter target coordinate vectors directly to discover habitable nodes or other bases."
-  },
-  {
-    q: "How does battle plunder work?",
-    a: "When you launch a successful offensive strike and defeat the defender's garrison, your surviving ships plunder a high fraction of their stored resources (excluding water) up to their carry limit."
-  },
-  {
-    q: "Can I trade resources with other players?",
-    a: "You cannot trade directly, but you can transport resources between your own colony outposts or coordinate joint military campaigns with alliance allies."
-  },
-  {
-    q: "How do I reclaim supply rewards and daily crates?",
-    a: "You can click on your daily reward crates inside the main station dashboard or construct a Supply Nexus facility to claim recurring supply reward drops."
-  },
-  {
-    q: "What are the maximum levels for resource extractors?",
-    a: "Your level limits depend on the outpost site potential: Max Level 25 for Main Station ★, Level 20 for Secondary Station ★★, and Level 15 for minor Outpost Colonies."
-  },
-  {
-    q: "Why can I not build or upgrade research projects on my new colony?",
-    a: "Each new colony outpost must possess its own active Research Center. Construct it in the 'Established Structures' lists under the XPL (Explore) Tab to unlock labs."
+    q: "How do I upgrade resource storage limits?",
+    a: "Build and upgrade your local Silo structures. Each upgrade level expands your maximum storage capacity for all five resources on that specific planet."
   },
   {
     q: "What is the difference between Interceptors and Assault Drones?",
-    a: "Interceptors are heavily shielded defensive fighters providing excellent protective parameters, while Assault Drones are high strike force weapon vessels built for offensive warp raids."
+    a: "Interceptors are heavily-shielded defensive fighters built to absorb damage and protect your base. Assault Drones are fragile, high-firepower strike units designed for offensive operations."
   },
   {
-    q: "How does radar scanning search work?",
-    a: "Construct and level up your local Radar Array to register wider sector scopes, detect incoming hostile raids, and unlock deep scans for deep planetary nodes."
+    q: "How do map limits work, and what happens if I am out-of-bounds?",
+    a: "The galactic map limits dynamically scale based on active player density. If map boundary adjustments ever put your station out-of-bounds, the server's relocation array automatically transfers your station to a safe coordinate inside the active grid with zero loss of progress or resources."
   },
   {
-    q: "What are warp thruster engine upgrades?",
-    a: "Warp core research inside the technology listings increases travel speed, minimizing the transit delay when dispatching space fleets across galactic quadrant coordinate systems."
-  },
-  {
-    q: "Can I delete my commander file or register under another name?",
-    a: "Yes. Open the drop-down Profile menu, click on the red 'Log Out' button, and confirm 'De-synchronize' to clear local state credentials and create a brand new commander file."
+    q: "What is the benefit of joining or creating an Alliance?",
+    a: "Joining or creating an Alliance unites you with other active commanders across the galaxy. This allows you to safely relocate fleets to friendly coordinates, coordinate joint military operations, and protect your outposts under a shared defensive network."
   }
 ];
 
@@ -170,6 +130,15 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   const rc = activePlanet.buildings.researchCenter;
   const targetLvl = rc.level + 1;
   const upgradeTimeMins = targetLvl * 2;
+
+  const allExtractorsLevelOneOrMore = (() => {
+    const resourceKeys: ('water' | 'plasma' | 'fuel' | 'food' | 'respirant')[] = ['water', 'plasma', 'fuel', 'food', 'respirant'];
+    return resourceKeys.every(rKey => {
+      const list = activePlanet.mines[rKey];
+      if (!list || list.length === 0) return false;
+      return list.every(mine => mine.level >= 1);
+    });
+  })();
 
   // Local storage tech levels and current upgrades - starts fully maxed when game starts
   const [techLevels, setTechLevels] = useState<Record<string, number>>(() => {
@@ -827,15 +796,21 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
                           <Clock size={11} className="animate-spin" /> Telemetry Processing ({getTimerString(activeResearch.endAt)})
                         </div>
                         {targetLvl <= maxLvl && (
-                          <button
-                            type="button"
-                            onClick={() => queueResearch(tech.id)}
-                            disabled={isResearching || isUpgrading}
-                            className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/50 text-amber-400 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono transition cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
-                          >
-                            <span>Queue Level {targetLvl}</span>
-                            <span className="text-[9px] text-amber-500 font-normal">(25 Gold)</span>
-                          </button>
+                          allExtractorsLevelOneOrMore ? (
+                            <button
+                              type="button"
+                              onClick={() => queueResearch(tech.id)}
+                              disabled={isResearching || isUpgrading}
+                              className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/50 text-amber-400 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono transition cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
+                            >
+                              <span>Queue Level {targetLvl}</span>
+                              <span className="text-[9px] text-amber-500 font-normal">(25 Gold)</span>
+                            </button>
+                          ) : (
+                            <span className="w-full py-1.5 text-center text-[9.5px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-2 rounded block" title="All 5 resource extractor pumps must be at least Level 1.">
+                              🔒 EXTRACTORS REQUISITE
+                            </span>
+                          )
                         )}
                       </div>
                     ) : isMax ? (
@@ -844,27 +819,40 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
                       </div>
                     ) : (
                       <div className="flex flex-col gap-2">
-                        <button
-                          type="button"
-                          onClick={() => startResearch(tech.id)}
-                          disabled={!!activeResearch || isResearching || isUpgrading}
-                          className={`w-full py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono border transition ${
-                            (activeResearch || isResearching || isUpgrading)
-                              ? 'border-slate-900 bg-slate-950 text-slate-650 opacity-40 cursor-not-allowed'
-                              : 'border-cyan-500/30 bg-cyan-950/20 text-cyan-400 hover:bg-cyan-950/40 hover:border-cyan-500 cursor-pointer'
-                          }`}
-                        >
-                          Initialize Research
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => queueResearch(tech.id)}
-                          disabled={isResearching || isUpgrading}
-                          className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/50 text-amber-400 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono transition cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
-                        >
-                          <span>Queue Level {targetLvl}</span>
-                          <span className="text-[9px] text-amber-500 font-normal">(25 Gold)</span>
-                        </button>
+                        {targetLvl >= 2 && !allExtractorsLevelOneOrMore ? (
+                          <div className="text-center py-2 px-3 border border-red-500/30 bg-red-950/20 rounded-xl space-y-1 font-mono">
+                            <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase block">
+                              🔒 UPGRADE LOCKED
+                            </span>
+                            <span className="text-[9px] text-slate-400 block leading-normal font-sans">
+                              Need all 5 extractor pump types at Level 1+ on this station.
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => startResearch(tech.id)}
+                              disabled={!!activeResearch || isResearching || isUpgrading}
+                              className={`w-full py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono border transition ${
+                                (activeResearch || isResearching || isUpgrading)
+                                  ? 'border-slate-900 bg-slate-950 text-slate-650 opacity-40 cursor-not-allowed'
+                                  : 'border-cyan-500/30 bg-cyan-950/20 text-cyan-400 hover:bg-cyan-950/40 hover:border-cyan-500 cursor-pointer'
+                              }`}
+                            >
+                              Initialize Research
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => queueResearch(tech.id)}
+                              disabled={isResearching || isUpgrading}
+                              className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/50 text-amber-400 rounded-xl text-[10px] font-bold uppercase tracking-wider font-mono transition cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
+                            >
+                              <span>Queue Level {targetLvl}</span>
+                              <span className="text-[9px] text-amber-500 font-normal">(25 Gold)</span>
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

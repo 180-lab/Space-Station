@@ -187,6 +187,44 @@ function findClusterCoordinate(targetX: number, targetY: number): { x: number; y
   return null;
 }
 
+// Generate random coordinates that don't overlap with existing player stations or habitable planets
+function getSafeRandomCoordinates(maxCoord: number): { x: number; y: number } {
+  let attempts = 0;
+  while (attempts < 500) {
+    attempts++;
+    const coords = getRandomCoordinates(maxCoord);
+    
+    // Check player stations
+    let overlap = false;
+    if (state && state.players) {
+      for (const player of Object.values(state.players)) {
+        if (player && player.planets) {
+          if (player.planets.some(pl => pl.sectorX === coords.x && pl.sectorY === coords.y)) {
+            overlap = true;
+            break;
+          }
+        }
+      }
+    }
+    if (overlap) continue;
+
+    // Check habitable planets
+    if (state && state.habitablePlanets) {
+      const overlapHabitable = state.habitablePlanets.some(hp => hp.coords.x === coords.x && hp.coords.y === coords.y);
+      if (overlapHabitable) continue;
+    }
+
+    return coords;
+  }
+
+  // Fallback: search concentric rings from center if possible, or just return random coordinates
+  const center = Math.floor(maxCoord / 2);
+  const clusterCoords = findClusterCoordinate(center, center);
+  if (clusterCoords) return clusterCoords;
+
+  return getRandomCoordinates(maxCoord);
+}
+
 // Default Troop Specifications
 const TROOP_SPECS = {
   defender: { name: "Interceptor", defenceHp: 18, attackHp: 10, carry: 600, speed: 75.0, waterConsumption: 1.0 },
@@ -268,7 +306,7 @@ function ensureAIsCount(count: number, s: GameState) {
 
     const factionIdx = Math.floor(Math.random() * factions.length);
     const limit = getCurrentMapLimits();
-    const coords = getRandomCoordinates(limit);
+    const coords = getSafeRandomCoordinates(limit);
     const x = coords.x;
     const y = coords.y;
     const planet = createInitialPlanet(`${name}'s Station`, x, y);
@@ -411,11 +449,11 @@ function normalizeState(s: GameState) {
       // Ensure all troops are present
       if (!pl.troops) pl.troops = {};
       const troopDefaults: Record<string, number> = {
-        defender: isFirst ? 12500 : 0,
-        attacker: isFirst ? 28600 : 0,
-        tank: isFirst ? 100 : 0,
-        looter: isFirst ? 1000 : 0,
-        drone: isFirst ? 100 : 0,
+        defender: 0,
+        attacker: 0,
+        tank: 0,
+        looter: 0,
+        drone: 0,
         settlementShip: 0
       };
       Object.keys(troopDefaults).forEach(tKey => {
@@ -438,14 +476,15 @@ function normalizeState(s: GameState) {
       if (!pl.buildings) pl.buildings = {};
       
       const buildingDefaults: Record<string, { level: number, maxLevel: number }> = {
-        fabricator: { level: isFirst ? 10 : 0, maxLevel: 10 },
-        commsHub: { level: isFirst ? 5 : 0, maxLevel: 5 },
-        researchCenter: { level: isFirst ? 20 : 0, maxLevel: 20 },
-        armyBase: { level: isFirst ? 22 : 0, maxLevel: 22 },
-        repository: { level: isFirst ? 45 : 0, maxLevel: 45 },
-        radar: { level: isFirst ? 15 : 0, maxLevel: 15 },
-        supplyNexus: { level: isFirst ? 50 : 0, maxLevel: 50 },
-        bunker: { level: isFirst ? 25 : 0, maxLevel: 25 }
+        fabricator: { level: 0, maxLevel: 10 },
+        commsHub: { level: 0, maxLevel: 5 },
+        researchCenter: { level: 0, maxLevel: 20 },
+        armyBase: { level: 0, maxLevel: 22 },
+        repository: { level: 0, maxLevel: 45 },
+        radar: { level: 0, maxLevel: 15 },
+        supplyNexus: { level: 0, maxLevel: 50 },
+        bunker: { level: 0, maxLevel: 25 },
+        magneticShield: { level: 0, maxLevel: 12 }
       };
 
       Object.entries(buildingDefaults).forEach(([bKey, bDef]) => {
@@ -459,12 +498,6 @@ function normalizeState(s: GameState) {
             health: 100
           };
         } else {
-          // Force first planet to be maxed, subsequent to start from zero
-          if (isFirst) {
-            pl.buildings[bKey].level = bDef.maxLevel;
-          } else if (pl.buildings[bKey].level === 1 && (bKey === "fabricator" || bKey === "commsHub" || bKey === "repository")) {
-            pl.buildings[bKey].level = 0;
-          }
           const bObj = pl.buildings[bKey];
           if (bObj.level === undefined) bObj.level = defaultLvl;
           bObj.maxLevel = bDef.maxLevel; // Enforce updated maxLevels like fabricator limit 10
@@ -484,16 +517,14 @@ function normalizeState(s: GameState) {
         if (!pl.mines[mKey]) {
           pl.mines[mKey] = Array.from({ length: count }, (_, i) => ({
             index: i,
-            level: isFirst ? 25 : 0,
+            level: 0,
             isUpgrading: false,
             upgradeEnd: null,
             health: 100
           }));
         } else {
           pl.mines[mKey].forEach((mine: any) => {
-            if (isFirst) {
-              mine.level = 25;
-            } else if (mine.level === undefined || mine.level === 1) {
+            if (mine.level === undefined) {
               mine.level = 0;
             }
             if (mine.isUpgrading === undefined) mine.isUpgrading = false;
@@ -502,15 +533,6 @@ function normalizeState(s: GameState) {
           });
         }
       });
-
-      // Ensure first planet has maxed resources
-      if (isFirst) {
-        if (pl.resources.water < 5000000) pl.resources.water = 5000000;
-        if (pl.resources.plasma < 5000000) pl.resources.plasma = 5000000;
-        if (pl.resources.fuel < 5000000) pl.resources.fuel = 5000000;
-        if (pl.resources.food < 5000000) pl.resources.food = 5000000;
-        if (pl.resources.respirant < 5000000) pl.resources.respirant = 5000000;
-      }
     });
   });
 
@@ -696,7 +718,7 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number, isF
   const createMines = (count: number): MineState[] => {
     return Array.from({ length: count }, (_, i) => ({
       index: i,
-      level: isFirstStation ? 25 : 1,
+      level: 0,
       isUpgrading: false,
       upgradeEnd: null,
       health: 100
@@ -717,14 +739,15 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number, isF
       respirant: createMines(3)
     },
     buildings: {
-      fabricator: { level: isFirstStation ? 10 : 0, maxLevel: 10, isUpgrading: false, upgradeEnd: null, health: 100 },
-      commsHub: { level: isFirstStation ? 5 : 0, maxLevel: 5, isUpgrading: false, upgradeEnd: null, health: 100 },
-      researchCenter: { level: isFirstStation ? 20 : 0, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
-      armyBase: { level: isFirstStation ? 22 : 0, maxLevel: 22, isUpgrading: false, upgradeEnd: null, health: 100 },
-      repository: { level: isFirstStation ? 45 : 0, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
-      radar: { level: isFirstStation ? 15 : 0, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
-      supplyNexus: { level: isFirstStation ? 50 : 0, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 },
-      bunker: { level: isFirstStation ? 25 : 0, maxLevel: 25, isUpgrading: false, upgradeEnd: null, health: 100 }
+      fabricator: { level: 0, maxLevel: 10, isUpgrading: false, upgradeEnd: null, health: 100 },
+      commsHub: { level: 0, maxLevel: 5, isUpgrading: false, upgradeEnd: null, health: 100 },
+      researchCenter: { level: 0, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
+      armyBase: { level: 0, maxLevel: 22, isUpgrading: false, upgradeEnd: null, health: 100 },
+      repository: { level: 0, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
+      radar: { level: 0, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
+      supplyNexus: { level: 0, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 },
+      bunker: { level: 0, maxLevel: 25, isUpgrading: false, upgradeEnd: null, health: 100 },
+      magneticShield: { level: 0, maxLevel: 12, isUpgrading: false, upgradeEnd: null, health: 100 }
     },
     resources: {
       water: isFirstStation ? 5000000 : 5000,
@@ -734,12 +757,12 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number, isF
       respirant: isFirstStation ? 5000000 : 5000
     },
     troops: {
-      defender: isFirstStation ? 12500 : 0,
-      attacker: isFirstStation ? 28600 : 0,
-      tank: isFirstStation ? 100 : 0,
-      looter: isFirstStation ? 1000 : 0,
-      drone: isFirstStation ? 100 : 0,
-      settlementShip: 1
+      defender: 0,
+      attacker: 0,
+      tank: 0,
+      looter: 0,
+      drone: 0,
+      settlementShip: 0
     },
     trainingQueue: []
   };
@@ -791,13 +814,21 @@ function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarg
   if (targetState) {
     const prevLvl = targetState.level;
     const prevHealth = targetState.health !== undefined ? targetState.health : 100;
-    const damage = numTanks; // 1% per tank
+    
+    // Magnetic Shield damage reduction (2.5% per level, up to 30% at level 12)
+    let damageReduction = 0;
+    const magShieldLvl = defPlanet.buildings?.magneticShield?.level || 0;
+    if (magShieldLvl > 0) {
+      damageReduction = 0.3 * (Math.min(12, magShieldLvl) / 12);
+    }
+    const damage = numTanks * (1 - damageReduction); // 1% per tank, reduced by Magnetic Shield
+    
     const computedHealth = prevHealth - damage;
 
     if (computedHealth > 0) {
       targetState.health = computedHealth;
       buildingDamageReports.push({
-        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName === "bunker" ? "Bunker" : finalName,
+        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName === "bunker" ? "Bunker" : finalName === "magneticShield" ? "Magnetic Shield" : finalName,
         levelsDestroyed: 0,
         previousLevel: prevLvl,
         newLevel: prevLvl
@@ -814,7 +845,7 @@ function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarg
       targetState.health = newHealth;
 
       buildingDamageReports.push({
-        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName === "bunker" ? "Bunker" : finalName,
+        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName === "bunker" ? "Bunker" : finalName === "magneticShield" ? "Magnetic Shield" : finalName,
         levelsDestroyed: levelsLost,
         previousLevel: prevLvl,
         newLevel: newLvl
@@ -1270,7 +1301,7 @@ function tickPlayerState(playerId: string, now: number): boolean {
 
           // Only notify if there is no other queued item for this planet
           if (!planet.upgradeQueue || planet.upgradeQueue.length === 0) {
-            const bNames = { commsHub: "Communications Hub", researchCenter: "Research Center", armyBase: "War Room", repository: "Silo", radar: "Radar Array", supplyNexus: "Supply Nexus", fabricator: "Fabricator", bunker: "Bunker" };
+            const bNames = { commsHub: "Communications Hub", researchCenter: "Research Center", armyBase: "War Room", repository: "Silo", radar: "Radar Array", supplyNexus: "Supply Nexus", fabricator: "Fabricator", bunker: "Bunker", magneticShield: "Magnetic Shield" };
             const name = bNames[bKey as keyof typeof bNames] || bKey;
             sendNotificationWithFallback(
               player.id,
@@ -1367,7 +1398,7 @@ function tickPlayerState(playerId: string, now: number): boolean {
 
               // Send notification on final item in building/mine queue
               if (planet.upgradeQueue.length === 0) {
-                const bNames = { commsHub: "Communications Hub", researchCenter: "Research Center", armyBase: "War Room", repository: "Silo", radar: "Radar Array", supplyNexus: "Supply Nexus", fabricator: "Fabricator", bunker: "Bunker" };
+                const bNames = { commsHub: "Communications Hub", researchCenter: "Research Center", armyBase: "War Room", repository: "Silo", radar: "Radar Array", supplyNexus: "Supply Nexus", fabricator: "Fabricator", bunker: "Bunker", magneticShield: "Magnetic Shield" };
                 const resNames = { water: "Water Extractor", plasma: "Plasma Extractor", fuel: "Fuel Extractor", food: "Food Extractor", respirant: "Respirant Extractor" };
                 const name = nextUp.type === 'mine' ? (resNames[nextUp.key as ResourceType] || `${nextUp.key} Mine`) : (bNames[nextUp.key as keyof typeof bNames] || nextUp.key);
                 sendNotificationWithFallback(
@@ -2400,10 +2431,10 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
 
     // Execute Moonbase combat simulation
     const attShieldLvl = fleet.defenseShieldsLevel || 10;
-    let defShieldLvl = 10;
-    if (defender) {
-      const defRc = defPlanet?.buildings.researchCenter;
-      if (defRc) defShieldLvl = defRc.level;
+    let defShieldLvl = 0;
+    if (defender && defPlanet) {
+      const isFirstDefPlanet = defender.planets[0]?.id === defPlanet.id;
+      defShieldLvl = defender.techLevels?.[defPlanet.id]?.defense_shields ?? (isFirstDefPlanet ? 20 : 0);
     }
 
     const combat = simulateMoonbaseCombat(
@@ -2928,7 +2959,7 @@ app.post("/api/register", (req, res) => {
 
   const id = `user_${Math.random().toString(36).substr(2, 9)}`;
   const limit = getCurrentMapLimits();
-  const coords = getRandomCoordinates(limit);
+  const coords = getSafeRandomCoordinates(limit);
   const startX = coords.x;
   const startY = coords.y;
 
@@ -3059,7 +3090,7 @@ app.post("/api/auth/google", async (req, res) => {
 
       // Create initial starting planet
       const limit = getCurrentMapLimits();
-      const coords = getRandomCoordinates(limit);
+      const coords = getSafeRandomCoordinates(limit);
       const startX = coords.x;
       const startY = coords.y;
       const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY, true);
@@ -3162,7 +3193,7 @@ app.post("/api/auth/google", async (req, res) => {
 
     // Create initial starting planet
     const limit = getCurrentMapLimits();
-    const coords = getRandomCoordinates(limit);
+    const coords = getSafeRandomCoordinates(limit);
     const startX = coords.x;
     const startY = coords.y;
     const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY, true);
@@ -3328,7 +3359,7 @@ app.post("/api/auth/google-play", async (req, res) => {
 
     // Create initial starting planet
     const limit = getCurrentMapLimits();
-    const coords = getRandomCoordinates(limit);
+    const coords = getSafeRandomCoordinates(limit);
     const startX = coords.x;
     const startY = coords.y;
     const planet = createInitialPlanet(`${cleanUsername}'s Station`, startX, startY, true);
@@ -3509,8 +3540,16 @@ app.post("/api/upgrade/mine", (req, res) => {
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
   const { planetId, resType, mineIndex, queue: reqQueue } = req.body;
+
+  // Run a status tick to ensure everything is caught up to date BEFORE evaluating upgrading states or deducting resources
+  const now = Date.now();
+  tickPlayerState(p.id, now);
+
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
+
+  const mineIndexNum = parseInt(String(mineIndex), 10);
+  if (isNaN(mineIndexNum)) return res.status(400).json({ error: "Invalid mine index" });
 
   // Pre-requisite check: Fabricator must be level >= 1 to upgrade/construct extractors (mines)
   const fab = planet.buildings.fabricator;
@@ -3519,9 +3558,9 @@ app.post("/api/upgrade/mine", (req, res) => {
   }
 
   const mines = planet.mines[resType as ResourceType];
-  if (!mines || !mines[mineIndex]) return res.status(404).json({ error: "Mine not found" });
+  if (!mines || !mines[mineIndexNum]) return res.status(404).json({ error: "Mine not found" });
 
-  const mine = mines[mineIndex];
+  const mine = mines[mineIndexNum];
 
   // Enforce 1 upgrade at a time (buildings or mines) limit per colony planet
   const isBuildingUpgrading = Object.values(planet.buildings).some((b: any) => b.isUpgrading);
@@ -3559,9 +3598,21 @@ app.post("/api/upgrade/mine", (req, res) => {
   let queuedCount = 0;
   if (mine.isUpgrading) queuedCount++;
   if (planet.upgradeQueue) {
-    queuedCount += planet.upgradeQueue.filter(q => q.type === 'mine' && q.key === resType && q.mineIndex === mineIndex).length;
+    queuedCount += planet.upgradeQueue.filter(q => q.type === 'mine' && q.key === resType && Number(q.mineIndex) === mineIndexNum).length;
   }
   const targetLevel = mine.level + queuedCount + 1;
+
+  if (targetLevel >= 2) {
+    const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"] as const;
+    const hasAllExtractorsConstructed = resourceKeys.every(rKey => {
+      const list = planet.mines[rKey];
+      if (!list || list.length === 0) return false;
+      return list.every((m: any) => m.level >= 1);
+    });
+    if (!hasAllExtractorsConstructed) {
+      return res.status(400).json({ error: "🔒 Advanced extractor upgrade locked: All 5 resource extractor pump types must be operational (Level 1 or higher) before any extractor can be upgraded to Level 2 or higher!" });
+    }
+  }
 
   const planetIndex = p.planets.findIndex(pl => pl.id === planetId);
   const maxExtractorLevel = planetIndex === 0 ? 25 : planetIndex === 1 ? 20 : 15;
@@ -3590,7 +3641,7 @@ app.post("/api/upgrade/mine", (req, res) => {
     planet.upgradeQueue!.push({
       type: 'mine',
       key: resType,
-      mineIndex: mineIndex,
+      mineIndex: mineIndexNum,
       targetLevel: targetLevel,
       spaceGoldCost: 15
     });
@@ -3693,19 +3744,13 @@ app.post("/api/upgrade/building", (req, res) => {
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
   const { planetId, buildingKey, queue: reqQueue } = req.body;
+
+  // Run a status tick to ensure everything is caught up to date BEFORE evaluating upgrading states or deducting resources
+  const now = Date.now();
+  tickPlayerState(p.id, now);
+
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
-
-  // Pre-requisite check: All resource extractor pumps must be at least Level 1
-  const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"] as const;
-  const hasAllExtractorsConstructed = resourceKeys.every(rKey => {
-    const list = planet.mines[rKey];
-    if (!list || list.length === 0) return false;
-    return list.every((mine: any) => mine.level >= 1);
-  });
-  if (!hasAllExtractorsConstructed) {
-    return res.status(400).json({ error: "🔒 Facility construction/upgrade locked: All 5 resource extractor pump types must be operational (Level 1 or higher) before any facility can be constructed or upgraded!" });
-  }
 
   const building = planet.buildings[buildingKey as keyof typeof planet.buildings] as BuildingState;
   if (!building) return res.status(404).json({ error: "Building not found" });
@@ -3718,21 +3763,26 @@ app.post("/api/upgrade/building", (req, res) => {
     }
   }
 
-  // Check Fabricator level requirements for secondary bases when unlocking buildings
-  const isSecondaryBase = p.planets[0]?.id !== planet.id;
-  if (isSecondaryBase && building.level === 0) {
+  // Check Fabricator level requirements when unlocking/constructing buildings
+  if (building.level === 0) {
     const fabLevel = planet.buildings.fabricator?.level || 0;
     if (buildingKey === "radar" && fabLevel < 2) {
-      return res.status(400).json({ error: "A Fabricator level 2 or higher is required to construct your Radar Array on this secondary station!" });
+      return res.status(400).json({ error: "A Fabricator level 2 or higher is required to construct your Radar Array." });
     }
     if (buildingKey === "researchCenter" && fabLevel < 4) {
-      return res.status(400).json({ error: "A Fabricator level 4 or higher is required to construct your Research Center on this secondary station!" });
+      return res.status(400).json({ error: "A Fabricator level 4 or higher is required to construct your Research Center." });
+    }
+    if (buildingKey === "magneticShield" && fabLevel < 10) {
+      return res.status(400).json({ error: "A Fabricator level 10 or higher is required to construct your Magnetic Shield." });
     }
     if (buildingKey === "armyBase" && fabLevel < 7) {
-      return res.status(400).json({ error: "A Fabricator level 7 or higher is required to construct your War Room on this secondary station!" });
+      return res.status(400).json({ error: "A Fabricator level 7 or higher is required to construct your War Room/Army Base." });
     }
     if (buildingKey === "supplyNexus" && fabLevel < 10) {
-      return res.status(400).json({ error: "A Fabricator level 10 or higher is required to construct your Supply Nexus on this secondary station!" });
+      return res.status(400).json({ error: "A Fabricator level 10 or higher is required to construct your Supply Nexus." });
+    }
+    if (buildingKey === "bunker" && fabLevel < 10) {
+      return res.status(400).json({ error: "A Fabricator level 10 or higher is required to construct your Bunker." });
     }
   }
 
@@ -3775,6 +3825,22 @@ app.post("/api/upgrade/building", (req, res) => {
     queuedCount += planet.upgradeQueue.filter(q => q.type === 'building' && q.key === buildingKey).length;
   }
   const targetLevel = building.level + queuedCount + 1;
+
+  if (targetLevel >= 2 || buildingKey !== "fabricator") {
+    const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"] as const;
+    const hasAllExtractorsConstructed = resourceKeys.every(rKey => {
+      const list = planet.mines[rKey];
+      if (!list || list.length === 0) return false;
+      return list.every((mine: any) => mine.level >= 1);
+    });
+    if (!hasAllExtractorsConstructed) {
+      if (targetLevel === 1) {
+        return res.status(400).json({ error: "🔒 Facility construction locked: All 5 resource extractor pump types must be operational (Level 1 or higher) before any facility other than the Fabricator can be constructed!" });
+      } else {
+        return res.status(400).json({ error: "🔒 Advanced construction/upgrade locked: All 5 resource extractor pump types must be operational (Level 1 or higher) before any facility can be upgraded to Level 2 or higher!" });
+      }
+    }
+  }
 
   if (targetLevel > building.maxLevel) return res.status(400).json({ error: `Building reaches max level (${building.maxLevel})` });
   if (building.health !== undefined && building.health < 100) return res.status(400).json({ error: "Building is damaged. Restore it to 100% health first before upgrading." });
@@ -3841,6 +3907,11 @@ app.post("/api/upgrade/research/start", (req, res) => {
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
   const { planetId, techId } = req.body;
+
+  // Run a status tick to ensure everything is caught up to date BEFORE evaluating upgrading states or deducting resources
+  const now = Date.now();
+  tickPlayerState(p.id, now);
+
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
 
@@ -3857,6 +3928,18 @@ app.post("/api/upgrade/research/start", (req, res) => {
 
   const currentLvl = Number(req.body.currentLevel) || 0;
   const targetLevel = currentLvl + 1;
+
+  if (targetLevel >= 2) {
+    const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"] as const;
+    const hasAllExtractorsConstructed = resourceKeys.every(rKey => {
+      const list = planet.mines[rKey];
+      if (!list || list.length === 0) return false;
+      return list.every((m: any) => m.level >= 1);
+    });
+    if (!hasAllExtractorsConstructed) {
+      return res.status(400).json({ error: "🔒 Advanced research locked: All 5 resource extractor pump types must be operational (Level 1 or higher) before any technology can be upgraded to Level 2 or higher!" });
+    }
+  }
 
   if (targetLevel > 20) {
     return res.status(400).json({ error: "Technology reaches max level (20)." });
@@ -3905,6 +3988,11 @@ app.post("/api/upgrade/research/queue", (req, res) => {
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
   const { planetId, techId } = req.body;
+
+  // Run a status tick to ensure everything is caught up to date BEFORE evaluating upgrading states or deducting resources
+  const now = Date.now();
+  tickPlayerState(p.id, now);
+
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
 
@@ -3934,6 +4022,18 @@ app.post("/api/upgrade/research/queue", (req, res) => {
   }
   queuedCount += planet.researchQueue.filter(q => q.key === techId).length;
   const targetLevel = currentLvl + queuedCount + 1;
+
+  if (targetLevel >= 2) {
+    const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"] as const;
+    const hasAllExtractorsConstructed = resourceKeys.every(rKey => {
+      const list = planet.mines[rKey];
+      if (!list || list.length === 0) return false;
+      return list.every((m: any) => m.level >= 1);
+    });
+    if (!hasAllExtractorsConstructed) {
+      return res.status(400).json({ error: "🔒 Advanced research locked: All 5 resource extractor pump types must be operational (Level 1 or higher) before any technology can be upgraded to Level 2 or higher!" });
+    }
+  }
 
   if (targetLevel > 20) {
     return res.status(400).json({ error: "Technology reaches max level (20)." });
@@ -3986,6 +4086,11 @@ app.post("/api/upgrade/queue/cancel", (req, res) => {
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
   const { planetId, queueIndex, queueType } = req.body;
+
+  // Run a status tick to ensure everything is caught up to date BEFORE evaluating upgrading states or deducting resources
+  const now = Date.now();
+  tickPlayerState(p.id, now);
+
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
 
@@ -4136,6 +4241,11 @@ app.post("/api/train/troop", (req, res) => {
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
   const { planetId, troopId, manufacturingSpeedLevel } = req.body;
+
+  // Run a status tick to ensure everything is caught up to date BEFORE evaluating training queues or deducting resources
+  const now = Date.now();
+  tickPlayerState(p.id, now);
+
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
 
@@ -4244,7 +4354,8 @@ app.post("/api/train/troop", (req, res) => {
   let buildDurationMs = Math.round(baseSecs * (1 - reductionFrac) * 1000);
 
   // Manufacturing speed upgrade decreases training speed by up to an additional 35% when lvl 20
-  const mfgLvl = parseInt(String(manufacturingSpeedLevel || 10), 10) || 10;
+  const isFirstPlanet = p.planets[0]?.id === planet.id;
+  const mfgLvl = p.techLevels?.[planet.id]?.manufacturing_speed ?? (isFirstPlanet ? 20 : 0);
   const mfgReduction = Math.min(0.35, 0.35 * (mfgLvl / 20));
   buildDurationMs = Math.round(buildDurationMs * (1 - mfgReduction));
 
@@ -4276,6 +4387,11 @@ app.post("/api/train/troop/complete", (req, res) => {
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
   const { planetId, queueIndex } = req.body;
+
+  // Run a status tick to ensure everything is caught up to date BEFORE evaluating training queues or deducting resources
+  const now = Date.now();
+  tickPlayerState(p.id, now);
+
   const planet = p.planets.find(pl => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
 
@@ -4690,7 +4806,9 @@ app.post("/api/fleet/send", (req, res) => {
 
   const now = Date.now();
 
-  const speedLvl = typeof req.body.troopSpeedLevel === "number" ? req.body.troopSpeedLevel : 1;
+  const isFirstPlanet = p.planets[0]?.id === planet.id;
+  const speedLvl = p.techLevels?.[planet.id]?.troop_speed ?? (isFirstPlanet ? 20 : 0);
+  const shieldsLvl = p.techLevels?.[planet.id]?.defense_shields ?? (isFirstPlanet ? 20 : 0);
   const boostPct = Math.max(0, Math.min(35, (speedLvl - 1) * (35 / 19))) / 100;
   const speedMultiplier = 1.0 + boostPct;
 
@@ -4763,6 +4881,7 @@ app.post("/api/fleet/send", (req, res) => {
     isWaitingToSettle: false,
     targetBuilding: targetBuilding || undefined,
     troopSpeedLevel: speedLvl,
+    defenseShieldsLevel: shieldsLvl,
     createdFleetId: createdFleetId || undefined,
     isTimed: isTimed
   };
@@ -4992,6 +5111,18 @@ app.post("/api/fleet/reroute", (req, res) => {
   const fleet = state.fleets.find(f => f.id === fleetId && f.senderId === p.id);
   if (!fleet) {
     return res.status(404).json({ error: "Active mission fleet not found or not owned by you" });
+  }
+
+  // Rule: as soon as you can't cancel an attack (more than 45% of the journey), you cannot reroute it either.
+  if (fleet.missionType === 'attack' && !fleet.isWaitingToSettle && !fleet.isReturning) {
+    const totalDuration = fleet.arrivesAt - fleet.startedAt;
+    const elapsed = Date.now() - fleet.startedAt;
+    const progressPercent = totalDuration > 0 ? (elapsed / totalDuration) * 100 : 0;
+    if (progressPercent > 45) {
+      return res.status(400).json({
+        error: `Reroute denied! Attack fleet has completed ${Math.round(progressPercent)}% of its journey (maximum 45% allowed for cancel or reroute).`
+      });
+    }
   }
 
   // Find target details
@@ -6257,7 +6388,7 @@ app.post("/api/tutorial/claim", (req, res) => {
   }
 
   const rewards: Record<number, { water: number; plasma: number; fuel: number; food: number; respirant: number; credits: number }> = {};
-  for (let i = 1; i <= 30; i++) {
+  for (let i = 1; i <= 32; i++) {
     const taskReward = getTaskResourceReward(i);
     rewards[i] = {
       water: taskReward.water,
@@ -6265,7 +6396,7 @@ app.post("/api/tutorial/claim", (req, res) => {
       fuel: taskReward.fuel,
       food: taskReward.food,
       respirant: taskReward.respirant,
-      credits: i === 30 ? 15000 : 50
+      credits: i === 32 ? 1500 : 50
     };
   }
 
@@ -6287,7 +6418,7 @@ app.post("/api/tutorial/claim", (req, res) => {
   // Fallback to first incomplete task to guarantee claimability and prevent invalid ID blockers
   if (isNaN(idNum) || !rewards[idNum]) {
     const completed = p.completedTutorialTasks || [];
-    for (let i = 1; i <= 30; i++) {
+    for (let i = 1; i <= 32; i++) {
       if (!completed.includes(i)) {
         idNum = i;
         break;
@@ -6295,9 +6426,9 @@ app.post("/api/tutorial/claim", (req, res) => {
     }
   }
 
-  // Absolute fallback to make sure task 30 or any claiming does not return error
+  // Absolute fallback to make sure task 32 or any claiming does not return error
   if (isNaN(idNum) || !rewards[idNum]) {
-    idNum = 30;
+    idNum = 32;
   }
 
   const reward = rewards[idNum];

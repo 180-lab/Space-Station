@@ -149,7 +149,8 @@ const BUILDING_INFO: Record<string, { name: string; desc: string; icon: string }
   repository: { name: 'Silo', desc: 'Secure vaults storing your resource mines. Max level 45, holds up to 5,000,000 of each fluid.', icon: '🗄️' },
   radar: { name: 'Radar Array', desc: 'Long-range sector radar scanners. Expands tactical awareness across coordinates.', icon: '🛰️' },
   supplyNexus: { name: 'Supply Nexus', desc: 'A quantum portal linking coordinates to core supplies. Max level 50, dispatches a total of 5,000,000 resources (1,000,000 of each type) directly to base storage when maxed.', icon: '🌌' },
-  bunker: { name: 'Bunker', desc: 'Secure reinforced deep underground bunker. Ends at level 25. Protects and saves up to 500,000 resources of each type from raids when maxed.', icon: '🛡️' }
+  bunker: { name: 'Bunker', desc: 'Secure reinforced deep underground bunker. Ends at level 25. Protects and saves up to 500,000 resources of each type from raids when maxed.', icon: '🛡️' },
+  magneticShield: { name: 'Magnetic Shield', desc: 'Active polarized deflection shield. Ends at level 12. Decreases the damage that a disruptor can do to your structures by up to 30% when maxed.', icon: '🧲' }
 };
 
 const getRepositoryCapacity = (level: number): number => {
@@ -195,6 +196,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [restoringKeys, setRestoringKeys] = useState<Record<string, boolean>>({});
   const [isQueueMinimized, setIsQueueMinimized] = useState(false);
+  const [isRadarTransitsMinimized, setIsRadarTransitsMinimized] = useState(false);
+  const [isRadarIncomingMinimized, setIsRadarIncomingMinimized] = useState(false);
+  const [isRadarOutgoingMinimized, setIsRadarOutgoingMinimized] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [chatPage, setChatPage] = useState(0);
@@ -293,8 +297,10 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
     if (key === 'fabricator') return 0;
     if (key === 'radar') return 2;
     if (key === 'researchCenter') return 4;
+    if (key === 'magneticShield') return 10;
     if (key === 'armyBase') return 7;
     if (key === 'supplyNexus') return 10;
+    if (key === 'bunker') return 10;
     return 1;
   };
 
@@ -308,7 +314,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
     'researchCenter',
     'supplyNexus',
     'repository',
-    'bunker'
+    'bunker',
+    'magneticShield'
   ];
 
   const sortBuildings = (a: [string, any], b: [string, any]) => {
@@ -938,7 +945,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                     <Clock size={12} className="animate-spin" />
                                     <span>{mine.level === 0 ? 'Constructing' : 'Upgrading'} {getTimerString(mine.upgradeEnd)}</span>
                                   </div>
-                                  {nextMineTargetLvl <= maxExtractorLevel && (
+                                  {nextMineTargetLvl <= maxExtractorLevel && (nextMineTargetLvl < 2 || allExtractorsLevelOneOrMore) && (
                                     <button 
                                       onClick={() => onUpgradeMine(resKey, mine.index, true)}
                                       disabled={isUpgrading}
@@ -947,6 +954,11 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                       <span className="text-emerald-400">{nextMineTargetLvl === 1 ? 'Queue Construction' : 'Queue Upgrade'}</span>
                                       <span className="text-amber-400 font-extrabold">(Lv. {nextMineTargetLvl})</span>
                                     </button>
+                                  )}
+                                  {nextMineTargetLvl <= maxExtractorLevel && nextMineTargetLvl >= 2 && !allExtractorsLevelOneOrMore && (
+                                    <span className="text-[9px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-2 py-1 rounded mt-1 block text-center" title="All 5 resource extractor pumps must be at least Level 1.">
+                                      🔒 EXTRACTORS REQUISITE (Lv 1)
+                                    </span>
                                   )}
                                 </div>
                               ) : mine.level >= maxExtractorLevel && !isDamaged ? (
@@ -959,6 +971,10 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                 >
                                   🔧 Repair Pump
                                 </button>
+                              ) : nextMineTargetLvl >= 2 && !allExtractorsLevelOneOrMore ? (
+                                <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-3 py-1.5 rounded" title="All 5 resource extractor pumps must be at least Level 1.">
+                                  🔒 EXTRACTORS REQUISITE
+                                </span>
                               ) : isAnyUpgradeInProgress ? (
                                 <button 
                                   onClick={() => onUpgradeMine(resKey, mine.index, true)}
@@ -1045,318 +1061,383 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
         return (
           <div className="border border-[#1E293B] bg-[#0A0F1D]/80 backdrop-blur-md rounded-xl overflow-hidden mt-4">
-            <div className="p-5 border-b border-[#1E293B]/70 bg-black/40 flex items-center justify-between text-left">
+            <div 
+              onClick={() => setIsRadarTransitsMinimized(!isRadarTransitsMinimized)}
+              className="p-5 border-b border-[#1E293B]/70 bg-black/40 flex items-center justify-between text-left cursor-pointer select-none hover:bg-black/50 transition duration-150"
+            >
               <div className="flex items-center gap-2">
                 <span className="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
-                <h3 className="text-xs font-bold uppercase tracking-widest text-cyan-400 font-mono">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-cyan-400 font-mono flex items-center gap-2">
                   Real-Time Fleet Radar Transits
+                  <span className="text-[9px] font-extrabold text-slate-500 bg-[#0A0F1D] border border-slate-800 px-1.5 py-0.5 rounded uppercase font-mono">
+                    {isRadarTransitsMinimized ? "Minimized" : "Active"}
+                  </span>
                 </h3>
               </div>
-              <span className="text-[10px] bg-[#05070A] text-slate-400 border border-[#1E293B] px-2.5 py-1 rounded-lg font-bold font-mono">
-                ACTIVE FLIGHTS: {outgoingFleets.length + incomingFleets.length}
-              </span>
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <span className="text-[10px] bg-[#05070A] text-slate-400 border border-[#1E293B] px-2.5 py-1 rounded-lg font-bold font-mono">
+                  ACTIVE FLIGHTS: {outgoingFleets.length + incomingFleets.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsRadarTransitsMinimized(!isRadarTransitsMinimized)}
+                  className="p-1 px-2.5 text-[9px] font-extrabold font-mono uppercase bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-400 border border-cyan-500/25 hover:border-cyan-400 rounded-lg transition duration-150 cursor-pointer flex items-center gap-1 select-none"
+                  title={isRadarTransitsMinimized ? "Maximize Radar Transits" : "Minimize Radar Transits"}
+                >
+                  {isRadarTransitsMinimized ? (
+                    <>
+                      <ChevronDown size={10} />
+                      <span>EXPAND</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronUp size={10} />
+                      <span>MINIMIZE</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
-            <div className="p-5 bg-black/20 space-y-5">
-              {/* INCOMING RADAR FLARES/ATTACKS */}
-              {incomingFleets.length > 0 && (
-                <div className="space-y-3">
-                  <span className="text-[10px] font-bold tracking-wider text-red-400 uppercase font-mono flex items-center gap-1.5 animate-pulse text-left">
-                    <ShieldAlert size={12} className="text-red-400" />
-                    Warning: Incoming Military Signatures ({incomingFleets.length})
-                  </span>
-                  <div className="space-y-3 font-mono text-xs">
-                    {incomingFleets.map((fleet) => {
-                      const totalDuration = fleet.arrivesAt - fleet.startedAt;
-                      const elapsed = Math.max(0, serverTime - fleet.startedAt);
-                      const progressPercent = totalDuration > 0 ? Math.min(100, (elapsed / totalDuration) * 100) : 0;
-                      const secsRemaining = Math.max(0, Math.ceil((fleet.arrivesAt - serverTime) / 1000));
+            {!isRadarTransitsMinimized && (
+              <div className="p-5 bg-black/20 space-y-5 animate-fade-in">
+                {/* INCOMING RADAR FLARES/ATTACKS */}
+                {incomingFleets.length > 0 && (
+                  <div className="space-y-3">
+                    <div 
+                      onClick={() => setIsRadarIncomingMinimized(!isRadarIncomingMinimized)}
+                      className="flex items-center justify-between cursor-pointer select-none pb-1 border-b border-red-500/20"
+                    >
+                      <span className="text-[10px] font-bold tracking-wider text-red-400 uppercase font-mono flex items-center gap-1.5 animate-pulse text-left">
+                        <ShieldAlert size={12} className="text-red-400" />
+                        Warning: Incoming Military Signatures ({incomingFleets.length})
+                      </span>
+                      <button 
+                        type="button" 
+                        onClick={(e) => { e.stopPropagation(); setIsRadarIncomingMinimized(!isRadarIncomingMinimized); }}
+                        className="text-[9px] font-bold font-mono text-slate-400 hover:text-white px-2 py-0.5 border border-[#1E293B] bg-[#05070A] rounded hover:bg-white/5 cursor-pointer"
+                      >
+                        {isRadarIncomingMinimized ? 'EXPAND 🔽' : 'MINIMIZE 🔼'}
+                      </button>
+                    </div>
 
-                      return (
-                        <div key={fleet.id} className="p-4 border border-red-900/35 bg-red-950/10 rounded-xl space-y-3 text-left">
-                          <div className="flex justify-between items-start flex-wrap gap-2">
-                            <div>
-                              <span className={`font-black uppercase tracking-wide px-2 py-0.5 rounded text-[10px] ${fleet.missionType === 'attack' ? 'text-white bg-red-800' : 'text-slate-300 bg-white/5'}`}>
-                                INCOMING {fleet.missionType.toUpperCase()}
-                              </span>
-                              <span className="text-slate-400 font-bold block mt-2 text-[11px]">
-                                SENDER: {fleet.senderName}
-                              </span>
-                              <span className="text-slate-400 block mt-1">
-                                T-Route: [{fleet.senderCoords.x}, {fleet.senderCoords.y}] &rarr; [{fleet.targetCoords.x}, {fleet.targetCoords.y}]
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-red-400 font-black text-xs block">{getTimerString(fleet.arrivesAt)} remaining</span>
-                              <span className="text-slate-500 text-[9px] block">
-                                ({Math.floor(secsRemaining / 3600)}h {Math.floor((secsRemaining % 3600) / 60)}m {secsRemaining % 60}s remaining)
-                              </span>
-                            </div>
-                          </div>
+                    {!isRadarIncomingMinimized && (
+                      <div className="space-y-3 font-mono text-xs">
+                        {incomingFleets.map((fleet) => {
+                          const totalDuration = fleet.arrivesAt - fleet.startedAt;
+                          const elapsed = Math.max(0, serverTime - fleet.startedAt);
+                          const progressPercent = totalDuration > 0 ? Math.min(100, (elapsed / totalDuration) * 100) : 0;
+                          const secsRemaining = Math.max(0, Math.ceil((fleet.arrivesAt - serverTime) / 1000));
 
-                          {/* Troops inside this fleet */}
-                          <div className="flex flex-wrap gap-1.5 text-[10px]">
-                            {Object.entries(fleet.troops).map(([tId, count]) => {
-                              if (!count) return null;
-                              return (
-                                <span key={tId} className="bg-red-950/40 border border-red-900/30 px-1.5 py-0.5 rounded uppercase font-bold text-red-300">
-                                  {tId}: {count}
-                                </span>
-                              );
-                            })}
-                          </div>
-
-                          {/* Visual Flight Bar */}
-                          <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5 relative">
-                            <div 
-                              className="bg-red-500 h-full rounded-full transition-all duration-300"
-                              style={{ width: `${progressPercent}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* OUTGOING TROOPS */}
-              {outgoingFleets.length > 0 && (
-                <div className="space-y-3">
-                  <span className="text-[10px] font-bold tracking-wider text-cyan-400 uppercase font-mono flex items-center gap-1.5 text-left">
-                    Your Dispatched Troops ({outgoingFleets.length})
-                  </span>
-                  <div className="space-y-3 font-mono text-xs">
-                    {outgoingFleets.map((fleet) => {
-                      const totalDuration = fleet.arrivesAt - fleet.startedAt;
-                      const elapsed = Math.max(0, serverTime - fleet.startedAt);
-                      const progressPercent = totalDuration > 0 ? Math.min(100, (elapsed / totalDuration) * 100) : 0;
-                      const secsRemaining = Math.max(0, Math.ceil((fleet.arrivesAt - serverTime) / 1000));
-
-                      return (
-                        <div 
-                          key={fleet.id} 
-                          style={{ cursor: fleet.isWaitingToSettle ? 'pointer' : 'default' }}
-                          onClick={() => {
-                            if (fleet.isWaitingToSettle && onSettle) {
-                              onSettle(fleet.id);
-                            }
-                          }}
-                          className={`p-4 border rounded-xl space-y-3 transition duration-150 text-left ${
-                            fleet.isWaitingToSettle 
-                              ? 'border-emerald-500 bg-emerald-950/25 hover:border-emerald-400 hover:bg-emerald-950/35 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
-                              : 'border-[#1E293B] bg-[#05070A]/85'
-                          }`}
-                        >
-                          <div className="flex justify-between items-start flex-wrap gap-2">
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`font-black uppercase tracking-wide px-2 py-0.5 rounded text-[10px] ${
-                                  fleet.isWaitingToSettle ? 'text-black bg-emerald-400' :
-                                  fleet.missionType === 'attack' ? 'text-red-400 bg-red-950/25' : 
-                                  fleet.missionType === 'colonize' ? 'text-amber-400 bg-amber-950/25' : 'text-blue-400 bg-blue-950/25'
-                                }`}>
-                                  {fleet.isWaitingToSettle ? 'SETTLEMENT ATTAINED' : `${fleet.missionType.toUpperCase()} DEPLOYMENT`}
-                                </span>
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-white/5 border border-white/5 text-slate-350 uppercase">
-                                  {fleet.isReturning ? 'Returning' : 'Outbound'}
-                                </span>
-                              </div>
-                              <span className="text-slate-400 block mt-2 text-[11px]">
-                                Target Coord: {fleet.targetName} [{fleet.targetCoords.x}, {fleet.targetCoords.y}]
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              {fleet.isWaitingToSettle ? (
-                                <span className="text-emerald-400 font-extrabold text-xs block animate-bounce font-mono">SECURED &bull; READY</span>
-                              ) : (
-                                <>
-                                  <span className="text-cyan-400 font-bold text-xs block">{getTimerString(fleet.arrivesAt)} remaining</span>
+                          return (
+                            <div key={fleet.id} className="p-4 border border-red-900/35 bg-red-950/10 rounded-xl space-y-3 text-left">
+                              <div className="flex justify-between items-start flex-wrap gap-2">
+                                <div>
+                                  <span className={`font-black uppercase tracking-wide px-2 py-0.5 rounded text-[10px] ${fleet.missionType === 'attack' ? 'text-white bg-red-800' : 'text-slate-300 bg-white/5'}`}>
+                                    INCOMING {fleet.missionType.toUpperCase()}
+                                  </span>
+                                  <span className="text-slate-400 font-bold block mt-2 text-[11px]">
+                                    SENDER: {fleet.senderName}
+                                  </span>
+                                  <span className="text-slate-400 block mt-1">
+                                    T-Route: [{fleet.senderCoords.x}, {fleet.senderCoords.y}] &rarr; [{fleet.targetCoords.x}, {fleet.targetCoords.y}]
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-red-400 font-black text-xs block">{getTimerString(fleet.arrivesAt)} remaining</span>
                                   <span className="text-slate-500 text-[9px] block">
                                     ({Math.floor(secsRemaining / 3600)}h {Math.floor((secsRemaining % 3600) / 60)}m {secsRemaining % 60}s remaining)
                                   </span>
-                                </>
-                              )}
+                                </div>
+                              </div>
+
+                              {/* Troops inside this fleet */}
+                              <div className="flex flex-wrap gap-1.5 text-[10px]">
+                                {Object.entries(fleet.troops).map(([tId, count]) => {
+                                  if (!count) return null;
+                                  return (
+                                    <span key={tId} className="bg-red-950/40 border border-red-900/30 px-1.5 py-0.5 rounded uppercase font-bold text-red-300">
+                                      {tId}: {count}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Visual Flight Bar */}
+                              <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5 relative">
+                                <div 
+                                  className="bg-red-500 h-full rounded-full transition-all duration-300"
+                                  style={{ width: `${progressPercent}%` }}
+                                />
+                              </div>
                             </div>
-                          </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                          {/* Troops inside this fleet */}
-                          <div className="flex flex-wrap gap-1.5 text-[10px]">
-                            {Object.entries(fleet.troops).map(([tId, count]) => {
-                              if (!count) return null;
-                              return (
-                                <span key={tId} className="bg-[#0A0F1D] border border-[#1E293B] px-1.5 py-0.5 rounded uppercase font-bold text-slate-350 font-mono">
-                                  {tId}: {count}
-                                </span>
-                              );
-                            })}
-                          </div>
+                {/* OUTGOING TROOPS */}
+                {outgoingFleets.length > 0 && (
+                  <div className="space-y-3">
+                    <div 
+                      onClick={() => setIsRadarOutgoingMinimized(!isRadarOutgoingMinimized)}
+                      className="flex items-center justify-between cursor-pointer select-none pb-1 border-b border-cyan-500/20"
+                    >
+                      <span className="text-[10px] font-bold tracking-wider text-cyan-400 uppercase font-mono flex items-center gap-1.5 text-left">
+                        Your Dispatched Troops ({outgoingFleets.length})
+                      </span>
+                      <button 
+                        type="button" 
+                        onClick={(e) => { e.stopPropagation(); setIsRadarOutgoingMinimized(!isRadarOutgoingMinimized); }}
+                        className="text-[9px] font-bold font-mono text-slate-400 hover:text-white px-2 py-0.5 border border-[#1E293B] bg-[#05070A] rounded hover:bg-white/5 cursor-pointer"
+                      >
+                        {isRadarOutgoingMinimized ? 'EXPAND 🔽' : 'MINIMIZE 🔼'}
+                      </button>
+                    </div>
 
-                          {/* Flight Bar */}
-                          <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5 relative">
+                    {!isRadarOutgoingMinimized && (
+                      <div className="space-y-3 font-mono text-xs">
+                        {outgoingFleets.map((fleet) => {
+                          const totalDuration = fleet.arrivesAt - fleet.startedAt;
+                          const elapsed = Math.max(0, serverTime - fleet.startedAt);
+                          const progressPercent = totalDuration > 0 ? Math.min(100, (elapsed / totalDuration) * 100) : 0;
+                          const secsRemaining = Math.max(0, Math.ceil((fleet.arrivesAt - serverTime) / 1000));
+
+                          return (
                             <div 
-                              className={`h-full rounded-full transition-all duration-350 ${
-                                fleet.isWaitingToSettle ? 'bg-emerald-500' :
-                                fleet.isReturning ? 'bg-yellow-500' :
-                                fleet.missionType === 'attack' ? 'bg-red-500' :
-                                fleet.missionType === 'colonize' ? 'bg-amber-500' : 'bg-blue-500'
+                              key={fleet.id} 
+                              style={{ cursor: fleet.isWaitingToSettle ? 'pointer' : 'default' }}
+                              onClick={() => {
+                                if (fleet.isWaitingToSettle && onSettle) {
+                                  onSettle(fleet.id);
+                                }
+                              }}
+                              className={`p-4 border rounded-xl space-y-3 transition duration-150 text-left ${
+                                fleet.isWaitingToSettle 
+                                  ? 'border-emerald-500 bg-emerald-950/25 hover:border-emerald-400 hover:bg-emerald-950/35 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                                  : 'border-[#1E293B] bg-[#05070A]/85'
                               }`}
-                              style={{ width: `${progressPercent}%` }}
-                            />
-                          </div>
+                            >
+                              <div className="flex justify-between items-start flex-wrap gap-2">
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`font-black uppercase tracking-wide px-2 py-0.5 rounded text-[10px] ${
+                                      fleet.isWaitingToSettle ? 'text-black bg-emerald-400' :
+                                      fleet.missionType === 'attack' ? 'text-red-400 bg-red-950/25' : 
+                                      fleet.missionType === 'colonize' ? 'text-amber-400 bg-amber-950/25' : 'text-blue-400 bg-blue-950/25'
+                                    }`}>
+                                      {fleet.isWaitingToSettle ? 'SETTLEMENT ATTAINED' : `${fleet.missionType.toUpperCase()} DEPLOYMENT`}
+                                    </span>
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-white/5 border border-white/5 text-slate-350 uppercase">
+                                      {fleet.isReturning ? 'Returning' : 'Outbound'}
+                                    </span>
+                                  </div>
+                                  <span className="text-slate-400 block mt-2 text-[11px]">
+                                    Target Coord: {fleet.targetName} [{fleet.targetCoords.x}, {fleet.targetCoords.y}]
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  {fleet.isWaitingToSettle ? (
+                                    <span className="text-emerald-400 font-extrabold text-xs block animate-bounce font-mono">SECURED &bull; READY</span>
+                                  ) : (
+                                    <>
+                                      <span className="text-cyan-400 font-bold text-xs block">{getTimerString(fleet.arrivesAt)} remaining</span>
+                                      <span className="text-slate-500 text-[9px] block">
+                                        ({Math.floor(secsRemaining / 3600)}h {Math.floor((secsRemaining % 3600) / 60)}m {secsRemaining % 60}s remaining)
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
 
-                          {fleet.isWaitingToSettle && (
-                            <div className="pt-1">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (onSettle) onSettle(fleet.id);
-                                }}
-                                className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] transition text-black font-extrabold uppercase tracking-wider text-[11px] rounded-lg animate-pulse cursor-pointer"
-                              >
-                                ⚡ CLICK HERE TO SETTLE ON PLANET
-                              </button>
-                            </div>
-                          )}
+                              {/* Troops inside this fleet */}
+                              <div className="flex flex-wrap gap-1.5 text-[10px]">
+                                {Object.entries(fleet.troops).map(([tId, count]) => {
+                                  if (!count) return null;
+                                  return (
+                                    <span key={tId} className="bg-[#0A0F1D] border border-[#1E293B] px-1.5 py-0.5 rounded uppercase font-bold text-slate-350 font-mono">
+                                      {tId}: {count}
+                                    </span>
+                                  );
+                                })}
+                              </div>
 
-                          {/* Recall, Cancel & Move Action Buttons */}
-                          {!fleet.isReturning && (
-                            <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                              {fleet.isWaitingToSettle ? (
-                                <div className="grid grid-cols-2 gap-2 mt-1">
+                              {/* Flight Bar */}
+                              <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5 relative">
+                                <div 
+                                  className={`h-full rounded-full transition-all duration-350 ${
+                                    fleet.isWaitingToSettle ? 'bg-emerald-500' :
+                                    fleet.isReturning ? 'bg-yellow-500' :
+                                    fleet.missionType === 'attack' ? 'bg-red-500' :
+                                    fleet.missionType === 'colonize' ? 'bg-amber-500' : 'bg-blue-500'
+                                  }`}
+                                  style={{ width: `${progressPercent}%` }}
+                                />
+                              </div>
+
+                              {fleet.isWaitingToSettle && (
+                                <div className="pt-1">
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (onCancelFleet) onCancelFleet(fleet.id);
+                                      if (onSettle) onSettle(fleet.id);
                                     }}
-                                    className="py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold uppercase text-[10px] rounded-lg transition cursor-pointer text-center"
+                                    className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] transition text-black font-extrabold uppercase tracking-wider text-[11px] rounded-lg animate-pulse cursor-pointer"
                                   >
-                                    ↩ Recall Troops
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setReroutingFleetId(fleet.id);
-                                      setRerouteX('');
-                                      setRerouteY('');
-                                    }}
-                                    className="py-1.5 px-3 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/30 font-bold uppercase text-[10px] rounded-lg transition cursor-pointer text-center"
-                                  >
-                                    📍 Move planet
+                                    ⚡ CLICK HERE TO SETTLE ON PLANET
                                   </button>
                                 </div>
-                              ) : (
-                                <div className="grid grid-cols-2 gap-2 mt-1">
-                                  {(() => {
-                                    const totalDuration = fleet.arrivesAt - fleet.startedAt;
-                                    const elapsed = serverTime - fleet.startedAt;
-                                    const progressPercent = totalDuration > 0 ? (elapsed / totalDuration) * 100 : 0;
-                                    const isAttack = fleet.missionType === 'attack';
-                                    const cannotRecallAttack = isAttack && progressPercent > 45;
+                              )}
 
-                                    return (
+                              {/* Recall, Cancel & Move Action Buttons */}
+                              {!fleet.isReturning && (
+                                <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                                  {fleet.isWaitingToSettle ? (
+                                    <div className="grid grid-cols-2 gap-2 mt-1">
                                       <button
                                         type="button"
-                                        disabled={cannotRecallAttack}
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           if (onCancelFleet) onCancelFleet(fleet.id);
                                         }}
-                                        className={`py-1.5 px-3 font-bold uppercase text-[10px] rounded-lg transition border text-center ${
-                                          cannotRecallAttack
-                                            ? 'bg-red-950/40 text-red-500 border-red-950 cursor-not-allowed'
-                                            : 'bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 cursor-pointer'
-                                        }`}
+                                        className="py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold uppercase text-[10px] rounded-lg transition cursor-pointer text-center"
                                       >
-                                        {cannotRecallAttack ? `🚫 Locked (${Math.round(progressPercent)}%)` : '🛑 Abort Mission'}
+                                        ↩ Recall Troops
                                       </button>
-                                    );
-                                  })()}
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setReroutingFleetId(fleet.id);
-                                      setRerouteX('');
-                                      setRerouteY('');
-                                    }}
-                                    className="py-1.5 px-3 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/25 font-bold uppercase text-[10px] rounded-lg transition cursor-pointer text-center"
-                                  >
-                                    📍 Reroute
-                                  </button>
-                                </div>
-                              )}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setReroutingFleetId(fleet.id);
+                                          setRerouteX('');
+                                          setRerouteY('');
+                                        }}
+                                        className="py-1.5 px-3 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/30 font-bold uppercase text-[10px] rounded-lg transition cursor-pointer text-center"
+                                      >
+                                        📍 Move planet
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="grid grid-cols-2 gap-2 mt-1">
+                                      {(() => {
+                                        const totalDuration = fleet.arrivesAt - fleet.startedAt;
+                                        const elapsed = serverTime - fleet.startedAt;
+                                        const progressPercent = totalDuration > 0 ? (elapsed / totalDuration) * 100 : 0;
+                                        const isAttack = fleet.missionType === 'attack';
+                                        const cannotRecallAttack = isAttack && progressPercent > 45;
 
-                              {reroutingFleetId === fleet.id && (
-                                <div className="p-3 bg-slate-950/90 border border-[#1E293B] rounded-lg space-y-2 mt-2" onClick={e => e.stopPropagation()}>
-                                  <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">Set New Flight Vectors</p>
-                                  <div className="flex gap-2 items-center">
-                                    <div className="flex-1">
-                                      <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Coord X</label>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        max={maxCoord}
-                                        value={rerouteX}
-                                        onChange={(e) => setRerouteX(e.target.value)}
-                                        placeholder={`0-${maxCoord}`}
-                                        className="w-full bg-[#05070A] border border-slate-800 text-cyan-400 rounded px-2 py-1 text-xs text-center font-bold"
-                                      />
+                                        return (
+                                          <>
+                                            <button
+                                              type="button"
+                                              disabled={cannotRecallAttack}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (onCancelFleet) onCancelFleet(fleet.id);
+                                              }}
+                                              className={`py-1.5 px-3 font-bold uppercase text-[10px] rounded-lg transition border text-center ${
+                                                cannotRecallAttack
+                                                  ? 'bg-red-950/40 text-red-500 border-red-950 cursor-not-allowed'
+                                                  : 'bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 cursor-pointer'
+                                              }`}
+                                            >
+                                              {cannotRecallAttack ? `🚫 Locked (${Math.round(progressPercent)}%)` : '🛑 Abort Mission'}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              disabled={cannotRecallAttack}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setReroutingFleetId(fleet.id);
+                                                setRerouteX('');
+                                                setRerouteY('');
+                                              }}
+                                              className={`py-1.5 px-3 font-bold uppercase text-[10px] rounded-lg transition border text-center ${
+                                                cannotRecallAttack
+                                                  ? 'bg-slate-950/40 text-slate-500 border-slate-900 cursor-not-allowed'
+                                                  : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border-cyan-500/25 cursor-pointer'
+                                              }`}
+                                            >
+                                              📍 Reroute
+                                            </button>
+                                          </>
+                                        );
+                                      })()}
                                     </div>
-                                    <div className="flex-1">
-                                      <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Coord Y</label>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        max={maxCoord}
-                                        value={rerouteY}
-                                        onChange={(e) => setRerouteY(e.target.value)}
-                                        placeholder={`0-${maxCoord}`}
-                                        className="w-full bg-[#05070A] border border-slate-800 text-cyan-400 rounded px-2 py-1 text-xs text-center font-bold"
-                                      />
+                                  )}
+
+                                  {reroutingFleetId === fleet.id && (
+                                    <div className="p-3 bg-slate-950/90 border border-[#1E293B] rounded-lg space-y-2 mt-2" onClick={e => e.stopPropagation()}>
+                                      <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">Set New Flight Vectors</p>
+                                      <div className="flex gap-2 items-center">
+                                        <div className="flex-1">
+                                          <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Coord X</label>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max={maxCoord}
+                                            value={rerouteX}
+                                            onChange={(e) => setRerouteX(e.target.value)}
+                                            placeholder={`0-${maxCoord}`}
+                                            className="w-full bg-[#05070A] border border-slate-800 text-cyan-400 rounded px-2 py-1 text-xs text-center font-bold"
+                                          />
+                                        </div>
+                                        <div className="flex-1">
+                                          <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Coord Y</label>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max={maxCoord}
+                                            value={rerouteY}
+                                            onChange={(e) => setRerouteY(e.target.value)}
+                                            placeholder={`0-${maxCoord}`}
+                                            className="w-full bg-[#05070A] border border-slate-800 text-cyan-400 rounded px-2 py-1 text-xs text-center font-bold"
+                                          />
+                                        </div>
+                                      </div>
+                                      <div className="flex gap-2 pt-1">
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            const tx = parseInt(rerouteX, 10);
+                                            const ty = parseInt(rerouteY, 10);
+                                            if (isNaN(tx) || isNaN(ty) || tx < 0 || tx > maxCoord || ty < 0 || ty > maxCoord) {
+                                              if (showToast) showToast(`Invalid coordinates (0-${maxCoord} allowed)`, 'error');
+                                              return;
+                                            }
+                                            if (onRerouteFleet) {
+                                              await onRerouteFleet(fleet.id, tx, ty);
+                                              setReroutingFleetId(null);
+                                            }
+                                          }}
+                                          className="flex-1 py-1 px-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded font-bold uppercase text-[10px] cursor-pointer"
+                                        >
+                                          Confirm Jump
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setReroutingFleetId(null)}
+                                          className="py-1 px-3 bg-slate-800 hover:bg-slate-700 text-slate-350 rounded font-bold uppercase text-[10px] cursor-pointer"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div className="flex gap-2 pt-1">
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        const tx = parseInt(rerouteX, 10);
-                                        const ty = parseInt(rerouteY, 10);
-                                        if (isNaN(tx) || isNaN(ty) || tx < 0 || tx > maxCoord || ty < 0 || ty > maxCoord) {
-                                          if (showToast) showToast(`Invalid coordinates (0-${maxCoord} allowed)`, 'error');
-                                          return;
-                                        }
-                                        if (onRerouteFleet) {
-                                          await onRerouteFleet(fleet.id, tx, ty);
-                                          setReroutingFleetId(null);
-                                        }
-                                      }}
-                                      className="flex-1 py-1 px-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded font-bold uppercase text-[10px] cursor-pointer"
-                                    >
-                                      Confirm Jump
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setReroutingFleetId(null)}
-                                      className="py-1 px-3 bg-slate-800 hover:bg-slate-700 text-slate-350 rounded font-bold uppercase text-[10px] cursor-pointer"
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
+                                  )}
                                 </div>
                               )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         );
       })()}
@@ -1543,13 +1624,13 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
           <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-left space-y-2 font-mono">
             <div className="flex items-center gap-2 text-red-400 text-xs font-black uppercase tracking-wider">
               <AlertTriangle size={15} />
-              <span>Modular Base Fabrication Terminals Locked</span>
+              <span>Advanced Construction Projects Locked (Lvl 2+)</span>
             </div>
             <p className="text-[11px] text-slate-300 leading-relaxed font-sans">
-              Admiral, base construction facilities are off-line. <span className="text-red-400 font-bold">You cannot construct or upgrade any base facility</span> until all 5 resource extractor pumps (Water, Plasma, Fuel, Food, and Respirant) have been constructed to at least <span className="text-[#5bc0be] font-bold">Level 1</span> on this outpost.
+              Admiral, advanced station systems are locked. <span className="text-red-400 font-bold">You cannot upgrade any facility or resource extractor pump to Level 2 or higher</span> until all 5 resource extractor pumps (Water, Plasma, Fuel, Food, and Respirant) have been constructed to at least <span className="text-[#5bc0be] font-bold">Level 1</span> on this station.
             </p>
             <div className="text-[10px] text-slate-400 font-sans pt-0.5">
-              Please scroll up to the <span className="text-[#5bc0be] font-bold">Resource Extractor Outposts</span> grid and construct any missing extractor pumps first!
+              Please scroll up to the <span className="text-[#5bc0be] font-bold">Resource Extractor Outposts</span> grid and construct any level 0 extractor pumps first!
             </div>
           </div>
         )}
@@ -1645,7 +1726,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                   {/* Expanded Building Detail Panel */}
                   {isExpanded && (
                     <div className="border-t border-[#1E293B]/60 p-4 bg-slate-950/20 space-y-4 animate-fade-in">
-                      {!allExtractorsLevelOneOrMore && (
+                      {!((bState.level === 0 && bKey === 'fabricator') || allExtractorsLevelOneOrMore) && (
                         <div className="p-3 border border-red-500/20 bg-red-950/40 rounded-xl text-red-400 text-xs font-mono text-left space-y-1">
                           <div className="font-extrabold flex items-center gap-1.5 uppercase text-[11px] tracking-wider">⚠️ EXTRACTORS REQUISITE MISSING</div>
                           <p className="text-[10.5px] text-slate-300 font-sans leading-relaxed">
@@ -1699,6 +1780,19 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                           {bState.level < 25 && (
                             <div className="text-[11px] text-slate-450 font-sans font-normal">
                               ↳ Next Level Protection: <strong className="text-emerald-400">{Math.round(500000 * ((bState.level + 1) / 25)).toLocaleString()}</strong> units
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {bKey === 'magneticShield' && (
+                        <div className="text-xs text-[#5bc0be] font-mono font-bold text-left flex flex-col gap-1.5">
+                          <div>
+                            Disruptor Building Damage Reduction: <span className="text-white bg-teal-950/40 border border-teal-800/30 px-1.5 py-0.5 rounded font-bold">{(bState.level * 2.5).toFixed(1)}%</span>
+                          </div>
+                          {bState.level < 12 && (
+                            <div className="text-[11px] text-slate-450 font-sans font-normal">
+                              ↳ Next Level Reduction: <strong className="text-emerald-400">{((bState.level + 1) * 2.5).toFixed(1)}%</strong>
                             </div>
                           )}
                         </div>
@@ -1921,18 +2015,24 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                               <span>{bState.level === 0 ? 'Constructing' : 'Upgrading'} {getTimerString(bState.upgradeEnd)}</span>
                             </div>
                             {nextTargetLvl <= bState.maxLevel && (
-                              <button 
-                                onClick={() => onUpgradeBuilding(bKey, true)}
-                                disabled={isUpgrading}
-                                className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                type="button"
-                              >
-                                <span className="text-emerald-400">Queue Upgrade</span>
-                                <span className="text-amber-400 font-extrabold">(Lv. {nextTargetLvl}, {nextUpgradeTimeMins}m)</span>
-                              </button>
+                              ((nextTargetLvl < 2 && bKey === 'fabricator') || allExtractorsLevelOneOrMore) ? (
+                                <button 
+                                  onClick={() => onUpgradeBuilding(bKey, true)}
+                                  disabled={isUpgrading}
+                                  className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                  type="button"
+                                >
+                                  <span className="text-emerald-400">Queue Upgrade</span>
+                                  <span className="text-amber-400 font-extrabold">(Lv. {nextTargetLvl}, {nextUpgradeTimeMins}m)</span>
+                                </button>
+                              ) : (
+                                <span className="text-[9px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-2.5 py-1 rounded mt-1 inline-block" title="All 5 resource extractor pumps must be at least Level 1.">
+                                  🔒 EXTRACTORS REQUISITE
+                                </span>
+                              )
                             )}
                           </div>
-                        ) : !allExtractorsLevelOneOrMore ? (
+                        ) : !((nextTargetLvl < 2 && bKey === 'fabricator') || allExtractorsLevelOneOrMore) ? (
                           <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-3 py-1.5 rounded" title="All 5 resource extractor pumps must be at least Level 1.">
                             🔒 EXTRACTORS REQUISITE
                           </span>
@@ -2043,18 +2143,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         <p className="text-slate-350 leading-relaxed font-sans">{info.desc}</p>
                         <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={1} planetResources={localResources} />
 
-                        {!allExtractorsLevelOneOrMore && (
-                          <div className="p-3 border border-red-500/20 bg-red-950/40 rounded-xl text-red-400 text-xs font-mono text-left space-y-1">
-                            <div className="font-extrabold flex items-center gap-1.5 uppercase tracking-wider text-[11px]">⚠️ EXTRACTORS REQUISITE MISSING</div>
-                            <p className="text-[10.5px] text-slate-300 font-sans leading-relaxed">
-                              All 5 resource extractor types must be at least <span className="text-[#5bc0be] font-bold">Level 1</span> before you can build or upgrade base facilities!
-                            </p>
-                          </div>
-                        )}
-                        
                         <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-2">
                           <span className="text-[9.5px] text-slate-500 font-mono font-bold tracking-wider">REQUISITE FABRICATOR: Lv. {getRequiredFabricatorLevel(bKey)}</span>
-                          {!allExtractorsLevelOneOrMore ? (
+                          {bKey !== 'fabricator' && !allExtractorsLevelOneOrMore ? (
                             <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-3 py-1.5 rounded" title="All 5 resource extractor pumps must be at least Level 1.">
                               🔒 EXTRACTORS REQUISITE
                             </span>

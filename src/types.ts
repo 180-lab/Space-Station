@@ -65,6 +65,7 @@ export interface ColonyPlanet {
     supplyNexus: BuildingState;   // Max 50
     fabricator: BuildingState;    // Max 10
     bunker?: BuildingState;
+    magneticShield?: BuildingState;
   };
   resources: {
     water: number;

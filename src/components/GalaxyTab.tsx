@@ -3114,15 +3114,16 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                         <div className="mt-2 space-y-1">
                                           <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
 
-                                            <div>Attacker Attack HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{attAtkValue.toLocaleString()}</span></div>
+                                            <div>Attacker HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{attAtkValue.toLocaleString()}</span></div>
                                           </div>
-                                          <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
+                                          <div className="flex flex-wrap gap-1.5 mt-1.5">
                                             {Object.entries(report.attackerInitialTroops).map(([type, qty]) => {
                                               if (!qty) return null;
                                               return (
-                                                <span key={type} className="bg-red-950/20 px-1 py-0.2 rounded border border-red-900/20 text-red-300">
-                                                  {(TROOP_NAME_MAPPING[type] || type)}: {qty} (loss: {report.attackerLosses[type] || 0})
-                                                </span>
+                                                <div key={type} className="bg-blue-950/10 px-2 py-1 rounded border border-blue-500/20 text-left flex flex-col font-mono select-none">
+                                                  <span className="text-blue-400 font-bold">{(TROOP_NAME_MAPPING[type] || type)}: {qty}</span>
+                                                  <span className="text-red-400 text-[8.5px] font-medium leading-tight">(loss: {report.attackerLosses[type] || 0})</span>
+                                                </div>
                                               );
                                             })}
                                           </div>
@@ -3142,32 +3143,33 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     const defLossPercent = totalDefInitial > 0 ? ((totalDefLosses / totalDefInitial) * 100).toFixed(1) : '0.0';
                                     return (
                                       <>
-                                        <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide flex items-center justify-between">
-                                          <span>STATION:{' '}
+                                        <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide flex items-center justify-between">
+                                          <span>Defender:{' '}
                                             <span 
                                               onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
-                                              className="underline decoration-dotted cursor-pointer hover:text-cyan-300"
+                                              className="underline decoration-dotted cursor-pointer hover:text-red-300"
                                             >
                                               {report.defenderName}
                                             </span>
                                           </span>
-                                          <span className="text-[10px] text-cyan-400 font-bold bg-cyan-950/25 px-1.5 py-0.5 rounded border border-cyan-900/20 font-mono select-none">
+                                          <span className="text-[10px] text-red-400 font-bold bg-red-950/25 px-1.5 py-0.5 rounded border border-red-900/20 font-mono select-none">
                                             Loss: {defLossPercent}%
                                           </span>
                                         </p>
                                         <p className="text-slate-500 text-[10px] mt-0.5">Target: [{report.defenderCoords.x}, {report.defenderCoords.y}]</p>
                                         <div className="mt-2 space-y-1">
                                           <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
-                                            <div>Defender HP (Defense Shields): <span className="text-cyan-400 font-mono font-extrabold">{defHpValue.toLocaleString()}</span></div>
+                                            <div>Defender HP (Defense Strength): <span className="text-cyan-400 font-mono font-extrabold">{defHpValue.toLocaleString()}</span></div>
                                             
                                           </div>
-                                          <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
+                                          <div className="flex flex-wrap gap-1.5 mt-1.5">
                                             {Object.entries(report.defenderInitialTroops).map(([type, qty]) => {
                                               if (!qty) return null;
                                               return (
-                                                <span key={type} className="bg-cyan-950/15 px-1 py-0.2 rounded border border-cyan-900/20 text-cyan-300">
-                                                  {(TROOP_NAME_MAPPING[type] || type)}: {qty} (loss: {report.defenderLosses[type] || 0})
-                                                </span>
+                                                <div key={type} className="bg-blue-950/10 px-2 py-1 rounded border border-blue-500/20 text-left flex flex-col font-mono select-none">
+                                                  <span className="text-blue-400 font-bold">{(TROOP_NAME_MAPPING[type] || type)}: {qty}</span>
+                                                  <span className="text-red-400 text-[8.5px] font-medium leading-tight">(loss: {report.defenderLosses[type] || 0})</span>
+                                                </div>
                                               );
                                             })}
                                           </div>
@@ -4101,6 +4103,12 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   const isRerouting = reroutingFleetId === fleet.id;
                   const etaSec = Math.max(0, Math.round((fleet.arrivesAt - serverTime) / 1000));
 
+                  const totalDuration = fleet.arrivesAt - fleet.startedAt;
+                  const elapsed = serverTime - fleet.startedAt;
+                  const progressPercent = totalDuration > 0 ? (elapsed / totalDuration) * 100 : 0;
+                  const isAttack = fleet.missionType === 'attack';
+                  const cannotRecallAttack = isAttack && progressPercent > 45;
+
                   return (
                     <div key={fleet.id} className="p-4 rounded-xl border border-[#1E293B] bg-[#05070A] space-y-3">
                       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
@@ -4134,19 +4142,22 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                         {!fleet.isReturning && onRerouteFleet && (
                           <button
                             type="button"
+                            disabled={cannotRecallAttack}
                             onClick={() => {
                               setReroutingFleetId(isRerouting ? null : fleet.id);
                               setRerouteX(fleet.targetCoords.x.toString());
                               setRerouteY(fleet.targetCoords.y.toString());
                               setRerouteType(fleet.missionType);
                             }}
-                            className={`px-3 py-1.5 rounded-lg border text-[10px] uppercase font-bold tracking-wider transition cursor-pointer shrink-0 ${
-                              isRerouting
-                                ? 'bg-amber-600 text-slate-950 border-amber-600 font-bold'
-                                : 'bg-slate-900 text-amber-500 border-amber-500/20 hover:bg-slate-850'
+                            className={`px-3 py-1.5 rounded-lg border text-[10px] uppercase font-bold tracking-wider transition shrink-0 ${
+                              cannotRecallAttack
+                                ? 'bg-slate-950/40 text-slate-500 border-slate-900 cursor-not-allowed'
+                                : isRerouting
+                                ? 'bg-amber-600 text-slate-950 border-amber-600 font-bold cursor-pointer'
+                                : 'bg-slate-900 text-amber-500 border-amber-500/20 hover:bg-slate-850 cursor-pointer'
                             }`}
                           >
-                            🔄 Re-Route Squadron
+                            {cannotRecallAttack ? `🚫 Locked (${Math.round(progressPercent)}%)` : '🔄 Re-Route Squadron'}
                           </button>
                         )}
                       </div>

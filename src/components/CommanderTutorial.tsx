@@ -9,7 +9,7 @@ interface CommanderTutorialProps {
   fleets: any[];
   onRefreshState: () => void;
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
-  setActiveTab: (tab: 'explore' | 'army' | 'galaxy' | 'research' | 'settings') => void;
+  setActiveTab: (tab: 'explore' | 'army' | 'galaxy' | 'research' | 'settings' | 'chat') => void;
   chatMessages?: any[];
   customTasks?: Record<string, any>;
 }
@@ -24,7 +24,7 @@ export interface TutorialTask {
   commanderTip: string;
   congratsMessage: string;
   encouragementQuote: string;
-  targetTab: 'explore' | 'army' | 'galaxy' | 'research' | 'settings';
+  targetTab: 'explore' | 'army' | 'galaxy' | 'research' | 'settings' | 'chat';
   rewards: {
     resources: { [key in ResourceType]?: number };
     credits: number;
@@ -79,485 +79,420 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   const rawTasks: TutorialTask[] = [
     {
       id: 1,
-      title: '🚀 Colonize Your 2nd Station',
-      shortDesc: 'Launch a Settlement Ship to habitable coordinates to establish a second colony.',
-      requirementHtml: 'Acquire <strong>at least 2 colony stations</strong> under your command.',
-      hint: 'First, train a Settlement Ship in the CMD (War Room) tab. Then open the GLXY (Galaxy) tab, locate a green dot marked "Habitable Planet", select it, assign the Settlement Ship, and click "Confirm & Dispatch"! Once arrived, select that planet from your planet dropdown in the XPL (Explore) tab to start managing your new colony.',
-      howToGetThere: '1. Go to the <strong>CMD</strong> tab.<br/>2. Locate the <strong>Settlement Ship</strong> and recruit 1.<br/>3. Go to the <strong>GLXY</strong> tab.<br/>4. Select any free green <strong>Habitable Planet</strong> on the map.<br/>5. Click it, select <strong>"Settle on Planet"</strong>, assign 1 Settlement Ship, and click <strong>"Confirm & Dispatch"</strong>.',
-      commanderTip: 'Find green Habitable Planets on the map inside the GLXY tab.',
-      congratsMessage: '🌟 OUTSTANDING FLIGHT TRAJECTORY! You colonized a brand new world, establishing your second station and expanding your galactic footprint!',
-      encouragementQuote: 'Excellent! Having a second station prepares your empire for massive economy scaling and advanced fleet deployments.',
-      targetTab: 'galaxy',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 15000,
-      },
+      title: '🏭 Upgrade Fabricator to Level 1',
+      shortDesc: 'Construct or upgrade your main station Fabricator to Level 1 to unlock basic building operations.',
+      requirementHtml: 'Have a <strong>Fabricator at Level 1 or higher</strong>.',
+      hint: 'Go to the XPL tab, find the Fabricator under Base Infrastructure Buildings, and click Upgrade.',
+      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Find the <strong>Fabricator</strong> in the Base Infrastructure Buildings list.<br/>3. Click <strong>"Upgrade Building"</strong> to start construction.',
+      commanderTip: 'The Fabricator is the only building you can build with Level 0 mines. Build it first!',
+      congratsMessage: '🏭 FABRICATOR LEVEL 1 REINFORCED! Your assembly grid is online, unlocking more complex planetary infrastructure projects!',
+      encouragementQuote: 'Excellent work, Admiral. The Fabricator is the cornerstone of all base constructions and heavy machinery setups.',
+      targetTab: 'explore',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 2,
       title: '🏗️ Construct All Resource Extractors',
-      shortDesc: 'Construct at least one active extractor of every resource type to establish full production capabilities.',
-      requirementHtml: 'Have <strong>at least one constructed extractor (Level 1 or higher)</strong> for each of the 5 resource types: Water, Plasma, Fuel, Food, and Respirant.',
-      hint: 'Under the XPL tab, scroll down to Resource Extractor Outposts. Identify any resource class with level 0 pumps, and click the yellow "Construct Extractor" button.',
-      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Scroll down below the active building lists to the <strong>"RESOURCE EXTRACTOR OUTPOSTS"</strong> grid.<br/>3. Locate resource classes with level 0 pumps (Not Constructed).<br/>4. Click the yellow <strong>"Construct Extractor"</strong> button to send a pump unit to Level 1.',
-      commanderTip: 'Under the XPL tab -> Resource Extractor Outposts, make sure every resource class has at least 1 level 1 or higher extractor pump.',
-      congratsMessage: '🏗️ ALL RESOURCE EXTRACTORS ESTABLISHED! Your colony now has a complete array of resource extraction lines running, securing constant automated passive yields!',
-      encouragementQuote: 'Amazing engineering, Admiral! Having all 5 resource extraction systems running is the key to a fully self-sustaining starbase.',
+      shortDesc: 'With a Level 1 Fabricator, you can now construct your resource extractors. Construct at least one of each type.',
+      requirementHtml: 'Construct <strong>all 5 resource extractor outposts</strong> (Water, Plasma, Fuel, Food, and Respirant) to Level 1 or higher.',
+      hint: 'Go to the XPL tab, scroll to Resource Extractor Outposts, and click Construct Extractor on every resource type with level 0.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Scroll down to <strong>"RESOURCE EXTRACTOR OUTPOSTS"</strong>.<br/>3. Click <strong>"Construct Extractor"</strong> on all 5 types of pumps (Water, Plasma, Fuel, Food, Respirant).',
+      commanderTip: 'Ensure each resource type has at least one active, level 1 or higher extractor.',
+      congratsMessage: '🏗️ EXTRACTOR ARRAYS ACTIVE! Your station is now continuously harvesting vital liquids, gases, and organic materials.',
+      encouragementQuote: 'Brilliant! Now your station is self-sufficient with constant resource yields flowing directly into your silo reserves.',
       targetTab: 'explore',
-      rewards: {
-        resources: { water: 10280, plasma: 10180, fuel: 10180, food: 10180, respirant: 10180 },
-        credits: 3000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 3,
-      title: '💧 Hydrothermal Water Pump Level 2',
-      shortDesc: 'Secure vital water resources to feed your station assemblies.',
-      requirementHtml: 'Upgrade <strong>at least one Hydrothermal Water Pump to Level 2 or higher</strong>.',
-      hint: 'Open the XPL tab, find the list of Resource Extractor Outposts, find the Hydrothermal Water Pump, and click "Upgrade Extractor" to level up!',
-      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Scroll down below the active building lists to the <strong>"RESOURCE EXTRACTOR OUTPOSTS"</strong> grid.<br/>3. Identify the <strong>💧 Hydrothermal Water Pumps</strong> section.<br/>4. Click the yellow <strong>"Upgrade Extractor"</strong> button under your first pump unit.',
-      commanderTip: 'Under the XPL tab -> Resource Extractor Outposts section.',
-      congratsMessage: '💧 SPLENDID HYDRATION LOGISTICS! Your hydrothermal pumps are working beautifully, channeling vital liquids straight into the reservation tanks!',
-      encouragementQuote: 'Keeping your fluid water production on point is essential for colonist health and troop training assembly lines!',
+      title: '📡 Establish Communications Hub Level 1',
+      shortDesc: 'Build a Communication Hub to interface with the galactic network.',
+      requirementHtml: 'Construct or upgrade your <strong>Communications Hub to Level 1 or higher</strong>.',
+      hint: 'Under the XPL tab, find the Communications Hub in the Infrastructure list and upgrade it.',
+      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Scroll to the Base Infrastructure Buildings list.<br/>3. Select <strong>Communications Hub</strong> and click <strong>"Upgrade Building"</strong>.',
+      commanderTip: 'Connecting to orbital frequencies allows subspace coordinate analysis and chat communications.',
+      congratsMessage: '📡 COMMUNICATION LINK ESTABLISHED! Subspace frequencies are online, scanning for signals and connection points.',
+      encouragementQuote: 'A great commander knows communication is key. Your communications grid is now ready to receive external transmissions.',
       targetTab: 'explore',
-      rewards: {
-        resources: { water: 10180, plasma: 10180, fuel: 10180, food: 10180, respirant: 10280 },
-        credits: 5000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 4,
-      title: '💨 Air Scrubber Level 2',
-      shortDesc: 'Provide atmospheric respirant gases to enable troop quarter logistics.',
-      requirementHtml: 'Upgrade <strong>at least one Air Scrubber (Respirant Siphon) to Level 2 or higher</strong>.',
-      hint: 'Under the XPL tab extractor list, find the Air Scrubber Siphons and trigger the Level 2 constructor upgrade sequence.',
-      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Find the <strong>💨 Air Scrubber / Oxygen Generators</strong> under the extractor posts section.<br/>3. Click <strong>"Upgrade Extractor"</strong> on pump index 1.',
-      commanderTip: 'Under the XPL tab -> Resource Extractor Outposts grid.',
-      congratsMessage: '💨 PURE OXYGEN FLOW ENHANCED! Healthy oxygen concentration levels guarantee your fabrication teams can work efficiently!',
-      encouragementQuote: 'Marvelous efficiency! Fresh atmosphere boosts engineering productivity tenfold across your entire planetary base.',
+      title: '📦 Construct Repository (Silo) Level 1',
+      shortDesc: 'Build a Repository to store raw materials harvested by extractor pumps.',
+      requirementHtml: 'Construct or upgrade your <strong>Repository (Silo) to Level 1 or higher</strong>.',
+      hint: 'Find the Repository building under Infrastructure inside the XPL tab and start construction.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Find the <strong>Repository (Silo)</strong> under Base Infrastructure Buildings.<br/>3. Click <strong>"Upgrade Building"</strong> to establish physical storage tanks.',
+      commanderTip: 'Silos prevent passive extraction wastage by keeping high reserve caps.',
+      congratsMessage: '📦 STORAGE VAULTS READY! Your Silo capacity has expanded, offering secure chambers for extra fluid yields.',
+      encouragementQuote: 'Perfect! Always keep an eye on your storage limit so your extractor siphons don\'t saturate and waste energy.',
       targetTab: 'explore',
-      rewards: {
-        resources: { water: 10180, plasma: 10180, fuel: 10180, food: 10280, respirant: 10180 },
-        credits: 4000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 5,
-      title: '🥗 Quantum Food Synthesizer Level 2',
-      shortDesc: 'Increase food production by upgrading biological food harvesters.',
-      requirementHtml: 'Upgrade <strong>at least one Quantum Food Synthesizer to Level 2 or higher</strong>.',
-      hint: 'Find the Bio-Synthesizer harvester in your extractor siphons list on the XPL tab, and click the Upgrade option.',
-      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Scroll down to the extractor outposts grid.<br/>3. Identify the <strong>🥗 Quantum Food Bio-Synthesizers</strong>.<br/>4. Click the yellow button marked <strong>"Upgrade Extractor"</strong>.',
-      commanderTip: 'Under the XPL tab -> Resource Extractor Outposts panel.',
-      congratsMessage: '🥗 MASTER BIOLOGICAL PRODUCTION! Your organic bio-synthesizers are generating high-calorie nutrients for your growing army!',
-      encouragementQuote: 'Astounding logic! High-tier armies move on their stomachs - ensuring balanced organic rations is crucial.',
+      title: '🏭 Upgrade Fabricator to Level 2',
+      shortDesc: 'Bring the Fabricator to Level 2 to unlock radar sensor blueprints.',
+      requirementHtml: 'Upgrade active <strong>Fabricator to Level 2 or higher</strong>.',
+      hint: 'Go to the XPL tab, find the Fabricator, and upgrade it to Level 2.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Find the <strong>Fabricator</strong> and trigger its Level 2 upgrade sequence.',
+      commanderTip: 'Upgrading the Fabricator unlocks advanced facility options like the Radar Array!',
+      congratsMessage: '🏭 FABRICATOR POWER UPGRADE! Level 2 nanite printers are online, allowing production of complex tactical sensors!',
+      encouragementQuote: 'Superb! A level 2 Fabricator brings us one step closer to scanning deep space.',
       targetTab: 'explore',
-      rewards: {
-        resources: { water: 10180, plasma: 10280, fuel: 10180, food: 10180, respirant: 10180 },
-        credits: 4000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 6,
-      title: '⚡ Thermal Plasma Refinery Level 2',
-      shortDesc: 'Acquire energy reactors to power up defensive particle shields.',
-      requirementHtml: 'Upgrade <strong>at least one Thermal Plasma Refinery to Level 2 or higher</strong>.',
-      hint: 'Locate the Plasma Refinery extractor in your XPL tab list and upgrade it to secure reactor fuel supplies.',
-      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Look for the <strong>⚡ Thermal Plasma Refineries</strong> row in your siphons grid.<br/>3. Trigger the <strong>"Upgrade Extractor"</strong> sequence using your active resources.',
-      commanderTip: 'Under the XPL tab -> Resource Extractor Outposts.',
-      congratsMessage: '⚡ THERMAL FISSION COMPLETED! High energetic reactors are successfully humming, storing concentrated plasma fuel inside core canisters!',
-      encouragementQuote: 'Stellar! Plasma fuel is highly critical for running science scanners, hyperdrive thruster upgrades, and high-tech shield nodes.',
+      title: '🛰️ Construct Radar Array Level 1',
+      shortDesc: 'Construct a Radar Array to scan neighboring coordinates for habitable planets.',
+      requirementHtml: 'Construct or upgrade your <strong>Radar Array to Level 1 or higher</strong>.',
+      hint: 'Under the XPL tab infrastructure, locate the Radar Array and upgrade it.',
+      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Scroll down to Base Infrastructure Buildings.<br/>3. Locate the <strong>Radar Array</strong> and click <strong>"Upgrade Building"</strong>.',
+      commanderTip: 'Radar scanning is necessary to locate other stations and uncharted habitable worlds.',
+      congratsMessage: '🛰️ DEEP SPACE RADAR OPERATIONAL! High-gain antennae are active, sending sweeping beams across unexplored galaxy coordinates.',
+      encouragementQuote: 'Excellent. Let\'s use our newly constructed radar arrays to map out the surrounding galaxy sector.',
       targetTab: 'explore',
-      rewards: {
-        resources: { water: 10150, plasma: 10000, fuel: 10000, food: 10200, respirant: 10100 },
-        credits: 4000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 7,
-      title: '📡 Activate Comms Hub Level 1',
-      shortDesc: 'Establish orbital communications arrays to relay incoming subspace trade frequencies.',
-      requirementHtml: 'Upgrade active station <strong>Comms Hub to Level 1 or higher</strong>.',
-      hint: 'Upgrade Comms Hub under Base Infrastructure Buildings inside the XPL tab.',
-      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Scroll down below construction lists to find <strong>Comms Hub</strong> under infrastructure.<br/>3. Click the yellow <strong>"Upgrade Building"</strong> button to establish Level 1 relay links.',
-      commanderTip: 'XPL tab -> Base Infrastructure Buildings -> Comms Hub slot.',
-      congratsMessage: '📡 COMMUNICATIONS ROUTER ACTIVE! Sub-space arrays are fully humming, tracking incoming trade and message frequencies!',
-      encouragementQuote: 'Superb! An active communications hub acts as the main node for diplomatic transactions, coordinate scanning, and alliance communication portals.',
-      targetTab: 'explore',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 5000,
-      },
+      title: '🌌 Execute Galaxy Radar Scan',
+      shortDesc: 'Initiate a deep coordinate scan in the Galaxy tab to find viable travel destinations.',
+      requirementHtml: 'Perform at least <strong>one Galaxy Radar Scan</strong>.',
+      hint: 'Go to the GLXY tab, find the Radar Scan control panel on the right, and trigger a sector scan.',
+      howToGetThere: '1. Go to the <strong>GLXY</strong> tab.<br/>2. Locate the <strong>"Deep Radar Sweep"</strong> dashboard panel.<br/>3. Click <strong>"Execute Sweep"</strong> to scan nearby space zones.',
+      commanderTip: 'A radar sweep maps out the coordinates of active empires, habitable anomalies, and AI threats.',
+      congratsMessage: '🌌 SCAN COMPLETED! Deep-space coordinates have been successfully synced with your navigational computers!',
+      encouragementQuote: 'Magnificent scan resolution! We now have accurate telemetry data on surrounding sectors.',
+      targetTab: 'galaxy',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 8,
-      title: '🏦 Silo Level 10',
-      shortDesc: 'Extend local warehouse capacities to safely store large resource reserves.',
-      requirementHtml: 'Upgrade <strong>Silo to Level 10 or higher</strong> on your planetary starbase.',
-      hint: 'Upgrade the Silo building under your XPL tab infrastructure list.',
-      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Locate the <strong>Silo</strong> building slot in the infrastructure grid.<br/>3. Upgrade it to Level 10 or higher (use Space Gold to complete instantly if desired).',
-      commanderTip: 'XPL tab -> Base Infrastructure Buildings -> Silo.',
-      congratsMessage: '🏦 STORAGE CAPACITY EXTENDED! Heavy-duty vaults are successfully reinforced to contain massive fluid reserves without pressure failure risks!',
-      encouragementQuote: 'Incredible early infrastructure development, Admiral! Larger repositories ensure you never lose passive yields during long offline cycles.',
+      title: '📈 Upgrade All Resource Extractors to Level 2',
+      shortDesc: 'Upgrade all 5 of your resource pumps to Level 2 to boost your base production.',
+      requirementHtml: 'Have <strong>at least one Level 2 or higher extractor</strong> for all 5 resources.',
+      hint: 'Go to XPL, find each pump type, and click Upgrade Extractor.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Look for Water, Plasma, Fuel, Food, and Respirant extractors.<br/>3. Click <strong>"Upgrade Extractor"</strong> on all 5 to level them up to Level 2.',
+      commanderTip: 'Upgraded pumps scale passive income, fueling expensive infrastructure.',
+      congratsMessage: '📈 SYSTEM-WIDE UPGRADE COMPLETE! Your extraction rate has doubled across all major resources.',
+      encouragementQuote: 'Incredible development! Higher resource output keeps our expansion plans completely on schedule.',
       targetTab: 'explore',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 6000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 9,
-      title: '🤝 Dispatch Interstellar Resources',
-      shortDesc: 'Transmit vital fluids directly to another commander to establish commerce relations.',
-      requirementHtml: 'Successfully <strong>transmit resources to any other player station</strong> using the Cargo Warp Link.',
-      hint: 'Under the GLXY (Galaxy) tab, select another player coordinate on the map, click "Transmit Resources", select any amount and dispatch.',
-      howToGetThere: '1. Open the <strong>GLXY</strong> tab.<br/>2. Select another commander station node from leaderboards or the coordinate scanner.<br/>3. Click <strong>"Transmit Resources"</strong> to open the Cargo link.<br/>4. Select at least 1 unit of resource and click <strong>"Transmit Resource Shipment"</strong>.',
-      commanderTip: 'GLXY tab map coordinates -> Click Player node -> Transmit Resources.',
-      congratsMessage: '🤝 CARGO PORTAL ENGAGED! Resource capsules successfully warped through deep coordinates, depositing cargo straight to target reserves!',
-      encouragementQuote: 'Marvelous diplomacy! Trading and cooperating with other commanders builds undying trust, ensuring mutual support.',
-      targetTab: 'galaxy',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 5000,
-      },
+      title: '🏭 Upgrade Fabricator to Level 4',
+      shortDesc: 'Construct or upgrade your main station Fabricator to Level 4 to unlock advanced facility options.',
+      requirementHtml: 'Have a <strong>Fabricator at Level 4 or higher</strong>.',
+      hint: 'Go to the XPL tab, find the Fabricator under Base Infrastructure Buildings, and click Upgrade to Level 4.',
+      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Find the <strong>Fabricator</strong> in the Base Infrastructure Buildings list.<br/>3. Click <strong>"Upgrade Building"</strong> to upgrade it to Level 4.',
+      commanderTip: 'Fabricators increase building construction speeds for all planetary projects.',
+      congratsMessage: '🏭 FABRICATOR LEVEL 4 UNLOCKED! You can now print advanced scientific structures!',
+      encouragementQuote: 'Outstanding! The path to advanced science and high-speed research projects is now officially open.',
+      targetTab: 'explore',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 10,
-      title: '⚙️ Queue an Extractor Upgrade',
-      shortDesc: 'Plan your extractor operations by adding a resource extractor upgrade to your construction queue.',
-      requirementHtml: 'Have <strong>at least 1 extractor upgrade queued</strong> in your construction queue.',
-      hint: 'Go to the XPL (Explore) tab, click on any resource card (like Water or Plasma) to reveal its active extractor units, then click the yellow "Add to Queue (15 Gold)" button for that extractor slot.',
-      howToGetThere: '1. Navigate to the <strong>XPL</strong> tab.<br/>2. Click any of the active resource cards at the top of your extractor panel (e.g., Ice Water, Plasma Core).<br/>3. Click <strong>"Add to Queue"</strong> under any of the listed slots.',
-      commanderTip: 'XPL tab -> Click resource card -> Extractor slots list -> Add to Queue.',
-      congratsMessage: '⚙️ EXTRACTOR QUEUE ACTIVATED! You have successfully queued a resource extractor upgrade project!',
-      encouragementQuote: 'Wonderful planning! Extractor queues ensure your planetary output rates scale sequentially while you command the skies.',
+      title: '📡 Upgrade Communications Hub to Level 2',
+      shortDesc: 'Upgrade your Communications Hub to Level 2 to expand orbital frequency bandwidth.',
+      requirementHtml: 'Have a <strong>Communications Hub at Level 2 or higher</strong>.',
+      hint: 'Go to XPL, find the Communications Hub under Base Infrastructure, and upgrade it to Level 2.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Find the <strong>Communications Hub</strong> under Base Infrastructure Buildings.<br/>3. Click <strong>"Upgrade Building"</strong> to upgrade it to Level 2.',
+      commanderTip: 'Upgraded communication hubs increase satellite transmission reach and power.',
+      congratsMessage: '📡 COMMUNICATIONS HUB UPGRADED! Your communication array has been boosted, securing better frequencies!',
+      encouragementQuote: 'Excellent connection strength! Keep expanding your infrastructure to match our growing colony size.',
       targetTab: 'explore',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 5000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 11,
-      title: '🎯 Launch a Strike Fleet Attack',
-      shortDesc: 'Launch an attack from your galaxy menu on hostiles to test weapon systems.',
-      requirementHtml: 'Dispatch a <strong>strike attack fleet</strong> towards any target coordinate on the deep space radar.',
-      hint: 'Under the GLXY (Galaxy) tab map, find any player coordinate. Choose "Attack Planet", select at least 1 combat unit, and dispatch flight travel.',
-      howToGetThere: '1. Navigate to the <strong>GLXY</strong> tab.<br/>2. Choose any coordinate or space outpost on the map view.<br/>3. Click <strong>"Deploy Fleet / Attack Planet"</strong>.<br/>4. Set military action type to <strong>"Attack"</strong>, allocate combat troops, and click <strong>"Confirm & Dispatch"</strong>.',
-      commanderTip: 'GLXY tab -> Click on Sector Nodes -> Settle / Deploy Fleet command overlay.',
-      congratsMessage: '🎯 TACTICAL SQUADRONS AWAY! Telemetry sensors verify military flight transponders are live en-route to their target destination coordinates!',
-      encouragementQuote: 'Spectacular military initiative, General! Letting the rogue players know who commands this sector is critical for security!',
-      targetTab: 'galaxy',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 7500,
-      },
+      title: '🔬 Construct Research Center Level 1',
+      shortDesc: 'Build a Research Center to start developing advanced space technologies.',
+      requirementHtml: 'Construct or upgrade your <strong>Research Center to Level 1 or higher</strong>.',
+      hint: 'Now that Fabricator is Level 4, go to XPL and construct the Research Center.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Scroll down to infrastructure buildings.<br/>3. Select <strong>Research Center</strong> and click <strong>"Upgrade Building"</strong>.',
+      commanderTip: 'Research Centers allow your scientists to work on shield tech, speed upgrades, and more!',
+      congratsMessage: '🔬 RESEARCH LAB ACTIVE! Your scientific staff are now standing by for technology assignments.',
+      encouragementQuote: 'Marvelous! Science is the ultimate equalizer in the deep void of space.',
+      targetTab: 'explore',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 12,
-      title: '🔋 Extractor Production Overdrive',
-      shortDesc: 'Use your accumulated Space Gold to boost planetary extraction pump outputs.',
-      requirementHtml: 'Activate a <strong>Production Boost overdrive</strong> on any active extractor category.',
-      hint: 'Go to the XPL tab, find the yellow button marked "BOOST PRODUCTION" above your Resource Extractor list, select 1-day duration, and activate the booster.',
-      howToGetThere: '1. Click open the <strong>XPL</strong> tab.<br/>2. Find the yellow <strong>"BOOST PRODUCTION"</strong> button next to Resource Extractor Outposts header.<br/>3. Pick a boost target, select 1 Day duration, and click <strong>"Activate Boost Overdrive"</strong>.',
-      commanderTip: 'XPL tab -> "BOOST PRODUCTION" yellow button on right column.',
-      congratsMessage: '🔋 OVERDRIVE SEQUENCE AUTHORIZED! Extractors are working at +14% overclocked efficiency, flooding storage vaults with resources!',
-      encouragementQuote: 'Outstanding productivity tactics! Space Gold booster allows you to fast-lane resource collection for heavy shipbuilding or research.',
-      targetTab: 'explore',
-      rewards: {
-        resources: { water: 10291, plasma: 10302, fuel: 10302, food: 10302, respirant: 10302 },
-        credits: 5000,
-      },
+      title: '🧪 Start a Science Research Project',
+      shortDesc: 'Direct your research staff to start any technology development in the Labs.',
+      requirementHtml: 'Initialize at least <strong>one science research project</strong>.',
+      hint: 'Go to the RES tab, choose any technology project (e.g., Warp Thrusters), and click Start Research.',
+      howToGetThere: '1. Open the <strong>RES</strong> tab.<br/>2. Select any technology blueprint.<br/>3. Click <strong>"Start Research Project"</strong> to allocate resources.',
+      commanderTip: 'Keep your labs active at all times to continually upgrade your military and industrial capabilities.',
+      congratsMessage: '🧪 BLUEPRINT CODING INITIALIZED! Your scientists are running simulation models on the selected tech.',
+      encouragementQuote: 'Great start! Tech development yields permanent passive buffs for your entire starbase fleet.',
+      targetTab: 'research',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 13,
-      title: '⚡ Dual Overdrive Mechanics',
-      shortDesc: 'Activate concurrent energy boosters across multiple mine types to maximize industrial yields.',
-      requirementHtml: 'Have <strong>at least two extractor types running production boosts simultaneously</strong>.',
-      hint: 'In the XPL tab, click "Boost Production" and purchase overdrive boosts on multiple different resource types.',
-      howToGetThere: '1. Navigate to the <strong>XPL</strong> tab.<br/>2. Click the yellow <strong>"BOOST PRODUCTION"</strong> console.<br/>3. Enable active overdrives on a second distinct fluid class (like Fuel, Plasma, or Respirant).',
-      commanderTip: 'XPL tab -> Boost Production -> Activate multiple concurrent category siphons.',
-      congratsMessage: '⚡ DUAL SYNERGETIC BOOST ENGINES HUMMING! Multiple extractor pipelines are successfully operating at overclocked parameters!',
-      encouragementQuote: 'Brilliant economics initiative, Admiral! Stacking boosters on both fuel and water guarantees heavy industry assembly lines never run dry.',
-      targetTab: 'explore',
-      rewards: {
-        resources: { water: 11000, plasma: 11000, fuel: 11000, food: 11000, respirant: 11000 },
-        credits: 6000,
-      },
+      title: '🏃‍♂️ Research: Warp Thrusters Level 1',
+      shortDesc: 'Complete Level 1 of Warp Thrusters (Troops Speed Upgrade) in your Research Center.',
+      requirementHtml: 'Research <strong>Troops Speed Upgrade to Level 1 or higher</strong>.',
+      hint: 'Go to the RES tab, locate "Troops Speed Upgrade", and research it.',
+      howToGetThere: '1. Go to the <strong>RES</strong> tab.<br/>2. Locate the <strong>Troops Speed Upgrade</strong> node.<br/>3. Trigger the upgrade using Water, Plasma, and Fuel.',
+      commanderTip: 'Warp Thrusters increase travel velocities, shortening galaxy travel times.',
+      congratsMessage: '🏃‍♂️ WARP THRUSTERS LEVEL 1 DEVELOPED! Fleet travel times have been successfully reduced!',
+      encouragementQuote: 'Amazing science coordination! Faster flight plans mean more rapid response times across our colonies.',
+      targetTab: 'research',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 14,
-      title: '🏭 Upgrade Fabricator to Level 2',
-      shortDesc: 'Upgrade your core station Fabricator building to reduce general construction times.',
-      requirementHtml: 'Upgrade the <strong>Fabricator building to Level 2 or higher</strong>.',
-      hint: 'Inside the XPL tab building list, locate the Fabricator, and upgrade it to Level 2.',
-      howToGetThere: '1. Navigate to the <strong>XPL</strong> tab.<br/>2. Scroll to the <strong>"BASE INFRASTRUCTURE BUILDINGS"</strong> list.<br/>3. Identify the <strong>Fabricator</strong> structure.<br/>4. Click the yellow <strong>"Upgrade Building"</strong> button (or click "Instant Complete" once queued).',
-      commanderTip: 'XPL tab -> Base Infrastructure Buildings -> Fabricator slot.',
-      congratsMessage: '🏭 NANO-YARD UPGRADED! Your station Fabricator now boasts dual-assembly assembly lanes, slashing all structure upgrade times significantly!',
-      encouragementQuote: 'Fabulous! Physical construction efficiency is the bedrock of rapid base development - higher fabricator levels let you expand in a flash.',
+      title: '🔬 Upgrade Research Center to Level 2',
+      shortDesc: 'Upgrade your Research Center to Level 2 to unlock advanced research levels.',
+      requirementHtml: 'Upgrade active <strong>Research Center to Level 2 or higher</strong>.',
+      hint: 'Find the Research Center in XPL and click Upgrade.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Locate the <strong>Research Center</strong> building.<br/>3. Upgrade it to Level 2.',
+      commanderTip: 'Upgraded laboratories reduce research durations and enable advanced tech tiers.',
+      congratsMessage: '🔬 LABS UPGRADED! Your scientists have access to brand new high-precision testing chambers.',
+      encouragementQuote: 'Outstanding! Higher-level laboratories accelerate our path to top-tier defensive shields.',
       targetTab: 'explore',
-      rewards: {
-        resources: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151 },
-        credits: 6000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 15,
-      title: '📡 Radar Array Level 1',
-      shortDesc: 'Construct a space Radar Array to sweep surrounding lightyears for rogue signals.',
-      requirementHtml: 'Upgrade the <strong>Radar Array building to Level 1 or higher</strong>.',
-      hint: 'In the XPL tab buildings list, locate the Radar Array, and click Upgrade/Build.',
-      howToGetThere: '1. Navigate to the <strong>XPL</strong> tab.<br/>2. Find the <strong>Radar Array</strong> building row (under base buildings grid).<br/>3. Click <strong>"Upgrade Building"</strong> to start building level 1. If queued, click ' +
-        '"Instant Upgrade" using Space Gold to finish instantly!',
-      commanderTip: 'XPL tab -> Base Infrastructure Buildings -> Radar Array.',
-      congratsMessage: '📡 RADAR ARRAY OPERATIONAL! Deep-space radar scanner frequencies are active, tracking passing ships and neighboring solar grids!',
-      encouragementQuote: 'Incredible early warning system! A sovereign admiral is never caught blind - keeping your radar level high maps out incoming hostile coordinates.',
-      targetTab: 'explore',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 5005,
-      },
+      title: '🛡️ Research: Defense Shields Level 2',
+      shortDesc: 'Develop Level 2 Defense Shields to secure your colony from orbital raids.',
+      requirementHtml: 'Research <strong>Defense Shields to Level 2 or higher</strong>.',
+      hint: 'Navigate to the RES tab, select Defense Shields, and upgrade it to Level 2.',
+      howToGetThere: '1. Open the <strong>RES</strong> tab.<br/>2. Find the <strong>Defense Shields</strong> technology node.<br/>3. Research it to Level 2.',
+      commanderTip: 'Shield systems add direct defensive HP boosts to your stationary fleet units.',
+      congratsMessage: '🛡️ PLASMA SHIELD FREQUENCIES RECALIBRATED! Defensive grid HP has successfully scaled!',
+      encouragementQuote: 'Strategic foresight, Admiral. Strong deflector shields guarantee safety from aggressive hostile maneuvers.',
+      targetTab: 'research',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 16,
-      title: '🛰️ Execute a Galaxy Radar Scan',
-      shortDesc: 'Use your operational Radar scanner to sweep galaxy coordinates in quest of resources.',
-      requirementHtml: 'Perform a <strong>sector grid scanner scan</strong> under the GLXY tab.',
-      hint: 'Navigate to the GLXY (Galaxy) tab, check your scan coordinates, and click on scan node or search to run telemetry diagnostics.',
-      howToGetThere: '1. Open the <strong>GLXY</strong> tab.<br/>2. Look at the **Galaxy Grid Sector Scanner** card.<br/>3. Input target coordinates or leave default, and click the blue <strong>"EXECUTE GALAXY RADAR SCAN"</strong> button.',
-      commanderTip: 'GLXY tab -> "Galaxy Grid Sector Scanner" widget.',
-      congratsMessage: '🛰️ TELEMETRY SWEEP SUCCESS! Scanner return file shows spatial coordinate structures mapped. Anomalies are indexed!',
-      encouragementQuote: 'Excellent reconnaissance! Sweeping coordinates lists let you find other players, habitable planets, and active target outposts.',
-      targetTab: 'galaxy',
-      rewards: {
-        resources: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151 },
-        credits: 4000,
-      },
+      title: '📈 Upgrade All Resource Extractors to Level 3',
+      shortDesc: 'Upgrade all 5 of your resource pumps to Level 3 to satisfy advanced raw material requirements.',
+      requirementHtml: 'Have <strong>at least one Level 3 or higher extractor</strong> for all 5 resources.',
+      hint: 'Under XPL, click Upgrade Extractor on all five resource outpost nodes.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Locate Water, Plasma, Fuel, Food, and Respirant extractors.<br/>3. Upgrade each pump to Level 3.',
+      commanderTip: 'As facilities grow, basic upkeep and building costs require high-yield extraction streams.',
+      congratsMessage: '📈 HIGH-YIELD PRODUCTION SECURED! Energy siphons are operating at optimal industrial speeds!',
+      encouragementQuote: 'Incredible work scaling our colony\'s resource supply lines. We now have the economy to back high-tier facilities.',
+      targetTab: 'explore',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 17,
-      title: '🧪 Research Center Level 1',
-      shortDesc: 'Build a high-energy Research Center to research advanced technology.',
-      requirementHtml: 'Upgrade active station <strong>Research Center building to Level 1 or higher</strong>.',
-      hint: 'Under the XPL tab building slots list, locate the Research Center and upgrade/build it to level 1.',
-      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Find the <strong>Research Center</strong> building card under slots array.<br/>3. Click <strong>"Upgrade Building"</strong> to establish level 1 capacity.',
-      commanderTip: 'XPL tab -> Base Infrastructure Buildings -> Research Center slot.',
-      congratsMessage: '🧪 SCIENCE HUB ESTABLISHED! Physical laboratory particles are colliding nicely, ready to authorize heavy spaceship construction technology schemas!',
-      encouragementQuote: 'Glorious, Admiral! A civilization without scientific research remains limited. Let us research higher physics next!',
+      title: '🏭 Upgrade Fabricator to Level 7',
+      shortDesc: 'Upgrade your main station Fabricator to Level 7 to unlock advanced heavy manufacturing capabilities.',
+      requirementHtml: 'Have a <strong>Fabricator at Level 7 or higher</strong>.',
+      hint: 'Find the Fabricator under XPL and click Upgrade to Level 7.',
+      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Find the <strong>Fabricator</strong> in infrastructure buildings.<br/>3. Click <strong>"Upgrade Building"</strong> to raise it to Level 7.',
+      commanderTip: 'A Level 7 Fabricator unlocks the Army Base (War Room) where you can build powerful warships!',
+      congratsMessage: '🏭 FABRICATOR LEVEL 7 UNLOCKED! Military blueprints have been uploaded to your station mainframe!',
+      encouragementQuote: 'Sensational! A powerful empire needs a powerful fleet. Next, let\'s build the War Room.',
       targetTab: 'explore',
-      rewards: {
-        resources: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000 },
-        credits: 8000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 18,
-      title: '🧬 Science Research Level 2',
-      shortDesc: 'Enhance structural integrity or harvester siphons to Level 2 inside science labs.',
-      requirementHtml: 'Upgrade <strong>any research technology node to Level 2 or higher</strong>.',
-      hint: 'Under the XPL tab, click on your Research Center building under base infrastructure to open the Research lab, find any technology project, and upgrade it to Level 2 or higher.',
-      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Scroll down to base infrastructure buildings and click on the <strong>Research Center</strong> (or open its management screen).<br/>3. Review started projects (e.g., Mineral Siphons, Defence Shields, Warp Thrusters).<br/>4. Ensure you have the materials and trigger <strong>"Start Quantum Research"</strong> to reach Level 2.',
-      commanderTip: 'XPL tab -> Base Buildings -> Research Center -> Science Project Upgrades List.',
-      congratsMessage: '🧬 PHYSICAL BLUEPRINTS OPTIMIZED! Permanent global technology upgrades successfully calibrated to Level 2!',
-      encouragementQuote: 'Magnificent intellect! Technology upgrades offer static multipliers that make all your fleets and buildings perform better on every world.',
-      targetTab: 'research',
-      rewards: {
-        resources: { water: 12000, plasma: 12000, fuel: 12000, food: 12000, respirant: 12000 },
-        credits: 6000,
-      },
+      title: '📡 Upgrade Communications Hub to Level 3',
+      shortDesc: 'Scale your Communications Hub to Level 3 to unlock deeper subspace frequencies.',
+      requirementHtml: 'Have a <strong>Communications Hub at Level 3 or higher</strong>.',
+      hint: 'Go to XPL, select the Communications Hub, and upgrade it to Level 3.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Scroll to <strong>Communications Hub</strong> and initiate the Level 3 upgrade sequence.',
+      commanderTip: 'Upgrading your Comms Hub improves remote command synchronization across sectors.',
+      congratsMessage: '📡 COMMUNICATIONS INTERFACE COMPLETED! Frequencies are completely clean and noise-free.',
+      encouragementQuote: 'Amazing subspace coordination. Your station\'s communication range is now highly impressive.',
+      targetTab: 'explore',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 19,
-      title: '🔬 Start a Research Project',
-      shortDesc: 'Perform active tech development inside your science Research tab.',
-      requirementHtml: 'Start or complete <strong>any quantum scientific technology research project</strong> inside the Research lab.',
-      hint: 'Go to the XPL tab, click on your Research Center building under base infrastructure to open the Research lab, and authorize a technology project like "Manufacturing Speed Upgrade" or "Defense Shields".',
-      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Scroll down to base infrastructure buildings and click on the <strong>Research Center</strong> structure.<br/>3. Under the Research lab screen, identify available techs like <strong>Defense Shields</strong> or <strong>Manufacturing Speed Upgrade</strong>.<br/>4. Click the cyan <strong>"START QUANTUM RESEARCH"</strong> button corresponding to your choice.',
-      commanderTip: 'XPL tab -> Base Buildings -> Research Center -> Tech Nodes Grid.',
-      congratsMessage: '🔬 RESEARCH BLUEPRINTS LOADED! Scientists verify telemetry files are successfully running simulation algorithms inside the labs!',
-      encouragementQuote: 'Truly magnificent! Science yields passive permanent boosts that affect all troop movement, defenses, and building production!',
-      targetTab: 'research',
-      rewards: {
-        resources: { water: 10145, plasma: 10151, fuel: 10151, food: 10151, respirant: 10151 },
-        credits: 5000,
-      },
+      title: '🛰️ Upgrade Radar Array to Level 2',
+      shortDesc: 'Calibrate your Radar Array to Level 2 to increase deep galaxy sweep scan resolution.',
+      requirementHtml: 'Have a <strong>Radar Array at Level 2 or higher</strong>.',
+      hint: 'Find your Radar Array under XPL and upgrade it to Level 2.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Find the <strong>Radar Array</strong> under Base Infrastructure.<br/>3. Click <strong>"Upgrade Building"</strong> to raise it to Level 2.',
+      commanderTip: 'Better radar arrays provide more precise scans, uncovering hidden planet details.',
+      congratsMessage: '🛰️ DEEP SPACE RADAR CALIBRATED! Sweep range and telemetry accuracy have risen!',
+      encouragementQuote: 'Marvelous scanning potential, Commander. Our sector charts are looking pristine.',
+      targetTab: 'explore',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 20,
-      title: '🛡️ War Room Level 1',
-      shortDesc: 'Set up barracks and launch coordinates decks for military defenses.',
-      requirementHtml: 'Upgrade <strong>War Room building to Level 1 or higher</strong> on your station.',
-      hint: 'Locate the War Room row in your XPL tab buildings array, and click Upgrade/Build.',
-      howToGetThere: '1. Navigate to the <strong>XPL</strong> tab.<br/>2. Find the <strong>War Room</strong> slot in base buildings grid.<br/>3. Trigger the <strong>"Upgrade Building"</strong> sequence to build Level 1 barracks.',
-      commanderTip: 'XPL tab -> Base Infrastructure Buildings -> War Room card.',
-      congratsMessage: '🛡️ BARRACKS SECURED! The war command deck is fully operational, establishing local training centers for military units!',
-      encouragementQuote: 'Magnificent tactical wisdom! Space is a hostile abyss - having a robust local defensive War Room protects your logistics caches.',
+      title: '⚔️ Construct War Room (Army Base) Level 1',
+      shortDesc: 'Construct the Army Base (War Room) to command and train defensive and offensive squadrons.',
+      requirementHtml: 'Construct or upgrade your <strong>War Room (Army Base) to Level 1 or higher</strong>.',
+      hint: 'Under the XPL tab, locate the Army Base building slot and start construction.',
+      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Find <strong>Army Base (War Room)</strong> under infrastructure buildings.<br/>3. Click <strong>"Upgrade Building"</strong> to establish the command deck.',
+      commanderTip: 'The War Room allows training Interceptors, Drones, and Settlement Ships.',
+      congratsMessage: '⚔️ WAR ROOM ONLINE! High-ranking tactical officers have boarded, activating the planetary defense grid!',
+      encouragementQuote: 'Magnificent! With our command deck ready, we can now assemble an interplanetary strike force.',
       targetTab: 'explore',
-      rewards: {
-        resources: { water: 12250, plasma: 10000, fuel: 10000, food: 13000, respirant: 11500 },
-        credits: 6000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 21,
-      title: '⚔️ Mobilize 15 Combat Troops',
-      shortDesc: 'Recruit at least 15 combat troops to garrison your colony shield walls.',
-      requirementHtml: 'Raise a total <strong>combat troop garrison count of at least 15 units</strong> on your planet station.',
-      hint: 'Open the CMD tab (must have level 1 War Room), choose any troop types such as Interceptors or Assault Drones, enter recruiting amounts, and click train.',
-      howToGetThere: '1. Navigate to the <strong>CMD</strong> tab.<br/>2. Select the <strong>Fabricate</strong> sub-tab.<br/>3. Select <strong>"Interceptor"</strong>, enter "15" in the quantity recruitment box, and click <strong>"Train Military Troops"</strong>.',
-      commanderTip: 'CMD tab -> Fabricate sub-tab -> Recruit Troop Garrison console panel.',
-      congratsMessage: '⚔️ TO ARMS, TROOPERS! Core garrison is fully mobilized, taking up defensive battle lines along the station hangar walls!',
-      encouragementQuote: 'Elite tactical defense, Commander! A robust standing army prevents other raiding players from stealing your resources.',
+      title: '🛸 Recruit Interceptors (10+)',
+      shortDesc: 'Train Interceptors inside your newly constructed War Room to defend your colony from planetary raids.',
+      requirementHtml: 'Have <strong>at least 10 active Interceptors</strong> in your fleet.',
+      hint: 'Go to the CMD tab, find Interceptors, and train at least 10.',
+      howToGetThere: '1. Go to the <strong>CMD</strong> tab.<br/>2. Select the <strong>Interceptor</strong> card.<br/>3. Recruit a total of 10 or more Interceptors.',
+      commanderTip: 'Interceptors are rapid-fire spacecrafts that defend your colony during incoming hostile attacks.',
+      congratsMessage: '🛸 DEFENSE SQUADRON DEPLOYED! 10 active Interceptors are patrolling the orbit!',
+      encouragementQuote: 'Strategic defense is outstanding, Commander. Your base is now secure from rogue raiders.',
       targetTab: 'army',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 5000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 22,
-      title: '✈️ Recruit Interceptors',
-      shortDesc: 'Recruit specialized atmospheric robotic fighters to guard airspace quadrants.',
-      requirementHtml: 'Maintain a garrison of <strong>at least 5 Interceptors</strong> on your active starbase.',
-      hint: 'Ensure your War Room is Level 1, navigate to CMD tab, input 5 or higher in the Interceptor block, and click Train.',
-      howToGetThere: '1. Navigate to the <strong>CMD</strong> tab.<br/>2. Select the <strong>Fabricate</strong> sub-tab.<br/>3. Identify the <strong>Interceptor</strong> troop recruiter row.<br/>4. Input <strong>5</strong> or higher and select <strong>"Train Military Troops"</strong>.',
-      commanderTip: 'CMD tab -> Fabricate sub-tab -> Recruit Interceptors.',
-      congratsMessage: '✈️ SKY DEFENSE PATROL ESTABLISHED! Robotic Interceptor systems are successfully cycling orbit grids, ready to lock onto incoming payloads!',
-      encouragementQuote: 'Spectacular military safety measures, Admiral! Interceptor escorts soak up tremendous pressure, countering enemy orbital strikes.',
+      title: '🚀 Recruit Assault Drones (10+)',
+      shortDesc: 'Assemble high-firepower Assault Drones to deliver severe kinetic bombardments on rival sectors.',
+      requirementHtml: 'Have <strong>at least 10 active Assault Drones</strong> in your fleet.',
+      hint: 'Go to the CMD tab, locate Assault Drones, and construct at least 10.',
+      howToGetThere: '1. Open the <strong>CMD</strong> tab.<br/>2. Scroll to the <strong>Assault Drone</strong> card.<br/>3. Manufacture at least 10 strike drone units.',
+      commanderTip: 'Assault Drones have lower shields but deliver massive offensive kinetic energy.',
+      congratsMessage: '🚀 STRIKE FLEET ASSEMBLED! Your Assault Drones are docked in active hangar ports, primed for combat.',
+      encouragementQuote: 'Excellent force projection! A strong offensive fleet is the ultimate deterrent in deep space.',
       targetTab: 'army',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 5000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 23,
-      title: '🛸 Recruit Assault Drones',
-      shortDesc: 'Assemble high-yield fighters to pierce planetary shields during sector raids.',
-      requirementHtml: 'Recruit and maintain <strong>at least 2 Assault Drones</strong> inside your hangar.',
-      hint: 'Go to the CMD tab, look for Assault Drone and initiate training of at least 2 military starships.',
-      howToGetThere: '1. Navigate to the <strong>CMD</strong> tab.<br/>2. Select the <strong>Fabricate</strong> sub-tab.<br/>3. Find the <strong>Assault Drone</strong> recruit slot.<br/>4. Order a batch of <strong>2</strong> or more starships.',
-      commanderTip: 'CMD tab -> Fabricate sub-tab -> Recruit Assault Drones.',
-      congratsMessage: '🛸 ATTACK PAYLOADS SECURED! Heavy assault drones are fully fueled and stationed in launch bays, awaiting destination warp coordinates!',
-      encouragementQuote: 'Brilliant expansion! Assault Drones deal immense structural damage to target planetary shield grids.',
-      targetTab: 'army',
-      rewards: {
-        resources: { water: 12000, plasma: 12000, fuel: 12000, food: 12000, respirant: 12000 },
-        credits: 6000,
-      },
+      title: '🤝 Join or Create a Galactic Alliance',
+      shortDesc: 'Establish mutual security pacts by joining an existing alliance or founding a new one.',
+      requirementHtml: 'Successfully <strong>join or create an alliance</strong>.',
+      hint: 'Go to the COMMS tab, navigate to the Alliance section, and join or create one.',
+      howToGetThere: '1. Open the <strong>COMMS</strong> tab.<br/>2. Find the <strong>Alliance</strong> board panel.<br/>3. Enter an alliance name to create one, or click <strong>"Join"</strong> on an active alliance.',
+      commanderTip: 'Alliances protect you from raids and offer coordinated support from other players.',
+      congratsMessage: '🤝 ALLIANCE CHANNELS AUTHORIZED! Your faction is now part of an interplanetary coalition.',
+      encouragementQuote: 'Superb diplomacy! Together, our forces will command supreme authority over the galactic quadrants.',
+      targetTab: 'chat',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 24,
-      title: '💬 Secure Private Transmission',
-      shortDesc: 'Send a private secure message transmission directly to another player station.',
-      requirementHtml: 'Send <strong>at least 1 direct private PM transmission</strong> to any other commander.',
-      hint: 'Navigate to the Settings tab, find the leaderboards, select any commander profile name, type a message in the private text transmitter desk and click dispatch PM.',
-      howToGetThere: '1. Click open the <strong>Settings</strong> tab.<br/>2. Open the <strong>"GLOBAL COMMANDER LEADERBOARDS"</strong>.<br/>3. Click on <strong>any player\'s profile row</strong> to open HUD details.<br/>4. Type a nice greeting in the <strong>"Secure Transmission Box"</strong>, and click <strong>"SEND PRIVATE TRANSMISSION"</strong>.',
-      commanderTip: 'Settings tab -> Click any Player Profile name -> Send Private PM.',
-      congratsMessage: '💬 MESSAGE ROUTED SUCCESSFULLY! Your transmission has been successfully fired across the lightyear array to neighboring stations!',
-      encouragementQuote: 'Fabulous diplomatic skill, Commander! Private communications let you negotiate truce pacts, commerce transactions or alliances.',
-      targetTab: 'settings',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 3000,
-      },
+      title: '💬 Broadcast in Public Holo-Chat',
+      shortDesc: 'Send a subspace audio-visual signal to the global public feed to announce your presence.',
+      requirementHtml: 'Send at least <strong>one public chat message</strong>.',
+      hint: 'Go to the COMMS tab, open Public Chat, type a greeting, and click Send.',
+      howToGetThere: '1. Navigate to the <strong>COMMS</strong> tab.<br/>2. Type a message in the <strong>Public Holo-Chat</strong> input field.<br/>3. Click <strong>"Transmit Signal"</strong> to broadcast.',
+      commanderTip: 'Keep communication friendly and build trade connections with nearby commanders.',
+      congratsMessage: '💬 BROADCAST RELAY COMPLETE! Your coordinate message has been received across the quadrant!',
+      encouragementQuote: 'Marvelous signal strength! Communicating with nearby commanders establishes your sector presence.',
+      targetTab: 'chat',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 25,
-      title: '📦 Claim Daily Crates or Supply Nexus',
-      shortDesc: 'Harvest daily payroll crates or request a Logistics transport cargo shipment.',
-      requirementHtml: 'Harvest resources by calling a <strong>Supply Nexus Cargo dispatch</strong> OR claiming <strong>Daily Rewards Crates</strong>.',
-      hint: 'In the XPL tab, click on daily reward crates on your top station hub panel, or trigger a Supply Nexus cargo claim shipment (if built).',
-      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Look at the top overview card.<br/>3. If your daily claims cooldown has ended, click <strong>"Claim Free Daily Crates"</strong>. Alternatively, find and click "Request Quantum Shipment" under your <strong>Supply Nexus</strong> building slot if level >= 1.',
-      commanderTip: 'XPL tab -> Top station hub Daily claims OR Supply Nexus row.',
-      congratsMessage: '📦 CARGO DISPATCH SECURED! Logistics freighters successfully docked in the bays, delivering valuable mineral fluids to your processors!',
-      encouragementQuote: 'Outstanding administrative management, Admiral! Consistently harvesting nexus drops boosts your economic upgrade rates exponentially.',
-      targetTab: 'explore',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 5000,
-      },
+      title: '📬 Send a Private Message Transmission',
+      shortDesc: 'Send a secure direct message to another Commander coordinates to coordinate tactical movements.',
+      requirementHtml: 'Successfully <strong>send a private message transmission</strong>.',
+      hint: 'Go to the GLXY tab, click another player\'s coordinates, click "Send Message", write your text, and submit.',
+      howToGetThere: '1. Open the <strong>GLXY</strong> tab.<br/>2. Select any active player node on the map.<br/>3. Click <strong>"Send Message"</strong>.<br/>4. Compose your transmission and click <strong>"Send"</strong>.',
+      commanderTip: 'Private transmissions are completely secret, perfect for alliance coordinates planning.',
+      congratsMessage: '📬 TRANSMISSION SENT! The target commander\'s communications array has accepted your secure packet!',
+      encouragementQuote: 'Sublime tactical coordination. Maintaining direct diplomatic links is key to victory.',
+      targetTab: 'galaxy',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 26,
-      title: '🤝 Join or Create an Alliance',
-      shortDesc: 'Unite together with other commanders by joining or creating a sovereign star alliance.',
-      requirementHtml: 'Become a <strong>registered member of an Alliance sector pack</strong> (Join or Create an Alliance).',
-      hint: 'Go to Settings tab, find "Star Alliances Portal", pick any active alliance to apply to or create your custom alliance brand name and symbol tag.',
-      howToGetThere: '1. Navigate to the <strong>Settings</strong> tab.<br/>2. Locate the <strong>"STAR ALLIANCES SECTOR PORTAL"</strong>.<br/>3. To join: review the list of alliances and click <strong>"Join Alliance Room"</strong>.<br/>4. To create: fill out Name, unique 3-letter Tag, and click create.',
-      commanderTip: 'Settings tab -> "STAR ALLIANCES SECTOR PORTAL".',
-      congratsMessage: '🤝 COALITION CHARTERED! You now stand united with galactic brothers! Safe defense corridors are officially established!',
-      encouragementQuote: 'Brilliant strategic move! A single twig snaps easily, but a bundle of space oak remains unbreakable. Your alliances will secure your frontiers.',
-      targetTab: 'settings',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 7000,
-      },
+      title: '📦 Upgrade Silo (Repository) to Level 5',
+      shortDesc: 'Scale your storage capacity to Level 5 to accommodate high-volume resource mining.',
+      requirementHtml: 'Upgrade active <strong>Repository (Silo) to Level 5 or higher</strong>.',
+      hint: 'Under XPL, select your Silo building and upgrade it to Level 5.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Find the <strong>Repository (Silo)</strong> under Infrastructure Buildings.<br/>3. Upgrade it to Level 5.',
+      commanderTip: 'A level 5 silo ensures high material storage, paving the way for maximum level fabricators.',
+      congratsMessage: '📦 COLD STORAGE DEPOTS REINFORCED! Silo capacity has expanded to accommodate massive reserves.',
+      encouragementQuote: 'Excellent base management. Your high storage capacity prevents mining loss during idle hours.',
+      targetTab: 'explore',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 27,
-      title: '📣 Public Holo-Chat Broadcast',
-      shortDesc: 'Broadcast a friendly transmission in the public sector general channel radio chat.',
-      requirementHtml: 'Type and publish <strong>at least 1 message in the public General chat</strong>.',
-      hint: 'On the main general dashboard (bottom row of most tabs), find the General Chat input, type a message, and click Send.',
-      howToGetThere: '1. Look at the bottom of the active screen (the <strong>Holographic General Chat Portal</strong> is loaded at the base of most screens).<br/>2. Locate the input chat box.<br/>3. Type an exciting message and hit the <strong>"Send Message"</strong> button.',
-      commanderTip: 'Holographic General Chat Portal widget at the bottom of the active screen layout.',
-      congratsMessage: '📣 DEEP SPACE BROADCAST TRANSMITTED! Your planetary voice has successfully echoed across public sector radio channels!',
-      encouragementQuote: 'Perfect sector social interaction! Networking with neighbors can establish peace agreements or reveal cooperative opportunities.',
+      title: '🏭 Upgrade Fabricator to Level 10 (MAX)',
+      shortDesc: 'Upgrade your main station Fabricator to Level 10 to unlock ultimate planetary construction blueprints.',
+      requirementHtml: 'Have a <strong>Fabricator at Level 10</strong>.',
+      hint: 'Bring your Fabricator to maximum Level 10 under the XPL tab.',
+      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Find the <strong>Fabricator</strong> and click <strong>"Upgrade Building"</strong> to reach maximum Level 10.',
+      commanderTip: 'A maximum Level 10 Fabricator unlocks endgame facilities like the heavy Bunker!',
+      congratsMessage: '🏭 FABRICATOR MAXIMIZED! You have successfully mastered planetary building engineering!',
+      encouragementQuote: 'Astounding achievement, Commander! Max level fabricators print planetary structures almost instantaneously.',
       targetTab: 'explore',
-      rewards: {
-        resources: { water: 13000, plasma: 14000, fuel: 15000, food: 12000, respirant: 12000 },
-        credits: 3000,
-      },
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 28,
-      title: '🛰️ Warp Thruster Speed Tech',
-      shortDesc: 'Increase thruster acceleration curves to speed up travel and strike times.',
-      requirementHtml: 'Upgrade the <strong>Warp Thruster technology node</strong> to Level 1 or higher.',
-      hint: 'Warp Thrusters are researched in the Research lab. Open the XPL tab, click on your Research Center building under base infrastructure, locate "Troop & Fleet Speed Upgrade (Warp Thrusters)" under tech nodes, and start researching.',
-      howToGetThere: '1. Open the <strong>XPL</strong> tab and click on your <strong>Research Center</strong> building.<br/>2. Locate the <strong>Troop & Fleet Speed Upgrade (Warp Thrusters)</strong> tech row.<br/>3. Confirm you have sufficient resources and click the blue <strong>"START QUANTUM RESEARCH"</strong> button corresponding to it.',
-      commanderTip: 'XPL tab -> Research Center -> Troops Speed & Warp Thrusters tech row.',
-      congratsMessage: '🛰️ HYPER-ACCELERATION ACHIEVED! Warp cores are successfully burning, speeding up overall fleet travel and reconnaissance times across sectors!',
-      encouragementQuote: 'Astonishing development, Admiral! Moving fleets at hyper-speeds ensures you catch threats off guard.',
-      targetTab: 'research',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 8000,
-      },
+      title: '⚔️ Upgrade War Room (Army Base) to Level 2',
+      shortDesc: 'Upgrade your War Room (Army Base) to Level 2 to expand military command limits.',
+      requirementHtml: 'Have a <strong>War Room (Army Base) at Level 2 or higher</strong>.',
+      hint: 'Under XPL, find the War Room (Army Base) and upgrade it to Level 2.',
+      howToGetThere: '1. Navigate to the <strong>XPL</strong> tab.<br/>2. Find the <strong>Army Base (War Room)</strong> in infrastructure.<br/>3. Click <strong>"Upgrade Building"</strong> to level 2.',
+      commanderTip: 'An upgraded War Room allows for heavier ship blueprints and faster training times.',
+      congratsMessage: '⚔️ WAR ROOM UPGRADED! Command limits have expanded, offering more workspace for top officers!',
+      encouragementQuote: 'Magnificent progress! A stronger command deck establishes immense security for our colonists.',
+      targetTab: 'explore',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 29,
-      title: '📊 Review Your Standing Stats',
-      shortDesc: 'Inspect rankings, leader positions, and Space gold logs to keep books tidy.',
-      requirementHtml: 'Review your <strong>Commander summary scores</strong> on the global Leaderboard stats roster.',
-      hint: 'Navigate to the Settings tab, locate the stats or leaderboard lists, find your name, and examine your standing score.',
-      howToGetThere: '1. Open the <strong>Settings</strong> tab.<br/>2. Locate the <strong>Commander Statistics Summary</strong> card.<br/>3. Review your population score (from mine upgrades), defense ratings, and Space Gold balance.',
-      commanderTip: 'Settings tab -> Overview and Leaderboard section.',
-      congratsMessage: '📊 SOVEREIGNDOM STATS VERIFIED! Sector audits are green, marking you as a legitimate certified emperor of space command ledger boards!',
-      encouragementQuote: 'Terrific ledger discipline! A master commander must constantly calculate population sizes and credit reserves to stay ahead of the pack.',
-      targetTab: 'settings',
-      rewards: {
-        resources: { water: 11500, plasma: 11000, fuel: 12000, food: 11500, respirant: 11000 },
-        credits: 4000,
-      },
+      title: '🔬 Upgrade Research Center to Level 3',
+      shortDesc: 'Upgrade your Research Center to Level 3 to enable ultimate scientific advancements.',
+      requirementHtml: 'Have a <strong>Research Center at Level 3 or higher</strong>.',
+      hint: 'Go to XPL, select the Research Center, and click Upgrade to Level 3.',
+      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Locate the <strong>Research Center</strong> under infrastructure.<br/>3. Click <strong>"Upgrade Building"</strong> to begin constructing Level 3 labs.',
+      commanderTip: 'Higher research levels are key to scaling fleet strength and unlock ultimate technologies.',
+      congratsMessage: '🔬 RESEARCH CENTER SCALE INITIATED! Advanced laboratories have successfully launched!',
+      encouragementQuote: 'Science leads the way, Commander! Excellent work scaling our physical and material research labs.',
+      targetTab: 'explore',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
       id: 30,
-      title: '👑 Settle a 3rd Colony Station',
-      shortDesc: 'Colonize your 3rd distinct planetary outpost to secure an official 3-planet cosmic system!',
-      requirementHtml: 'Acquire <strong>at least 3 colonized starbase stations</strong> under your royal empire command.',
-      hint: 'Produce another Settlement Ship inside the CMD tab. Sweep the map inside the GLXY tab to discover another habitable star coordinate, click it, select "Settle on Planet", assign the Settlement Ship, and click Deploy!',
-      howToGetThere: '1. Open the <strong>CMD</strong> tab.<br/>2. Draft another <strong>Settlement Ship</strong>.<br/>3. Navigate to the <strong>GLXY</strong> tab map scan.<br/>4. Locate another green <strong>Habitable Planet</strong>, click coordinates, select <strong>"Settle on Planet"</strong>, allocate the settlement unit, and click dispatch.',
-      commanderTip: 'GLXY tab -> locate a third green habitable node coordinate and settle!',
-      congratsMessage: '👑 HAIL VICTORIOUS GRAND SOVEREIGN EMPEROR! You have colonized 3 unique star systems and successfully finished all aspects of space command!',
-      encouragementQuote: 'Outstanding galactic mastery, Supreme Admiral! You have successfully mastered space building, science, military troops recruitment, chat broadcasts, and alliances! Go on and rule the stars!',
-      targetTab: 'galaxy',
-      rewards: {
-        resources: { water: 10000, plasma: 10000, fuel: 10000, food: 10000, respirant: 10000 },
-        credits: 30000,
-      },
+      title: '🛡️ Construct Bunker Level 1',
+      shortDesc: 'Construct a Bunker to protect your stored resources from hostile raids.',
+      requirementHtml: 'Construct or upgrade your <strong>Bunker to Level 1 or higher</strong>.',
+      hint: 'Now that Fabricator is Level 10, construct the Bunker under Base Infrastructure Buildings inside the XPL tab.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Locate the <strong>Bunker</strong> slot under infrastructure buildings.<br/>3. Click <strong>"Upgrade Building"</strong> to construct the vault.',
+      commanderTip: 'Bunkers hide a fixed percentage of your total resources, keeping them safe from looting fleets.',
+      congratsMessage: '🛡️ HEAVY BUNKER ACTIVE! Deep core vaults are now online, shielding your hard-earned wealth.',
+      encouragementQuote: 'Incredible security foresight. Hostile fleets will return empty-handed even if they penetrate our outer orbital shields.',
+      targetTab: 'explore',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
+    {
+      id: 31,
+      title: '⚔️ Launch a Strike Fleet Attack',
+      shortDesc: 'Command your fleet to launch a tactical strike attack mission against an AI or hostile station.',
+      requirementHtml: 'Successfully dispatch at least <strong>one attack fleet mission</strong>.',
+      hint: 'Go to the GLXY tab, click an active coordinate or AI target, click "Strike Fleet", assign ships, and click dispatch.',
+      howToGetThere: '1. Navigate to the <strong>GLXY</strong> tab.<br/>2. Select an active hostile coordinate on the galaxy grid.<br/>3. Click <strong>"Dispatch Fleet"</strong>, select <strong>"Strike Attack"</strong> as the mission type, and send ships.',
+      commanderTip: 'Ensure your fleet has sufficient high-attack Assault Drones to overcome enemy defenders!',
+      congratsMessage: '⚔️ STRIKE FORCES LAUNCHED! Your heavy bombers have entered hyperdrive coordinates toward the target!',
+      encouragementQuote: 'Sector dominance established! Taking the fight to the enemy coordinates earns prestige and wealth.',
+      targetTab: 'galaxy',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
+    },
+    {
+      id: 32,
+      title: '🚀 Settle Your 2nd Colony Station',
+      shortDesc: 'Launch a Settlement Ship to habitable planetary coordinates to establish a second colony.',
+      requirementHtml: 'Acquire <strong>at least 2 colony stations</strong> under your command.',
+      hint: 'First, train a Settlement Ship in the CMD tab. Open the GLXY tab, locate a green dot marked "Habitable Planet", select it, assign the Settlement Ship, and click dispatch. Once arrived, select it in the XPL tab dropdown!',
+      howToGetThere: '1. Open the <strong>CMD</strong> tab.<br/>2. Train 1 <strong>Settlement Ship</strong>.<br/>3. Go to the <strong>GLXY</strong> tab map.<br/>4. Locate any green <strong>Habitable Planet</strong>.<br/>5. Click it, select <strong>"Settle on Planet"</strong>, assign your ship, and dispatch!',
+      commanderTip: 'This is the final ultimate step of the Academy. Good luck, Admiral!',
+      congratsMessage: '👑 GRAND EMPYREAN CONQUEROR! You have settled your second colony, scaled your economy, and finished all training academies!',
+      encouragementQuote: 'Magnificent! You are now a fully-fledged galactic sovereign. Rule the stars with wisdom and might!',
+      targetTab: 'galaxy',
+      rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 1500 }
+    }
   ];
 
   const tasks: TutorialTask[] = rawTasks.map(t => {
@@ -597,10 +532,22 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
 
   // Logic to determine if task objective is met
   const checkObjectiveMet = (task: TutorialTask): boolean => {
+    const checkTechLvl = (techId: string, minLvl: number): boolean => {
+      return player.planets.some(pl => {
+        const techData = localStorage.getItem(`moonbase_tech_${player.id}_${pl.id}`);
+        if (!techData) return false;
+        try {
+          const parsed = JSON.parse(techData);
+          return (parsed[techId] || 0) >= minLvl;
+        } catch {
+          return false;
+        }
+      });
+    };
 
     switch (task.id) {
       case 1:
-        return player.planets.length >= 2;
+        return (checkTargetPlanet.buildings.fabricator?.level || 0) >= 1;
       case 2:
         return (
           (
@@ -613,153 +560,113 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
           completedList.includes(2)
         );
       case 3:
-        return checkTargetPlanet.mines.water.some((m) => m.level >= 2);
-      case 4:
-        return checkTargetPlanet.mines.respirant.some((m) => m.level >= 2);
-      case 5:
-        return checkTargetPlanet.mines.food.some((m) => m.level >= 2);
-      case 6:
-        return checkTargetPlanet.mines.plasma.some((m) => m.level >= 2);
-      case 7:
         return (checkTargetPlanet.buildings.commsHub?.level || 0) >= 1;
+      case 4:
+        return (checkTargetPlanet.buildings.repository?.level || 0) >= 1;
+      case 5:
+        return (checkTargetPlanet.buildings.fabricator?.level || 0) >= 2;
+      case 6:
+        return (checkTargetPlanet.buildings.radar?.level || 0) >= 1;
+      case 7:
+        return (
+          localStorage.getItem(`moonbase_scan_${player.id}`) === 'true' ||
+          completedList.includes(7)
+        );
       case 8:
-        return (checkTargetPlanet.buildings.repository?.level || 0) >= 10;
+        return (
+          (
+            checkTargetPlanet.mines.water?.some((m) => m.level >= 2) &&
+            checkTargetPlanet.mines.plasma?.some((m) => m.level >= 2) &&
+            checkTargetPlanet.mines.fuel?.some((m) => m.level >= 2) &&
+            checkTargetPlanet.mines.food?.some((m) => m.level >= 2) &&
+            checkTargetPlanet.mines.respirant?.some((m) => m.level >= 2)
+          ) ||
+          completedList.includes(8)
+        );
       case 9:
-        return (
-          localStorage.getItem(`moonbase_resources_sent_${player.id}`) === 'true' ||
-          completedList.includes(9)
-        );
+        return (checkTargetPlanet.buildings.fabricator?.level || 0) >= 4;
       case 10:
-        return (
-          (checkTargetPlanet.upgradeQueue && checkTargetPlanet.upgradeQueue.some((q) => q.type === 'mine')) ||
-          completedList.includes(10)
-        );
+        return (checkTargetPlanet.buildings.commsHub?.level || 0) >= 2;
       case 11:
-        return (
-          fleets.some((f) => f.senderId === player.id && f.missionType === 'attack') ||
-          localStorage.getItem(`moonbase_attack_dispatched_${player.id}`) === 'true' ||
-          completedList.includes(11)
-        );
+        return (checkTargetPlanet.buildings.researchCenter?.level || 0) >= 1;
       case 12:
-        const isMineBoosted = Object.values(checkTargetPlanet.mines).some((minesList: any) =>
-          minesList.some((m: any) => m.boostedUntil && Number(m.boostedUntil) > Date.now())
-        );
         return (
-          isMineBoosted ||
-          localStorage.getItem(`moonbase_boosted_${player.id}`) === 'true' ||
+          localStorage.getItem(`moonbase_activeres_${player.id}`) !== null ||
           completedList.includes(12)
         );
       case 13:
-        // Dual boosted overdrive
-        const boostedCount = Object.values(checkTargetPlanet.mines).filter((minesList: any) =>
-          minesList.some((m: any) => m.boostedUntil && Number(m.boostedUntil) > Date.now())
-        ).length;
-        return (
-          boostedCount >= 2 ||
-          localStorage.getItem(`moonbase_dual_boosted_${player.id}`) === 'true' ||
-          completedList.includes(13)
-        );
+        return checkTechLvl('troop_speed', 1) || completedList.includes(13);
       case 14:
-        return (checkTargetPlanet.buildings.fabricator?.level || 0) >= 2;
+        return (checkTargetPlanet.buildings.researchCenter?.level || 0) >= 2;
       case 15:
-        return (checkTargetPlanet.buildings.radar?.level || 0) >= 1;
+        return checkTechLvl('defense_shields', 2) || completedList.includes(15);
       case 16:
         return (
-          localStorage.getItem(`moonbase_scan_${player.id}`) === 'true' ||
+          (
+            checkTargetPlanet.mines.water?.some((m) => m.level >= 3) &&
+            checkTargetPlanet.mines.plasma?.some((m) => m.level >= 3) &&
+            checkTargetPlanet.mines.fuel?.some((m) => m.level >= 3) &&
+            checkTargetPlanet.mines.food?.some((m) => m.level >= 3) &&
+            checkTargetPlanet.mines.respirant?.some((m) => m.level >= 3)
+          ) ||
           completedList.includes(16)
         );
       case 17:
-        return (checkTargetPlanet.buildings.researchCenter?.level || 0) >= 1;
+        return (checkTargetPlanet.buildings.fabricator?.level || 0) >= 7;
       case 18:
-        // Any research node level >= 2
-        const hasTechLvl2Globally = player.planets.some(pl => {
-          const techData = localStorage.getItem(`moonbase_tech_${player.id}_${pl.id}`);
-          if (!techData) return false;
-          try {
-            const parsed = JSON.parse(techData);
-            return Object.values(parsed).some((lvl: any) => lvl >= 2);
-          } catch {
-            return false;
-          }
-        });
-        return (
-          hasTechLvl2Globally ||
-          localStorage.getItem(`tech_lvl2_${player.id}`) === 'true' ||
-          completedList.includes(18)
-        );
+        return (checkTargetPlanet.buildings.commsHub?.level || 0) >= 3;
       case 19:
-        const hasStartedResGlobally = player.planets.some(pl => localStorage.getItem(`moonbase_activeres_${player.id}_${pl.id}`) !== null);
-        const hasTechResearchedGlobally = player.planets.some(pl => {
-          const techData = localStorage.getItem(`moonbase_tech_${player.id}_${pl.id}`);
-          if (!techData) return false;
-          try {
-            const parsed = JSON.parse(techData);
-            return Object.values(parsed).some((lvl: any) => lvl > 0);
-          } catch {
-            return false;
-          }
-        });
-        const hasResearchCenterGlobally = player.planets.some(pl => (pl.buildings.researchCenter?.level || 0) >= 1);
-        return (
-          hasStartedResGlobally ||
-          hasTechResearchedGlobally ||
-          hasResearchCenterGlobally ||
-          localStorage.getItem(`moonbase_activeres_${player.id}`) === 'true' ||
-          localStorage.getItem(`tech_researched_${player.id}`) === 'true' ||
-          completedList.includes(19)
-        );
+        return (checkTargetPlanet.buildings.radar?.level || 0) >= 2;
       case 20:
         return (checkTargetPlanet.buildings.armyBase?.level || 0) >= 1;
       case 21:
-        const totalCombatSquads = (player.planets || []).reduce((sum, pl) => {
-          const t = pl.troops || {};
-          return sum + (t.defender || 0) + (t.attacker || 0) + (t.tank || 0) + (t.looter || 0) + (t.drone || 0);
-        }, 0) || (
-          (activePlanet.troops?.defender || 0) +
-          (activePlanet.troops?.attacker || 0) +
-          (activePlanet.troops?.tank || 0) +
-          (activePlanet.troops?.looter || 0) +
-          (activePlanet.troops?.drone || 0)
-        );
-        return totalCombatSquads >= 15;
-      case 22:
-        return (player.planets || []).some(pl => (pl.troops?.defender || 0) >= 5) || (activePlanet.troops?.defender || 0) >= 5;
-      case 23:
-        return (player.planets || []).some(pl => (pl.troops?.attacker || 0) >= 2) || (activePlanet.troops?.attacker || 0) >= 2;
-      case 24:
-        const sentMsgLog =
-          (player.commandMessages && player.commandMessages.some((m) => m.senderId === player.id)) ||
-          localStorage.getItem(`moonbase_msg_sent_${player.id}`) === 'true';
-        return sentMsgLog || completedList.includes(24);
-      case 25:
         return (
-          localStorage.getItem(`moonbase_nexus_claimed_${player.id}`) === 'true' ||
-          completedList.includes(25)
+          (player.planets || []).some(pl => (pl.troops?.defender || 0) >= 10) ||
+          (activePlanet.troops?.defender || 0) >= 10 ||
+          completedList.includes(21)
         );
-      case 26:
+      case 22:
+        return (
+          (player.planets || []).some(pl => (pl.troops?.attacker || 0) >= 10) ||
+          (activePlanet.troops?.attacker || 0) >= 10 ||
+          completedList.includes(22)
+        );
+      case 23:
         return (
           (player.allianceId !== null && player.allianceId !== '') ||
           localStorage.getItem(`moonbase_alliance_joined_${player.id}`) === 'true' ||
-          completedList.includes(26)
+          completedList.includes(23)
         );
-      case 27:
-        const hasChattedLog =
+      case 24:
+        return (
           chatMessages.some((msg: any) => msg.senderId === player.id) ||
-          localStorage.getItem(`moonbase_chatted_${player.id}`) === 'true';
-        return hasChattedLog || completedList.includes(27);
+          localStorage.getItem(`moonbase_chatted_${player.id}`) === 'true' ||
+          completedList.includes(24)
+        );
+      case 25:
+        return (
+          (player.commandMessages && player.commandMessages.some((m) => m.senderId === player.id)) ||
+          localStorage.getItem(`moonbase_msg_sent_${player.id}`) === 'true' ||
+          completedList.includes(25)
+        );
+      case 26:
+        return (checkTargetPlanet.buildings.repository?.level || 0) >= 5;
+      case 27:
+        return (checkTargetPlanet.buildings.fabricator?.level || 0) >= 10;
       case 28:
-        return (
-          localStorage.getItem(`moonbase_activeres_${player.id}`) !== null ||
-          completedList.includes(28)
-        );
+        return (checkTargetPlanet.buildings.armyBase?.level || 0) >= 2;
       case 29:
-        return (
-          localStorage.getItem(`moonbase_payroll_checked_${player.id}`) === 'true' ||
-          player.lastDailyRewardClaim !== undefined ||
-          completedList.includes(29)
-        );
+        return (checkTargetPlanet.buildings.researchCenter?.level || 0) >= 3;
       case 30:
-        return player.planets.length >= 3;
+        return (checkTargetPlanet.buildings.bunker?.level || 0) >= 1;
+      case 31:
+        return (
+          fleets.some((f) => f.senderId === player.id && f.missionType === 'attack') ||
+          localStorage.getItem(`moonbase_attack_dispatched_${player.id}`) === 'true' ||
+          completedList.includes(31)
+        );
+      case 32:
+        return player.planets.length >= 2;
       default:
         return false;
     }

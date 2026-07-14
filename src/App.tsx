@@ -1233,7 +1233,8 @@ export default function App() {
             radar: 'Radar Array',
             supplyNexus: 'Supply Nexus',
             fabricator: 'Fabricator',
-            bunker: 'Bunker'
+            bunker: 'Bunker',
+            magneticShield: 'Magnetic Shield'
           };
           const bName = bNames[key] || key;
           const msg = `${bName} construction finished! Upgraded to Level ${lvl}.`;
@@ -1355,13 +1356,13 @@ export default function App() {
     
     const mockMines = (count = 1) => Array.from({ length: count }, (_, i) => ({
       index: i,
-      level: 1,
+      level: 0,
       isUpgrading: false,
       upgradeEnd: null
     }));
 
     const mockBuilding = (maxLevel = 50): BuildingState => ({
-      level: 1,
+      level: 0,
       maxLevel,
       isUpgrading: false,
       upgradeEnd: null
@@ -1406,10 +1407,11 @@ export default function App() {
           radar: mockBuilding(15),
           supplyNexus: mockBuilding(50),
           fabricator: mockBuilding(10),
-          bunker: mockBuilding(25)
+          bunker: mockBuilding(25),
+          magneticShield: mockBuilding(12)
         },
         resources: { water: 5000, plasma: 2000, fuel: 3000, food: 4000, respirant: 2500 },
-        troops: { defender: 10, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+        troops: { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
         trainingQueue: [],
         upgradeQueue: []
       }],

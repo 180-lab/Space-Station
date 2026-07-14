@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ColonyPlanet, PlayerProfile, BattleReport, CreatedFleet, getUpgradeResourceCost } from '../types';
 
 import imgInterceptor from '../assets/images/defensive_interceptor_1780872114708.png';
 import imgAssaultDrone from '../assets/images/assault_drone_1780871759723.png';
-import imgDisrupter from '../assets/images/disrupter_tank_1780871773673.png';
+import imgDisrupter from '../assets/images/disrupter.png';
 import imgMatterExtractor from '../assets/images/matter_extractor_1780871789535.png';
 import imgMissileLauncher from '../assets/images/missile_launcher_1780871805054.png';
 import imgSettlementShip from '../assets/images/settlement_ship_1780871819613.png';
@@ -36,7 +36,8 @@ import {
   ShieldAlert,
   Rocket,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Upload
 } from 'lucide-react';
 
 interface ArmyBaseTabProps {
@@ -123,7 +124,7 @@ const TROOP_DETAILS = {
   },
   drone: {
     name: 'Missile Launcher',
-    desc: 'Low-profile cloaked robotic drone. Elite speed indicators indicators designed for scouting, recon, and mapping targets.',
+    desc: '',
     defenceHp: 120,
     attackHp: 120,
     carry: 200,
@@ -208,8 +209,18 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   const [rerouteY, setRerouteY] = useState<string>('');
 
   const [activeTroopInfo, setActiveTroopInfo] = useState<string | null>(null);
-  const [activeImageZoom, setActiveImageZoom] = useState<string | null>(null);
-  const [activeImageZoomTitle, setActiveImageZoomTitle] = useState<string | null>(null);
+  const [zoomedImage, setZoomedImage] = useState<{ src: string, name: string } | null>(null);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setZoomedImage(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const [subTab, setSubTab] = useState<'troops' | 'fabricate' | 'fleet'>('troops');
   const [showReportsModal, setShowReportsModal] = useState(false);
   const [combatLogsFilter, setCombatLogsFilter] = useState<'all' | 'saved' | 'unread'>('all');
@@ -1010,22 +1021,19 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                     return (
                       <div 
                         key={tId}
-                        className="p-4 border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-white/10 transition"
+                        className="p-4 border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition duration-200 hover:border-white/10"
                       >
                         <div className="flex items-center gap-3.5 flex-1 min-w-0">
                           {details.image ? (
                             <div 
-                              onClick={() => {
-                                setActiveImageZoom(details.image);
-                                setActiveImageZoomTitle(details.name);
-                              }}
-                              className="relative w-12 h-12 rounded-xl border border-[#1E293B] overflow-hidden shrink-0 bg-[#05070a]/90 cursor-pointer hover:border-cyan-500/40" 
-                              title={`Click to expand full resolution ${details.name}`}
+                              onClick={() => setZoomedImage({ src: details.image, name: details.name })}
+                              className="relative shrink-0 w-12 h-12 rounded-xl border border-[#1E293B] hover:border-cyan-500/50 overflow-hidden bg-[#05070a]/90 cursor-zoom-in group/smimg"
+                              title="Click to expand blueprint image"
                             >
                               <img 
                                 src={details.image} 
                                 alt={details.name} 
-                                className="w-full h-full object-cover opacity-90 hover:scale-105 transition duration-350"
+                                className="w-full h-full object-cover opacity-90 transition duration-350 group-hover/smimg:scale-110"
                                 referrerPolicy="no-referrer"
                               />
                             </div>
@@ -1251,32 +1259,33 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                 return (
                   <div 
                     key={tId}
-                    className={`p-5 border rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md flex flex-col gap-4.5 hover:border-white/10 transition duration-150 overflow-hidden ${isLocked ? 'border-red-950/40 relative opacity-75' : 'border-[#1E293B]'}`}
+                    className={`p-5 border rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md flex flex-col gap-4.5 transition duration-150 relative overflow-hidden ${
+                      isLocked ? 'border-red-950/40 opacity-75' : 'border-[#1E293B] hover:border-white/10'
+                    }`}
                     id={`troop_card_${tId}`}
                   >
-                  {/* Aspect-Ratio Rich Troop Image Banner */}
-                  {details.image && (
-                    <div 
-                      onClick={() => {
-                        setActiveImageZoom(details.image);
-                        setActiveImageZoomTitle(details.name);
-                      }}
-                      className="relative h-28 w-full rounded-lg overflow-hidden border border-white/5 bg-[#05070a] -mt-1 -mx-1 mb-2 cursor-pointer group/img"
-                      title="Click to view full-sized spacecraft blueprint"
-                    >
-                      <img 
-                        src={details.image} 
-                        alt={details.name} 
-                        className="w-full h-full object-cover opacity-60 group-hover/img:opacity-80 group-hover/img:scale-102 transition duration-500"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#0A0F1D] via-transparent to-[#0A0F1D]/30" />
-                      
-                      {/* Interactive scanner lines/scitech corner guides */}
-                      <div className="absolute inset-0 border border-cyan-500/0 group-hover/img:border-cyan-500/20 transition-all duration-300 rounded-lg pointer-events-none" />
-                      <div className="absolute inset-0 bg-cyan-950/5 opacity-0 group-hover/img:opacity-30 transition-all duration-300 pointer-events-none" />
-                    </div>
-                  )}
+                    {/* Aspect-Ratio Rich Troop Image Banner */}
+                    {details.image && (
+                      <div 
+                        onClick={() => setZoomedImage({ src: details.image, name: details.name })}
+                        className="relative h-28 w-full rounded-lg overflow-hidden border border-white/5 hover:border-cyan-500/30 bg-[#05070a] -mt-1 -mx-1 mb-2 group/img cursor-zoom-in"
+                        title="Click to expand blueprint image"
+                      >
+                        <div className="w-full h-full">
+                          <img 
+                            src={details.image} 
+                            alt={details.name} 
+                            className="w-full h-full object-cover opacity-60 group-hover/img:opacity-80 group-hover/img:scale-102 transition duration-500"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0F1D] via-transparent to-[#0A0F1D]/30 pointer-events-none" />
+                        
+                        {/* Interactive scanner lines/scitech corner guides */}
+                        <div className="absolute inset-0 border border-cyan-500/0 group-hover/img:border-cyan-500/20 transition-all duration-300 rounded-lg pointer-events-none" />
+                        <div className="absolute inset-0 bg-cyan-950/5 opacity-0 group-hover/img:opacity-30 transition-all duration-300 pointer-events-none" />
+                      </div>
+                    )}
 
                   {/* Header info */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2341,35 +2350,42 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                   const cannotRecallAttack = isAttack && progressPercent > 45;
 
                                   return (
-                                    <button
-                                      type="button"
-                                      disabled={cannotRecallAttack}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (onCancelFleet) onCancelFleet(fleet.id);
-                                      }}
-                                      className={`py-1.5 px-3 font-bold uppercase text-[9px] rounded-lg transition border text-center ${
-                                        cannotRecallAttack
-                                          ? 'bg-red-950/40 text-red-500 border-red-950 cursor-not-allowed'
-                                          : 'bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 cursor-pointer'
-                                      }`}
-                                    >
-                                      {cannotRecallAttack ? `🚫 Locked (${Math.round(progressPercent)}%)` : '🛑 Abort Mission'}
-                                    </button>
+                                    <>
+                                      <button
+                                        type="button"
+                                        disabled={cannotRecallAttack}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (onCancelFleet) onCancelFleet(fleet.id);
+                                        }}
+                                        className={`py-1.5 px-3 font-bold uppercase text-[9px] rounded-lg transition border text-center ${
+                                          cannotRecallAttack
+                                            ? 'bg-red-950/40 text-red-500 border-red-950 cursor-not-allowed'
+                                            : 'bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-500/30 cursor-pointer'
+                                        }`}
+                                      >
+                                        {cannotRecallAttack ? `🚫 Locked (${Math.round(progressPercent)}%)` : '🛑 Abort Mission'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={cannotRecallAttack}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setReroutingFleetId(fleet.id);
+                                          setRerouteX('');
+                                          setRerouteY('');
+                                        }}
+                                        className={`py-1.5 px-3 font-bold uppercase text-[9px] rounded-lg transition border text-center ${
+                                          cannotRecallAttack
+                                            ? 'bg-slate-950/40 text-slate-500 border-slate-900 cursor-not-allowed'
+                                            : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border-cyan-500/25 cursor-pointer'
+                                        }`}
+                                      >
+                                        📍 Reroute
+                                      </button>
+                                    </>
                                   );
                                 })()}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setReroutingFleetId(fleet.id);
-                                    setRerouteX('');
-                                    setRerouteY('');
-                                  }}
-                                  className="py-1.5 px-3 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/25 font-bold uppercase text-[9px] rounded-lg transition cursor-pointer text-center"
-                                >
-                                  📍 Reroute
-                                </button>
                               </div>
                             )}
 
@@ -2708,46 +2724,48 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                               <p className="text-slate-500 text-[10px] mt-0.5">Origin: [{report.attackerCoords.x}, {report.attackerCoords.y}]</p>
                               <div className="mt-2 space-y-1">
                                 <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
-                                  <div>Attacker Attack HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{attStats.atk.toLocaleString()}</span></div>
+                                  <div>Attacker HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{attStats.atk.toLocaleString()}</span></div>
                                 </div>
-                                <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
                                   {Object.entries(report.attackerInitialTroops).map(([type, qty]) => {
                                     if (!qty) return null;
                                     return (
-                                      <span key={type} className="bg-red-950/20 px-1 py-0.2 rounded border border-red-900/20 text-red-300">
-                                        {(TROOP_NAME_MAPPING[type] || type)}: {qty} (loss: {report.attackerLosses[type] || 0})
-                                      </span>
+                                      <div key={type} className="bg-blue-950/10 px-2 py-1 rounded border border-blue-500/20 text-left flex flex-col font-mono select-none">
+                                        <span className="text-blue-400 font-bold">{(TROOP_NAME_MAPPING[type] || type)}: {qty}</span>
+                                        <span className="text-red-400 text-[8.5px] font-medium leading-tight">(loss: {report.attackerLosses[type] || 0})</span>
+                                      </div>
                                     );
                                   })}
                                 </div>
                               </div>
                             </div>
                             <div>
-                              <p className="font-bold text-cyan-100 text-cyan-400 uppercase tracking-wide flex items-center justify-between">
-                                <span>STATION:{' '}
+                              <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide flex items-center justify-between">
+                                <span>Defender:{' '}
                                   <span 
                                     onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
-                                    className="underline decoration-dotted cursor-pointer hover:text-cyan-300 font-bold text-cyan-400"
+                                    className="underline decoration-dotted cursor-pointer hover:text-red-300 font-bold text-red-400"
                                   >
                                     {report.defenderName}
                                   </span>
                                 </span>
-                                <span className="text-[10px] text-cyan-400 font-bold bg-cyan-950/25 px-1.5 py-0.5 rounded border border-cyan-900/20 font-mono select-none">
+                                <span className="text-[10px] text-red-400 font-bold bg-red-950/25 px-1.5 py-0.5 rounded border border-red-900/20 font-mono select-none">
                                   Loss: {defLossPercent}%
                                 </span>
                               </p>
                               <p className="text-slate-500 text-[10px] mt-0.5">Target: [{report.defenderCoords.x}, {report.defenderCoords.y}]</p>
                               <div className="mt-2 space-y-1">
                                 <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
-                                  <div>Defender HP (Defense Shields): <span className="text-cyan-400 font-mono font-extrabold">{defStats.hp.toLocaleString()}</span></div>
+                                  <div>Defender HP (Defense Strength): <span className="text-cyan-400 font-mono font-extrabold">{defStats.hp.toLocaleString()}</span></div>
                                 </div>
-                                <div className="flex flex-wrap gap-1 text-[9px] text-slate-400 mt-1.5">
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
                                   {Object.entries(report.defenderInitialTroops).map(([type, qty]) => {
                                     if (!qty) return null;
                                     return (
-                                      <span key={type} className="bg-cyan-950/15 px-1 py-0.2 rounded border border-cyan-900/20 text-cyan-300">
-                                        {(TROOP_NAME_MAPPING[type] || type)}: {qty} (loss: {report.defenderLosses[type] || 0})
-                                      </span>
+                                      <div key={type} className="bg-blue-950/10 px-2 py-1 rounded border border-blue-500/20 text-left flex flex-col font-mono select-none">
+                                        <span className="text-blue-400 font-bold">{(TROOP_NAME_MAPPING[type] || type)}: {qty}</span>
+                                        <span className="text-red-400 text-[8.5px] font-medium leading-tight">(loss: {report.defenderLosses[type] || 0})</span>
+                                      </div>
                                     );
                                   })}
                                 </div>
@@ -2884,55 +2902,44 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
         </div>
       )}
 
-      {/* Spacecraft HD Blueprint Viewer Modal Backdrop */}
-      {activeImageZoom && (
+      {/* Expanded / Zoomed Image Modal */}
+      {zoomedImage && (
         <div 
-          onClick={() => {
-            setActiveImageZoom(null);
-            setActiveImageZoomTitle(null);
-          }}
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-fade-in"
+          onClick={() => setZoomedImage(null)}
         >
           <div 
-            onClick={(e) => e.stopPropagation()} 
-            className="relative w-full max-w-4xl bg-[#0A0F1D]/95 border border-[#1E293B] shadow-[0_0_50px_rgba(5,182,212,0.15)] rounded-2xl overflow-hidden p-3 md:p-6 text-center"
+            className="relative max-w-4xl w-full bg-[#0A0F1D]/90 border border-cyan-500/30 rounded-2xl p-3 shadow-[0_0_50px_rgba(6,182,212,0.15)] flex flex-col items-center gap-3"
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Corner Hologram Hud elements */}
-            <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-500/40 rounded-tl-xl pointer-events-none" />
-            <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-cyan-500/40 rounded-tr-xl pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-cyan-500/40 rounded-bl-xl pointer-events-none" />
-            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-500/40 rounded-br-xl pointer-events-none" />
-            
-            {/* Grid background layer */}
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(18,24,38,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(18,24,38,0.1)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
-
-            <div className="flex items-center justify-between border-b border-[#1E293B]/60 pb-3 mb-4.5 relative z-10">
-              <div className="text-left font-mono">
-                <span className="text-[9px] text-[#5bc0be] uppercase tracking-widest font-black block">HOLOGRAPHIC BLUEPRINT SCHEMATIC</span>
-                <h4 className="text-sm md:text-base font-black text-white uppercase">{activeImageZoomTitle || 'Spaceship Artwork'}</h4>
+            {/* Header info */}
+            <div className="w-full flex items-center justify-between border-b border-white/10 pb-2 px-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+                <span className="font-mono text-xs font-bold text-slate-300 tracking-wider uppercase">{zoomedImage.name} Blueprint View</span>
               </div>
-              <button
-                onClick={() => {
-                  setActiveImageZoom(null);
-                  setActiveImageZoomTitle(null);
-                }}
-                className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/40 font-mono text-xs font-bold text-slate-400 transition cursor-pointer"
-                aria-label="Close schematic"
+              <button 
+                onClick={() => setZoomedImage(null)}
+                className="text-xs font-mono text-slate-400 hover:text-white border border-white/10 hover:border-white/30 rounded px-2.5 py-1 transition cursor-pointer"
               >
-                CLOSE [ESC]
+                Close [Esc]
               </button>
             </div>
 
-            <div className="relative rounded-lg overflow-hidden border border-[#1E293B] bg-black/40 flex items-center justify-center min-h-[300px] md:min-h-[500px]">
+            {/* Image body */}
+            <div className="relative w-full max-h-[70vh] rounded-xl overflow-hidden border border-white/5 bg-black flex items-center justify-center">
               <img 
-                src={activeImageZoom} 
-                alt={activeImageZoomTitle || 'Spacecraft Blueprint'} 
-                className="max-h-[70vh] max-w-full object-contain mx-auto select-none rounded animate-fade-in"
+                src={zoomedImage.src} 
+                alt={zoomedImage.name} 
+                className="max-w-full max-h-[70vh] object-contain"
                 referrerPolicy="no-referrer"
               />
-              <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-black/60 border border-white/5 text-[9px] text-slate-500 font-mono tracking-wider rounded">
-                COGNITIVE VISUAL TELEMETRY ACTIVE
-              </div>
+            </div>
+
+            {/* Footer sci-fi indicators */}
+            <div className="w-full flex justify-between text-[10px] font-mono text-slate-500 px-2">
+              <span>SCANNER STATUS: ACTIVE</span>
+              <span>HD SCHEMATIC DISPLAY</span>
             </div>
           </div>
         </div>
