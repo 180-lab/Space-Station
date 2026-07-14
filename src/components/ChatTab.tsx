@@ -112,7 +112,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                           </button>
                         )}
                         <span className="text-slate-600 font-normal font-sans">
-                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          {new Date(msg.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </span>
                       </div>
                       

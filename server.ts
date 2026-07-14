@@ -354,6 +354,68 @@ function ensureAIsCount(count: number, s: GameState) {
   }
 }
 
+// Ensure admin has a maxed everything station and resources
+function ensureAdminMaxed(p: any) {
+  if (!p || !p.googleEmail) return;
+  const email = p.googleEmail.toLowerCase();
+  if (email !== "banele180@gmail.com" && email !== "banzz1918@gmail.com") return;
+
+  p.credits = 1000000; // Admin convenience credits
+
+  if (!p.planets) p.planets = [];
+  p.planets.forEach((pl: any, planetIndex: number) => {
+    if (!pl) return;
+    
+    // Max buildings
+    const buildingDefaults: Record<string, { maxLevel: number }> = {
+      fabricator: { maxLevel: 10 },
+      commsHub: { maxLevel: 5 },
+      researchCenter: { maxLevel: 20 },
+      armyBase: { maxLevel: 22 },
+      repository: { maxLevel: 45 },
+      radar: { maxLevel: 15 },
+      supplyNexus: { maxLevel: 50 },
+      bunker: { maxLevel: 25 },
+      magneticShield: { maxLevel: 12 }
+    };
+
+    if (!pl.buildings) pl.buildings = {};
+    Object.entries(buildingDefaults).forEach(([bKey, bDef]) => {
+      pl.buildings[bKey] = {
+        level: bDef.maxLevel,
+        maxLevel: bDef.maxLevel,
+        isUpgrading: false,
+        upgradeEnd: null,
+        health: 100
+      };
+    });
+
+    // Max mines
+    const maxExtractorLevel = planetIndex === 0 ? 25 : planetIndex === 1 ? 20 : 15;
+    if (!pl.mines) pl.mines = {};
+    const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"] as const;
+    resourceKeys.forEach(rKey => {
+      const mineCount = rKey === "water" ? 6 : 3;
+      pl.mines[rKey] = Array.from({ length: mineCount }, (_, i) => ({
+        index: i,
+        level: maxExtractorLevel,
+        isUpgrading: false,
+        upgradeEnd: null,
+        health: 100
+      }));
+    });
+
+    // Let's also give them max resources
+    pl.resources = {
+      water: 99999999,
+      plasma: 99999999,
+      fuel: 99999999,
+      food: 99999999,
+      respirant: 99999999
+    };
+  });
+}
+
 // Normalize GameState to ensure all newly-added properties exist across legacy states
 function normalizeState(s: GameState) {
   if (!s) return;
@@ -533,6 +595,9 @@ function normalizeState(s: GameState) {
           });
         }
       });
+      
+      // Apply admin booster if applicable
+      ensureAdminMaxed(p);
     });
   });
 
@@ -3125,6 +3190,7 @@ app.post("/api/auth/google", async (req, res) => {
       };
 
       state.players[uid] = newPlayer;
+      ensureAdminMaxed(newPlayer);
 
       // Log discovery
       state.newsEvents.unshift({
@@ -3469,6 +3535,20 @@ app.post("/api/dev/reset-universe", (req, res) => {
   bootstrapUniverse();
   saveState();
   res.json({ success: true, message: "Universe successfully reset to initial clean data!" });
+});
+
+// Reset individual player profile from server database (restricted to admin users)
+app.post("/api/dev/reset-my-player", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  if (!p.googleEmail || (p.googleEmail.toLowerCase() !== 'banele180@gmail.com' && p.googleEmail.toLowerCase() !== 'banzz1918@gmail.com')) {
+    return res.status(403).json({ error: "Access Denied: Player profile reset is restricted to administrator accounts only." });
+  }
+
+  delete state.players[p.id];
+  saveState();
+  res.json({ success: true, message: "Your player profile has been completely removed from the universe." });
 });
 
 // Heartbeat test route

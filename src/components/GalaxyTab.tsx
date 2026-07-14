@@ -1119,7 +1119,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             <button 
               type="submit"
               disabled={isScanning}
-              className="px-5 py-3.5 bg-cyan-500/10 hover:bg-cyan-500/20 hover:shadow-[0_0_12px_rgba(34,211,238,0.25)] text-cyan-400 font-bold text-xs uppercase tracking-widest border border-cyan-500/40 rounded-xl transition flex items-center justify-center gap-2 whitespace-nowrap active:scale-[0.98] cursor-pointer"
+              className="px-5 py-3.5 bg-cyan-500/10 hover:bg-cyan-500/20 hover:shadow-[0_0_12px_rgba(34,211,238,0.25)] text-cyan-400 font-bold text-xs uppercase tracking-widest border border-cyan-500/40 rounded-xl transition flex items-center justify-center gap-2 whitespace-nowrap active:scale-[0.98] cursor-pointer animate-[pulse_3.5s_infinite] shadow-[0_0_15px_rgba(34,211,238,0.15)]"
               title="Search Sector: trigger planetary radar sweep"
             >
               <Search size={14} title="Search magnifying glass icon" />
@@ -4981,7 +4981,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               {displayName}
                             </button>
                             <span className="text-slate-600 font-normal">
-                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                              {new Date(msg.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </span>
                           </div>
                           

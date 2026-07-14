@@ -44,6 +44,9 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   customTasks = {},
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [hasClickedExpandGuide, setHasClickedExpandGuide] = useState(() => {
+    return localStorage.getItem(`moonbase_expand_guide_clicked_${player.id}`) === 'true';
+  });
   const [isHowToOpen, setIsHowToOpen] = useState(false);
   const [claimingId, setClaimingId] = useState<number | null>(null);
   const [allowOverflow, setAllowOverflow] = useState(false);
@@ -131,14 +134,14 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     },
     {
       id: 5,
-      title: '🏭 Upgrade Fabricator to Level 2',
-      shortDesc: 'Bring the Fabricator to Level 2 to unlock radar sensor blueprints.',
-      requirementHtml: 'Upgrade active <strong>Fabricator to Level 2 or higher</strong>.',
-      hint: 'Go to the XPL tab, find the Fabricator, and upgrade it to Level 2.',
-      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Find the <strong>Fabricator</strong> and trigger its Level 2 upgrade sequence.',
-      commanderTip: 'Upgrading the Fabricator unlocks advanced facility options like the Radar Array!',
-      congratsMessage: '🏭 FABRICATOR POWER UPGRADE! Level 2 nanite printers are online, allowing production of complex tactical sensors!',
-      encouragementQuote: 'Superb! A level 2 Fabricator brings us one step closer to scanning deep space.',
+      title: '🏭 Queue/Upgrade Fabricator to Level 2',
+      shortDesc: 'Queue a construction upgrade for your main station Fabricator to Level 2, or construct/upgrade it directly.',
+      requirementHtml: 'Queue a Fabricator upgrade or have a <strong>Fabricator at Level 2 or higher</strong>.',
+      hint: 'Under the XPL tab infrastructure, select your Fabricator and click Queue Upgrade or Upgrade Building.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Find the <strong>Fabricator</strong>.<br/>3. Start the upgrade directly, or if another building is active, use Space Gold to click <strong>"Queue Upgrade"</strong>.',
+      commanderTip: 'Upgrading or queuing the Fabricator secures a continuous, high-speed construction grid!',
+      congratsMessage: '🏭 FABRICATOR QUEUED OR UPGRADED! Your planetary assembly lines are operating with maximum structural fluidity.',
+      encouragementQuote: 'Superb planning! Utilizing the construction queue ensures your base expands even while you command other sectors.',
       targetTab: 'explore',
       rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
@@ -365,15 +368,15 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     },
     {
       id: 23,
-      title: '🤝 Join or Create a Galactic Alliance',
-      shortDesc: 'Establish mutual security pacts by joining an existing alliance or founding a new one.',
-      requirementHtml: 'Successfully <strong>join or create an alliance</strong>.',
-      hint: 'Go to the COMMS tab, navigate to the Alliance section, and join or create one.',
-      howToGetThere: '1. Open the <strong>COMMS</strong> tab.<br/>2. Find the <strong>Alliance</strong> board panel.<br/>3. Enter an alliance name to create one, or click <strong>"Join"</strong> on an active alliance.',
-      commanderTip: 'Alliances protect you from raids and offer coordinated support from other players.',
-      congratsMessage: '🤝 ALLIANCE CHANNELS AUTHORIZED! Your faction is now part of an interplanetary coalition.',
-      encouragementQuote: 'Superb diplomacy! Together, our forces will command supreme authority over the galactic quadrants.',
-      targetTab: 'chat',
+      title: '⚡ Deploy Extractor Production Boost',
+      shortDesc: 'Supercharge your station\'s extraction rates by deploying a tactical overdrive production boost.',
+      requirementHtml: 'Activate a <strong>production boost</strong> on any of your extractor pumps, or trigger system-wide overdrive.',
+      hint: 'Go to the XPL tab, find any resource extractor outpost category, and click "⚡ Boost", or select the Standalone Production Overdrive Card.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Locate the <strong>RESOURCE EXTRACTOR OUTPOSTS</strong> or the standalone <strong>Production Boost</strong> card.<br/>3. Select <strong>"⚡ Boost"</strong>, choose a duration, and deploy the booster using Space Gold.',
+      commanderTip: 'Overdrive boosts multiply resource extraction hourly output by +14%, securing massive reserves rapidly.',
+      congratsMessage: '⚡ REFINE MATRICES SUPERCHARGED! Extractor siphons are glowing with active overdrive booster fields!',
+      encouragementQuote: 'Incredible initiative, Admiral. Active production boosts give us the economic leverage to fund gargantuan projects.',
+      targetTab: 'explore',
       rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
@@ -564,7 +567,11 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
       case 4:
         return (checkTargetPlanet.buildings.repository?.level || 0) >= 1;
       case 5:
-        return (checkTargetPlanet.buildings.fabricator?.level || 0) >= 2;
+        return (
+          (checkTargetPlanet.buildings.fabricator?.level || 0) >= 2 ||
+          checkTargetPlanet.buildings.fabricator?.isUpgrading ||
+          (checkTargetPlanet.upgradeQueue || []).some((item: any) => item.type === 'building' && item.key === 'fabricator')
+        );
       case 6:
         return (checkTargetPlanet.buildings.radar?.level || 0) >= 1;
       case 7:
@@ -633,8 +640,10 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
         );
       case 23:
         return (
-          (player.allianceId !== null && player.allianceId !== '') ||
-          localStorage.getItem(`moonbase_alliance_joined_${player.id}`) === 'true' ||
+          localStorage.getItem(`moonbase_boosted_${player.id}`) === 'true' ||
+          Object.values(checkTargetPlanet.mines || {}).some((list: any) => 
+            Array.isArray(list) && list.some((mine: any) => mine.boostedUntil && Number(mine.boostedUntil) > Date.now())
+          ) ||
           completedList.includes(23)
         );
       case 24:
@@ -781,7 +790,13 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     <div className="bg-gradient-to-b from-[#0F172A] to-[#020617] border border-cyan-500/20 rounded-2xl shadow-[0_0_20px_rgba(34,211,238,0.05)] overflow-hidden font-mono transition-all duration-300">
       {/* Header bar */}
       <div 
-        onClick={() => setIsCollapsed(!isCollapsed)}
+        onClick={() => {
+          if (isCollapsed) {
+            localStorage.setItem(`moonbase_expand_guide_clicked_${player.id}`, 'true');
+            setHasClickedExpandGuide(true);
+          }
+          setIsCollapsed(!isCollapsed);
+        }}
         className="px-5 py-4 bg-[#0A0F1D]/80 backdrop-blur-md flex justify-between items-center bg-black/30 border-b border-[#1E293B]/60 cursor-pointer select-none"
       >
         <div className="flex items-center gap-3">
@@ -815,7 +830,9 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
         <div
           className={`px-3 py-1 text-xs font-bold uppercase tracking-wider transition-all duration-200 rounded-lg cursor-pointer flex items-center ml-4 ${
             isCollapsed
-              ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 font-extrabold hover:shadow-[0_0_12px_rgba(6,182,212,0.5)] hover:scale-105 active:scale-95'
+              ? `bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 font-extrabold hover:shadow-[0_0_12px_rgba(6,182,212,0.5)] hover:scale-105 active:scale-95 ${
+                  !hasClickedExpandGuide ? 'animate-pulse shadow-[0_0_15px_rgba(34,211,238,0.85)] border-2 border-cyan-300' : ''
+                }`
               : 'bg-gradient-to-r from-amber-500 to-rose-600 text-white font-extrabold hover:shadow-[0_0_12px_rgba(244,63,94,0.5)] hover:scale-105 active:scale-95'
           }`}
         >

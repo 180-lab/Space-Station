@@ -285,6 +285,9 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   const [selectedResource, setSelectedResource] = useState<ResourceType | null>(null);
   const [showStructures, setShowStructures] = useState(true);
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(null);
+  const [hasClickedRadar, setHasClickedRadar] = useState(() => {
+    return localStorage.getItem(`moonbase_radar_clicked_${player.id}`) === 'true';
+  });
 
   const formatLimit = (limit: number): string => {
     if (limit >= 1000000) {
@@ -1657,7 +1660,11 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
               return (
                 <div 
                   key={bKey}
-                  className="border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md overflow-hidden transition-all duration-200"
+                  className={`border rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md overflow-hidden transition-all duration-200 ${
+                    bKey === 'radar' && !hasClickedRadar
+                      ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.6)] animate-pulse'
+                      : 'border-[#1E293B]'
+                  }`}
                   id={`building_${bKey}`}
                 >
                   {/* Building Trigger Header Button */}
@@ -1665,6 +1672,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                     type="button"
                     onClick={() => {
                       if (bKey === 'radar') {
+                        localStorage.setItem(`moonbase_radar_clicked_${player.id}`, 'true');
+                        setHasClickedRadar(true);
                         if (onNavigateToGalaxySubTab) {
                           onNavigateToGalaxySubTab('scanner');
                         } else {
@@ -2100,7 +2109,11 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                 return (
                   <div 
                     key={bKey}
-                    className="border border-dashed border-[#5bc0be]/30 rounded-xl bg-[#090D1A]/50 backdrop-blur-md overflow-hidden hover:border-[#5bc0be]/60 transition duration-150"
+                    className={`border border-dashed rounded-xl bg-[#090D1A]/50 backdrop-blur-md overflow-hidden hover:border-[#5bc0be]/60 transition duration-150 ${
+                      bKey === 'radar' && !hasClickedRadar
+                        ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.6)] animate-pulse'
+                        : 'border-[#5bc0be]/30'
+                    }`}
                     id={`blueprint_${bKey}`}
                   >
                     <div className="p-4 flex items-center justify-between text-left gap-4">
@@ -2118,6 +2131,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         type="button"
                         onClick={() => {
                           if (bKey === 'radar') {
+                            localStorage.setItem(`moonbase_radar_clicked_${player.id}`, 'true');
+                            setHasClickedRadar(true);
                             if (onNavigateToGalaxySubTab) {
                               onNavigateToGalaxySubTab('scanner');
                             } else {
@@ -2245,7 +2260,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                             {displayName}
                           </button>
                           <span className="text-slate-600 font-normal">
-                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            {new Date(msg.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                           </span>
                         </div>
                         

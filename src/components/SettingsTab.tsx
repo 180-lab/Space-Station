@@ -421,6 +421,39 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     });
   };
 
+  const [resettingPlayer, setResettingPlayer] = useState(false);
+  const handleResetPlayerProfile = () => {
+    setConfirmModal({
+      title: '🚨 WIPE PLAYER STATE & RESTART GAME?',
+      message: 'WARNING: This will permanently purge your commander account, planet colonies, and fleet units from the server database. You will be logged out and can register a fresh account immediately. Are you absolutely sure?',
+      onConfirm: async () => {
+        setResettingPlayer(true);
+        try {
+          const res = await fetch('/api/dev/reset-my-player', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': player.id,
+            }
+          });
+          if (res.ok) {
+            showToast('Commander data successfully purged from database!', 'success');
+            localStorage.clear();
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+          } else {
+            showToast('Failed to communicate purge directive with mainframe.', 'error');
+          }
+        } catch (err) {
+          showToast('Network error during state purge.', 'error');
+        } finally {
+          setResettingPlayer(false);
+        }
+      }
+    });
+  };
+
   const [resettingServer, setResettingServer] = useState(false);
   const handleResetServerState = () => {
     setConfirmModal({
@@ -823,36 +856,52 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </div>
 
               {/* Account and maintenance action cards */}
+              <div className="pt-4 border-t border-[#1E293B]/60 space-y-3.5">
+                <h4 className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <AlertTriangle size={12} className="text-cyan-500 animate-pulse" /> COMMANDER CORE DATA CONTROLS
+                </h4>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleResetApp}
+                    className="py-2.5 px-3 bg-cyan-950/10 hover:bg-cyan-950/25 border border-cyan-500/25 text-cyan-400 rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw size={12} /> Clear Cache
+                  </button>
+                  
+                  <button
+                    onClick={handleLogoutClick}
+                    className="py-2.5 px-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <LogOut size={12} /> Log Out
+                  </button>
+                </div>
+              </div>
+
               {player.googleEmail && (player.googleEmail.toLowerCase() === 'banele180@gmail.com' || player.googleEmail.toLowerCase() === 'banzz1918@gmail.com') && (
-                <div className="pt-4 border-t border-[#1E293B]/60 space-y-3.5">
+                <div className="pt-4 border-t border-red-500/20 space-y-3.5">
                   <h4 className="text-[10px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <AlertTriangle size={12} /> RESTRICTED MAINTENANCE CODES
+                    <AlertTriangle size={12} /> SYSTEM ADMINISTRATOR CONTROLS
                   </h4>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={handleResetApp}
-                      className="py-2.5 px-3 bg-red-950/10 hover:bg-red-950/20 border border-red-500/25 text-red-400 rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <RotateCcw size={12} /> Clear Cache
-                    </button>
-                    
-                    <button
-                      onClick={handleLogoutClick}
-                      className="py-2.5 px-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <LogOut size={12} /> Log Out
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleResetPlayerProfile}
+                    disabled={resettingPlayer}
+                    className="w-full py-2.5 px-3 bg-red-950/20 hover:bg-red-900/40 border border-red-600/50 text-red-300 disabled:opacity-50 rounded-xl font-bold font-mono text-[10px] uppercase tracking-widest transition flex items-center justify-center gap-2 cursor-pointer mt-2 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+                    type="button"
+                  >
+                    <RefreshCw size={12} className={resettingPlayer ? 'animate-spin' : ''} /> 
+                    {resettingPlayer ? 'Purging Account State...' : '☢️ Wipe Profile & Start New Game'}
+                  </button>
 
                   <button
                     onClick={handleResetServerState}
                     disabled={resettingServer}
-                    className="w-full py-2.5 px-3 bg-red-950/20 hover:bg-red-900/40 border border-red-600/50 text-red-300 disabled:opacity-50 rounded-xl font-bold font-mono text-[10px] uppercase tracking-widest transition flex items-center justify-center gap-2 cursor-pointer mt-2 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+                    className="w-full py-2.5 px-3 bg-red-950/40 hover:bg-red-900/50 border border-red-600 text-red-100 disabled:opacity-50 rounded-xl font-bold font-mono text-[10px] uppercase tracking-widest transition flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.2)]"
                     type="button"
                   >
                     <RefreshCw size={12} className={resettingServer ? 'animate-spin' : ''} /> 
-                    {resettingServer ? 'Executing reset override...' : '☢️ Force Reset Game Server'}
+                    {resettingServer ? 'Executing reset override...' : '🚨 Force Reset Server Database'}
                   </button>
                 </div>
               )}
