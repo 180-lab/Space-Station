@@ -13,6 +13,7 @@ import {
   RotateCcw,
   CheckCircle,
   HelpCircle,
+  Search,
   Laptop,
   User,
   Home,
@@ -25,6 +26,49 @@ import {
   Key,
   RefreshCw
 } from 'lucide-react';
+
+const FAQS = [
+  {
+    q: "What is the core objective of the game?",
+    a: "Your objective is to build a mighty space-faring empire. You extract 5 essential resources (Water, Plasma, Fuel, Food, and Respirant), upgrade local facilities on your outposts, research global technologies, build fleets of space warships, and expand by colonizing habitable planets across the galaxy."
+  },
+  {
+    q: "How do I colonize a new habitable planet or station?",
+    a: "First, build exactly one (1) Settlement Ship in your War Room (CMD tab). Next, select your Radar Array under your Explore Tab and run a sector scan on your target coordinate to discover if it contains a habitable planet or station. Once scanned, go to the Galaxy Map (GLXY tab), choose 'Colonize' as your mission, and launch your Settlement Ship. Upon arrival, it settles and materializes your new colony!"
+  },
+  {
+    q: "What are the rules for cancelling or rerouting an attack fleet?",
+    a: "Strategic timing is critical: you can only abort/cancel or reroute an 'Attack' fleet during the first 45% of its journey. As soon as the fleet crosses the 45% travel mark, its quantum hyper-drives lock in—making it impossible to either cancel or reroute the squadron!"
+  },
+  {
+    q: "Why is my troop garrison size decreasing on its own?",
+    a: "Every soldier in your active garrison continuously consumes Water, Food, and Respirant (O2). If your local hourly production of these resources drops below zero and runs dry, your troops suffer severe attrition, slowly starving and dehydrating over time. Ensure your life-support extractors are upgraded or boosted!"
+  },
+  {
+    q: "How does resource plunder and combat work?",
+    a: "When you launch a successful offensive strike and defeat the defender's garrison, your surviving ships plunder a high fraction of all five stored resources (including water!) up to their carrying capacity, exceeding whatever resources are protected by their defensive Bunker."
+  },
+  {
+    q: "Are research technology upgrades shared across my colonies?",
+    a: "No. Each space station and colony outpost works independently based on its own local Research Center's upgrades. You must research technology projects (like Defense Shields, Manufacturing Speed, or Troop Speed) separately at each individual station to unlock those benefits locally."
+  },
+  {
+    q: "How do I upgrade resource storage limits?",
+    a: "Build and upgrade your local Silo structures. Each upgrade level expands your maximum storage capacity for all five resources on that specific planet."
+  },
+  {
+    q: "What is the difference between Interceptors and Assault Drones?",
+    a: "Interceptors are heavily-shielded defensive fighters built to absorb damage and protect your base. Assault Drones are fragile, high-firepower strike units designed for offensive operations."
+  },
+  {
+    q: "How do map limits work, and what happens if I am out-of-bounds?",
+    a: "The galactic map limits dynamically scale based on active player density. If map boundary adjustments ever put your station out-of-bounds, the server's relocation array automatically transfers your station to a safe coordinate inside the active grid with zero loss of progress or resources."
+  },
+  {
+    q: "What is the benefit of joining or creating an Alliance?",
+    a: "Joining or creating an Alliance unites you with other active commanders across the galaxy. This allows you to safely relocate fleets to friendly coordinates, coordinate joint military operations, and protect your outposts under a shared defensive network."
+  }
+];
 
 interface SettingsTabProps {
   player: PlayerProfile;
@@ -45,6 +89,7 @@ interface SettingsTabProps {
   onNavigateToLeaderboard?: () => void;
   populationRank?: number;
   customTasks?: Record<string, any>;
+  galaxyConfig?: any;
 }
 
 const COSMETIC_SKINS = [
@@ -72,7 +117,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onOpenPayments,
   onNavigateToLeaderboard,
   populationRank,
-  customTasks = {}
+  customTasks = {},
+  galaxyConfig
 }) => {
   // Rename commander name and base colony names state
   const [commanderName, setCommanderName] = useState(player.username);
@@ -84,6 +130,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [showSync, setShowSync] = useState(false);
   const [showRegistryNames, setShowRegistryNames] = useState(false);
   const [showFeedbackConsole, setShowFeedbackConsole] = useState(false);
+  const [showFaq, setShowFaq] = useState(false);
+  const [faqSearch, setFaqSearch] = useState('');
+  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
   const [gatewayUrl, setGatewayUrl] = useState(() => {
     const saved = localStorage.getItem('space_station_backend_url');
     if (saved) return saved;
@@ -132,6 +181,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     setTaskEncouragementQuoteInput(custom?.encouragementQuote ?? defTask?.encouragementQuote ?? '');
   }, [selectedTaskId, customTasks]);
 
+  // Galaxy admin configuration form states
+  const [initialGalaxySize, setInitialGalaxySize] = useState('15');
+  const [initialColonizationZoneSize, setInitialColonizationZoneSize] = useState('7');
+  const [spawnDistance, setSpawnDistance] = useState('2');
+  const [zoneGrowthOccupancyThreshold, setZoneGrowthOccupancyThreshold] = useState('0.50');
+  const [galaxyOccupancyThreshold, setGalaxyOccupancyThreshold] = useState('0.70');
+  const [expansionIncrement, setExpansionIncrement] = useState('5');
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [triggeringAction, setTriggeringAction] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (galaxyConfig) {
+      setInitialGalaxySize(String(galaxyConfig.initialGalaxySize ?? 15));
+      setInitialColonizationZoneSize(String(galaxyConfig.initialColonizationZoneSize ?? 7));
+      setSpawnDistance(String(galaxyConfig.spawnDistance ?? 2));
+      setZoneGrowthOccupancyThreshold(String(galaxyConfig.zoneGrowthOccupancyThreshold ?? 0.50));
+      setGalaxyOccupancyThreshold(String(galaxyConfig.galaxyOccupancyThreshold ?? 0.70));
+      setExpansionIncrement(String(galaxyConfig.expansionIncrement ?? 5));
+    }
+  }, [galaxyConfig]);
+
   const handleUpdateTaskText = async (e: React.FormEvent) => {
     e.preventDefault();
     setUpdatingTask(true);
@@ -167,6 +237,68 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       showToast(err.message || 'Error transmitting task update.', 'error');
     } finally {
       setUpdatingTask(false);
+    }
+  };
+
+  const handleSaveGalaxyConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingConfig(true);
+    try {
+      const res = await fetch('/api/admin/galaxy-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id,
+        },
+        body: JSON.stringify({
+          initialGalaxySize: parseInt(initialGalaxySize, 10),
+          initialColonizationZoneSize: parseInt(initialColonizationZoneSize, 10),
+          spawnDistance: parseInt(spawnDistance, 10),
+          zoneGrowthOccupancyThreshold: parseFloat(zoneGrowthOccupancyThreshold),
+          galaxyOccupancyThreshold: parseFloat(galaxyOccupancyThreshold),
+          expansionIncrement: parseInt(expansionIncrement, 10),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message || 'Galaxy configuration updated successfully!', 'success');
+        if (onRefreshState) {
+          onRefreshState();
+        }
+      } else {
+        showToast(data.error || 'Failed to update galaxy configuration.', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Error saving galaxy configuration.', 'error');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const handleTriggerGalaxyAction = async (action: 'grow-zone' | 'expand-galaxy') => {
+    setTriggeringAction(action);
+    try {
+      const res = await fetch('/api/admin/galaxy-config/trigger', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id,
+        },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message || 'Action executed successfully!', 'success');
+        if (onRefreshState) {
+          onRefreshState();
+        }
+      } else {
+        showToast(data.error || 'Failed to execute action.', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Error executing trigger.', 'error');
+    } finally {
+      setTriggeringAction(null);
     }
   };
 
@@ -426,30 +558,39 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     setConfirmModal({
       title: '🚨 WIPE PLAYER STATE & RESTART GAME?',
       message: 'WARNING: This will permanently purge your commander account, planet colonies, and fleet units from the server database. You will be logged out and can register a fresh account immediately. Are you absolutely sure?',
-      onConfirm: async () => {
-        setResettingPlayer(true);
-        try {
-          const res = await fetch('/api/dev/reset-my-player', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-user-id': player.id,
+      onConfirm: () => {
+        // Second level check for confirmation
+        setTimeout(() => {
+          setConfirmModal({
+            title: '☢️ CRITICAL SECURE DESTRUCT CONFIRMATION',
+            message: 'This is an IRREVERSIBLE action. All of your progress, alliances, and fleet units will be permanently vaporized. Are you absolutely sure you want to proceed?',
+            onConfirm: async () => {
+              setResettingPlayer(true);
+              try {
+                const res = await fetch('/api/dev/reset-my-player', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': player.id,
+                  }
+                });
+                if (res.ok) {
+                  showToast('Commander data successfully purged from database!', 'success');
+                  localStorage.clear();
+                  setTimeout(() => {
+                    window.location.reload();
+                  }, 1000);
+                } else {
+                  showToast('Failed to communicate purge directive with mainframe.', 'error');
+                }
+              } catch (err) {
+                showToast('Network error during state purge.', 'error');
+              } finally {
+                setResettingPlayer(false);
+              }
             }
           });
-          if (res.ok) {
-            showToast('Commander data successfully purged from database!', 'success');
-            localStorage.clear();
-            setTimeout(() => {
-              window.location.reload();
-            }, 1000);
-          } else {
-            showToast('Failed to communicate purge directive with mainframe.', 'error');
-          }
-        } catch (err) {
-          showToast('Network error during state purge.', 'error');
-        } finally {
-          setResettingPlayer(false);
-        }
+        }, 150);
       }
     });
   };
@@ -903,6 +1044,124 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     <RefreshCw size={12} className={resettingServer ? 'animate-spin' : ''} /> 
                     {resettingServer ? 'Executing reset override...' : '🚨 Force Reset Server Database'}
                   </button>
+
+                  {/* GALAXY EXPANSION ARCHITECTURE SETTINGS */}
+                  <div className="pt-4 border-t border-[#1E293B] space-y-3">
+                    <h4 className="text-[10px] font-bold text-cyan-450 uppercase tracking-widest flex items-center gap-1.5">
+                      🌌 GALAXY EXPANSION ARCHITECTURE
+                    </h4>
+                    
+                    <div className="p-3.5 bg-[#03060C] border border-[#1E293B] rounded-xl space-y-3 font-mono text-[10.5px]">
+                      <div className="grid grid-cols-2 gap-2 text-slate-400">
+                        <div>
+                          <span>Current Map Size:</span>
+                          <span className="text-white font-bold ml-1.5">{galaxyConfig?.currentGalaxySize ?? 15}x{galaxyConfig?.currentGalaxySize ?? 15}</span>
+                        </div>
+                        <div>
+                          <span>Current Zone:</span>
+                          <span className="text-cyan-400 font-bold ml-1.5">{galaxyConfig?.currentColonizationZoneSize ?? 7}x{galaxyConfig?.currentColonizationZoneSize ?? 7}</span>
+                        </div>
+                      </div>
+
+                      <form onSubmit={handleSaveGalaxyConfig} className="space-y-3 mt-2">
+                        <div className="grid grid-cols-2 gap-2 text-left">
+                          <div>
+                            <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Initial Galaxy Size</label>
+                            <input
+                              type="number"
+                              value={initialGalaxySize}
+                              onChange={(e) => setInitialGalaxySize(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-950 border border-[#1E293B] text-slate-200 rounded-lg text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Initial Zone Size</label>
+                            <input
+                              type="number"
+                              value={initialColonizationZoneSize}
+                              onChange={(e) => setInitialColonizationZoneSize(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-950 border border-[#1E293B] text-slate-200 rounded-lg text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-left">
+                          <div>
+                            <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Min Spawn Distance</label>
+                            <input
+                              type="number"
+                              value={spawnDistance}
+                              onChange={(e) => setSpawnDistance(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-950 border border-[#1E293B] text-slate-200 rounded-lg text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Expansion Increment</label>
+                            <input
+                              type="number"
+                              value={expansionIncrement}
+                              onChange={(e) => setExpansionIncrement(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-950 border border-[#1E293B] text-slate-200 rounded-lg text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-left">
+                          <div>
+                            <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Zone Growth Threshold</label>
+                            <input
+                              type="text"
+                              value={zoneGrowthOccupancyThreshold}
+                              onChange={(e) => setZoneGrowthOccupancyThreshold(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-950 border border-[#1E293B] text-slate-200 rounded-lg text-xs"
+                              placeholder="0.50"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Galaxy Expand Threshold</label>
+                            <input
+                              type="text"
+                              value={galaxyOccupancyThreshold}
+                              onChange={(e) => setGalaxyOccupancyThreshold(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-950 border border-[#1E293B] text-slate-200 rounded-lg text-xs"
+                              placeholder="0.70"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={savingConfig}
+                          className="w-full py-2 bg-cyan-600/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 font-bold text-[10px] uppercase tracking-wider rounded-lg transition duration-150 disabled:opacity-50 cursor-pointer"
+                        >
+                          {savingConfig ? 'Saving Revisions...' : '💾 Update Expansion Parameters'}
+                        </button>
+                      </form>
+
+                      {/* Instant Force Manual Triggers */}
+                      <div className="pt-2 border-t border-[#1E293B]/60 space-y-2">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold block text-left">Instant Manual Triggers</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleTriggerGalaxyAction('grow-zone')}
+                            disabled={!!triggeringAction}
+                            className="py-2 bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-600/50 text-emerald-300 rounded-lg text-[9px] font-bold uppercase tracking-wider transition cursor-pointer disabled:opacity-50"
+                          >
+                            📡 Grow Zone Manually
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleTriggerGalaxyAction('expand-galaxy')}
+                            disabled={!!triggeringAction}
+                            className="py-2 bg-cyan-950/40 hover:bg-cyan-950/40 border border-cyan-600/50 text-cyan-300 rounded-lg text-[9px] font-bold uppercase tracking-wider transition cursor-pointer disabled:opacity-50"
+                          >
+                            🌌 Expand Frontier Manually
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </>
@@ -1502,6 +1761,114 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   CONFIRM ACTION
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ACADEMY FAQ & DATABASE SECTION */}
+      <div className="p-5 bg-[#0A0F1D] border border-cyan-500/10 rounded-2xl space-y-5 shadow-lg text-left relative overflow-hidden">
+        {/* Decorative corner flash */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
+
+        <button
+          onClick={() => setShowFaq(!showFaq)}
+          className="w-full flex items-center justify-between text-left hover:text-white transition duration-150 cursor-pointer select-none border-b border-[#1E293B]/60 pb-2"
+          type="button"
+        >
+          <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2">
+            <HelpCircle size={14} className="text-cyan-400" /> ACADEMY FAQ & DATABASE
+            {showFaq ? (
+              <ChevronUp size={12} className="text-red-500" />
+            ) : (
+              <ChevronDown size={12} className="text-emerald-500" />
+            )}
+          </h3>
+          <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider font-extrabold hidden sm:inline">Tactical Database (10)</span>
+        </button>
+
+        {showFaq && (
+          <div className="space-y-1.5 pt-1 animate-fade-in">
+            {/* FAQ database search box and title */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1E293B]/60 pb-3 gap-3">
+              <span className="text-[10px] text-cyan-400 font-mono font-bold uppercase tracking-wider block">
+                📍 Commander Academy Tactical Database
+              </span>
+              
+              {/* Search Input */}
+              <div className="relative w-full sm:w-72">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <Search size={13} className="text-slate-500" />
+                </span>
+                <input
+                  id="faq-search-input"
+                  type="text"
+                  placeholder="Query academy database..."
+                  value={faqSearch}
+                  onChange={(e) => setFaqSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-1.5 bg-slate-950/90 border border-slate-800/80 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 font-mono transition"
+                />
+              </div>
+            </div>
+
+            {/* FAQ Accordions List */}
+            <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1 pt-2">
+              {(() => {
+                const filteredFaqs = FAQS.filter(
+                  f => f.q.toLowerCase().includes(faqSearch.toLowerCase()) || 
+                       f.a.toLowerCase().includes(faqSearch.toLowerCase())
+                );
+
+                if (filteredFaqs.length === 0) {
+                  return (
+                    <div className="text-center py-10 border border-dashed border-[#1E293B]/50 rounded-xl bg-[#030712]/30">
+                      <p className="text-xs text-slate-500 font-mono">No database records found matching key phrase.</p>
+                    </div>
+                  );
+                }
+
+                return filteredFaqs.map((faq) => {
+                  const originalIndex = FAQS.indexOf(faq);
+                  const isExpanded = faqOpenIndex === originalIndex;
+
+                  return (
+                    <div 
+                      key={originalIndex} 
+                      id={`faq-item-${originalIndex}`}
+                      className={`border rounded-xl transition-all duration-200 overflow-hidden ${
+                        isExpanded 
+                          ? 'border-cyan-500/35 bg-[#090E1B]' 
+                          : 'border-[#1E293B]/60 bg-[#0A0F1D]/40 hover:border-slate-800'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        id={`faq-btn-${originalIndex}`}
+                        onClick={() => setFaqOpenIndex(isExpanded ? null : originalIndex)}
+                        className="w-full p-4 flex items-center justify-between text-left cursor-pointer transition focus:outline-none"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-xs text-cyan-400 font-mono font-bold shrink-0 mt-0.5">
+                            {String(originalIndex + 1).padStart(2, '0')}.
+                          </span>
+                          <span className="text-xs font-semibold text-white tracking-wide leading-relaxed">
+                            {faq.q}
+                          </span>
+                        </div>
+                        <span className="text-slate-500 shrink-0 ml-3">
+                          {isExpanded ? <ChevronUp size={14} className="text-cyan-400" /> : <ChevronDown size={14} />}
+                        </span>
+                      </button>
+                      
+                      {isExpanded && (
+                        <div className="px-4 pb-4.5 pt-1 text-slate-300 text-[11px] font-sans leading-relaxed border-t border-white/5 bg-slate-950/20 pl-8 select-text">
+                          {faq.a}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         )}

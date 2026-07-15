@@ -20,6 +20,7 @@ import {
   Alliance,
   ResourceType,
   CommandMessage,
+  GalaxyConfig,
 } from "./src/types";
 import { getUpgradeResourceCost, getTaskResourceReward } from "./src/gameUtils";
 import { checkSpeedHack, redis as serverRedis } from "./antiCheat";
@@ -109,27 +110,160 @@ let state: GameState = {
   ]
 };
 
-// Map expansion limits rules: Start at 20, expand progressively up to 235 as density grows.
-function getCurrentMapLimits(): number {
+// Initialize the galaxy config if it's missing or has blank properties
+function initializeGalaxyConfig() {
+  if (!state) return;
+  if (!state.galaxyConfig) {
+    state.galaxyConfig = {
+      initialGalaxySize: 15,
+      reservedCenterSector: { x: 7, y: 7 },
+      initialColonizationZoneSize: 7,
+      spawnDistance: 2,
+      zoneGrowthOccupancyThreshold: 0.50, // default 50% occupancy to grow zone
+      galaxyOccupancyThreshold: 0.70, // default 70% occupancy to expand map
+      expansionIncrement: 5,
+      currentGalaxySize: 15,
+      currentColonizationZoneSize: 7
+    };
+  }
+  
+  if (!state.galaxyConfig.currentGalaxySize) {
+    state.galaxyConfig.currentGalaxySize = state.galaxyConfig.initialGalaxySize || 15;
+  }
+  if (!state.galaxyConfig.currentColonizationZoneSize) {
+    state.galaxyConfig.currentColonizationZoneSize = state.galaxyConfig.initialColonizationZoneSize || 7;
+  }
+  if (!state.galaxyConfig.reservedCenterSector) {
+    const size = state.galaxyConfig.currentGalaxySize;
+    state.galaxyConfig.reservedCenterSector = {
+      x: Math.floor(size / 2),
+      y: Math.floor(size / 2)
+    };
+  }
+}
+
+// Check and dynamically grow the colonization zone or expand the entire galaxy limits
+function checkAndExpandGalaxy() {
+  initializeGalaxyConfig();
+  const config = state.galaxyConfig!;
+  
+  const currentMapSize = config.currentGalaxySize || 15;
+  let zoneSize = config.currentColonizationZoneSize || config.initialColonizationZoneSize || 7;
+  
+  // 1. Colonization Zone Growth
+  if (zoneSize < currentMapSize) {
+    const cx = config.reservedCenterSector ? config.reservedCenterSector.x : Math.floor(currentMapSize / 2);
+    const cy = config.reservedCenterSector ? config.reservedCenterSector.y : Math.floor(currentMapSize / 2);
+    const halfSize = Math.floor(zoneSize / 2);
+    
+    const minX = Math.max(0, cx - halfSize);
+    const maxX = Math.min(currentMapSize - 1, cx + halfSize);
+    const minY = Math.max(0, cy - halfSize);
+    const maxY = Math.min(currentMapSize - 1, cy + halfSize);
+    
+    let occupiedCount = 0;
+    if (state.players) {
+      for (const player of Object.values(state.players)) {
+        if (player && player.planets) {
+          for (const pl of player.planets) {
+            if (pl.sectorX >= minX && pl.sectorX <= maxX && pl.sectorY >= minY && pl.sectorY <= maxY) {
+              occupiedCount++;
+            }
+          }
+        }
+      }
+    }
+    
+    const totalSectorsInZone = zoneSize * zoneSize - 1; // excluding reserved center
+    const zoneOccupancy = totalSectorsInZone > 0 ? occupiedCount / totalSectorsInZone : 0;
+    const zoneThreshold = config.zoneGrowthOccupancyThreshold !== undefined ? config.zoneGrowthOccupancyThreshold : 0.50;
+    
+    if (zoneOccupancy >= zoneThreshold) {
+      const nextZoneSize = zoneSize + 2;
+      config.currentColonizationZoneSize = Math.min(nextZoneSize, currentMapSize);
+      console.log(`[Colonization Zone grew] Size grew from ${zoneSize}x${zoneSize} to ${config.currentColonizationZoneSize}x${config.currentColonizationZoneSize} (Occupancy: ${(zoneOccupancy * 100).toFixed(1)}% >= ${(zoneThreshold * 100).toFixed(1)}%)`);
+      saveState();
+      zoneSize = config.currentColonizationZoneSize; // update local ref
+    }
+  }
+  
+  // 2. Entire Galaxy Frontier Expansion
   let totalBases = 0;
   if (state.players) {
-    for (const p of Object.values(state.players)) {
-      totalBases += p.planets?.length || 0;
+    for (const player of Object.values(state.players)) {
+      totalBases += player.planets?.length || 0;
     }
   }
+  
+  const totalGalaxySectors = currentMapSize * currentMapSize - 1; // excluding reserved center
+  const galaxyOccupancy = totalGalaxySectors > 0 ? totalBases / totalGalaxySectors : 0;
+  const galaxyThreshold = config.galaxyOccupancyThreshold !== undefined ? config.galaxyOccupancyThreshold : 0.70;
+  
+  if (galaxyOccupancy >= galaxyThreshold) {
+    const increment = config.expansionIncrement || 5;
+    const oldSize = currentMapSize;
+    const newSize = currentMapSize + increment;
+    
+    config.currentGalaxySize = newSize;
+    if (zoneSize >= oldSize) {
+      config.currentColonizationZoneSize = newSize;
+    }
+    
+    console.log(`[GALAXY EXPANSION] Universe expanded from ${oldSize}x${oldSize} to ${newSize}x${newSize}! Occupancy was ${(galaxyOccupancy * 100).toFixed(1)}% >= ${(galaxyThreshold * 100).toFixed(1)}%`);
+    
+    // Galactic Command immersive announcement broadcast
+    const BROADCAST_TEMPLATES = [
+      "GALACTIC COMMAND\n\nLong-range sensor arrays have successfully mapped new regions beyond the known frontier. Navigation systems have been updated. Previously unreachable sectors are now open for exploration.",
+      "GALACTIC COMMAND\n\nCenturies of research have culminated in a breakthrough in deep-space navigation. New sectors have been charted and are now available for colonization.",
+      "GALACTIC COMMAND\n\nExploration fleets have returned with confirmed hyperspace routes beyond the current frontier. Galactic Command authorizes expansion into newly discovered space.",
+      "GALACTIC COMMAND\n\nOur civilizations have reached another milestone in interstellar exploration. Additional sectors have been integrated into the Galactic Navigation Network.",
+      "GALACTIC COMMAND\n\nAdvanced radar arrays have extended humanity's vision deeper into the galaxy. Frontier sectors are now accessible to all commanders."
+    ];
+    
+    const randomMsg = BROADCAST_TEMPLATES[Math.floor(Math.random() * BROADCAST_TEMPLATES.length)];
+    
+    if (!state.chatMessages) {
+      state.chatMessages = [];
+    }
+    
+    state.chatMessages.push({
+      id: `chat_expansion_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      channel: "global",
+      senderId: "system",
+      senderName: "GALACTIC COMMAND",
+      senderFaction: "System",
+      senderFactionColor: "#F1C40F",
+      allianceTag: "GAL",
+      receiverId: null,
+      content: randomMsg,
+      timestamp: Date.now()
+    });
+    
+    if (state.chatMessages.length > 200) {
+      state.chatMessages.shift();
+    }
+    
+    if (!state.newsEvents) {
+      state.newsEvents = [];
+    }
+    state.newsEvents.push({
+      id: `news_expansion_${Date.now()}`,
+      title: "🌌 New Frontiers Charted!",
+      content: `Galactic Command has expanded the known sector coordinates to ${newSize}x${newSize} space. High-resolution navigation channels are now online!`,
+      type: "system",
+      timestamp: Date.now()
+    });
+    
+    saveState();
+  }
+}
 
-  let c = 20;
-  const stages = [20, 40, 60, 80, 100, 120, 150, 180, 210, 235];
-  for (let i = 0; i < stages.length; i++) {
-    const stageMax = stages[i];
-    const threshold = Math.floor(stageMax * stageMax * 0.25); // 25% occupancy threshold
-    if (totalBases >= threshold && i < stages.length - 1) {
-      c = stages[i + 1];
-    } else if (totalBases < threshold) {
-      break;
-    }
-  }
-  return c;
+// Map expansion limits rules
+function getCurrentMapLimits(): number {
+  initializeGalaxyConfig();
+  checkAndExpandGalaxy();
+  const currentMapSize = state.galaxyConfig?.currentGalaxySize || 15;
+  return currentMapSize - 1; // maxCoord (limit) is dimension - 1
 }
 
 // Generate coordinate within the current limit margins [margin, maxCoord - margin]
@@ -144,6 +278,31 @@ function getRandomCoordinates(maxCoord: number): { x: number; y: number } {
   }
   const x = Math.floor(Math.random() * range) + margin;
   const y = Math.floor(Math.random() * range) + margin;
+  return { x, y };
+}
+
+// Generate coordinate within the dynamic player spawn region (respects colonization zone size)
+function getPlayerSpawnCoordinates(maxCoord: number): { x: number; y: number } {
+  initializeGalaxyConfig();
+  const config = state.galaxyConfig!;
+  
+  const currentMapSize = maxCoord + 1;
+  const cx = config.reservedCenterSector ? config.reservedCenterSector.x : Math.floor(currentMapSize / 2);
+  const cy = config.reservedCenterSector ? config.reservedCenterSector.y : Math.floor(currentMapSize / 2);
+  
+  const zoneSize = config.currentColonizationZoneSize || config.initialColonizationZoneSize || 7;
+  const halfSize = Math.floor(zoneSize / 2);
+  
+  const minX = Math.max(0, cx - halfSize);
+  const maxX = Math.min(maxCoord, cx + halfSize);
+  const minY = Math.max(0, cy - halfSize);
+  const maxY = Math.min(maxCoord, cy + halfSize);
+  
+  const rangeX = maxX - minX + 1;
+  const rangeY = maxY - minY + 1;
+  
+  const x = Math.floor(Math.random() * rangeX) + minX;
+  const y = Math.floor(Math.random() * rangeY) + minY;
   return { x, y };
 }
 
@@ -162,7 +321,7 @@ function findClusterCoordinate(targetX: number, targetY: number): { x: number; y
         const cx = targetX + dx;
         const cy = targetY + dy;
         
-        if (cx < 5 || cx > limit - 5 || cy < 5 || cy > limit - 5) {
+        if (cx < 0 || cx > limit || cy < 0 || cy > limit) {
           continue;
         }
         
@@ -188,13 +347,28 @@ function findClusterCoordinate(targetX: number, targetY: number): { x: number; y
 }
 
 // Generate random coordinates that don't overlap with existing player stations or habitable planets
+// and respect the reserved center sector, and minimum spawn distance.
 function getSafeRandomCoordinates(maxCoord: number): { x: number; y: number } {
+  initializeGalaxyConfig();
+  const config = state.galaxyConfig!;
+  
+  const currentMapSize = maxCoord + 1;
+  const cx = config.reservedCenterSector ? config.reservedCenterSector.x : Math.floor(currentMapSize / 2);
+  const cy = config.reservedCenterSector ? config.reservedCenterSector.y : Math.floor(currentMapSize / 2);
+  
+  const minDistance = config.spawnDistance !== undefined ? config.spawnDistance : 2;
+  
   let attempts = 0;
-  while (attempts < 500) {
+  while (attempts < 1000) {
     attempts++;
-    const coords = getRandomCoordinates(maxCoord);
+    const coords = getPlayerSpawnCoordinates(maxCoord);
     
-    // Check player stations
+    // 1. Never place a colony on the reserved center sector
+    if (coords.x === cx && coords.y === cy) {
+      continue;
+    }
+    
+    // 2. Check if overlap with any player or AI station (same sector)
     let overlap = false;
     if (state && state.players) {
       for (const player of Object.values(state.players)) {
@@ -207,21 +381,70 @@ function getSafeRandomCoordinates(maxCoord: number): { x: number; y: number } {
       }
     }
     if (overlap) continue;
-
-    // Check habitable planets
+    
+    // 3. Check habitable planets (same sector)
     if (state && state.habitablePlanets) {
       const overlapHabitable = state.habitablePlanets.some(hp => hp.coords.x === coords.x && hp.coords.y === coords.y);
       if (overlapHabitable) continue;
     }
-
+    
+    // 4. Respect a configurable minimum spawn distance (default 2-3 sectors)
+    let tooClose = false;
+    if (state && state.players) {
+      for (const player of Object.values(state.players)) {
+        if (player && player.planets) {
+          for (const pl of player.planets) {
+            const dist = Math.hypot(coords.x - pl.sectorX, coords.y - pl.sectorY);
+            if (dist < minDistance) {
+              tooClose = true;
+              break;
+            }
+          }
+        }
+        if (tooClose) break;
+      }
+    }
+    if (tooClose) continue;
+    
     return coords;
   }
-
-  // Fallback: search concentric rings from center if possible, or just return random coordinates
-  const center = Math.floor(maxCoord / 2);
-  const clusterCoords = findClusterCoordinate(center, center);
+  
+  // Fallback 1: if we cannot find a coordinate respecting the minimum distance after 1000 attempts,
+  // try again with minDistance = 0 (only checking same-sector overlap and reserved center)
+  attempts = 0;
+  while (attempts < 500) {
+    attempts++;
+    const coords = getPlayerSpawnCoordinates(maxCoord);
+    
+    if (coords.x === cx && coords.y === cy) {
+      continue;
+    }
+    
+    let overlap = false;
+    if (state && state.players) {
+      for (const player of Object.values(state.players)) {
+        if (player && player.planets) {
+          if (player.planets.some(pl => pl.sectorX === coords.x && pl.sectorY === coords.y)) {
+            overlap = true;
+            break;
+          }
+        }
+      }
+    }
+    if (overlap) continue;
+    
+    if (state && state.habitablePlanets) {
+      const overlapHabitable = state.habitablePlanets.some(hp => hp.coords.x === coords.x && hp.coords.y === coords.y);
+      if (overlapHabitable) continue;
+    }
+    
+    return coords;
+  }
+  
+  // Fallback 2: find the nearest unoccupied coordinate starting from center
+  const clusterCoords = findClusterCoordinate(cx, cy);
   if (clusterCoords) return clusterCoords;
-
+  
   return getRandomCoordinates(maxCoord);
 }
 
@@ -395,14 +618,26 @@ function ensureAdminMaxed(p: any) {
     if (!pl.mines) pl.mines = {};
     const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"] as const;
     resourceKeys.forEach(rKey => {
-      const mineCount = rKey === "water" ? 6 : 3;
-      pl.mines[rKey] = Array.from({ length: mineCount }, (_, i) => ({
-        index: i,
-        level: maxExtractorLevel,
-        isUpgrading: false,
-        upgradeEnd: null,
-        health: 100
-      }));
+      let mineCount = rKey === "water" ? 6 : 3;
+      if (pl.mines[rKey] && pl.mines[rKey].length > 0) {
+        mineCount = pl.mines[rKey].length;
+      } else if (state && state.habitablePlanets) {
+        const hp = state.habitablePlanets.find(item => Number(item.coords.x) === Number(pl.sectorX) && Number(item.coords.y) === Number(pl.sectorY));
+        if (hp && hp.extractors && hp.extractors[rKey] !== undefined) {
+          mineCount = hp.extractors[rKey];
+        }
+      }
+
+      pl.mines[rKey] = Array.from({ length: mineCount }, (_, i) => {
+        const existing = pl.mines[rKey]?.[i];
+        return {
+          index: i,
+          level: maxExtractorLevel,
+          isUpgrading: existing ? existing.isUpgrading : false,
+          upgradeEnd: existing ? existing.upgradeEnd : null,
+          health: existing && existing.health !== undefined ? existing.health : 100
+        };
+      });
     });
 
     // Let's also give them max resources
@@ -419,6 +654,7 @@ function ensureAdminMaxed(p: any) {
 // Normalize GameState to ensure all newly-added properties exist across legacy states
 function normalizeState(s: GameState) {
   if (!s) return;
+  initializeGalaxyConfig();
 
   const limit = getCurrentMapLimits();
 
@@ -694,6 +930,51 @@ async function loadState() {
 
       normalizeState(state);
 
+      // Auto-heal any colonized habitable planets to make sure they have their correct extractors
+      if (state && state.habitablePlanets && state.players) {
+        state.habitablePlanets.forEach((hp: any) => {
+          if (hp.isColonized && hp.extractors) {
+            // Find the player's planet at these coordinates
+            for (const player of Object.values(state.players) as any[]) {
+              if (player && player.planets) {
+                const planet = player.planets.find((pl: any) => Number(pl.sectorX) === Number(hp.coords.x) && Number(pl.sectorY) === Number(hp.coords.y));
+                if (planet && planet.mines) {
+                  // Verify if we need to adjust mines
+                  const currentWater = planet.mines.water?.length || 0;
+                  const currentPlasma = planet.mines.plasma?.length || 0;
+                  const targetWater = hp.extractors.water || 6;
+                  const targetPlasma = hp.extractors.plasma || 3;
+                  
+                  if (currentWater !== targetWater || currentPlasma !== targetPlasma) {
+                    console.log(`[Auto-Heal Planet Extractors] Repairing ${planet.name} at [${planet.sectorX}, ${planet.sectorY}]. Water: ${currentWater} -> ${targetWater}, Plasma: ${currentPlasma} -> ${targetPlasma}`);
+                    const createMines = (count: number, existingArray: any[] = []): any[] => {
+                      return Array.from({ length: count }, (_, i) => {
+                        const existing = existingArray[i];
+                        return {
+                          index: i,
+                          level: existing ? existing.level : 0,
+                          isUpgrading: existing ? existing.isUpgrading : false,
+                          upgradeEnd: existing ? existing.upgradeEnd : null,
+                          health: existing && existing.health !== undefined ? existing.health : 100
+                        };
+                      });
+                    };
+                    
+                    planet.mines = {
+                      water: createMines(hp.extractors.water || 6, planet.mines.water),
+                      plasma: createMines(hp.extractors.plasma || 3, planet.mines.plasma),
+                      fuel: createMines(hp.extractors.fuel || 3, planet.mines.fuel),
+                      food: createMines(hp.extractors.food || 3, planet.mines.food),
+                      respirant: createMines(hp.extractors.respirant || 3, planet.mines.respirant)
+                    };
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
       // Initial save to seed Cloud SQL
       saveState();
       
@@ -756,7 +1037,13 @@ function findNearestUnoccupiedCoordinate(targetX: number, targetY: number): { x:
 }
 
 // Create initial planet
-function createInitialPlanet(name: string, sectorX: number, sectorY: number, isFirstStation: boolean = false): ColonyPlanet {
+function createInitialPlanet(
+  name: string, 
+  sectorX: number, 
+  sectorY: number, 
+  isFirstStation: boolean = false,
+  customMinesCount?: { water: number; plasma: number; fuel: number; food: number; respirant: number }
+): ColonyPlanet {
   let finalX = sectorX;
   let finalY = sectorY;
 
@@ -797,11 +1084,11 @@ function createInitialPlanet(name: string, sectorX: number, sectorY: number, isF
     sectorY: finalY,
     skinId: "default",
     mines: {
-      water: createMines(6),
-      plasma: createMines(3),
-      fuel: createMines(3),
-      food: createMines(3),
-      respirant: createMines(3)
+      water: createMines(customMinesCount ? customMinesCount.water : 6),
+      plasma: createMines(customMinesCount ? customMinesCount.plasma : 3),
+      fuel: createMines(customMinesCount ? customMinesCount.fuel : 3),
+      food: createMines(customMinesCount ? customMinesCount.food : 3),
+      respirant: createMines(customMinesCount ? customMinesCount.respirant : 3)
     },
     buildings: {
       fabricator: { level: 0, maxLevel: 10, isUpgrading: false, upgradeEnd: null, health: 100 },
@@ -921,6 +1208,38 @@ function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarg
   return buildingDamageReports;
 }
 
+function getOrGenerateHabitableExtractors(hp: any, indexForProportion?: number) {
+  if (hp.extractors) return hp.extractors;
+
+  let isOneThird = false;
+  if (typeof indexForProportion === "number") {
+    isOneThird = (indexForProportion % 3 === 0);
+  } else {
+    isOneThird = (Math.random() < 0.35);
+  }
+
+  if (isOneThird) {
+    hp.extractors = {
+      water: 14,
+      plasma: 1,
+      fuel: 1,
+      food: 1,
+      respirant: 1
+    };
+  } else {
+    const counts = { water: 4, plasma: 1, fuel: 1, food: 1, respirant: 1 };
+    let remaining = 10;
+    const keys: ("water" | "plasma" | "fuel" | "food" | "respirant")[] = ["water", "plasma", "fuel", "food", "respirant"];
+    while (remaining > 0) {
+      const k = keys[Math.floor(Math.random() * keys.length)];
+      counts[k]++;
+      remaining--;
+    }
+    hp.extractors = counts;
+  }
+  return hp.extractors;
+}
+
 function ensureMinimumHabitablePlanets() {
   if (!state.habitablePlanets) {
     state.habitablePlanets = [];
@@ -947,10 +1266,17 @@ function ensureMinimumHabitablePlanets() {
     return !overlap;
   });
   
+  // Self-heal and assign extractors to any that don't have them
+  state.habitablePlanets.forEach((p, index) => {
+    if (!p.isColonized && !p.extractors) {
+      getOrGenerateHabitableExtractors(p, index);
+    }
+  });
+  
   const uncolonized = state.habitablePlanets.filter(p => !p.isColonized);
-  if (uncolonized.length >= 20) return;
+  if (uncolonized.length >= 50) return;
 
-  const countNeeded = 20 - uncolonized.length;
+  const countNeeded = 50 - uncolonized.length;
   const namesPool = [
     "Gaia Aurelia", "Kepler-Prime", "Gliese-91", "New Hope", "Epsilon-D", 
     "Zephyr-9", "Arcadia", "Core Dome-A", "Oasis-1", "Eden-X", 
@@ -990,12 +1316,14 @@ function ensureMinimumHabitablePlanets() {
 
     const name = "Habitable " + namesPool[Math.floor(Math.random() * namesPool.length)];
     const id = `hab_${targetX}_${targetY}`;
-    state.habitablePlanets.push({
+    const hp: any = {
       id,
       name,
       coords: { x: targetX, y: targetY },
       isColonized: false
-    });
+    };
+    getOrGenerateHabitableExtractors(hp, state.habitablePlanets.length);
+    state.habitablePlanets.push(hp);
   }
 }
 
@@ -1269,7 +1597,7 @@ function tickPlayerState(playerId: string, now: number): boolean {
             planet.resources.respirant >= storageLimit;
           
           const isMineBoosted = mine.boostedUntil && now < Number(mine.boostedUntil);
-          let hourlyProd = isOtherMaxed ? (resKey === "water" ? 14000 : 42000) : getMineProductionPerHour(mine.level, resKey as ResourceType);
+          let hourlyProd = isOtherMaxed ? 14000 : getMineProductionPerHour(mine.level, resKey as ResourceType);
           if (isMineBoosted) {
             hourlyProd = hourlyProd * 1.14;
           }
@@ -1300,7 +1628,7 @@ function tickPlayerState(playerId: string, now: number): boolean {
         
         mines.forEach(mine => {
           const isMineBoosted = mine.boostedUntil && now < Number(mine.boostedUntil);
-          let hourlyProd = isOtherMaxed ? (resKey === "water" ? 14000 : 42000) : getMineProductionPerHour(mine.level, resKey as ResourceType);
+          let hourlyProd = isOtherMaxed ? 14000 : getMineProductionPerHour(mine.level, resKey as ResourceType);
           if (isMineBoosted) {
             hourlyProd = hourlyProd * 1.14;
           }
@@ -2428,9 +2756,19 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       // Check researchCenter level 20 requirements
       const hasLvl20 = attacker.planets.some(p => p.buildings.researchCenter.level >= 20);
       if (hasLvl20 && attacker.planets.length < 20) {
+        // Find matching habitable planet to inherit custom extractors
+        let customExt: any = undefined;
+        if (state.habitablePlanets) {
+          const matchedHp = state.habitablePlanets.find(item => Number(item.coords.x) === Number(fleet.targetCoords.x) && Number(item.coords.y) === Number(fleet.targetCoords.y));
+          if (matchedHp) {
+            customExt = getOrGenerateHabitableExtractors(matchedHp);
+            matchedHp.isColonized = true;
+          }
+        }
+
         // Create new planet
         const planetNum = attacker.planets.length + 1;
-        const newPlanet = createInitialPlanet(`${attacker.username}'s Colony ${planetNum}`, fleet.targetCoords.x, fleet.targetCoords.y);
+        const newPlanet = createInitialPlanet(`${attacker.username}'s Colony ${planetNum}`, fleet.targetCoords.x, fleet.targetCoords.y, false, customExt);
         
         // Put surviving colonizing troops into this planet
         Object.entries(fleet.troops).forEach(([tId, count]) => {
@@ -2439,6 +2777,7 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
         newPlanet.troops.settlementShip = 1; // each station starts with 1 settlement ship
 
         attacker.planets.push(newPlanet);
+        ensureAdminMaxed(attacker);
 
         // Add news event
         state.newsEvents.unshift({
@@ -3623,7 +3962,8 @@ app.all("/api/state", (req, res) => {
     playersList,
     serverTime: now,
     customTasks: state.customTasks || {},
-    maxCoord: getCurrentMapLimits()
+    maxCoord: getCurrentMapLimits(),
+    galaxyConfig: state.galaxyConfig || null
   });
 });
 
@@ -4541,6 +4881,54 @@ app.post("/api/galaxy/scan", (req, res) => {
   const hasSettlementShip = p.planets.some(pl => (pl.troops?.settlementShip || 0) > 0) ||
                             state.fleets.some(f => f.senderId === p.id && (f.troops?.settlementShip || 0) > 0);
 
+  const hasSettlementShipInStation = planet && (planet.troops?.settlementShip || 0) > 0;
+
+  // If the active planet has a settlement ship in station, include every unsettled coordinate within the grid
+  if (hasSettlementShipInStation) {
+    const limit = getCurrentMapLimits();
+    const occupiedCoords = new Set<string>();
+
+    // Mark player planets/stations as occupied
+    Object.values(state.players).forEach(player => {
+      if (player.planets) {
+        player.planets.forEach(pl => {
+          occupiedCoords.add(`${pl.sectorX}_${pl.sectorY}`);
+        });
+      }
+    });
+
+    // Mark habitable planets as occupied
+    if (state.habitablePlanets) {
+      state.habitablePlanets.forEach(hp => {
+        occupiedCoords.add(`${hp.coords.x}_${hp.coords.y}`);
+      });
+    }
+
+    // Add all vacant coordinates within the grid as unsettled targets
+    for (let x = 0; x <= limit; x++) {
+      for (let y = 0; y <= limit; y++) {
+        const coordKey = `${x}_${y}`;
+        if (!occupiedCoords.has(coordKey)) {
+          const dist = Math.hypot(x - cx, y - cy);
+          allTargets.push({
+            id: "unsettled",
+            username: "Uncharted Space",
+            faction: "Unsettled Grid Space",
+            factionColor: "#64748b", // slate gray
+            allianceTag: null,
+            planetId: `unsettled_${x}_${y}`,
+            planetName: "Unsettled Coordinate",
+            coords: { x, y },
+            scores: { population: 0, attack: 0, defence: 0, raiders: 0 },
+            dist,
+            isUnsettled: true,
+            isHabitable: false
+          });
+        }
+      }
+    }
+  }
+
   // Inject uncharted habitable planets/stations currently visible
   if (state.habitablePlanets) {
     state.habitablePlanets.forEach(hp => {
@@ -4557,7 +4945,8 @@ app.post("/api/galaxy/scan", (req, res) => {
         coords: hp.coords,
         scores: { population: 0, attack: 0, defence: 0, raiders: 0 },
         dist,
-        isHabitable: true
+        isHabitable: true,
+        extractors: getOrGenerateHabitableExtractors(hp)
       });
     });
   }
@@ -4567,9 +4956,10 @@ app.post("/api/galaxy/scan", (req, res) => {
 
   const maxScanDist = scanRadius * 10;
   
-  // Separate habitable targets and non-habitable targets
+  // Separate habitable targets, unsettled targets, and non-habitable player targets
   const habTargets = allTargets.filter(t => t.isHabitable);
-  const otherTargets = allTargets.filter(t => !t.isHabitable);
+  const unsettledTargets = allTargets.filter(t => t.isUnsettled);
+  const otherTargets = allTargets.filter(t => !t.isHabitable && !t.isUnsettled);
 
   // Filter non-habitable targets (player stations).
   // To keep the universe alive and discoverable, we always include player stations.
@@ -4584,10 +4974,14 @@ app.post("/api/galaxy/scan", (req, res) => {
   // Always show all uncolonized habitable planets in the universe to make them visible and discoverable from the start
   const visibleHabs = habTargets;
 
+  // Limit unsettled targets to the closest 50 to keep payload lightweight and prevent network "Failed to fetch" timeouts
+  const visibleUnsettled = unsettledTargets.slice(0, 50);
+
   // Combine and sort by distance
-  let targets = [...visibleOthers, ...visibleHabs];
+  let targets = [...visibleOthers, ...visibleHabs, ...visibleUnsettled];
   targets.sort((a, b) => a.dist - b.dist);
 
+  saveState();
   res.json({ targets, scanRadius });
 });
 
@@ -4688,7 +5082,8 @@ app.post("/api/galaxy/intelligence", (req, res) => {
         type: "habitable",
         planetName: isHab.name,
         coords: { x: xVal, y: yVal },
-        description: "This is a pristine uncharted habitable planetary zone rich in basic elements. No planetary defense batteries or garrison troops detected. Clear for direct colony settlement ships."
+        description: "This is a pristine uncharted habitable planetary zone rich in basic elements. No planetary defense batteries or garrison troops detected. Clear for direct colony settlement ships.",
+        extractors: getOrGenerateHabitableExtractors(isHab)
       };
     } else {
       report = {
@@ -4828,9 +5223,35 @@ app.post("/api/fleet/send", (req, res) => {
       return res.status(400).json({ error: "Command limits reached. Max 20 colonized colony planets." });
     }
     // 3. Must be a habitable planet in the database on those coordinates that is NOT yet colonized!
-    const targetHabitable = state.habitablePlanets?.find(hp => hp.coords.x === targetX && hp.coords.y === targetY);
+    let targetHabitable = state.habitablePlanets?.find(hp => hp.coords.x === targetX && hp.coords.y === targetY);
     if (!targetHabitable) {
-      return res.status(400).json({ error: "No habitable station or planet detected at these coordinates! Check your radar scanning array." });
+      // Check if coordinate is vacant (no player planet exists there)
+      let occupied = false;
+      for (const playerObj of Object.values(state.players)) {
+        if (playerObj.planets && playerObj.planets.some(pl => pl.sectorX === targetX && pl.sectorY === targetY)) {
+          occupied = true;
+          break;
+        }
+      }
+      if (occupied) {
+        return res.status(400).json({ error: "These coordinates have already been colonized by another commander!" });
+      }
+      
+      // Dynamically generate an uncolonized habitable planet here so it can be colonized!
+      if (!state.habitablePlanets) {
+        state.habitablePlanets = [];
+      }
+      const namesPool = ["New Terra", "Genesis Prime", "Nova Aura", "Verdant Outpost", "Apex Junction"];
+      const randomName = namesPool[Math.floor(Math.random() * namesPool.length)] + ` [${targetX}, ${targetY}]`;
+      const newHab = {
+        id: `hab_${targetX}_${targetY}`,
+        name: randomName,
+        coords: { x: targetX, y: targetY },
+        isColonized: false,
+        extractors: { water: 1, plasma: 1, fuel: 1, food: 1, respirant: 1 }
+      };
+      state.habitablePlanets.push(newHab);
+      targetHabitable = newHab;
     }
     if (targetHabitable.isColonized) {
       return res.status(400).json({ error: "These coordinates have already been colonized by another commander!" });
@@ -5050,12 +5471,21 @@ app.post("/api/fleet/settle", (req, res) => {
   const targetX = fleet.targetCoords.x;
   const targetY = fleet.targetCoords.y;
 
-  const newPlanet = createInitialPlanet(planetName, targetX, targetY);
+  let customExt: any = undefined;
+  if (state.habitablePlanets) {
+    const matchedHp = state.habitablePlanets.find(item => Number(item.coords.x) === Number(targetX) && Number(item.coords.y) === Number(targetY));
+    if (matchedHp) {
+      customExt = getOrGenerateHabitableExtractors(matchedHp);
+      matchedHp.isColonized = true;
+    }
+  }
+
+  const newPlanet = createInitialPlanet(planetName, targetX, targetY, false, customExt);
   const finalX = newPlanet.sectorX;
   const finalY = newPlanet.sectorY;
 
   if (state.habitablePlanets) {
-    const hp = state.habitablePlanets.find(item => item.coords.x === finalX && item.coords.y === finalY);
+    const hp = state.habitablePlanets.find(item => Number(item.coords.x) === Number(finalX) && Number(item.coords.y) === Number(finalY));
     if (hp) {
       hp.isColonized = true;
     }
@@ -5068,6 +5498,7 @@ app.post("/api/fleet/settle", (req, res) => {
   newPlanet.troops.settlementShip = 1; // each station starts with 1 settlement ship
 
   p.planets.push(newPlanet);
+  ensureAdminMaxed(p);
 
   state.newsEvents.unshift({
     id: `news_${Math.random().toString(36).substr(2, 9)}`,
@@ -5153,16 +5584,24 @@ app.post("/api/colonize", (req, res) => {
   // Deduct Settlement Ship
   planet.troops.settlementShip -= 1;
 
-  // Mark habitable planet as colonized if matching coordinates
-  const hp = state.habitablePlanets?.find(item => item.coords.x === finalX && item.coords.y === finalY);
+  // Mark habitable planet as colonized if matching coordinates (try target coordinates first, then final coordinates)
+  let hp = state.habitablePlanets?.find(item => Number(item.coords.x) === Number(targetX) && Number(item.coords.y) === Number(targetY));
+  if (!hp) {
+    hp = state.habitablePlanets?.find(item => Number(item.coords.x) === Number(finalX) && Number(item.coords.y) === Number(finalY));
+  }
   if (hp) {
     hp.isColonized = true;
   }
 
   // Create new planet
   const newColonyName = hp ? hp.name : `${p.username}'s Colony [${finalX}, ${finalY}]`;
-  const newPlanet = createInitialPlanet(newColonyName, finalX, finalY, false);
+  let customExt: any = undefined;
+  if (hp) {
+    customExt = getOrGenerateHabitableExtractors(hp);
+  }
+  const newPlanet = createInitialPlanet(newColonyName, finalX, finalY, false, customExt);
   p.planets.push(newPlanet);
+  ensureAdminMaxed(p);
 
   // System news event
   state.newsEvents.unshift({
@@ -5715,8 +6154,8 @@ app.post("/api/alliance/join", (req, res) => {
   if (p.allianceId) return res.status(400).json({ error: "Already registered in an Alliance." });
 
   const maxCommsHubLvl = Math.max(...p.planets.map(pl => pl.buildings.commsHub?.level || 0));
-  if (maxCommsHubLvl < 4) {
-    return res.status(400).json({ error: "Joining an Alliance requires Communications Hub Level 4 or higher." });
+  if (maxCommsHubLvl < 2) {
+    return res.status(400).json({ error: "Joining an Alliance requires Communications Hub Level 2 or higher." });
   }
 
   const { allianceId } = req.body;
@@ -5757,8 +6196,8 @@ app.post("/api/alliance/apply", (req, res) => {
   if (p.allianceId) return res.status(400).json({ error: "Already registered in an Alliance." });
 
   const maxCommsHubLvl = Math.max(...p.planets.map(pl => pl.buildings.commsHub?.level || 0));
-  if (maxCommsHubLvl < 4) {
-    return res.status(400).json({ error: "Applying to an Alliance requires Communications Hub Level 4 or higher." });
+  if (maxCommsHubLvl < 2) {
+    return res.status(400).json({ error: "Applying to an Alliance requires Communications Hub Level 2 or higher." });
   }
 
   const { allianceId } = req.body;
@@ -6814,6 +7253,124 @@ app.post("/api/feedback/private-list", (req, res) => {
     state.feedbacks = [];
   }
   res.json({ success: true, feedbacks: state.feedbacks });
+});
+
+// Fetch galaxy config (Admins only)
+app.get("/api/admin/galaxy-config", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+
+  initializeGalaxyConfig();
+  res.json({ success: true, galaxyConfig: state.galaxyConfig });
+});
+
+// Update galaxy config parameters (Admins only)
+app.post("/api/admin/galaxy-config", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+
+  initializeGalaxyConfig();
+  const config = state.galaxyConfig!;
+  const {
+    initialGalaxySize,
+    reservedCenterSector,
+    initialColonizationZoneSize,
+    spawnDistance,
+    zoneGrowthOccupancyThreshold,
+    galaxyOccupancyThreshold,
+    expansionIncrement,
+    currentGalaxySize,
+    currentColonizationZoneSize
+  } = req.body;
+
+  if (initialGalaxySize !== undefined) config.initialGalaxySize = Number(initialGalaxySize);
+  if (reservedCenterSector !== undefined) config.reservedCenterSector = { x: Number(reservedCenterSector.x), y: Number(reservedCenterSector.y) };
+  if (initialColonizationZoneSize !== undefined) config.initialColonizationZoneSize = Number(initialColonizationZoneSize);
+  if (spawnDistance !== undefined) config.spawnDistance = Number(spawnDistance);
+  if (zoneGrowthOccupancyThreshold !== undefined) config.zoneGrowthOccupancyThreshold = Number(zoneGrowthOccupancyThreshold);
+  if (galaxyOccupancyThreshold !== undefined) config.galaxyOccupancyThreshold = Number(galaxyOccupancyThreshold);
+  if (expansionIncrement !== undefined) config.expansionIncrement = Number(expansionIncrement);
+  
+  if (currentGalaxySize !== undefined) config.currentGalaxySize = Number(currentGalaxySize);
+  if (currentColonizationZoneSize !== undefined) config.currentColonizationZoneSize = Number(currentColonizationZoneSize);
+
+  saveState();
+  res.json({ success: true, message: "Galaxy Configuration successfully updated!", galaxyConfig: config });
+});
+
+// Force action triggers for debugging/testing (Admins only)
+app.post("/api/admin/galaxy-config/trigger", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+
+  initializeGalaxyConfig();
+  const config = state.galaxyConfig!;
+  const { action } = req.body;
+
+  if (action === "grow-zone") {
+    const prevSize = config.currentColonizationZoneSize || config.initialColonizationZoneSize || 7;
+    const currentMapSize = config.currentGalaxySize || 15;
+    const nextSize = prevSize + 2;
+    config.currentColonizationZoneSize = Math.min(nextSize, currentMapSize);
+    saveState();
+    return res.json({ success: true, message: `Manually grew colonization zone from ${prevSize} to ${config.currentColonizationZoneSize}` });
+  } else if (action === "expand-galaxy") {
+    const oldSize = config.currentGalaxySize || 15;
+    const increment = config.expansionIncrement || 5;
+    const newSize = oldSize + increment;
+    config.currentGalaxySize = newSize;
+    if (config.currentColonizationZoneSize >= oldSize) {
+      config.currentColonizationZoneSize = newSize;
+    }
+
+    // Post to chat
+    const BROADCAST_TEMPLATES = [
+      "GALACTIC COMMAND\n\nLong-range sensor arrays have successfully mapped new regions beyond the known frontier. Navigation systems have been updated. Previously unreachable sectors are now open for exploration.",
+      "GALACTIC COMMAND\n\nCenturies of research have culminated in a breakthrough in deep-space navigation. New sectors have been charted and are now available for colonization.",
+      "GALACTIC COMMAND\n\nExploration fleets have returned with confirmed hyperspace routes beyond the current frontier. Galactic Command authorizes expansion into newly discovered space.",
+      "GALACTIC COMMAND\n\nOur civilizations have reached another milestone in interstellar exploration. Additional sectors have been integrated into the Galactic Navigation Network.",
+      "GALACTIC COMMAND\n\nAdvanced radar arrays have extended humanity's vision deeper into the galaxy. Frontier sectors are now accessible to all commanders."
+    ];
+    const randomMsg = BROADCAST_TEMPLATES[Math.floor(Math.random() * BROADCAST_TEMPLATES.length)];
+
+    if (!state.chatMessages) state.chatMessages = [];
+    state.chatMessages.push({
+      id: `chat_expansion_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      channel: "global",
+      senderId: "system",
+      senderName: "GALACTIC COMMAND",
+      senderFaction: "System",
+      senderFactionColor: "#F1C40F",
+      allianceTag: "GAL",
+      receiverId: null,
+      content: randomMsg,
+      timestamp: Date.now()
+    });
+    if (state.chatMessages.length > 200) state.chatMessages.shift();
+
+    if (!state.newsEvents) state.newsEvents = [];
+    state.newsEvents.push({
+      id: `news_expansion_${Date.now()}`,
+      title: "🌌 New Frontiers Charted!",
+      content: `Galactic Command has expanded the known sector coordinates to ${newSize}x${newSize} space. High-resolution navigation channels are now online!`,
+      type: "system",
+      timestamp: Date.now()
+    });
+
+    saveState();
+    return res.json({ success: true, message: `Manually expanded galaxy from ${oldSize} to ${newSize}` });
+  } else {
+    return res.status(400).json({ error: "Invalid action. Choose 'grow-zone' or 'expand-galaxy'." });
+  }
 });
 
 // Fetch custom tasks definition

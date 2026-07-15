@@ -561,11 +561,11 @@ export const CommunicationsHubDetail: React.FC<CommunicationsHubDetailProps> = (
               )}
 
               {/* Join list */}
-              {commsHubLvl < 4 ? (
+              {commsHubLvl < 2 ? (
                 <div className="p-4 bg-yellow-950/5 rounded-xl border border-yellow-500/10 flex flex-col items-center justify-center text-center space-y-2.5">
                   <Users size={18} className="text-yellow-400 opacity-60 animate-pulse" />
                   <span className="text-[9px] text-yellow-500 uppercase tracking-widest font-bold">Join Alliance Blocked</span>
-                  <p className="text-slate-400 text-[10.5px]">Requires Communications Hub Level 4 to apply/join any galactic alliance coalition (Current: Level {commsHubLvl}).</p>
+                  <p className="text-slate-400 text-[10.5px]">Requires Communications Hub Level 2 to apply/join any galactic alliance coalition (Current: Level {commsHubLvl}).</p>
                 </div>
               ) : (
                 <div className="p-4 bg-[#05070A]/90 rounded-xl border border-[#1E293B] space-y-3">

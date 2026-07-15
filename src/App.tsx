@@ -358,6 +358,7 @@ export default function App() {
   const [newsEvents, setNewsEvents] = useState<NewsEvent[]>([]);
   const [serverTime, setServerTime] = useState<number>(Date.now());
   const [maxCoord, setMaxCoord] = useState<number>(40);
+  const [galaxyConfig, setGalaxyConfig] = useState<any>(null);
   const [customTasks, setCustomTasks] = useState<Record<string, any>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [viewingPlayerId, setViewingPlayerId] = useState<string | null>(null);
@@ -1512,6 +1513,9 @@ export default function App() {
         setServerTime(data.serverTime);
         if (data.maxCoord !== undefined) {
           setMaxCoord(data.maxCoord);
+        }
+        if (data.galaxyConfig !== undefined) {
+          setGalaxyConfig(data.galaxyConfig);
         }
         setCustomTasks(data.customTasks || {});
         consecutiveErrorsRef.current = 0;
@@ -3698,6 +3702,7 @@ export default function App() {
             onCreateAlliance={handleCreateAlliance}
             onJoinAlliance={handleJoinAlliance}
             maxCoord={maxCoord}
+            galaxyConfig={galaxyConfig}
             onLeaveAlliance={handleLeaveAlliance}
             onDeclareWar={handleDeclareWar}
             onRefreshState={fetchState}
@@ -3766,6 +3771,7 @@ export default function App() {
             showStationsTop={showStationsTop}
             setShowStationsTop={setShowStationsTop}
             showToast={showToast}
+            galaxyConfig={galaxyConfig}
             onRefreshState={fetchState}
             onLinkGoogle={handleLinkGoogleAccount}
             onOpenPayments={() => {

@@ -76,6 +76,7 @@ interface GalaxyTabProps {
   localResources?: Record<string, number>;
   isUpgrading?: boolean;
   maxCoord?: number;
+  galaxyConfig?: any;
   onUpgradeBuilding?: (buildingKey: string, queue?: boolean) => Promise<any> | any;
   isDirectRadarView?: boolean;
   onCloseRadarDirectView?: () => void;
@@ -170,6 +171,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   localResources,
   isUpgrading = false,
   maxCoord = 100,
+  galaxyConfig,
   onUpgradeBuilding,
   isDirectRadarView,
   onCloseRadarDirectView
@@ -228,6 +230,9 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [expandedTargets, setExpandedTargets] = useState<Record<string, boolean>>({});
   const [radarRadius, setRadarRadius] = useState(1);
   const [isScanning, setIsScanning] = useState(false);
+  const [hasClickedScan, setHasClickedScan] = useState(() => {
+    return localStorage.getItem(`moonbase_scan_${player.id}`) === 'true';
+  });
 
   const [isTyping, setIsTyping] = useState(false);
 
@@ -269,7 +274,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   const [editingHighlights, setEditingHighlights] = useState(false);
   const [allianceMemberReports, setAllianceMemberReports] = useState<any[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
-  const [activeReportsTab, setActiveReportsTab] = useState<'highlights' | 'troops' | 'situation' | 'activity'>('highlights');
+  const [activeReportsTab, setActiveReportsTab] = useState<'highlights' | 'troops' | 'situation' | 'activity' | 'applications'>('highlights');
   const [expandedMemberPlanets, setExpandedMemberPlanets] = useState<Record<string, boolean>>({});
   const [readIntelFleets, setReadIntelFleets] = useState<Record<string, boolean>>(() => {
     try {
@@ -719,6 +724,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
       const data = await safeParseJson(res);
       if (res.ok) {
         localStorage.setItem(`moonbase_scan_${player.id}`, 'true');
+        setHasClickedScan(true);
       }
       setScanResults(data.targets || []);
       setRadarRadius(data.scanRadius || 1);
@@ -745,18 +751,23 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   // Open fleet dispatch panel
   const openDispatchFleet = (target: any, type: 'attack' | 'colonize' | 'recon' | 'move') => {
     setSelectedTarget(target);
-    setFleetType(type);
+    const isUncolonized = target.isHabitable || target.isUnsettled;
+    let actualType = type;
+    if (isUncolonized) {
+      actualType = 'colonize';
+    }
+    setFleetType(actualType);
     setTargetBuilding('random');
     
     // Set smart default troops count
     const initial: Record<string, number> = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
-    if (type === 'recon' || type === 'move') {
+    if (actualType === 'colonize') {
+      initial.settlementShip = Math.min(1, activePlanet.troops.settlementShip || 0);
+    } else if (actualType === 'recon' || actualType === 'move') {
       initial.drone = Math.min(5, activePlanet.troops.drone || 0);
-    } else if (type === 'attack') {
+    } else if (actualType === 'attack') {
       initial.attacker = Math.min(10, activePlanet.troops.attacker || 0);
       initial.looter = Math.min(5, activePlanet.troops.looter || 0);
-    } else if (type === 'colonize') {
-      initial.settlementShip = Math.min(1, activePlanet.troops.settlementShip || 0);
     }
     setFleetTroops(initial);
   };
@@ -1119,7 +1130,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             <button 
               type="submit"
               disabled={isScanning}
-              className="px-5 py-3.5 bg-cyan-500/10 hover:bg-cyan-500/20 hover:shadow-[0_0_12px_rgba(34,211,238,0.25)] text-cyan-400 font-bold text-xs uppercase tracking-widest border border-cyan-500/40 rounded-xl transition flex items-center justify-center gap-2 whitespace-nowrap active:scale-[0.98] cursor-pointer animate-[pulse_3.5s_infinite] shadow-[0_0_15px_rgba(34,211,238,0.15)]"
+              className={`px-5 py-3.5 hover:bg-cyan-500/20 hover:shadow-[0_0_12px_rgba(34,211,238,0.25)] text-cyan-400 font-bold text-xs uppercase tracking-widest border rounded-xl transition flex items-center justify-center gap-2 whitespace-nowrap active:scale-[0.98] cursor-pointer ${
+                !hasClickedScan
+                  ? 'bg-cyan-500/25 border-cyan-300 animate-[pulse_1s_infinite] shadow-[0_0_20px_rgba(34,211,238,0.65)] scale-[1.03]'
+                  : 'bg-cyan-500/10 border-cyan-500/40 animate-[pulse_4.5s_infinite] shadow-[0_0_15px_rgba(34,211,238,0.15)]'
+              }`}
               title="Search Sector: trigger planetary radar sweep"
             >
               <Search size={14} title="Search magnifying glass icon" />
@@ -1155,6 +1170,30 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             </div>
           </div>
 
+          {/* Visual Colonization Zone Readout */}
+          {galaxyConfig && (
+            <div className="p-4 bg-[#0A1625]/40 border border-[#1E293B] rounded-xl font-mono text-[11px] leading-relaxed relative overflow-hidden text-left shadow-md">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-xl pointer-events-none animate-pulse"></div>
+              <div className="flex items-center gap-2 text-cyan-400 font-extrabold text-xs uppercase tracking-widest mb-1.5 glow-cyan">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
+                🌌 DEEP SPACE RADAR TELEMETRY
+              </div>
+              <p className="text-slate-350 font-sans text-xs">
+                The current explored universe spans <span className="text-white font-bold">{maxCoord + 1} × {maxCoord + 1}</span> sectors. Improved radar and deep-space exploration technologies are actively pushing humanity's coordinates outward.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-[#1E293B]/60 text-slate-400 text-[10.5px]">
+                <div>
+                  <span className="text-slate-500 font-bold">COLONIZATION ZONE:</span>
+                  <span className="text-emerald-400 font-bold ml-1.5">{galaxyConfig.currentColonizationZoneSize} × {galaxyConfig.currentColonizationZoneSize}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-bold">RESERVED CENTER SECTOR:</span>
+                  <span className="text-red-400 font-bold ml-1.5">[{galaxyConfig.reservedCenterSector?.x}, {galaxyConfig.reservedCenterSector?.y}]</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Collapsible RADAR dropdown box */}
           <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4 shadow-lg">
             <div 
@@ -1180,7 +1219,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     <div className="text-left font-mono">
                       <p className="text-xs font-bold text-emerald-400">SETTLEMENT FLIGHT READY</p>
                       <p className="text-[10.5px] text-slate-400 font-sans leading-normal">
-                        You have <span className="text-white font-bold">{activePlanet.troops.settlementShip} Settlement Ship(s)</span> at this active station. Settle on any unsettled habitable zones listed below.
+                        You have <span className="text-white font-bold">{activePlanet.troops.settlementShip} Settlement Ship(s)</span> at this active station. Every unsettled coordinate within the grid is now fully mapped and showing on the radar below.
                       </p>
                     </div>
                   </div>
@@ -1253,30 +1292,36 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                             <div className="flex items-center gap-3 min-w-0">
                               <div 
                                 onClick={() => {
-                                  if (!target.isHabitable && target.id && onViewPlayerProfile) {
+                                  if (!target.isHabitable && !target.isUnsettled && target.id && onViewPlayerProfile) {
                                     onViewPlayerProfile(target.id);
                                   }
                                 }}
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 border border-cyan-500/45 text-cyan-400 bg-cyan-500/10 uppercase font-mono shadow-inner shadow-cyan-500/15 ${!target.isHabitable && target.id && onViewPlayerProfile ? 'cursor-pointer hover:bg-cyan-500/20 hover:text-cyan-300' : ''}`}
-                                title={!target.isHabitable && target.id && onViewPlayerProfile ? "Click to view Commander Profile" : undefined}
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 border uppercase font-mono shadow-inner ${
+                                  target.isUnsettled
+                                    ? 'border-slate-500/45 text-slate-400 bg-slate-500/10 shadow-slate-500/15'
+                                    : 'border-cyan-500/45 text-cyan-400 bg-cyan-500/10 shadow-cyan-500/15'
+                                } ${!target.isHabitable && !target.isUnsettled && target.id && onViewPlayerProfile ? 'cursor-pointer hover:bg-cyan-500/20 hover:text-cyan-300' : ''}`}
+                                title={!target.isHabitable && !target.isUnsettled && target.id && onViewPlayerProfile ? "Click to view Commander Profile" : undefined}
                               >
-                                {target.planetName[0]}
+                                {target.isUnsettled ? '🛰️' : target.planetName[0]}
                               </div>
                               <div className="text-left min-w-0">
                                 <h4 
                                   onClick={() => {
-                                    if (!target.isHabitable && target.id && onViewPlayerProfile) {
+                                    if (!target.isHabitable && !target.isUnsettled && target.id && onViewPlayerProfile) {
                                       onViewPlayerProfile(target.id);
                                     }
                                   }}
-                                  className={`font-bold text-slate-200 text-[11px] sm:text-sm leading-tight truncate ${!target.isHabitable && target.id && onViewPlayerProfile ? 'cursor-pointer hover:text-cyan-400 transition' : ''}`}
-                                  title={!target.isHabitable && target.id && onViewPlayerProfile ? "Click to view Commander Profile" : undefined}
+                                  className={`font-bold text-slate-200 text-[11px] sm:text-sm leading-tight truncate ${!target.isHabitable && !target.isUnsettled && target.id && onViewPlayerProfile ? 'cursor-pointer hover:text-cyan-400 transition' : ''}`}
+                                  title={!target.isHabitable && !target.isUnsettled && target.id && onViewPlayerProfile ? "Click to view Commander Profile" : undefined}
                                 >
                                   {target.planetName} <span className="text-[10px] sm:text-xs text-cyan-400 font-mono ml-1.5">[{target.coords.x}, {target.coords.y}]</span>
                                 </h4>
                                 <div className="text-[11px] text-slate-400 font-medium">
                                   {target.isHabitable ? (
                                     <span className="text-emerald-450 font-bold uppercase tracking-wide text-[10px] text-emerald-400 font-sans">Habitable Station</span>
+                                  ) : target.isUnsettled ? (
+                                    <span className="text-slate-400 font-bold uppercase tracking-wide text-[10px] font-mono">Unsettled Coordinate</span>
                                   ) : (
                                     <>Commander: <button type="button" onClick={() => { if (onViewPlayerProfile && target.id) onViewPlayerProfile(target.id); }} className="text-cyan-400 font-bold font-mono hover:underline hover:text-cyan-300 transition cursor-pointer text-left">{target.username}</button></>
                                   )}
@@ -1430,6 +1475,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                   <span className="text-slate-500 block text-[9px] uppercase tracking-wider">Alliance Rank</span>
                                   {target.isHabitable ? (
                                     <span className="font-bold text-emerald-400 text-xs uppercase text-emerald-450">Uncharted Planet</span>
+                                  ) : target.isUnsettled ? (
+                                    <span className="font-bold text-slate-400 text-xs uppercase">Unsettled Coordinate</span>
                                   ) : target.allianceTag ? (
                                     <span className="font-bold text-yellow-400 text-xs">alliance member</span>
                                   ) : (
@@ -1442,7 +1489,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 </div>
                                 <div className="p-2.5 bg-[#030508]/60 border border-[#161E2E] rounded-xl">
                                   <span className="text-slate-500 block text-[9px] uppercase tracking-wider">{target.isHabitable ? "Type" : "System Population"}</span>
-                                  <span className="font-bold text-emerald-400 text-xs">{target.isHabitable ? "Carbon-Based Biosphere" : `${target.scores.population.toLocaleString()} citizens`}</span>
+                                  <span className="font-bold text-emerald-400 text-xs">{target.isHabitable ? "Carbon-Based Biosphere" : target.isUnsettled ? "None - Vacant Sector" : `${target.scores.population.toLocaleString()} citizens`}</span>
                                 </div>
                                 <div className="p-2.5 bg-[#030508]/60 border border-[#161E2E] rounded-xl font-mono">
                                   <span className="text-slate-500 block text-[9px] uppercase tracking-wider">Galaxy Tracking Signal</span>
@@ -1462,10 +1509,58 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 </span>
                               </div>
 
+                              {/* Detected Resource Extractors on Habitable Stations */}
+                              {target.isHabitable && target.extractors && (
+                                <div className="p-3 bg-emerald-950/10 border border-emerald-500/20 rounded-xl space-y-2">
+                                  <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-mono flex items-center gap-1.5">
+                                    <span>⚡</span> DETECTED RESOURCE EXTRACTORS ({
+                                      (target.extractors.water || 0) +
+                                      (target.extractors.plasma || 0) +
+                                      (target.extractors.fuel || 0) +
+                                      (target.extractors.food || 0) +
+                                      (target.extractors.respirant || 0)
+                                    } Total)
+                                  </h4>
+                                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-1">
+                                    <div className="p-2 bg-[#030508]/60 border border-[#161E2E] rounded-lg text-center font-mono">
+                                      <span className="text-[9px] text-slate-400 block uppercase font-bold">💧 Water</span>
+                                      <span className="text-[11px] font-black text-blue-400">{target.extractors.water || 0} Pumps</span>
+                                    </div>
+                                    <div className="p-2 bg-[#030508]/60 border border-[#161E2E] rounded-lg text-center font-mono">
+                                      <span className="text-[9px] text-slate-400 block uppercase font-bold">🔥 Plasma</span>
+                                      <span className="text-[11px] font-black text-purple-400">{target.extractors.plasma || 0} Pumps</span>
+                                    </div>
+                                    <div className="p-2 bg-[#030508]/60 border border-[#161E2E] rounded-lg text-center font-mono">
+                                      <span className="text-[9px] text-slate-400 block uppercase font-bold">⚡ Fuel</span>
+                                      <span className="text-[11px] font-black text-amber-400">{target.extractors.fuel || 0} Pumps</span>
+                                    </div>
+                                    <div className="p-2 bg-[#030508]/60 border border-[#161E2E] rounded-lg text-center font-mono">
+                                      <span className="text-[9px] text-slate-400 block uppercase font-bold">🌾 Food</span>
+                                      <span className="text-[11px] font-black text-green-400">{target.extractors.food || 0} Pumps</span>
+                                    </div>
+                                    <div className="p-2 bg-[#030508]/60 border border-[#161E2E] rounded-lg text-center font-mono col-span-2 sm:col-span-1">
+                                      <span className="text-[9px] text-slate-400 block uppercase font-bold">💨 Respirant</span>
+                                      <span className="text-[11px] font-black text-teal-400">{target.extractors.respirant || 0} Pumps</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
                               {/* Tactical Mission Deployments */}
                               <div className="border-t border-[#1E293B]/30 pt-3 flex flex-wrap items-center gap-2 text-xs">
                                 {isUserSelf ? (
                                   <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-850">COMMANDER HQ</span>
+                                ) : target.isUnsettled ? (
+                                  <>
+                                    <button 
+                                      type="button"
+                                      onClick={() => openDispatchFleet(target, 'move')}
+                                      className="px-3.5 py-2 bg-emerald-950/25 border border-emerald-500/40 text-emerald-400 hover:bg-[#10b981]/15 rounded-xl font-bold transition cursor-pointer text-[11px] font-mono"
+                                      title="Dispatch a fleet containing a Settlement Ship to colonize this vacant sector coordinate"
+                                    >
+                                      Move Fleet
+                                    </button>
+                                  </>
                                 ) : target.isHabitable ? (
                                   <>
                                     <button 
@@ -1478,18 +1573,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     <button 
                                       type="button"
                                       onClick={() => openDispatchFleet(target, 'move')}
-                                      className="px-3.5 py-2 bg-[#0D1527] border border-[#1E293B] text-slate-355 rounded-xl hover:bg-[#0F1E36] font-bold transition cursor-pointer text-[11px] font-mono"
+                                      className="px-3.5 py-2 bg-emerald-950/25 border border-emerald-500/40 text-emerald-400 hover:bg-[#10b981]/15 rounded-xl font-bold transition cursor-pointer text-[11px] font-mono"
+                                      title="Dispatch a fleet containing a Settlement Ship to colonize this habitable station"
                                     >
                                       Move Fleet
                                     </button>
-                                    <button 
-                                      type="button"
-                                      onClick={() => openDispatchFleet(target, 'colonize')}
-                                      className="px-4 py-2 bg-emerald-950/25 border border-emerald-500/40 text-emerald-400 hover:bg-[#10b981]/15 rounded-xl font-bold transition cursor-pointer text-[11px] animate-pulse font-mono"
-                                    >
-                                      Settle Sector
-                                    </button>
-
                                   </>
                                 ) : (
                                   <>
@@ -1504,7 +1592,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     <button 
                                       type="button"
                                       onClick={() => openDispatchFleet(target, 'move')}
-                                      className="px-3.5 py-2 bg-slate-900 border border-[#1E293B] text-slate-300 rounded-xl hover:bg-slate-850 font-bold transition cursor-pointer text-[11px]"
+                                      className="px-3.5 py-2 bg-emerald-950/25 border border-emerald-500/40 text-emerald-400 hover:bg-[#10b981]/15 rounded-xl font-bold transition cursor-pointer text-[11px]"
                                     >
                                       Move Fleet
                                     </button>
@@ -2650,11 +2738,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   )}
 
                   {/* Join list */}
-                  {commsHubLvl < 4 ? (
+                  {commsHubLvl < 2 ? (
                     <div className="p-5 bg-yellow-950/5 rounded-xl border border-yellow-500/10 flex flex-col items-center justify-center text-center space-y-2.5 font-mono">
                       <Users size={24} className="text-yellow-400 opacity-60 animate-pulse" />
                       <span className="text-[10px] text-yellow-500 uppercase tracking-widest font-bold">Join Alliance Blocked</span>
-                      <p className="text-slate-400 text-xs">Requires Communications Hub Level 4 to apply/join any galactic alliance coalition (Current: Level {commsHubLvl}).</p>
+                      <p className="text-slate-400 text-xs">Requires Communications Hub Level 2 to apply/join any galactic alliance coalition (Current: Level {commsHubLvl}).</p>
                     </div>
                   ) : (
                     <div className="p-5 bg-[#05070A]/90 rounded-xl border border-[#1E293B] space-y-4 font-mono">
@@ -4283,10 +4371,26 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
         const hasCombat = (fleetTroops.attacker || 0) >= 1 || (fleetTroops.tank || 0) >= 1 || (fleetTroops.looter || 0) >= 1 || (fleetTroops.defender || 0) >= 1;
         const hasSettlement = (fleetTroops.settlementShip || 0) >= 1;
 
+        const isUncolonized = selectedTarget.isHabitable || selectedTarget.isUnsettled;
+
         const selectedRf = selectedReserveFleetId !== 'manual' ? createdFleets.find(f => f.id === selectedReserveFleetId) : null;
-        const isMissionReady = selectedReserveFleetId !== 'manual' 
-          ? (selectedRf ? !selectedRf.isTraveling : false)
-          : (hasDrone || hasCombat || hasSettlement);
+        
+        let isMissionReady = false;
+        if (selectedReserveFleetId !== 'manual') {
+          if (selectedRf && !selectedRf.isTraveling) {
+            if (isUncolonized) {
+              isMissionReady = (selectedRf.troops.settlementShip || 0) >= 1;
+            } else {
+              isMissionReady = true;
+            }
+          }
+        } else {
+          if (isUncolonized) {
+            isMissionReady = hasSettlement;
+          } else {
+            isMissionReady = (hasDrone || hasCombat || hasSettlement);
+          }
+        }
 
         let inferredType: 'attack' | 'colonize' | 'recon' | 'move' = 'move';
         if (selectedReserveFleetId !== 'manual') {
@@ -4628,18 +4732,24 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                 </div>
                 <div className="flex justify-between items-center bg-cyan-950/10 border border-cyan-500/10 p-2 rounded-xl mt-3">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Mission Directive Flight Path:</span>
-                  <select
-                    value={fleetType}
-                    onChange={(e) => setFleetType(e.target.value as any)}
-                    className="bg-[#05070A] border border-cyan-800/40 text-cyan-400 text-xs font-mono py-1 px-2.5 rounded-lg focus:outline-none cursor-pointer font-bold"
-                    id="drawer-mission-directive-flight-select"
-                  >
-                    <option value="move" className="text-slate-300">🛸 Move Relocation (Standard)</option>
-                    <option value="timed_move" className="text-slate-300">⏱️ Launch Timed Move (24h Window)</option>
-                    <option value="attack" className="text-slate-300">⚔️ Attack Station (Standard)</option>
-                    <option value="timed_attack" className="text-slate-300">⏱️ Launch Timed Attack (24h Window)</option>
-                    <option value="colonize" className="text-slate-300">🚀 Settle Colony</option>
-                  </select>
+                  {selectedTarget.isHabitable || selectedTarget.isUnsettled ? (
+                    <span className="font-bold text-emerald-400 text-xs uppercase font-mono bg-emerald-950/30 px-2.5 py-1.5 rounded border border-emerald-800/30">
+                      🚀 Move & Settle Colony
+                    </span>
+                  ) : (
+                    <select
+                      value={fleetType}
+                      onChange={(e) => setFleetType(e.target.value as any)}
+                      className="bg-[#05070A] border border-cyan-800/40 text-cyan-400 text-xs font-mono py-1 px-2.5 rounded-lg focus:outline-none cursor-pointer font-bold"
+                      id="drawer-mission-directive-flight-select"
+                    >
+                      <option value="move" className="text-slate-300">🛸 Move Relocation (Standard)</option>
+                      <option value="timed_move" className="text-slate-300">⏱️ Launch Timed Move (24h Window)</option>
+                      <option value="attack" className="text-slate-300">⚔️ Attack Station (Standard)</option>
+                      <option value="timed_attack" className="text-slate-300">⏱️ Launch Timed Attack (24h Window)</option>
+                      <option value="colonize" className="text-slate-300">🚀 Settle Colony</option>
+                    </select>
+                  )}
                 </div>
                 {(() => {
                   const distance = Math.hypot(selectedTarget.coords.x - activePlanet.sectorX, selectedTarget.coords.y - activePlanet.sectorY);
@@ -4791,6 +4901,26 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     Allocated forces will be divided evenly across {dispatchNumFleets} separate tactical squadrons to execute simultaneous tasks.
                   </div>
                 )}
+                {selectedTarget && (selectedTarget.isHabitable || selectedTarget.isUnsettled) && (() => {
+                  const hasShip = selectedReserveFleetId !== 'manual'
+                    ? (createdFleets.find(f => f.id === selectedReserveFleetId)?.troops.settlementShip || 0) >= 1
+                    : (fleetTroops.settlementShip || 0) >= 1;
+
+                  if (!hasShip) {
+                    return (
+                      <div className="p-3 bg-red-950/25 border border-red-500/30 rounded-xl text-[11px] text-red-400 font-bold font-sans flex items-center gap-2 mt-2 animate-pulse">
+                        <span className="text-base">⚠️</span>
+                        <span>MISSION CRITICAL: You must allocate at least 1 Settlement Ship to move to and settle this uncolonized sector.</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="p-3 bg-emerald-950/25 border border-emerald-500/30 rounded-xl text-[11px] text-emerald-400 font-bold font-sans flex items-center gap-2 mt-2">
+                      <span className="text-base">✓</span>
+                      <span>Settlement Ship is allocated. Ready to colonize sector coordinates!</span>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
@@ -5122,6 +5252,42 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                     <>
                       <p className="text-xs text-slate-350 font-sans"><span className="text-emerald-400 font-mono font-bold">PLANET CLASSIFICATION:</span> Uncharted Habitable Zone</p>
                       <p className="text-xs text-slate-300 leading-relaxed font-sans bg-emerald-950/25 border border-emerald-500/30 p-2.5 rounded-lg mt-1">{intelReport.description}</p>
+                      
+                      {intelReport.extractors && (
+                        <div className="mt-4 p-3.5 bg-emerald-950/10 border border-emerald-500/20 rounded-xl space-y-2 text-left">
+                          <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-mono flex items-center gap-1.5">
+                            <span>⚡</span> DETECTED RESOURCE EXTRACTORS ({
+                              (intelReport.extractors.water || 0) +
+                              (intelReport.extractors.plasma || 0) +
+                              (intelReport.extractors.fuel || 0) +
+                              (intelReport.extractors.food || 0) +
+                              (intelReport.extractors.respirant || 0)
+                            } Total)
+                          </h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2">
+                            <div className="p-2 bg-[#090E1B] border border-[#1E293B]/60 rounded-lg text-center font-mono">
+                              <span className="text-[9px] text-slate-400 block uppercase font-bold">💧 Water</span>
+                              <span className="text-[11px] font-black text-blue-400">{intelReport.extractors.water} Pumps</span>
+                            </div>
+                            <div className="p-2 bg-[#090E1B] border border-[#1E293B]/60 rounded-lg text-center font-mono">
+                              <span className="text-[9px] text-slate-400 block uppercase font-bold">🔥 Plasma</span>
+                              <span className="text-[11px] font-black text-purple-400">{intelReport.extractors.plasma} Pumps</span>
+                            </div>
+                            <div className="p-2 bg-[#090E1B] border border-[#1E293B]/60 rounded-lg text-center font-mono">
+                              <span className="text-[9px] text-slate-400 block uppercase font-bold">⚡ Fuel</span>
+                              <span className="text-[11px] font-black text-amber-400">{intelReport.extractors.fuel} Pumps</span>
+                            </div>
+                            <div className="p-2 bg-[#090E1B] border border-[#1E293B]/60 rounded-lg text-center font-mono">
+                              <span className="text-[9px] text-slate-400 block uppercase font-bold">🌾 Food</span>
+                              <span className="text-[11px] font-black text-green-400">{intelReport.extractors.food} Pumps</span>
+                            </div>
+                            <div className="p-2 bg-[#090E1B] border border-[#1E293B]/60 rounded-lg text-center font-mono col-span-2 sm:col-span-1">
+                              <span className="text-[9px] text-slate-400 block uppercase font-bold">💨 Respirant</span>
+                              <span className="text-[11px] font-black text-teal-400">{intelReport.extractors.respirant} Pumps</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                   {intelReport.type === 'void' && (
@@ -5700,7 +5866,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   { id: 'highlights', label: '📌 Notes & Highlights' },
                   { id: 'troops', label: '🎖️ Troop Intelligence' },
                   { id: 'situation', label: '📡 Situation Room' },
-                  { id: 'activity', label: '👥 Activity Roster' }
+                  { id: 'activity', label: '👥 Activity Roster' },
+                  { id: 'applications', label: `📬 Applications (${activeAlliance?.applications?.length || 0})` }
                 ].map((t) => (
                   <button
                     key={t.id}
@@ -6383,6 +6550,107 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                           ))}
                         </div>
                       )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 5: ALLIANCE APPLICATIONS */}
+              {activeReportsTab === 'applications' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl">
+                    <h4 className="text-xs font-bold text-yellow-400 uppercase tracking-widest font-mono">📬 PENDING MEMBERSHIP APPLICATIONS</h4>
+                    <p className="text-[11px] text-slate-400 leading-relaxed font-sans font-normal mt-0.5">
+                      Review recruitment applications from external system commanders seeking to enlist. Approving accepts them into the active alliance roster, while declining clears their request. Only alliance leaders and officers can approve or decline requests.
+                    </p>
+                  </div>
+
+                  {!activeAlliance?.applications || activeAlliance.applications.length === 0 ? (
+                    <div className="p-8 text-center text-slate-500 italic bg-[#030508]/60 border border-dashed border-[#1E293B] rounded-xl font-sans text-xs">
+                      No pending membership applications at this time. Roster invitation queue is empty.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {activeAlliance.applications.map((app) => (
+                        <div key={app.playerId} className="p-4 border border-yellow-500/25 bg-yellow-500/5 hover:bg-yellow-500/10 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => onViewPlayerProfile && onViewPlayerProfile(app.playerId)}
+                                className="font-bold text-white hover:text-cyan-400 underline cursor-pointer text-sm"
+                              >
+                                Commander {app.username}
+                              </button>
+                              <span className="text-slate-500 text-[10px] block mt-0.5">
+                                Submitted: {new Date(app.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {(player.allianceRole === 'leader' || player.allianceRole === 'officer') ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch('/api/alliance/approve', {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                        'x-user-id': player.id
+                                      },
+                                      body: JSON.stringify({ targetPlayerId: app.playerId })
+                                    });
+                                    const data = await safeParseJson(res);
+                                    if (res.ok) {
+                                      if (showToast) showToast(`Approved Commander ${app.username} into our Alliance!`, 'success');
+                                      if (onRefreshState) onRefreshState();
+                                    } else {
+                                      if (showToast) showToast(data.error || 'Approval failed', 'error');
+                                    }
+                                  } catch (err) {
+                                    if (showToast) showToast('Communication link error', 'error');
+                                  }
+                                }}
+                                className="px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold rounded-lg uppercase text-[10.5px] cursor-pointer transition duration-150"
+                              >
+                                Approve ✅
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch('/api/alliance/decline', {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                        'x-user-id': player.id
+                                      },
+                                      body: JSON.stringify({ targetPlayerId: app.playerId })
+                                    });
+                                    const data = await safeParseJson(res);
+                                    if (res.ok) {
+                                      if (showToast) showToast(`Declined application request from ${app.username}.`, 'info');
+                                      if (onRefreshState) onRefreshState();
+                                    } else {
+                                      if (showToast) showToast(data.error || 'Operation failed', 'error');
+                                    }
+                                  } catch (err) {
+                                    if (showToast) showToast('Net interface error', 'error');
+                                  }
+                                }}
+                                className="px-3.5 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-bold rounded-lg uppercase text-[10.5px] cursor-pointer transition duration-150"
+                              >
+                                Decline ❌
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 italic">Officer authorization required to respond</span>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

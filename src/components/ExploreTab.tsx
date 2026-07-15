@@ -488,12 +488,11 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
       activePlanet.resources.respirant >= repositoryLimit;
       
     const mines = activePlanet.mines[resKey] || [];
-    if (isOtherMaxed) {
-      return resKey === 'water' ? 84000 : 42000;
-    }
     return mines.reduce((sum, m) => {
       const isMineBoosted = m.boostedUntil && Number(m.boostedUntil) > serverTime;
-      const baseOutput = Math.round((m.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
+      const baseOutput = isOtherMaxed 
+        ? 14000 
+        : Math.round((m.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
       const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
       return sum + output;
     }, 0);
@@ -711,11 +710,11 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
             activePlanet.resources.food >= repositoryLimit &&
             activePlanet.resources.respirant >= repositoryLimit;
           
-          const totalProd = isOtherMaxed
-            ? (resKey === 'water' ? 84000 : 42000)
-            : mines.reduce((sum, m) => {
+          const totalProd = mines.reduce((sum, m) => {
                 const isMineBoosted = m.boostedUntil && Number(m.boostedUntil) > serverTime;
-                const baseOutput = Math.round((m.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
+                const baseOutput = isOtherMaxed
+                  ? 14000
+                  : Math.round((m.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
                 const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
                 return sum + output;
               }, 0);

@@ -71,49 +71,6 @@ const TECHS: TechDef[] = [
   }
 ];
 
-const FAQS = [
-  {
-    q: "What is the core objective of the game?",
-    a: "Your objective is to build a mighty space-faring empire. You extract 5 essential resources (Water, Plasma, Fuel, Food, and Respirant), upgrade local facilities on your outposts, research global technologies, build fleets of space warships, and expand by colonizing habitable planets across the galaxy."
-  },
-  {
-    q: "How do I colonize a new habitable planet or station?",
-    a: "First, build exactly one (1) Settlement Ship in your War Room (CMD tab). Next, select your Radar Array under your Explore Tab and run a sector scan on your target coordinate to discover if it contains a habitable planet or station. Once scanned, go to the Galaxy Map (GLXY tab), choose 'Colonize' as your mission, and launch your Settlement Ship. Upon arrival, it settles and materializes your new colony!"
-  },
-  {
-    q: "What are the rules for cancelling or rerouting an attack fleet?",
-    a: "Strategic timing is critical: you can only abort/cancel or reroute an 'Attack' fleet during the first 45% of its journey. As soon as the fleet crosses the 45% travel mark, its quantum hyper-drives lock in—making it impossible to either cancel or reroute the squadron!"
-  },
-  {
-    q: "Why is my troop garrison size decreasing on its own?",
-    a: "Every soldier in your active garrison continuously consumes Water, Food, and Respirant (O2). If your local hourly production of these resources drops below zero and runs dry, your troops suffer severe attrition, slowly starving and dehydrating over time. Ensure your life-support extractors are upgraded or boosted!"
-  },
-  {
-    q: "How does resource plunder and combat work?",
-    a: "When you launch a successful offensive strike and defeat the defender's garrison, your surviving ships plunder a high fraction of all five stored resources (including water!) up to their carrying capacity, exceeding whatever resources are protected by their defensive Bunker."
-  },
-  {
-    q: "Are research technology upgrades shared across my colonies?",
-    a: "No. Each space station and colony outpost works independently based on its own local Research Center's upgrades. You must research technology projects (like Defense Shields, Manufacturing Speed, or Troop Speed) separately at each individual station to unlock those benefits locally."
-  },
-  {
-    q: "How do I upgrade resource storage limits?",
-    a: "Build and upgrade your local Silo structures. Each upgrade level expands your maximum storage capacity for all five resources on that specific planet."
-  },
-  {
-    q: "What is the difference between Interceptors and Assault Drones?",
-    a: "Interceptors are heavily-shielded defensive fighters built to absorb damage and protect your base. Assault Drones are fragile, high-firepower strike units designed for offensive operations."
-  },
-  {
-    q: "How do map limits work, and what happens if I am out-of-bounds?",
-    a: "The galactic map limits dynamically scale based on active player density. If map boundary adjustments ever put your station out-of-bounds, the server's relocation array automatically transfers your station to a safe coordinate inside the active grid with zero loss of progress or resources."
-  },
-  {
-    q: "What is the benefit of joining or creating an Alliance?",
-    a: "Joining or creating an Alliance unites you with other active commanders across the galaxy. This allows you to safely relocate fleets to friendly coordinates, coordinate joint military operations, and protect your outposts under a shared defensive network."
-  }
-];
-
 export const ResearchTab: React.FC<ResearchTabProps> = ({
   player,
   activePlanet,
@@ -180,9 +137,6 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   });
 
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
-  const [subTab, setSubTab] = useState<'tech' | 'faq'>('tech');
-  const [faqSearch, setFaqSearch] = useState('');
-  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
   const [isResearching, setIsResearching] = useState(false);
 
   const [isTyping, setIsTyping] = useState(false);
@@ -559,130 +513,19 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
         </div>
       </div>
 
-      {/* Sub-Navigation Tabs */}
-      <div className="flex border-b border-[#1E293B]/70 gap-2 mb-2 p-0.5 bg-slate-950/45 rounded-xl">
-        <button
-          type="button"
-          onClick={() => setSubTab('tech')}
-          className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider font-mono transition flex items-center justify-center gap-2 ${
-            subTab === 'tech'
-              ? 'bg-cyan-950/50 border border-cyan-500/35 text-cyan-400 font-extrabold shadow-[0_0_8px_rgba(34,211,238,0.15)]'
-              : 'border border-transparent text-slate-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          🔬 Quantum Upgrades
-        </button>
-        <button
-          type="button"
-          id="faq-subtab-btn"
-          onClick={() => setSubTab('faq')}
-          className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider font-mono transition flex items-center justify-center gap-2 ${
-            subTab === 'faq'
-              ? 'bg-cyan-950/50 border border-cyan-500/35 text-cyan-400 font-extrabold shadow-[0_0_8px_rgba(34,211,238,0.15)]'
-              : 'border border-transparent text-slate-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          ❓ Academy FAQ & Database (20)
-        </button>
-      </div>
 
-      {subTab === 'faq' ? (
-        <div className="space-y-1.5 text-left animate-fade-in">
-          {/* FAQ database search box and title */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1E293B]/60 pb-3 gap-3">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2">
-              <HelpCircle size={14} className="text-cyan-400 animate-pulse" /> Commander Tactical Database
-            </h3>
-            
-            {/* Search Input */}
-            <div className="relative w-full sm:w-72">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <Search size={13} className="text-slate-500" />
-              </span>
-              <input
-                id="faq-search-input"
-                type="text"
-                placeholder="Query academy database..."
-                value={faqSearch}
-                onChange={(e) => setFaqSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 bg-slate-950/90 border border-slate-800/80 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 font-mono transition"
-              />
-            </div>
-          </div>
-
-          {/* FAQ Accordions List */}
-          <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
-            {(() => {
-              const filteredFaqs = FAQS.filter(
-                f => f.q.toLowerCase().includes(faqSearch.toLowerCase()) || 
-                     f.a.toLowerCase().includes(faqSearch.toLowerCase())
-              );
-
-              if (filteredFaqs.length === 0) {
-                return (
-                  <div className="text-center py-10 border border-dashed border-[#1E293B]/50 rounded-xl bg-[#030712]/30">
-                    <p className="text-xs text-slate-500 font-mono">No database records found matching key phrase.</p>
-                  </div>
-                );
-              }
-
-              return filteredFaqs.map((faq) => {
-                const originalIndex = FAQS.indexOf(faq);
-                const isExpanded = faqOpenIndex === originalIndex;
-
-                return (
-                  <div 
-                    key={originalIndex} 
-                    id={`faq-item-${originalIndex}`}
-                    className={`border rounded-xl transition-all duration-200 overflow-hidden ${
-                      isExpanded 
-                        ? 'border-cyan-500/35 bg-[#090E1B]' 
-                        : 'border-[#1E293B]/60 bg-[#0A0F1D]/40 hover:border-slate-800'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      id={`faq-btn-${originalIndex}`}
-                      onClick={() => setFaqOpenIndex(isExpanded ? null : originalIndex)}
-                      className="w-full p-4 flex items-center justify-between text-left cursor-pointer transition focus:outline-none"
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="text-xs text-cyan-400 font-mono font-bold shrink-0 mt-0.5">
-                          {String(originalIndex + 1).padStart(2, '0')}.
-                        </span>
-                        <span className="text-xs font-semibold text-white tracking-wide leading-relaxed">
-                          {faq.q}
-                        </span>
-                      </div>
-                      <span className="text-slate-500 shrink-0 ml-3">
-                        {isExpanded ? <ChevronUp size={14} className="text-cyan-400" /> : <ChevronDown size={14} />}
-                      </span>
-                    </button>
-                    
-                    {isExpanded && (
-                      <div className="px-4 pb-4.5 pt-1 text-slate-300 text-[11px] font-sans leading-relaxed border-t border-white/5 bg-slate-950/20 pl-8 select-text">
-                        {faq.a}
-                      </div>
-                    )}
-                  </div>
-                );
-              });
-            })()}
-          </div>
+      {rc.level === 0 ? (
+        <div className="p-8 border border-red-500/20 bg-[#0A0F1D]/80 backdrop-blur-md rounded-2xl text-center space-y-4 max-w-xl mx-auto shadow-xl">
+          <div className="text-4xl text-red-400">🧪</div>
+          <h3 className="text-sm font-extrabold text-red-400 uppercase tracking-widest font-mono">
+            RESEARCH CENTER OFFLINE
+          </h3>
+          <p className="text-xs text-slate-350 font-sans leading-relaxed">
+            This secondary colony station does not possess an active command laboratory. 
+            Navigate to your <strong>Established Structures</strong> or <strong>Unlocked Blueprints</strong> in the station commands tab to construct a Research Center first before authorizing advanced scientific research.
+          </p>
         </div>
       ) : (
-        rc.level === 0 ? (
-          <div className="p-8 border border-red-500/20 bg-[#0A0F1D]/80 backdrop-blur-md rounded-2xl text-center space-y-4 max-w-xl mx-auto shadow-xl">
-            <div className="text-4xl text-red-400">🧪</div>
-            <h3 className="text-sm font-extrabold text-red-400 uppercase tracking-widest font-mono">
-              RESEARCH CENTER OFFLINE
-            </h3>
-            <p className="text-xs text-slate-350 font-sans leading-relaxed">
-              This secondary colony station does not possess an active command laboratory. 
-              Navigate to your <strong>Established Structures</strong> or <strong>Unlocked Blueprints</strong> in the station commands tab to construct a Research Center first before authorizing advanced scientific research.
-            </p>
-          </div>
-        ) : (
           <div className="space-y-1.5 text-left">
             <div className="flex items-center justify-between border-b border-[#1E293B]/60 pb-3">
               <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2">
@@ -860,7 +703,6 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
               })}
             </div>
           </div>
-        )
       )}
 
       {/* Polish Settings Footer */}

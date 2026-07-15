@@ -307,6 +307,19 @@ export interface GameState {
   feedbacks?: SuggestionFeedback[];
   customTasks?: Record<string, any>;
   maxCoord?: number;
+  galaxyConfig?: GalaxyConfig;
+}
+
+export interface GalaxyConfig {
+  initialGalaxySize: number;
+  reservedCenterSector: { x: number; y: number };
+  initialColonizationZoneSize: number;
+  spawnDistance: number;
+  zoneGrowthOccupancyThreshold: number;
+  galaxyOccupancyThreshold: number;
+  expansionIncrement: number;
+  currentGalaxySize: number;
+  currentColonizationZoneSize: number;
 }
 
 export interface HabitablePlanet {
@@ -314,6 +327,13 @@ export interface HabitablePlanet {
   name: string;
   coords: { x: number; y: number };
   isColonized: boolean;
+  extractors?: {
+    water: number;
+    plasma: number;
+    fuel: number;
+    food: number;
+    respirant: number;
+  };
 }
 
 export interface LeaderboardPlayer {

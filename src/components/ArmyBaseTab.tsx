@@ -3,7 +3,7 @@ import { ColonyPlanet, PlayerProfile, BattleReport, CreatedFleet, getUpgradeReso
 
 import imgInterceptor from '../assets/images/defensive_interceptor_1780872114708.png';
 import imgAssaultDrone from '../assets/images/assault_drone_1780871759723.png';
-import imgDisrupter from '../assets/images/disrupter.png';
+import imgDisrupter from '../assets/images/disrupter.svg';
 import imgMatterExtractor from '../assets/images/matter_extractor_1780871789535.png';
 import imgMissileLauncher from '../assets/images/missile_launcher_1780871805054.png';
 import imgSettlementShip from '../assets/images/settlement_ship_1780871819613.png';

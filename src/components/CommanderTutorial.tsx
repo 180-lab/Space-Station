@@ -82,7 +82,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   const rawTasks: TutorialTask[] = [
     {
       id: 1,
-      title: '🏭 Upgrade Fabricator to Level 1',
+      title: '🏭 Construct Fabricator to Level 1',
       shortDesc: 'Construct or upgrade your main station Fabricator to Level 1 to unlock basic building operations.',
       requirementHtml: 'Have a <strong>Fabricator at Level 1 or higher</strong>.',
       hint: 'Go to the XPL tab, find the Fabricator under Base Infrastructure Buildings, and click Upgrade.',
@@ -186,13 +186,13 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     },
     {
       id: 9,
-      title: '🏭 Upgrade Fabricator to Level 4',
-      shortDesc: 'Construct or upgrade your main station Fabricator to Level 4 to unlock advanced facility options.',
-      requirementHtml: 'Have a <strong>Fabricator at Level 4 or higher</strong>.',
-      hint: 'Go to the XPL tab, find the Fabricator under Base Infrastructure Buildings, and click Upgrade to Level 4.',
-      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Find the <strong>Fabricator</strong> in the Base Infrastructure Buildings list.<br/>3. Click <strong>"Upgrade Building"</strong> to upgrade it to Level 4.',
-      commanderTip: 'Fabricators increase building construction speeds for all planetary projects.',
-      congratsMessage: '🏭 FABRICATOR LEVEL 4 UNLOCKED! You can now print advanced scientific structures!',
+      title: '🏭 Queue/Upgrade Fabricator to Level 4',
+      shortDesc: 'Queue an upgrade for your main station Fabricator to Level 4 to expand your building queues and speed up assembly line structures.',
+      requirementHtml: 'Have a <strong>queued upgrade</strong> for your Fabricator or have a <strong>Fabricator at Level 4 or higher</strong>.',
+      hint: 'Go to the XPL tab, find the Fabricator under Base Infrastructure Buildings, and click Upgrade or Queue Upgrade to Level 4.',
+      howToGetThere: '1. Go to the <strong>XPL</strong> tab.<br/>2. Find the <strong>Fabricator</strong> in the Base Infrastructure Buildings list.<br/>3. Click <strong>"Upgrade Building"</strong> or <strong>"Queue Upgrade"</strong> to upgrade it to Level 4.',
+      commanderTip: 'Using the construction queue allows simultaneous planetary building operations!',
+      congratsMessage: '🏭 FABRICATOR QUEUED OR UPGRADED TO LEVEL 4! You can now print advanced scientific structures!',
       encouragementQuote: 'Outstanding! The path to advanced science and high-speed research projects is now officially open.',
       targetTab: 'explore',
       rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
@@ -381,15 +381,15 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     },
     {
       id: 24,
-      title: '💬 Broadcast in Public Holo-Chat',
-      shortDesc: 'Send a subspace audio-visual signal to the global public feed to announce your presence.',
-      requirementHtml: 'Send at least <strong>one public chat message</strong>.',
-      hint: 'Go to the COMMS tab, open Public Chat, type a greeting, and click Send.',
-      howToGetThere: '1. Navigate to the <strong>COMMS</strong> tab.<br/>2. Type a message in the <strong>Public Holo-Chat</strong> input field.<br/>3. Click <strong>"Transmit Signal"</strong> to broadcast.',
-      commanderTip: 'Keep communication friendly and build trade connections with nearby commanders.',
-      congratsMessage: '💬 BROADCAST RELAY COMPLETE! Your coordinate message has been received across the quadrant!',
-      encouragementQuote: 'Marvelous signal strength! Communicating with nearby commanders establishes your sector presence.',
-      targetTab: 'chat',
+      title: '⚡ Boost Extractor Production Yields',
+      shortDesc: 'Supercharge your mining rates by activating a tactical overdrive production boost on your extractor outposts.',
+      requirementHtml: 'Deploy a <strong>production booster</strong> overdrive on any of your active extractor pumps.',
+      hint: 'Go to the XPL tab, find any resource extractor outpost category, and click "⚡ Boost" to supercharge its output.',
+      howToGetThere: '1. Open the <strong>XPL</strong> tab.<br/>2. Scroll down to <strong>"RESOURCE EXTRACTOR OUTPOSTS"</strong>.<br/>3. Click the <strong>"⚡ Boost"</strong> button next to any of your extractor pumps and confirm overdrive deployment.',
+      commanderTip: 'Overdrive boosts multiply resource extraction hourly output by +14%, securing massive reserves rapidly.',
+      congratsMessage: '⚡ EXTRACTION SUPERCHARGED! Your extractor outposts are operating in tactical overdrive!',
+      encouragementQuote: 'Fabulous strategy! Maximizing extraction rates provides our colony with vital reserves to build flagship vessels.',
+      targetTab: 'explore',
       rewards: { resources: { water: 5000, plasma: 5000, fuel: 5000, food: 5000, respirant: 5000 }, credits: 50 }
     },
     {
@@ -591,7 +591,11 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
           completedList.includes(8)
         );
       case 9:
-        return (checkTargetPlanet.buildings.fabricator?.level || 0) >= 4;
+        return (
+          (checkTargetPlanet.buildings.fabricator?.level || 0) >= 4 ||
+          checkTargetPlanet.buildings.fabricator?.isUpgrading ||
+          (checkTargetPlanet.upgradeQueue || []).some((item: any) => item.type === 'building' && item.key === 'fabricator')
+        );
       case 10:
         return (checkTargetPlanet.buildings.commsHub?.level || 0) >= 2;
       case 11:
@@ -648,8 +652,10 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
         );
       case 24:
         return (
-          chatMessages.some((msg: any) => msg.senderId === player.id) ||
-          localStorage.getItem(`moonbase_chatted_${player.id}`) === 'true' ||
+          localStorage.getItem(`moonbase_boosted_${player.id}`) === 'true' ||
+          Object.values(checkTargetPlanet.mines || {}).some((list: any) => 
+            Array.isArray(list) && list.some((mine: any) => mine.boostedUntil && Number(mine.boostedUntil) > Date.now())
+          ) ||
           completedList.includes(24)
         );
       case 25:

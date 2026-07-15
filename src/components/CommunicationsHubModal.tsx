@@ -141,7 +141,7 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
   const [editingHighlights, setEditingHighlights] = useState(false);
   const [allianceMemberReports, setAllianceMemberReports] = useState<any[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
-  const [activeReportsTab, setActiveReportsTab] = useState<'highlights' | 'troops' | 'situation' | 'activity' | 'battles'>('highlights');
+  const [activeReportsTab, setActiveReportsTab] = useState<'highlights' | 'troops' | 'situation' | 'activity' | 'battles' | 'applications'>('highlights');
   const [expandedMemberPlanets, setExpandedMemberPlanets] = useState<Record<string, boolean>>({});
   const [readIntelFleets, setReadIntelFleets] = useState<Record<string, boolean>>(() => {
     try {
@@ -1157,11 +1157,11 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                   )}
 
                   {/* Join existing alliances list */}
-                  {commsHubLvl < 4 ? (
+                  {commsHubLvl < 2 ? (
                     <div className="p-5 bg-yellow-950/5 rounded-xl border border-yellow-500/10 flex flex-col items-center justify-center text-center space-y-2.5">
                       <Users size={20} className="text-yellow-400 opacity-60 animate-pulse" />
                       <span className="text-[10px] text-yellow-500 uppercase tracking-widest font-bold">Join Alliance Blocked</span>
-                      <p className="text-slate-400 text-[11px] leading-relaxed">Requires Communications Hub Level 4 to enlist in existing cosmic coalitions (Current Level: {commsHubLvl}).</p>
+                      <p className="text-slate-400 text-[11px] leading-relaxed">Requires Communications Hub Level 2 to enlist in existing cosmic coalitions (Current Level: {commsHubLvl}).</p>
                     </div>
                   ) : (
                     <div className="p-4 bg-[#05070A]/90 rounded-xl border border-[#1E293B] space-y-3">
@@ -1241,7 +1241,8 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                     { id: 'troops', label: '🎖️ Troop Intelligence' },
                     { id: 'situation', label: '📡 Situation Room' },
                     { id: 'activity', label: '👥 Activity Roster' },
-                    { id: 'battles', label: '⚔️ Battle Reports' }
+                    { id: 'battles', label: '⚔️ Battle Reports' },
+                    { id: 'applications', label: `📬 Applications (${activeAlliance?.applications?.length || 0})` }
                   ].map((t) => (
                     <button
                       key={t.id}
@@ -2055,6 +2056,105 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                     </div>
                   );
                 })()}
+
+                {/* TAB 6: ALLIANCE APPLICATIONS */}
+                {activeReportsTab === 'applications' && (
+                  <div className="space-y-4 animate-fade-in">
+                    <div className="p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl">
+                      <h4 className="text-xs font-bold text-yellow-400 uppercase tracking-widest font-mono flex items-center gap-2">
+                        📬 PENDING MEMBERSHIP APPLICATIONS ({activeAlliance?.applications?.length || 0})
+                      </h4>
+                      <p className="text-[11px] text-slate-400 leading-relaxed font-sans mt-1">
+                        Review recruitment applications from external system commanders seeking to enlist. Approving accepts them into the active alliance roster, while declining clears their request. Only alliance leaders and officers can approve or decline requests.
+                      </p>
+                    </div>
+
+                    {!activeAlliance?.applications || activeAlliance.applications.length === 0 ? (
+                      <div className="p-8 text-center text-slate-500 italic bg-[#030508]/60 border border-dashed border-[#1E293B] rounded-xl font-sans text-xs">
+                        No pending membership applications at this time. Roster invitation queue is empty.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {activeAlliance.applications.map((app) => (
+                          <div key={app.playerId} className="p-4 border border-yellow-500/25 bg-yellow-500/5 hover:bg-yellow-500/10 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+                              <div>
+                                <span className="font-bold text-white text-sm">
+                                  Commander {app.username}
+                                </span>
+                                <span className="text-slate-500 text-[10px] block mt-0.5">
+                                  Submitted: {new Date(app.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {(player.allianceRole === 'leader' || player.allianceRole === 'officer') ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch('/api/alliance/approve', {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'x-user-id': player.id
+                                        },
+                                        body: JSON.stringify({ targetPlayerId: app.playerId })
+                                      });
+                                      const data = await res.json();
+                                      if (res.ok) {
+                                        if (showToast) showToast(`Approved Commander ${app.username} into our Alliance!`, 'success');
+                                        if (onRefreshState) onRefreshState();
+                                      } else {
+                                        if (showToast) showToast(data.error || 'Approval failed', 'error');
+                                      }
+                                    } catch (err) {
+                                      if (showToast) showToast('Communication link error', 'error');
+                                    }
+                                  }}
+                                  className="px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold rounded-lg uppercase text-[10.5px] cursor-pointer transition duration-150"
+                                >
+                                  Approve ✅
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch('/api/alliance/decline', {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'x-user-id': player.id
+                                        },
+                                        body: JSON.stringify({ targetPlayerId: app.playerId })
+                                      });
+                                      const data = await res.json();
+                                      if (res.ok) {
+                                        if (showToast) showToast(`Declined application request from ${app.username}.`, 'info');
+                                        if (onRefreshState) onRefreshState();
+                                      } else {
+                                        if (showToast) showToast(data.error || 'Operation failed', 'error');
+                                      }
+                                    } catch (err) {
+                                      if (showToast) showToast('Net interface error', 'error');
+                                    }
+                                  }}
+                                  className="px-3.5 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-bold rounded-lg uppercase text-[10.5px] cursor-pointer transition duration-150"
+                                >
+                                  Decline ❌
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 italic">Officer authorization required to respond</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
               </div>
 
