@@ -124,6 +124,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [commanderName, setCommanderName] = useState(player.username);
   const [selectedRenamePlanetId, setSelectedRenamePlanetId] = useState(player.planets[0]?.id || '');
   const [planetNewName, setPlanetNewName] = useState(player.planets[0]?.name || '');
+  const [showRenameConfirmModal, setShowRenameConfirmModal] = useState(false);
 
   const [showDisplayTheme, setShowDisplayTheme] = useState(false);
   const [showSoundFx, setShowSoundFx] = useState(false);
@@ -393,6 +394,20 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       showToast('Commander name cannot be empty!', 'error');
       return;
     }
+
+    const rCount = player.renameCount || 0;
+    if (rCount >= 2) {
+      if (!showRenameConfirmModal) {
+        setShowRenameConfirmModal(true);
+        return;
+      }
+    }
+
+    await executeRename();
+  };
+
+  const executeRename = async () => {
+    setShowRenameConfirmModal(false);
     try {
       const res = await fetch('/api/player/rename', {
         method: 'POST',
@@ -1316,6 +1331,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <p className="text-[10.5px] text-slate-500 leading-relaxed mt-0.5">
                 Alters your formal signature and username across global star alliances, communications, and battle alerts.
               </p>
+              <div className="mt-1 font-mono text-[9.5px]">
+                {(() => {
+                  const rCount = player.renameCount || 0;
+                  if (rCount === 0) {
+                    return <span className="text-emerald-400 font-bold">✓ Free (2 free renames remaining)</span>;
+                  } else if (rCount === 1) {
+                    return <span className="text-emerald-400 font-bold">✓ Free (1 free rename remaining)</span>;
+                  } else {
+                    return <span className="text-amber-400 font-bold">⚠️ Cost: 1,000 Space gold (Total renames: {rCount})</span>;
+                  }
+                })()}
+              </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <input
@@ -1333,6 +1360,56 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <Check size={11} /> Save Name
               </button>
             </div>
+
+            {showRenameConfirmModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+                <div className="w-full max-w-md bg-slate-900 border border-amber-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500"></div>
+                  
+                  <h3 className="text-sm font-bold text-amber-400 font-mono uppercase tracking-wider flex items-center gap-2">
+                    ⚠️ Space Gold Deduct Confirmation
+                  </h3>
+                  
+                  <div className="mt-4 space-y-3">
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      You have already used your free commander renames. Altering your formal signature again requires a system reconfiguration fee.
+                    </p>
+                    
+                    <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3 space-y-2 font-mono text-[11px]">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Desired Name:</span>
+                        <span className="text-cyan-400 font-bold">{commanderName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Reconfiguration Cost:</span>
+                        <span className="text-amber-400 font-bold">1,000 Space Gold</span>
+                      </div>
+                      <div className="flex justify-between border-t border-slate-800/60 pt-2">
+                        <span className="text-slate-500">Your Balance:</span>
+                        <span className="text-white font-bold">{(player.credits || 0).toLocaleString()} SG</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex justify-end gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowRenameConfirmModal(false)}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold font-mono text-[10px] uppercase tracking-wider rounded-xl transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={executeRename}
+                      className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold font-mono text-[10px] uppercase tracking-wider rounded-xl transition cursor-pointer shadow-lg shadow-amber-500/10"
+                    >
+                      Confirm & Deduct 1,000 SG
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </form>
 
           {/* Colony Stations Renaming Form */}

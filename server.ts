@@ -648,6 +648,15 @@ function ensureAdminMaxed(p: any) {
       food: 99999999,
       respirant: 99999999
     };
+
+    // Ensure admin gets at least 1 settlement ship per station
+    if (!pl.troops) {
+      pl.troops = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 1 };
+    } else {
+      if (pl.troops.settlementShip === undefined || pl.troops.settlementShip < 1) {
+        pl.troops.settlementShip = 1;
+      }
+    }
   });
 }
 
@@ -2774,7 +2783,13 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
         Object.entries(fleet.troops).forEach(([tId, count]) => {
           newPlanet.troops[tId as keyof typeof newPlanet.troops] = count;
         });
-        newPlanet.troops.settlementShip = 1; // each station starts with 1 settlement ship
+        const isAdminPlayer = attacker && attacker.googleEmail && (attacker.googleEmail.toLowerCase() === "banele180@gmail.com" || attacker.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+        if (!isAdminPlayer) {
+          // Normal players do not get any free starting troops (including settlement ship) on a newly colonized station
+          newPlanet.troops.settlementShip = 0;
+        } else {
+          newPlanet.troops.settlementShip = 1; // Admin gets a settlement ship
+        }
 
         attacker.planets.push(newPlanet);
         ensureAdminMaxed(attacker);
@@ -3331,6 +3346,20 @@ app.get("/api/notifications/stream", (req, res) => {
   });
 });
 
+// Helper to ensure duplicate usernames are resolved with a unique numeric suffix
+function getUniqueUsername(baseName: string): string {
+  let name = baseName.trim();
+  if (!name) name = "Commander";
+  let uniqueName = name;
+  let suffix = 1;
+  const lowercaseNames = new Set(Object.values(state.players).map(p => p.username.toLowerCase()));
+  while (lowercaseNames.has(uniqueName.toLowerCase())) {
+    uniqueName = `${name}_${suffix}`;
+    suffix++;
+  }
+  return uniqueName;
+}
+
 // Helper to find player profile and verify token/session
 function getLoggedPlayer(req: express.Request): PlayerProfile | null {
   const userId = req.headers["x-user-id"] as string;
@@ -3490,7 +3519,7 @@ app.post("/api/auth/google", async (req, res) => {
       
       const selectFaction = faction || factions[0];
       const selectColor = selectFaction === "Nexus Syndicate" ? factionColors[1] : selectFaction === "Eclipse Vanguard" ? factionColors[2] : factionColors[0];
-      const defaultUsername = username || email.split("@")[0];
+      const defaultUsername = getUniqueUsername(username || email.split("@")[0]);
 
       // Create initial starting planet
       const limit = getCurrentMapLimits();
@@ -3594,7 +3623,7 @@ app.post("/api/auth/google", async (req, res) => {
     const selectFaction = factions[0];
     const selectColor = factionColors[0];
 
-    const defaultUsername = name || (email ? email.split("@")[0] : `Commander_${uid.substring(0, 5)}`);
+    const defaultUsername = getUniqueUsername(name || (email ? email.split("@")[0] : `Commander_${uid.substring(0, 5)}`));
 
     // Create initial starting planet
     const limit = getCurrentMapLimits();
@@ -3759,7 +3788,8 @@ app.post("/api/auth/google-play", async (req, res) => {
     const selectFaction = factions[0];
     const selectColor = factionColors[0];
 
-    const cleanUsername = displayName.replace(/[^a-zA-Z0-9_ ]/g, "").substring(0, 15) || `Commander_${playerId.substring(0, 5)}`;
+    const rawUsername = displayName.replace(/[^a-zA-Z0-9_ ]/g, "").substring(0, 15) || `Commander_${playerId.substring(0, 5)}`;
+    const cleanUsername = getUniqueUsername(rawUsername);
     const uid = `gpgs_${playerId}`;
 
     // Create initial starting planet
@@ -4700,9 +4730,9 @@ app.post("/api/train/troop", (req, res) => {
   const rawQuantity = req.body.count !== undefined ? req.body.count : req.body.quantity;
   const count = Math.floor(Number(rawQuantity));
 
-  // 2. Explicitly reject if quantity is NaN, less than or equal to 0, or greater than 1000
-  if (isNaN(count) || count <= 0 || count > 1000) {
-    return res.status(400).json({ error: "Invalid training quantity. Quantity must be a valid number between 1 and 1000." });
+  // 2. Explicitly reject if quantity is NaN, less than or equal to 0, or greater than 1000000
+  if (isNaN(count) || count <= 0 || count > 1000000) {
+    return res.status(400).json({ error: "Invalid training quantity. Quantity must be a valid number between 1 and 1,000,000." });
   }
 
   // 3. Perform backend balance validation check for both resources and player credits before pushing/deducting
@@ -4762,13 +4792,32 @@ app.post("/api/train/troop", (req, res) => {
     if (count > 1) {
       return res.status(400).json({ error: "You can only construct one Settlement Ship at a time!" });
     }
-    const currentShipCount = planet.troops.settlementShip || 0;
-    if (currentShipCount >= 1) {
-      return res.status(400).json({ error: "You can only have one Settlement Ship on each base!" });
-    }
-    const isAlreadyTraining = planet.trainingQueue.some(item => item.troopId === "settlementShip");
-    if (isAlreadyTraining) {
-      return res.status(400).json({ error: "One Settlement Ship is already in the construction queue." });
+
+    const isAdminPlayer = p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+    if (!isAdminPlayer) {
+      const totalBasesShipCount = p.planets.reduce((acc: number, pl: any) => acc + (pl.troops?.settlementShip || 0), 0);
+      const totalFleetsShipCount = state.fleets
+        .filter((f: any) => f.senderId === p.id)
+        .reduce((acc: number, f: any) => acc + (f.troops?.settlementShip || 0), 0);
+      const totalTrainingShipCount = p.planets.reduce((acc: number, pl: any) => {
+        const trainingShips = pl.trainingQueue?.filter((item: any) => item.troopId === "settlementShip")
+          .reduce((sum: number, item: any) => sum + item.count, 0) || 0;
+        return acc + trainingShips;
+      }, 0);
+      
+      const totalSettlementShips = totalBasesShipCount + totalFleetsShipCount + totalTrainingShipCount;
+      if (totalSettlementShips >= 1) {
+        return res.status(400).json({ error: "You cannot have more than 1 Settlement Ship in total across all bases, fleets, and construction queues!" });
+      }
+    } else {
+      const currentShipCount = planet.troops.settlementShip || 0;
+      if (currentShipCount >= 1) {
+        return res.status(400).json({ error: "You can only have one Settlement Ship on each base!" });
+      }
+      const isAlreadyTraining = planet.trainingQueue.some(item => item.troopId === "settlementShip");
+      if (isAlreadyTraining) {
+        return res.status(400).json({ error: "One Settlement Ship is already in the construction queue." });
+      }
     }
   }
 
@@ -5495,7 +5544,13 @@ app.post("/api/fleet/settle", (req, res) => {
   Object.entries(fleet.troops).forEach(([tId, count]) => {
     newPlanet.troops[tId as keyof typeof newPlanet.troops] = count;
   });
-  newPlanet.troops.settlementShip = 1; // each station starts with 1 settlement ship
+  const isAdminPlayer = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+  if (!isAdminPlayer) {
+    // Normal players do not get any free starting troops (including settlement ship) on a newly settled station
+    newPlanet.troops.settlementShip = 0;
+  } else {
+    newPlanet.troops.settlementShip = 1; // Admin gets a settlement ship
+  }
 
   p.planets.push(newPlanet);
   ensureAdminMaxed(p);
@@ -6024,9 +6079,29 @@ app.post("/api/player/rename", (req, res) => {
     return res.status(400).json({ error: "That commander name is already registered in the database!" });
   }
 
+  // Changing name is free for the first 2 times, then costs 1000 Space gold
+  const currentCount = p.renameCount || 0;
+  let chargeAmount = 0;
+  if (currentCount >= 2) {
+    chargeAmount = 1000;
+    if ((p.credits || 0) < chargeAmount) {
+      return res.status(400).json({ error: `Insufficient Space gold. Renaming costs 1,000 Space gold (Current: ${p.credits || 0}).` });
+    }
+  }
+
+  // Deduct credits if applicable
+  if (chargeAmount > 0) {
+    p.credits = (p.credits || 0) - chargeAmount;
+  }
+
+  // Increment rename count
+  p.renameCount = currentCount + 1;
+
   // Update name in player profile state
   p.username = desiredName;
   state.players[p.id].username = desiredName;
+  state.players[p.id].renameCount = p.renameCount;
+  state.players[p.id].credits = p.credits;
 
   // Sync alliance members and chat sender records dynamically
   if (p.allianceId && state.alliances[p.allianceId]) {

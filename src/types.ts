@@ -124,6 +124,7 @@ export interface PlayerProfile {
   createdFleets?: CreatedFleet[];
   autoUnloadResources?: boolean;
   welcomeMessageSent?: boolean;
+  renameCount?: number;
 }
 
 export interface CommandMessage {
