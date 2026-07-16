@@ -3,7 +3,7 @@ import { ColonyPlanet, PlayerProfile, BattleReport, CreatedFleet, getUpgradeReso
 
 import imgInterceptor from '../assets/images/defensive_interceptor_1780872114708.png';
 import imgAssaultDrone from '../assets/images/assault_drone_1780871759723.png';
-import imgDisrupter from '../assets/images/disrupter_google_drive.png';
+import imgDisrupter from '../assets/images/disrupter.png';
 import imgMatterExtractor from '../assets/images/matter_extractor_1780871789535.png';
 import imgMissileLauncher from '../assets/images/missile_launcher_1780871805054.png';
 import imgSettlementShip from '../assets/images/settlement_ship_1780871819613.png';
@@ -84,7 +84,7 @@ const TROOP_DETAILS = {
     defenceHp: 18,
     attackHp: 10,
     carry: 600,
-    costs: { water: 150, plasma: 0, fuel: 0, food: 200, respirant: 100 },
+    costs: { water: 750, plasma: 0, fuel: 0, food: 1000, respirant: 500 },
     icon: Shield,
     color: 'text-blue-400 bg-blue-950/30',
     image: imgInterceptor
@@ -95,7 +95,7 @@ const TROOP_DETAILS = {
     defenceHp: 9,
     attackHp: 30,
     carry: 400,
-    costs: { water: 300, plasma: 450, fuel: 450, food: 300, respirant: 0 },
+    costs: { water: 1500, plasma: 2250, fuel: 2250, food: 1500, respirant: 0 },
     icon: Sword,
     color: 'text-red-400 bg-red-950/30',
     image: imgAssaultDrone
@@ -106,7 +106,7 @@ const TROOP_DETAILS = {
     defenceHp: 5,
     attackHp: 5,
     carry: 0,
-    costs: { water: 0, plasma: 800, fuel: 1200, food: 0, respirant: 400 },
+    costs: { water: 0, plasma: 4000, fuel: 6000, food: 0, respirant: 2000 },
     icon: Crosshair,
     color: 'text-amber-500 bg-amber-950/30',
     image: imgDisrupter
@@ -117,7 +117,7 @@ const TROOP_DETAILS = {
     defenceHp: 4,
     attackHp: 4,
     carry: 1000,
-    costs: { water: 500, plasma: 0, fuel: 200, food: 400, respirant: 0 },
+    costs: { water: 2500, plasma: 0, fuel: 1000, food: 2000, respirant: 0 },
     icon: Truck,
     color: 'text-emerald-400 bg-emerald-950/30',
     image: imgMatterExtractor
@@ -128,7 +128,7 @@ const TROOP_DETAILS = {
     defenceHp: 120,
     attackHp: 120,
     carry: 200,
-    costs: { water: 1000, plasma: 1000, fuel: 1500, food: 0, respirant: 500 },
+    costs: { water: 5000, plasma: 5000, fuel: 7500, food: 0, respirant: 2500 },
     icon: Activity,
     color: 'text-purple-400 bg-purple-950/30',
     image: imgMissileLauncher
@@ -139,7 +139,7 @@ const TROOP_DETAILS = {
     defenceHp: 50,
     attackHp: 0,
     carry: 5000,
-    costs: { water: 1500, plasma: 1000, fuel: 2000, food: 1500, respirant: 1000 },
+    costs: { water: 7500, plasma: 5000, fuel: 10000, food: 7500, respirant: 5000 },
     icon: Rocket,
     color: 'text-teal-400 bg-teal-950/30',
     image: imgSettlementShip
@@ -1318,7 +1318,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                     <div className="text-left sm:text-right font-mono shrink-0">
                       <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Division Spec</div>
                       <div className="text-xs font-bold text-slate-300 mt-1 uppercase">
-                        {details.name.split(' ')[1]} Grade Ship
+                        {details.name.includes(' ') ? details.name.split(' ')[details.name.split(' ').length - 1] : details.name} Grade Ship
                       </div>
                     </div>
                   </div>
@@ -2740,16 +2740,16 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                               </div>
                             </div>
                             <div>
-                              <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide flex items-center justify-between">
+                              <p className="font-bold text-blue-100 text-blue-400 uppercase tracking-wide flex items-center justify-between">
                                 <span>Defender:{' '}
                                   <span 
                                     onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
-                                    className="underline decoration-dotted cursor-pointer hover:text-red-300 font-bold text-red-400"
+                                    className="underline decoration-dotted cursor-pointer hover:text-blue-300 font-bold text-blue-400"
                                   >
                                     {report.defenderName}
                                   </span>
                                 </span>
-                                <span className="text-[10px] text-red-400 font-bold bg-red-950/25 px-1.5 py-0.5 rounded border border-red-900/20 font-mono select-none">
+                                <span className="text-[10px] text-blue-400 font-bold bg-blue-950/25 px-1.5 py-0.5 rounded border border-blue-900/20 font-mono select-none">
                                   Loss: {defLossPercent}%
                                 </span>
                               </p>

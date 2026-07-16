@@ -67,6 +67,14 @@ const FAQS = [
   {
     q: "What is the benefit of joining or creating an Alliance?",
     a: "Joining or creating an Alliance unites you with other active commanders across the galaxy. This allows you to safely relocate fleets to friendly coordinates, coordinate joint military operations, and protect your outposts under a shared defensive network."
+  },
+  {
+    q: "When is each building unlocked to be built?",
+    a: "Building availability is determined by your outpost's local Fabricator level:\n• Fabricator: Available from start (Lv. 0)\n• Repository: Requires Fabricator Lv. 1\n• Communications Hub: Requires Fabricator Lv. 1\n• Radar Array: Requires Fabricator Lv. 2\n• Research Center: Requires Fabricator Lv. 4\n• War Room (Army Base): Requires Fabricator Lv. 7\n• Defensive Bunker: Requires Fabricator Lv. 10\n• Supply Nexus: Requires Fabricator Lv. 10\n• Magnetic Shield: Requires Fabricator Lv. 10"
+  },
+  {
+    q: "When is each troop type unlocked to be trained?",
+    a: "Troop training is determined by your local War Room (Army Base) level:\n• Settlement Ship: Requires War Room Lv. 1 (and all of your owned War Rooms must be at least Level 22 across all active outposts to construction-authorize)\n• Interceptor (Vanguard defender): Requires War Room Lv. 3\n• Missile Launcher (Heavy battery drone): Requires War Room Lv. 6\n• Assault Drone (Strike fighter attacker): Requires War Room Lv. 10\n• Matter Extractor (Swift looter): Requires War Room Lv. 15\n• Disrupter (Artillery structure demolishing tank): Requires War Room Lv. 19"
   }
 ];
 
@@ -1938,7 +1946,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       </button>
                       
                       {isExpanded && (
-                        <div className="px-4 pb-4.5 pt-1 text-slate-300 text-[11px] font-sans leading-relaxed border-t border-white/5 bg-slate-950/20 pl-8 select-text">
+                        <div className="px-4 pb-4.5 pt-1 text-slate-300 text-[11px] font-sans leading-relaxed border-t border-white/5 bg-slate-950/20 pl-8 select-text whitespace-pre-line">
                           {faq.a}
                         </div>
                       )}

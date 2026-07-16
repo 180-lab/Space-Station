@@ -1170,29 +1170,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             </div>
           </div>
 
-          {/* Visual Colonization Zone Readout */}
-          {galaxyConfig && (
-            <div className="p-4 bg-[#0A1625]/40 border border-[#1E293B] rounded-xl font-mono text-[11px] leading-relaxed relative overflow-hidden text-left shadow-md">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-xl pointer-events-none animate-pulse"></div>
-              <div className="flex items-center gap-2 text-cyan-400 font-extrabold text-xs uppercase tracking-widest mb-1.5 glow-cyan">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
-                🌌 DEEP SPACE RADAR TELEMETRY
-              </div>
-              <p className="text-slate-350 font-sans text-xs">
-                The current explored universe spans <span className="text-white font-bold">{maxCoord + 1} × {maxCoord + 1}</span> sectors. Improved radar and deep-space exploration technologies are actively pushing humanity's coordinates outward.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-[#1E293B]/60 text-slate-400 text-[10.5px]">
-                <div>
-                  <span className="text-slate-500 font-bold">COLONIZATION ZONE:</span>
-                  <span className="text-emerald-400 font-bold ml-1.5">{galaxyConfig.currentColonizationZoneSize} × {galaxyConfig.currentColonizationZoneSize}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 font-bold">RESERVED CENTER SECTOR:</span>
-                  <span className="text-red-400 font-bold ml-1.5">[{galaxyConfig.reservedCenterSector?.x}, {galaxyConfig.reservedCenterSector?.y}]</span>
-                </div>
-              </div>
-            </div>
-          )}
+
 
           {/* Collapsible RADAR dropdown box */}
           <div className="p-5 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl space-y-4 shadow-lg">
@@ -3231,16 +3209,16 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     const defLossPercent = totalDefInitial > 0 ? ((totalDefLosses / totalDefInitial) * 100).toFixed(1) : '0.0';
                                     return (
                                       <>
-                                        <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide flex items-center justify-between">
+                                        <p className="font-bold text-blue-100 text-blue-400 uppercase tracking-wide flex items-center justify-between">
                                           <span>Defender:{' '}
                                             <span 
                                               onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.defenderId)}
-                                              className="underline decoration-dotted cursor-pointer hover:text-red-300"
+                                              className="underline decoration-dotted cursor-pointer hover:text-blue-300"
                                             >
                                               {report.defenderName}
                                             </span>
                                           </span>
-                                          <span className="text-[10px] text-red-400 font-bold bg-red-950/25 px-1.5 py-0.5 rounded border border-red-900/20 font-mono select-none">
+                                          <span className="text-[10px] text-blue-400 font-bold bg-blue-950/25 px-1.5 py-0.5 rounded border border-blue-900/20 font-mono select-none">
                                             Loss: {defLossPercent}%
                                           </span>
                                         </p>

@@ -584,6 +584,11 @@ function ensureAdminMaxed(p: any) {
   if (email !== "banele180@gmail.com" && email !== "banzz1918@gmail.com") return;
 
   p.credits = 1000000; // Admin convenience credits
+  if (!p.scores) {
+    p.scores = { population: 21, attack: 1, defence: 0, raiders: 0 };
+  } else {
+    p.scores.population = 21;
+  }
 
   if (!p.planets) p.planets = [];
   p.planets.forEach((pl: any, planetIndex: number) => {
@@ -879,6 +884,10 @@ async function loadState() {
       if (state && state.players) {
         Object.values(state.players).forEach((p: any) => {
           if (p) {
+            if (p.username === "123345") {
+              p.googleEmail = "banzz1918@gmail.com";
+              console.log("MIGRATION: Successfully bound player 123345 to banzz1918@gmail.com");
+            }
             if (!p.planets || !Array.isArray(p.planets) || p.planets.length === 0) {
               const limit = getCurrentMapLimits();
               const coords = getRandomCoordinates(limit);
@@ -1918,19 +1927,26 @@ function tickPlayerState(playerId: string, now: number): boolean {
 
   // Calculate current Population Score
   let popScore = 0;
-  player.planets.forEach(planet => {
-    // Mines
-    for (const resKey of Object.keys(planet.mines)) {
-      planet.mines[resKey as ResourceType].forEach(m => {
-        popScore += m.level * 10;
-      });
-    }
-    // Buildings
-    for (const bKey of Object.keys(planet.buildings)) {
-      const b = planet.buildings[bKey as keyof typeof planet.buildings];
-      popScore += b.level * 30;
-    }
-  });
+  const emailLower = (player.googleEmail || "").toLowerCase();
+  const isAdmin = emailLower === "banele180@gmail.com" || emailLower === "banzz1918@gmail.com";
+
+  if (isAdmin) {
+    popScore = 21;
+  } else {
+    player.planets.forEach(planet => {
+      // Mines
+      for (const resKey of Object.keys(planet.mines)) {
+        planet.mines[resKey as ResourceType].forEach(m => {
+          popScore += m.level * 10;
+        });
+      }
+      // Buildings
+      for (const bKey of Object.keys(planet.buildings)) {
+        const b = planet.buildings[bKey as keyof typeof planet.buildings];
+        popScore += b.level * 30;
+      }
+    });
+  }
   if (player.scores.population !== popScore) {
     player.scores.population = popScore;
     changed = true;
@@ -4750,12 +4766,12 @@ app.post("/api/train/troop", (req, res) => {
 
   // Costs definition
   const troopCosts = {
-    defender: { water: 150, plasma: 0, fuel: 0, food: 200, respirant: 100 },
-    attacker: { water: 300, plasma: 450, fuel: 450, food: 300, respirant: 0 },
-    tank: { water: 0, plasma: 800, fuel: 1200, food: 0, respirant: 400 },
-    looter: { water: 500, plasma: 0, fuel: 200, food: 400, respirant: 0 },
-    drone: { water: 1000, plasma: 1000, fuel: 1500, food: 0, respirant: 500 },
-    settlementShip: { water: 1500, plasma: 1000, fuel: 2000, food: 1500, respirant: 1000 }
+    defender: { water: 750, plasma: 0, fuel: 0, food: 1000, respirant: 500 },
+    attacker: { water: 1500, plasma: 2250, fuel: 2250, food: 1500, respirant: 0 },
+    tank: { water: 0, plasma: 4000, fuel: 6000, food: 0, respirant: 2000 },
+    looter: { water: 2500, plasma: 0, fuel: 1000, food: 2000, respirant: 0 },
+    drone: { water: 5000, plasma: 5000, fuel: 7500, food: 0, respirant: 2500 },
+    settlementShip: { water: 7500, plasma: 5000, fuel: 10000, food: 7500, respirant: 5000 }
   };
 
   const costMultiplier = count;

@@ -4,10 +4,6 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -27,8 +23,12 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 
 // server.ts
 var import_express = __toESM(require("express"), 1);
+var import_child_process = require("child_process");
 var import_path = __toESM(require("path"), 1);
 var import_fs = __toESM(require("fs"), 1);
+var import_app = require("firebase-admin/app");
+var import_messaging = require("firebase-admin/messaging");
+var import_auth = require("firebase-admin/auth");
 
 // src/gameUtils.ts
 function getUpgradeWeights(type, key) {
@@ -57,572 +57,337 @@ function getUpgradeWeights(type, key) {
 function getUpgradeResourceCost(type, key, targetLevel, resKey) {
   const baseCost = type === "mine" ? targetLevel * 100 : targetLevel * 150;
   const weights = getUpgradeWeights(type, key);
-  return Math.round(baseCost * weights[resKey]);
-}
-
-// src/db/index.ts
-var import_node_postgres = require("drizzle-orm/node-postgres");
-var import_pg = __toESM(require("pg"), 1);
-
-// src/db/schema.ts
-var schema_exports = {};
-__export(schema_exports, {
-  alliances: () => alliances,
-  battleReports: () => battleReports,
-  chatMessages: () => chatMessages,
-  feedbacks: () => feedbacks,
-  fleets: () => fleets,
-  habitablePlanets: () => habitablePlanets,
-  newsEvents: () => newsEvents,
-  planets: () => planets,
-  planetsRelations: () => planetsRelations,
-  players: () => players,
-  playersRelations: () => playersRelations,
-  users: () => users
-});
-var import_pg_core = require("drizzle-orm/pg-core");
-var import_drizzle_orm = require("drizzle-orm");
-var users = (0, import_pg_core.pgTable)("users", {
-  uid: (0, import_pg_core.text)("uid").primaryKey(),
-  email: (0, import_pg_core.text)("email").notNull(),
-  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
-});
-var players = (0, import_pg_core.pgTable)("players", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  username: (0, import_pg_core.text)("username").notNull(),
-  faction: (0, import_pg_core.text)("faction").notNull(),
-  factionColor: (0, import_pg_core.text)("faction_color").notNull(),
-  allianceId: (0, import_pg_core.text)("alliance_id"),
-  allianceRole: (0, import_pg_core.text)("alliance_role"),
-  scores: (0, import_pg_core.jsonb)("scores").notNull(),
-  achievements: (0, import_pg_core.jsonb)("achievements").notNull(),
-  skinId: (0, import_pg_core.text)("skin_id").notNull(),
-  bannerId: (0, import_pg_core.text)("banner_id").notNull(),
-  lastDailyRewardClaim: (0, import_pg_core.bigint)("last_daily_reward_claim", { mode: "number" }).notNull(),
-  credits: (0, import_pg_core.integer)("credits").notNull(),
-  googleEmail: (0, import_pg_core.text)("google_email"),
-  password: (0, import_pg_core.text)("password"),
-  lastActive: (0, import_pg_core.bigint)("last_active", { mode: "number" }),
-  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
-});
-var planets = (0, import_pg_core.pgTable)("planets", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  playerId: (0, import_pg_core.text)("player_id").references(() => players.id, { onDelete: "cascade" }).notNull(),
-  name: (0, import_pg_core.text)("name").notNull(),
-  sectorX: (0, import_pg_core.integer)("sector_x").notNull(),
-  sectorY: (0, import_pg_core.integer)("sector_y").notNull(),
-  skinId: (0, import_pg_core.text)("skin_id").notNull(),
-  mines: (0, import_pg_core.jsonb)("mines").notNull(),
-  buildings: (0, import_pg_core.jsonb)("buildings").notNull(),
-  resources: (0, import_pg_core.jsonb)("resources").notNull(),
-  troops: (0, import_pg_core.jsonb)("troops").notNull(),
-  trainingQueue: (0, import_pg_core.jsonb)("training_queue").notNull(),
-  lastSupplyNexusClaim: (0, import_pg_core.bigint)("last_supply_nexus_claim", { mode: "number" }),
-  upgradeQueue: (0, import_pg_core.jsonb)("upgrade_queue"),
-  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
-});
-var alliances = (0, import_pg_core.pgTable)("alliances", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  name: (0, import_pg_core.text)("name").notNull(),
-  tag: (0, import_pg_core.text)("tag").notNull(),
-  leaderId: (0, import_pg_core.text)("leader_id").notNull(),
-  leaderName: (0, import_pg_core.text)("leader_name").notNull(),
-  members: (0, import_pg_core.jsonb)("members").notNull(),
-  wars: (0, import_pg_core.jsonb)("wars").notNull(),
-  bannerColor: (0, import_pg_core.text)("banner_color").notNull(),
-  bannerSymbol: (0, import_pg_core.text)("banner_symbol").notNull(),
-  highlights: (0, import_pg_core.text)("highlights"),
-  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
-});
-var chatMessages = (0, import_pg_core.pgTable)("chat_messages", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  channel: (0, import_pg_core.text)("channel").notNull(),
-  senderId: (0, import_pg_core.text)("sender_id").notNull(),
-  senderName: (0, import_pg_core.text)("sender_name").notNull(),
-  senderFaction: (0, import_pg_core.text)("sender_faction").notNull(),
-  senderFactionColor: (0, import_pg_core.text)("sender_faction_color").notNull(),
-  allianceTag: (0, import_pg_core.text)("alliance_tag"),
-  receiverId: (0, import_pg_core.text)("receiver_id"),
-  content: (0, import_pg_core.text)("content").notNull(),
-  timestamp: (0, import_pg_core.bigint)("timestamp", { mode: "number" }).notNull()
-});
-var fleets = (0, import_pg_core.pgTable)("fleets", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  senderId: (0, import_pg_core.text)("sender_id").notNull(),
-  senderName: (0, import_pg_core.text)("sender_name").notNull(),
-  senderCoords: (0, import_pg_core.jsonb)("sender_coords").notNull(),
-  targetId: (0, import_pg_core.text)("target_id"),
-  targetName: (0, import_pg_core.text)("target_name").notNull(),
-  targetCoords: (0, import_pg_core.jsonb)("target_coords").notNull(),
-  missionType: (0, import_pg_core.text)("mission_type").notNull(),
-  troops: (0, import_pg_core.jsonb)("troops").notNull(),
-  startedAt: (0, import_pg_core.bigint)("started_at", { mode: "number" }).notNull(),
-  arrivesAt: (0, import_pg_core.bigint)("arrives_at", { mode: "number" }).notNull(),
-  isReturning: (0, import_pg_core.boolean)("is_returning").notNull(),
-  isWaitingToSettle: (0, import_pg_core.boolean)("is_waiting_to_settle"),
-  targetBuilding: (0, import_pg_core.text)("target_building"),
-  lootCarried: (0, import_pg_core.jsonb)("loot_carried"),
-  troopSpeedLevel: (0, import_pg_core.integer)("troop_speed_level"),
-  defenseShieldsLevel: (0, import_pg_core.integer)("defense_shields_level")
-});
-var battleReports = (0, import_pg_core.pgTable)("battle_reports", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  timestamp: (0, import_pg_core.bigint)("timestamp", { mode: "number" }).notNull(),
-  attackerId: (0, import_pg_core.text)("attacker_id").notNull(),
-  attackerName: (0, import_pg_core.text)("attacker_name").notNull(),
-  attackerAlliance: (0, import_pg_core.text)("attacker_alliance"),
-  defenderId: (0, import_pg_core.text)("defender_id").notNull(),
-  defenderName: (0, import_pg_core.text)("defender_name").notNull(),
-  defenderAlliance: (0, import_pg_core.text)("defender_alliance"),
-  isRecon: (0, import_pg_core.boolean)("is_recon"),
-  attackerCoords: (0, import_pg_core.jsonb)("attacker_coords").notNull(),
-  defenderCoords: (0, import_pg_core.jsonb)("defender_coords").notNull(),
-  attackerInitialTroops: (0, import_pg_core.jsonb)("attacker_initial_troops").notNull(),
-  attackerLosses: (0, import_pg_core.jsonb)("attacker_losses").notNull(),
-  defenderInitialTroops: (0, import_pg_core.jsonb)("defender_initial_troops").notNull(),
-  defenderLosses: (0, import_pg_core.jsonb)("defender_losses").notNull(),
-  winner: (0, import_pg_core.text)("winner").notNull(),
-  resourcesStolen: (0, import_pg_core.jsonb)("resources_stolen").notNull(),
-  buildingDamage: (0, import_pg_core.jsonb)("building_damage"),
-  attackHpKilled: (0, import_pg_core.integer)("attack_hp_killed").notNull(),
-  defenceHpKilled: (0, import_pg_core.integer)("defence_hp_killed").notNull(),
-  battleRounds: (0, import_pg_core.jsonb)("battle_rounds"),
-  buildings: (0, import_pg_core.jsonb)("buildings"),
-  mines: (0, import_pg_core.jsonb)("mines"),
-  resources: (0, import_pg_core.jsonb)("resources")
-});
-var newsEvents = (0, import_pg_core.pgTable)("news_events", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  title: (0, import_pg_core.text)("title").notNull(),
-  content: (0, import_pg_core.text)("content").notNull(),
-  type: (0, import_pg_core.text)("type").notNull(),
-  timestamp: (0, import_pg_core.bigint)("timestamp", { mode: "number" }).notNull()
-});
-var habitablePlanets = (0, import_pg_core.pgTable)("habitable_planets", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  name: (0, import_pg_core.text)("name").notNull(),
-  coords: (0, import_pg_core.jsonb)("coords").notNull(),
-  isColonized: (0, import_pg_core.boolean)("is_colonized").notNull()
-});
-var feedbacks = (0, import_pg_core.pgTable)("feedbacks", {
-  id: (0, import_pg_core.text)("id").primaryKey(),
-  senderId: (0, import_pg_core.text)("sender_id").notNull(),
-  senderName: (0, import_pg_core.text)("sender_name").notNull(),
-  senderEmail: (0, import_pg_core.text)("sender_email").notNull(),
-  content: (0, import_pg_core.text)("content").notNull(),
-  category: (0, import_pg_core.text)("category").notNull(),
-  timestamp: (0, import_pg_core.bigint)("timestamp", { mode: "number" }).notNull()
-});
-var playersRelations = (0, import_drizzle_orm.relations)(players, ({ many }) => ({
-  planets: many(planets)
-}));
-var planetsRelations = (0, import_drizzle_orm.relations)(planets, ({ one }) => ({
-  player: one(players, {
-    fields: [planets.playerId],
-    references: [players.id]
-  })
-}));
-
-// src/db/index.ts
-var { Pool } = import_pg.default;
-var createPool = () => {
-  return new Pool({
-    host: process.env.SQL_HOST,
-    user: process.env.SQL_USER,
-    password: process.env.SQL_PASSWORD,
-    database: process.env.SQL_DB_NAME,
-    connectionTimeoutMillis: 15e3
-  });
-};
-var pool = createPool();
-pool.on("error", (err) => {
-  console.error("Unexpected error on idle SQL pool client:", err);
-});
-var db = (0, import_node_postgres.drizzle)(pool, { schema: schema_exports });
-
-// src/db/state-sync.ts
-async function loadStateFromDB() {
-  const loadedState = {
-    players: {},
-    alliances: {},
-    chatMessages: [],
-    fleets: [],
-    battleReports: [],
-    newsEvents: [],
-    habitablePlanets: [],
-    feedbacks: []
-  };
-  try {
-    const dbPlayers = await db.select().from(players);
-    for (const p of dbPlayers) {
-      const playerProfile = {
-        id: p.id,
-        username: p.username,
-        faction: p.faction,
-        factionColor: p.factionColor,
-        allianceId: p.allianceId || null,
-        allianceRole: p.allianceRole,
-        planets: [],
-        scores: p.scores,
-        achievements: p.achievements,
-        skinId: p.skinId,
-        bannerId: p.bannerId,
-        lastDailyRewardClaim: p.lastDailyRewardClaim,
-        credits: p.credits,
-        googleEmail: p.googleEmail || void 0,
-        password: p.password || void 0,
-        lastActive: p.lastActive || void 0
-      };
-      loadedState.players[p.id] = playerProfile;
-    }
-    const dbPlanPlanets = await db.select().from(planets);
-    for (const pl of dbPlanPlanets) {
-      const colony = {
-        id: pl.id,
-        name: pl.name,
-        sectorX: pl.sectorX,
-        sectorY: pl.sectorY,
-        skinId: pl.skinId,
-        mines: pl.mines,
-        buildings: pl.buildings,
-        resources: pl.resources,
-        troops: pl.troops,
-        trainingQueue: pl.trainingQueue,
-        lastSupplyNexusClaim: pl.lastSupplyNexusClaim || void 0,
-        upgradeQueue: pl.upgradeQueue || void 0
-      };
-      if (loadedState.players[pl.playerId]) {
-        loadedState.players[pl.playerId].planets.push(colony);
-      }
-    }
-    const dbAlliances = await db.select().from(alliances);
-    for (const a of dbAlliances) {
-      const alliance = {
-        id: a.id,
-        name: a.name,
-        tag: a.tag,
-        leaderId: a.leaderId,
-        leaderName: a.leaderName,
-        members: a.members,
-        wars: a.wars,
-        bannerColor: a.bannerColor,
-        bannerSymbol: a.bannerSymbol,
-        highlights: a.highlights || void 0
-      };
-      loadedState.alliances[a.id] = alliance;
-    }
-    const dbChats = await db.select().from(chatMessages);
-    loadedState.chatMessages = dbChats.map((c) => ({
-      id: c.id,
-      channel: c.channel,
-      senderId: c.senderId,
-      senderName: c.senderName,
-      senderFaction: c.senderFaction,
-      senderFactionColor: c.senderFactionColor,
-      allianceTag: c.allianceTag,
-      receiverId: c.receiverId,
-      content: c.content,
-      timestamp: c.timestamp
-    }));
-    const dbFleets = await db.select().from(fleets);
-    loadedState.fleets = dbFleets.map((f) => ({
-      id: f.id,
-      senderId: f.senderId,
-      senderName: f.senderName,
-      senderCoords: f.senderCoords,
-      targetId: f.targetId,
-      targetName: f.targetName,
-      targetCoords: f.targetCoords,
-      missionType: f.missionType,
-      troops: f.troops,
-      startedAt: f.startedAt,
-      arrivesAt: f.arrivesAt,
-      isReturning: f.isReturning,
-      isWaitingToSettle: f.isWaitingToSettle || void 0,
-      targetBuilding: f.targetBuilding || void 0,
-      lootCarried: f.lootCarried || void 0,
-      troopSpeedLevel: f.troopSpeedLevel || void 0,
-      defenseShieldsLevel: f.defenseShieldsLevel || void 0
-    }));
-    const dbReports = await db.select().from(battleReports);
-    loadedState.battleReports = dbReports.map((r) => ({
-      id: r.id,
-      timestamp: r.timestamp,
-      attackerId: r.attackerId,
-      attackerName: r.attackerName,
-      attackerAlliance: r.attackerAlliance || void 0,
-      defenderId: r.defenderId,
-      defenderName: r.defenderName,
-      defenderAlliance: r.defenderAlliance || void 0,
-      isRecon: r.isRecon || void 0,
-      attackerCoords: r.attackerCoords,
-      defenderCoords: r.defenderCoords,
-      attackerInitialTroops: r.attackerInitialTroops,
-      attackerLosses: r.attackerLosses,
-      defenderInitialTroops: r.defenderInitialTroops,
-      defenderLosses: r.defenderLosses,
-      winner: r.winner,
-      resourcesStolen: r.resourcesStolen,
-      buildingDamage: r.buildingDamage || void 0,
-      attackHpKilled: r.attackHpKilled,
-      defenceHpKilled: r.defenceHpKilled,
-      battleRounds: r.battleRounds || void 0,
-      buildings: r.buildings || void 0,
-      mines: r.mines || void 0,
-      resources: r.resources || void 0
-    }));
-    const dbNews = await db.select().from(newsEvents);
-    loadedState.newsEvents = dbNews.map((n) => ({
-      id: n.id,
-      title: n.title,
-      content: n.content,
-      type: n.type,
-      timestamp: n.timestamp
-    }));
-    const dbHabitable = await db.select().from(habitablePlanets);
-    loadedState.habitablePlanets = dbHabitable.map((h) => ({
-      id: h.id,
-      name: h.name,
-      coords: h.coords,
-      isColonized: h.isColonized
-    }));
-    const dbFeedbacks = await db.select().from(feedbacks);
-    loadedState.feedbacks = dbFeedbacks.map((f) => ({
-      id: f.id,
-      senderId: f.senderId,
-      senderName: f.senderName,
-      senderEmail: f.senderEmail,
-      content: f.content,
-      category: f.category,
-      timestamp: f.timestamp
-    }));
-  } catch (error) {
-    console.error("Error loading state from Cloud SQL database:", error);
-    throw error;
+  const cost = Math.round(baseCost * weights[resKey]);
+  if (type === "mine") {
+    return Math.round(cost * 3.25);
+  } else {
+    return Math.round(cost * 5);
   }
-  return loadedState;
 }
-async function saveStateToDB(state2) {
+function getTaskResourceCost(taskId) {
+  const defaultCost = { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
+  switch (taskId) {
+    case 1:
+      return {
+        water: getUpgradeResourceCost("building", "fabricator", 1, "water"),
+        plasma: getUpgradeResourceCost("building", "fabricator", 1, "plasma"),
+        fuel: getUpgradeResourceCost("building", "fabricator", 1, "fuel"),
+        food: getUpgradeResourceCost("building", "fabricator", 1, "food"),
+        respirant: getUpgradeResourceCost("building", "fabricator", 1, "respirant")
+      };
+    case 2:
+      return {
+        water: getUpgradeResourceCost("mine", "water", 1, "water"),
+        plasma: getUpgradeResourceCost("mine", "plasma", 1, "plasma"),
+        fuel: getUpgradeResourceCost("mine", "fuel", 1, "fuel"),
+        food: getUpgradeResourceCost("mine", "food", 1, "food"),
+        respirant: getUpgradeResourceCost("mine", "respirant", 1, "respirant")
+      };
+    case 3:
+      return {
+        water: getUpgradeResourceCost("building", "commsHub", 1, "water"),
+        plasma: getUpgradeResourceCost("building", "commsHub", 1, "plasma"),
+        fuel: getUpgradeResourceCost("building", "commsHub", 1, "fuel"),
+        food: getUpgradeResourceCost("building", "commsHub", 1, "food"),
+        respirant: getUpgradeResourceCost("building", "commsHub", 1, "respirant")
+      };
+    case 4:
+      return {
+        water: getUpgradeResourceCost("building", "repository", 1, "water"),
+        plasma: getUpgradeResourceCost("building", "repository", 1, "plasma"),
+        fuel: getUpgradeResourceCost("building", "repository", 1, "fuel"),
+        food: getUpgradeResourceCost("building", "repository", 1, "food"),
+        respirant: getUpgradeResourceCost("building", "repository", 1, "respirant")
+      };
+    case 5:
+      return {
+        water: getUpgradeResourceCost("building", "fabricator", 2, "water"),
+        plasma: getUpgradeResourceCost("building", "fabricator", 2, "plasma"),
+        fuel: getUpgradeResourceCost("building", "fabricator", 2, "fuel"),
+        food: getUpgradeResourceCost("building", "fabricator", 2, "food"),
+        respirant: getUpgradeResourceCost("building", "fabricator", 2, "respirant")
+      };
+    case 6:
+      return {
+        water: getUpgradeResourceCost("building", "radar", 1, "water"),
+        plasma: getUpgradeResourceCost("building", "radar", 1, "plasma"),
+        fuel: getUpgradeResourceCost("building", "radar", 1, "fuel"),
+        food: getUpgradeResourceCost("building", "radar", 1, "food"),
+        respirant: getUpgradeResourceCost("building", "radar", 1, "respirant")
+      };
+    case 7:
+      return defaultCost;
+    case 8:
+      return {
+        water: getUpgradeResourceCost("mine", "water", 2, "water") * 2,
+        plasma: getUpgradeResourceCost("mine", "plasma", 2, "plasma") * 2,
+        fuel: getUpgradeResourceCost("mine", "fuel", 2, "fuel") * 2,
+        food: getUpgradeResourceCost("mine", "food", 2, "food") * 2,
+        respirant: getUpgradeResourceCost("mine", "respirant", 2, "respirant") * 2
+      };
+    case 9:
+      return {
+        water: getUpgradeResourceCost("building", "fabricator", 4, "water"),
+        plasma: getUpgradeResourceCost("building", "fabricator", 4, "plasma"),
+        fuel: getUpgradeResourceCost("building", "fabricator", 4, "fuel"),
+        food: getUpgradeResourceCost("building", "fabricator", 4, "food"),
+        respirant: getUpgradeResourceCost("building", "fabricator", 4, "respirant")
+      };
+    case 10:
+      return {
+        water: getUpgradeResourceCost("building", "commsHub", 2, "water"),
+        plasma: getUpgradeResourceCost("building", "commsHub", 2, "plasma"),
+        fuel: getUpgradeResourceCost("building", "commsHub", 2, "fuel"),
+        food: getUpgradeResourceCost("building", "commsHub", 2, "food"),
+        respirant: getUpgradeResourceCost("building", "commsHub", 2, "respirant")
+      };
+    case 11:
+      return {
+        water: getUpgradeResourceCost("building", "researchCenter", 1, "water"),
+        plasma: getUpgradeResourceCost("building", "researchCenter", 1, "plasma"),
+        fuel: getUpgradeResourceCost("building", "researchCenter", 1, "fuel"),
+        food: getUpgradeResourceCost("building", "researchCenter", 1, "food"),
+        respirant: getUpgradeResourceCost("building", "researchCenter", 1, "respirant")
+      };
+    case 12:
+      return { water: 3e3, plasma: 4e3, fuel: 5e3, food: 2e3, respirant: 2e3 };
+    case 13:
+      return { water: 3e3, plasma: 4e3, fuel: 5e3, food: 2e3, respirant: 2e3 };
+    case 14:
+      return {
+        water: getUpgradeResourceCost("building", "researchCenter", 2, "water"),
+        plasma: getUpgradeResourceCost("building", "researchCenter", 2, "plasma"),
+        fuel: getUpgradeResourceCost("building", "researchCenter", 2, "fuel"),
+        food: getUpgradeResourceCost("building", "researchCenter", 2, "food"),
+        respirant: getUpgradeResourceCost("building", "researchCenter", 2, "respirant")
+      };
+    case 15:
+      return { water: 4600, plasma: 9200, fuel: 11500, food: 2300, respirant: 5750 };
+    case 16:
+      return {
+        water: getUpgradeResourceCost("mine", "water", 3, "water") * 2,
+        plasma: getUpgradeResourceCost("mine", "plasma", 3, "plasma") * 2,
+        fuel: getUpgradeResourceCost("mine", "fuel", 3, "fuel") * 2,
+        food: getUpgradeResourceCost("mine", "food", 3, "food") * 2,
+        respirant: getUpgradeResourceCost("mine", "respirant", 3, "respirant") * 2
+      };
+    case 17:
+      return {
+        water: getUpgradeResourceCost("building", "fabricator", 7, "water"),
+        plasma: getUpgradeResourceCost("building", "fabricator", 7, "plasma"),
+        fuel: getUpgradeResourceCost("building", "fabricator", 7, "fuel"),
+        food: getUpgradeResourceCost("building", "fabricator", 7, "food"),
+        respirant: getUpgradeResourceCost("building", "fabricator", 7, "respirant")
+      };
+    case 18:
+      return {
+        water: getUpgradeResourceCost("building", "commsHub", 3, "water"),
+        plasma: getUpgradeResourceCost("building", "commsHub", 3, "plasma"),
+        fuel: getUpgradeResourceCost("building", "commsHub", 3, "fuel"),
+        food: getUpgradeResourceCost("building", "commsHub", 3, "food"),
+        respirant: getUpgradeResourceCost("building", "commsHub", 3, "respirant")
+      };
+    case 19:
+      return {
+        water: getUpgradeResourceCost("building", "radar", 2, "water"),
+        plasma: getUpgradeResourceCost("building", "radar", 2, "plasma"),
+        fuel: getUpgradeResourceCost("building", "radar", 2, "fuel"),
+        food: getUpgradeResourceCost("building", "radar", 2, "food"),
+        respirant: getUpgradeResourceCost("building", "radar", 2, "respirant")
+      };
+    case 20:
+      return {
+        water: getUpgradeResourceCost("building", "armyBase", 1, "water"),
+        plasma: getUpgradeResourceCost("building", "armyBase", 1, "plasma"),
+        fuel: getUpgradeResourceCost("building", "armyBase", 1, "fuel"),
+        food: getUpgradeResourceCost("building", "armyBase", 1, "food"),
+        respirant: getUpgradeResourceCost("building", "armyBase", 1, "respirant")
+      };
+    case 21:
+      return { water: 750, plasma: 0, fuel: 0, food: 1e3, respirant: 500 };
+    case 22:
+      return { water: 600, plasma: 900, fuel: 900, food: 600, respirant: 0 };
+    case 23:
+      return defaultCost;
+    case 24:
+      return defaultCost;
+    case 25:
+      return defaultCost;
+    case 26:
+      return {
+        water: getUpgradeResourceCost("building", "repository", 5, "water"),
+        plasma: getUpgradeResourceCost("building", "repository", 5, "plasma"),
+        fuel: getUpgradeResourceCost("building", "repository", 5, "fuel"),
+        food: getUpgradeResourceCost("building", "repository", 5, "food"),
+        respirant: getUpgradeResourceCost("building", "repository", 5, "respirant")
+      };
+    case 27:
+      return {
+        water: getUpgradeResourceCost("building", "fabricator", 10, "water"),
+        plasma: getUpgradeResourceCost("building", "fabricator", 10, "plasma"),
+        fuel: getUpgradeResourceCost("building", "fabricator", 10, "fuel"),
+        food: getUpgradeResourceCost("building", "fabricator", 10, "food"),
+        respirant: getUpgradeResourceCost("building", "fabricator", 10, "respirant")
+      };
+    case 28:
+      return {
+        water: getUpgradeResourceCost("building", "armyBase", 2, "water"),
+        plasma: getUpgradeResourceCost("building", "armyBase", 2, "plasma"),
+        fuel: getUpgradeResourceCost("building", "armyBase", 2, "fuel"),
+        food: getUpgradeResourceCost("building", "armyBase", 2, "food"),
+        respirant: getUpgradeResourceCost("building", "armyBase", 2, "respirant")
+      };
+    case 29:
+      return {
+        water: getUpgradeResourceCost("building", "researchCenter", 3, "water"),
+        plasma: getUpgradeResourceCost("building", "researchCenter", 3, "plasma"),
+        fuel: getUpgradeResourceCost("building", "researchCenter", 3, "fuel"),
+        food: getUpgradeResourceCost("building", "researchCenter", 3, "food"),
+        respirant: getUpgradeResourceCost("building", "researchCenter", 3, "respirant")
+      };
+    case 30:
+      return {
+        water: getUpgradeResourceCost("building", "bunker", 1, "water"),
+        plasma: getUpgradeResourceCost("building", "bunker", 1, "plasma"),
+        fuel: getUpgradeResourceCost("building", "bunker", 1, "fuel"),
+        food: getUpgradeResourceCost("building", "bunker", 1, "food"),
+        respirant: getUpgradeResourceCost("building", "bunker", 1, "respirant")
+      };
+    case 31:
+      return { water: 1500, plasma: 1e3, fuel: 1500, food: 1e3, respirant: 1e3 };
+    case 32:
+      return { water: 5e3, plasma: 5e3, fuel: 1e4, food: 5e3, respirant: 5e3 };
+    default:
+      return defaultCost;
+  }
+}
+function getTaskResourceReward(taskId) {
+  const nextTaskId = taskId + 1;
+  const nextTaskCost = nextTaskId <= 32 ? getTaskResourceCost(nextTaskId) : { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
+  return {
+    water: nextTaskCost.water + 5e3,
+    plasma: nextTaskCost.plasma + 5e3,
+    fuel: nextTaskCost.fuel + 5e3,
+    food: nextTaskCost.food + 5e3,
+    respirant: nextTaskCost.respirant + 5e3
+  };
+}
+
+// antiCheat.ts
+var import_ioredis = __toESM(require("ioredis"), 1);
+var localCache = /* @__PURE__ */ new Map();
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of localCache.entries()) {
+    if (now - val > 15e3) {
+      localCache.delete(key);
+    }
+  }
+}, 3e4);
+var isRedisHealthy = false;
+var redis = new import_ioredis.default({
+  host: "note-believe-rosegold-84519.db.redis.io",
+  port: 14372,
+  password: "i73aF6P0isDnIWJTBq4X9Rw1oANUV9Ie",
+  lazyConnect: true,
+  // Non-blocking lazy connection
+  maxRetriesPerRequest: 1,
+  // Fail fast on requests if connection drops
+  connectTimeout: 1500,
+  // Timeout connection after 1.5 seconds
+  enableOfflineQueue: false,
+  // DO NOT queue commands when connection is down - fail fast
+  retryStrategy(times) {
+    if (times > 3) {
+      return null;
+    }
+    return Math.min(times * 200, 1e3);
+  }
+});
+redis.on("connect", () => {
+  console.log("Connecting to Cloud Redis...");
+});
+redis.on("ready", () => {
+  isRedisHealthy = true;
+  console.log("Successfully connected and ready on Cloud Redis database.");
+});
+redis.on("error", (error) => {
+  isRedisHealthy = false;
+  console.warn("Cloud Redis is offline (using high-performance in-memory fallback):", error.message);
+});
+redis.on("close", () => {
+  isRedisHealthy = false;
+});
+redis.on("end", () => {
+  isRedisHealthy = false;
+  console.log("Redis connection retry attempts exhausted. Operating permanently in-memory fallback mode.");
+});
+function withTimeout(promise, timeoutMs) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`Redis operation timeout after ${timeoutMs}ms`)), timeoutMs))
+  ]);
+}
+async function checkSpeedHack(userId, actionPath, minIntervalMs = 150) {
+  const redisKey = `anticheat:speed:${userId}:${actionPath}`;
+  const now = Date.now();
+  if (!isRedisHealthy || redis.status !== "ready") {
+    const lastTime = localCache.get(redisKey);
+    if (lastTime) {
+      const diff = now - lastTime;
+      if (diff < minIntervalMs) {
+        console.warn(`[Anti-Speed-Hack] [Local Cache] Blocked rapid request from user ${userId} on ${actionPath} (Interval: ${diff}ms)`);
+        return false;
+      }
+    }
+    localCache.set(redisKey, now);
+    return true;
+  }
   try {
-    for (const a of Object.values(state2.alliances)) {
-      await db.insert(alliances).values({
-        id: a.id,
-        name: a.name,
-        tag: a.tag,
-        leaderId: a.leaderId,
-        leaderName: a.leaderName,
-        members: a.members,
-        wars: a.wars,
-        bannerColor: a.bannerColor,
-        bannerSymbol: a.bannerSymbol,
-        highlights: a.highlights || null
-      }).onConflictDoUpdate({
-        target: alliances.id,
-        set: {
-          name: a.name,
-          tag: a.tag,
-          leaderId: a.leaderId,
-          leaderName: a.leaderName,
-          members: a.members,
-          wars: a.wars,
-          bannerColor: a.bannerColor,
-          bannerSymbol: a.bannerSymbol,
-          highlights: a.highlights || null
-        }
-      });
-    }
-    for (const p of Object.values(state2.players)) {
-      await db.insert(players).values({
-        id: p.id,
-        username: p.username,
-        faction: p.faction,
-        factionColor: p.factionColor,
-        allianceId: p.allianceId || null,
-        allianceRole: p.allianceRole || null,
-        scores: p.scores,
-        achievements: p.achievements,
-        skinId: p.skinId,
-        bannerId: p.bannerId,
-        lastDailyRewardClaim: p.lastDailyRewardClaim,
-        credits: p.credits,
-        googleEmail: p.googleEmail || null,
-        password: p.password || null,
-        lastActive: p.lastActive || null
-      }).onConflictDoUpdate({
-        target: players.id,
-        set: {
-          username: p.username,
-          faction: p.faction,
-          factionColor: p.factionColor,
-          allianceId: p.allianceId || null,
-          allianceRole: p.allianceRole || null,
-          scores: p.scores,
-          achievements: p.achievements,
-          skinId: p.skinId,
-          bannerId: p.bannerId,
-          lastDailyRewardClaim: p.lastDailyRewardClaim,
-          credits: p.credits,
-          googleEmail: p.googleEmail || null,
-          password: p.password || null,
-          lastActive: p.lastActive || null
-        }
-      });
-      if (p.planets) {
-        for (const pl of p.planets) {
-          await db.insert(planets).values({
-            id: pl.id,
-            playerId: p.id,
-            name: pl.name,
-            sectorX: pl.sectorX,
-            sectorY: pl.sectorY,
-            skinId: pl.skinId,
-            mines: pl.mines,
-            buildings: pl.buildings,
-            resources: pl.resources,
-            troops: pl.troops,
-            trainingQueue: pl.trainingQueue,
-            lastSupplyNexusClaim: pl.lastSupplyNexusClaim || null,
-            upgradeQueue: pl.upgradeQueue || null
-          }).onConflictDoUpdate({
-            target: planets.id,
-            set: {
-              name: pl.name,
-              sectorX: pl.sectorX,
-              sectorY: pl.sectorY,
-              skinId: pl.skinId,
-              mines: pl.mines,
-              buildings: pl.buildings,
-              resources: pl.resources,
-              troops: pl.troops,
-              trainingQueue: pl.trainingQueue,
-              lastSupplyNexusClaim: pl.lastSupplyNexusClaim || null,
-              upgradeQueue: pl.upgradeQueue || null
-            }
-          });
-        }
+    const lastTimeStr = await withTimeout(redis.get(redisKey), 400);
+    if (lastTimeStr) {
+      const lastTime = parseInt(lastTimeStr, 10);
+      const diff = now - lastTime;
+      if (diff < minIntervalMs) {
+        console.warn(`[Anti-Speed-Hack] Cloud Redis blocked rapid request from user ${userId} on ${actionPath} (Interval: ${diff}ms)`);
+        return false;
       }
     }
-    for (const c of state2.chatMessages) {
-      await db.insert(chatMessages).values({
-        id: c.id,
-        channel: c.channel,
-        senderId: c.senderId,
-        senderName: c.senderName,
-        senderFaction: c.senderFaction,
-        senderFactionColor: c.senderFactionColor,
-        allianceTag: c.allianceTag || null,
-        receiverId: c.receiverId || null,
-        content: c.content,
-        timestamp: c.timestamp
-      }).onConflictDoNothing();
-    }
-    await db.delete(fleets);
-    for (const f of state2.fleets) {
-      await db.insert(fleets).values({
-        id: f.id,
-        senderId: f.senderId,
-        senderName: f.senderName,
-        senderCoords: f.senderCoords,
-        targetId: f.targetId || null,
-        targetName: f.targetName,
-        targetCoords: f.targetCoords,
-        missionType: f.missionType,
-        troops: f.troops,
-        startedAt: f.startedAt,
-        arrivesAt: f.arrivesAt,
-        isReturning: f.isReturning,
-        isWaitingToSettle: f.isWaitingToSettle || false,
-        targetBuilding: f.targetBuilding || null,
-        lootCarried: f.lootCarried || null,
-        troopSpeedLevel: f.troopSpeedLevel || null,
-        defenseShieldsLevel: f.defenseShieldsLevel || null
-      });
-    }
-    for (const r of state2.battleReports) {
-      await db.insert(battleReports).values({
-        id: r.id,
-        timestamp: r.timestamp,
-        attackerId: r.attackerId,
-        attackerName: r.attackerName,
-        attackerAlliance: r.attackerAlliance || null,
-        defenderId: r.defenderId,
-        defenderName: r.defenderName,
-        defenderAlliance: r.defenderAlliance || null,
-        isRecon: r.isRecon || false,
-        attackerCoords: r.attackerCoords,
-        defenderCoords: r.defenderCoords,
-        attackerInitialTroops: r.attackerInitialTroops,
-        attackerLosses: r.attackerLosses,
-        defenderInitialTroops: r.defenderInitialTroops,
-        defenderLosses: r.defenderLosses,
-        winner: r.winner,
-        resourcesStolen: r.resourcesStolen,
-        buildingDamage: r.buildingDamage || null,
-        attackHpKilled: r.attackHpKilled,
-        defenceHpKilled: r.defenceHpKilled,
-        battleRounds: r.battleRounds || null,
-        buildings: r.buildings || null,
-        mines: r.mines || null,
-        resources: r.resources || null
-      }).onConflictDoNothing();
-    }
-    for (const n of state2.newsEvents) {
-      await db.insert(newsEvents).values({
-        id: n.id,
-        title: n.title,
-        content: n.content,
-        type: n.type,
-        timestamp: n.timestamp
-      }).onConflictDoNothing();
-    }
-    if (state2.habitablePlanets) {
-      for (const h of state2.habitablePlanets) {
-        await db.insert(habitablePlanets).values({
-          id: h.id,
-          name: h.name,
-          coords: h.coords,
-          isColonized: h.isColonized
-        }).onConflictDoUpdate({
-          target: habitablePlanets.id,
-          set: {
-            name: h.name,
-            coords: h.coords,
-            isColonized: h.isColonized
-          }
-        });
+    await withTimeout(redis.set(redisKey, now.toString(), "PX", 5e3), 400);
+    localCache.set(redisKey, now);
+    return true;
+  } catch (err) {
+    isRedisHealthy = false;
+    const lastTime = localCache.get(redisKey);
+    if (lastTime) {
+      const diff = now - lastTime;
+      if (diff < minIntervalMs) {
+        return false;
       }
     }
-    if (state2.feedbacks) {
-      for (const f of state2.feedbacks) {
-        await db.insert(feedbacks).values({
-          id: f.id,
-          senderId: f.senderId,
-          senderName: f.senderName,
-          senderEmail: f.senderEmail,
-          content: f.content,
-          category: f.category,
-          timestamp: f.timestamp
-        }).onConflictDoNothing();
-      }
-    }
-  } catch (error) {
-    console.error("Error saving state to Cloud SQL database (non-blocking fallback active):", error);
+    localCache.set(redisKey, now);
+    return true;
   }
 }
 
 // server.ts
+var import_google_auth_library = require("google-auth-library");
 var app = (0, import_express.default)();
-var PORT = process.env.PORT ? parseInt(process.env.PORT) : 3e3;
+var PORT = 3e3;
+app.use((req, res, next) => {
+  const match = req.url.match(/\/api(\/|$)/);
+  if (match && match.index !== void 0 && match.index > 0) {
+    const rewritten = req.url.substring(match.index);
+    console.log(`[ROUTER AUTO-HEAL] Rewriting proxy subpath: ${req.url} -> ${rewritten}`);
+    req.url = rewritten;
+  }
+  next();
+});
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Expose-Headers", "Content-Type, Content-Length, Authorization, X-Requested-With, x-user-id");
-  const requestHeaders = req.header("access-control-request-headers");
-  if (requestHeaders) {
-    res.setHeader("Access-Control-Allow-Headers", requestHeaders);
-  } else {
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-user-id");
-  }
+  res.setHeader("Access-Control-Expose-Headers", "Content-Type, Content-Length, Authorization, X-Requested-With, x-user-id, X-User-Id");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-user-id, X-User-Id, accept, origin, *");
   if (req.method === "OPTIONS") {
     res.sendStatus(200);
     return;
@@ -630,6 +395,30 @@ app.use((req, res, next) => {
   next();
 });
 app.use(import_express.default.json());
+app.use("/api", async (req, res, next) => {
+  try {
+    if (req.method === "POST" || req.method === "PUT" || req.method === "DELETE") {
+      const apiPath = (req.path || "").toLowerCase();
+      if (apiPath.includes("/login") || apiPath.includes("/register") || apiPath.includes("/auth/google") || apiPath.includes("/notifications/register-token")) {
+        return next();
+      }
+      const userId = req.headers["x-user-id"];
+      if (userId) {
+        const isValid = await checkSpeedHack(userId, apiPath, 150);
+        if (!isValid) {
+          return res.status(429).json({
+            error: "Quantum anti-speed-hack mechanism active: Request rate exceeds safety parameters. Action blocked.",
+            success: false
+          });
+        }
+      }
+    }
+    next();
+  } catch (err) {
+    console.error("Anti-cheat middleware validation failed, bypassing to ensure service availability:", err);
+    next();
+  }
+});
 var STATE_FILE = import_path.default.join(process.cwd(), "galaxy_state.json");
 var state = {
   players: {},
@@ -640,26 +429,295 @@ var state = {
   newsEvents: [],
   habitablePlanets: [
     { id: "hab_12_18", name: "Habitable Gaia Aurelia", coords: { x: 12, y: 18 }, isColonized: false },
-    { id: "hab_34_72", name: "Habitable Station Kepler-Prime", coords: { x: 34, y: 72 }, isColonized: false },
-    { id: "hab_45_19", name: "Habitable Outpost Gliese-91", coords: { x: 45, y: 19 }, isColonized: false },
-    { id: "hab_67_82", name: "Habitable Station New Hope", coords: { x: 67, y: 82 }, isColonized: false },
-    { id: "hab_15_55", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 55 }, isColonized: false },
-    { id: "hab_85_44", name: "Habitable Station Zephyr-9", coords: { x: 85, y: 44 }, isColonized: false },
-    { id: "hab_52_63", name: "Habitable Planet Arcadia", coords: { x: 52, y: 63 }, isColonized: false },
+    { id: "hab_34_22", name: "Habitable Station Kepler-Prime", coords: { x: 34, y: 22 }, isColonized: false },
+    { id: "hab_25_19", name: "Habitable Outpost Gliese-91", coords: { x: 25, y: 19 }, isColonized: false },
+    { id: "hab_17_32", name: "Habitable Station New Hope", coords: { x: 17, y: 32 }, isColonized: false },
+    { id: "hab_15_25", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 25 }, isColonized: false },
+    { id: "hab_35_14", name: "Habitable Station Zephyr-9", coords: { x: 35, y: 14 }, isColonized: false },
+    { id: "hab_22_33", name: "Habitable Planet Arcadia", coords: { x: 22, y: 33 }, isColonized: false },
     { id: "hab_29_31", name: "Habitable Core Dome-A", coords: { x: 29, y: 31 }, isColonized: false },
-    { id: "hab_73_25", name: "Habitable Station Oasis-1", coords: { x: 73, y: 25 }, isColonized: false },
-    { id: "hab_91_85", name: "Habitable Planet Eden-X", coords: { x: 91, y: 85 }, isColonized: false },
-    { id: "hab_8_92", name: "Habitable Outpost Genesis", coords: { x: 8, y: 92 }, isColonized: false },
-    { id: "hab_40_40", name: "Habitable Station Midway", coords: { x: 40, y: 40 }, isColonized: false }
+    { id: "hab_13_25", name: "Habitable Station Oasis-1", coords: { x: 13, y: 25 }, isColonized: false },
+    { id: "hab_31_35", name: "Habitable Planet Eden-X", coords: { x: 31, y: 35 }, isColonized: false },
+    { id: "hab_8_32", name: "Habitable Outpost Genesis", coords: { x: 8, y: 32 }, isColonized: false },
+    { id: "hab_35_35", name: "Habitable Station Midway", coords: { x: 35, y: 35 }, isColonized: false }
   ]
 };
+function initializeGalaxyConfig() {
+  if (!state) return;
+  if (!state.galaxyConfig) {
+    state.galaxyConfig = {
+      initialGalaxySize: 15,
+      reservedCenterSector: { x: 7, y: 7 },
+      initialColonizationZoneSize: 7,
+      spawnDistance: 2,
+      zoneGrowthOccupancyThreshold: 0.5,
+      // default 50% occupancy to grow zone
+      galaxyOccupancyThreshold: 0.7,
+      // default 70% occupancy to expand map
+      expansionIncrement: 5,
+      currentGalaxySize: 15,
+      currentColonizationZoneSize: 7
+    };
+  }
+  if (!state.galaxyConfig.currentGalaxySize) {
+    state.galaxyConfig.currentGalaxySize = state.galaxyConfig.initialGalaxySize || 15;
+  }
+  if (!state.galaxyConfig.currentColonizationZoneSize) {
+    state.galaxyConfig.currentColonizationZoneSize = state.galaxyConfig.initialColonizationZoneSize || 7;
+  }
+  if (!state.galaxyConfig.reservedCenterSector) {
+    const size = state.galaxyConfig.currentGalaxySize;
+    state.galaxyConfig.reservedCenterSector = {
+      x: Math.floor(size / 2),
+      y: Math.floor(size / 2)
+    };
+  }
+}
+function checkAndExpandGalaxy() {
+  initializeGalaxyConfig();
+  const config = state.galaxyConfig;
+  const currentMapSize = config.currentGalaxySize || 15;
+  let zoneSize = config.currentColonizationZoneSize || config.initialColonizationZoneSize || 7;
+  if (zoneSize < currentMapSize) {
+    const cx = config.reservedCenterSector ? config.reservedCenterSector.x : Math.floor(currentMapSize / 2);
+    const cy = config.reservedCenterSector ? config.reservedCenterSector.y : Math.floor(currentMapSize / 2);
+    const halfSize = Math.floor(zoneSize / 2);
+    const minX = Math.max(0, cx - halfSize);
+    const maxX = Math.min(currentMapSize - 1, cx + halfSize);
+    const minY = Math.max(0, cy - halfSize);
+    const maxY = Math.min(currentMapSize - 1, cy + halfSize);
+    let occupiedCount = 0;
+    if (state.players) {
+      for (const player of Object.values(state.players)) {
+        if (player && player.planets) {
+          for (const pl of player.planets) {
+            if (pl.sectorX >= minX && pl.sectorX <= maxX && pl.sectorY >= minY && pl.sectorY <= maxY) {
+              occupiedCount++;
+            }
+          }
+        }
+      }
+    }
+    const totalSectorsInZone = zoneSize * zoneSize - 1;
+    const zoneOccupancy = totalSectorsInZone > 0 ? occupiedCount / totalSectorsInZone : 0;
+    const zoneThreshold = config.zoneGrowthOccupancyThreshold !== void 0 ? config.zoneGrowthOccupancyThreshold : 0.5;
+    if (zoneOccupancy >= zoneThreshold) {
+      const nextZoneSize = zoneSize + 2;
+      config.currentColonizationZoneSize = Math.min(nextZoneSize, currentMapSize);
+      console.log(`[Colonization Zone grew] Size grew from ${zoneSize}x${zoneSize} to ${config.currentColonizationZoneSize}x${config.currentColonizationZoneSize} (Occupancy: ${(zoneOccupancy * 100).toFixed(1)}% >= ${(zoneThreshold * 100).toFixed(1)}%)`);
+      saveState();
+      zoneSize = config.currentColonizationZoneSize;
+    }
+  }
+  let totalBases = 0;
+  if (state.players) {
+    for (const player of Object.values(state.players)) {
+      totalBases += player.planets?.length || 0;
+    }
+  }
+  const totalGalaxySectors = currentMapSize * currentMapSize - 1;
+  const galaxyOccupancy = totalGalaxySectors > 0 ? totalBases / totalGalaxySectors : 0;
+  const galaxyThreshold = config.galaxyOccupancyThreshold !== void 0 ? config.galaxyOccupancyThreshold : 0.7;
+  if (galaxyOccupancy >= galaxyThreshold) {
+    const increment = config.expansionIncrement || 5;
+    const oldSize = currentMapSize;
+    const newSize = currentMapSize + increment;
+    config.currentGalaxySize = newSize;
+    if (zoneSize >= oldSize) {
+      config.currentColonizationZoneSize = newSize;
+    }
+    console.log(`[GALAXY EXPANSION] Universe expanded from ${oldSize}x${oldSize} to ${newSize}x${newSize}! Occupancy was ${(galaxyOccupancy * 100).toFixed(1)}% >= ${(galaxyThreshold * 100).toFixed(1)}%`);
+    const BROADCAST_TEMPLATES = [
+      "GALACTIC COMMAND\n\nLong-range sensor arrays have successfully mapped new regions beyond the known frontier. Navigation systems have been updated. Previously unreachable sectors are now open for exploration.",
+      "GALACTIC COMMAND\n\nCenturies of research have culminated in a breakthrough in deep-space navigation. New sectors have been charted and are now available for colonization.",
+      "GALACTIC COMMAND\n\nExploration fleets have returned with confirmed hyperspace routes beyond the current frontier. Galactic Command authorizes expansion into newly discovered space.",
+      "GALACTIC COMMAND\n\nOur civilizations have reached another milestone in interstellar exploration. Additional sectors have been integrated into the Galactic Navigation Network.",
+      "GALACTIC COMMAND\n\nAdvanced radar arrays have extended humanity's vision deeper into the galaxy. Frontier sectors are now accessible to all commanders."
+    ];
+    const randomMsg = BROADCAST_TEMPLATES[Math.floor(Math.random() * BROADCAST_TEMPLATES.length)];
+    if (!state.chatMessages) {
+      state.chatMessages = [];
+    }
+    state.chatMessages.push({
+      id: `chat_expansion_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      channel: "global",
+      senderId: "system",
+      senderName: "GALACTIC COMMAND",
+      senderFaction: "System",
+      senderFactionColor: "#F1C40F",
+      allianceTag: "GAL",
+      receiverId: null,
+      content: randomMsg,
+      timestamp: Date.now()
+    });
+    if (state.chatMessages.length > 200) {
+      state.chatMessages.shift();
+    }
+    if (!state.newsEvents) {
+      state.newsEvents = [];
+    }
+    state.newsEvents.push({
+      id: `news_expansion_${Date.now()}`,
+      title: "\u{1F30C} New Frontiers Charted!",
+      content: `Galactic Command has expanded the known sector coordinates to ${newSize}x${newSize} space. High-resolution navigation channels are now online!`,
+      type: "system",
+      timestamp: Date.now()
+    });
+    saveState();
+  }
+}
+function getCurrentMapLimits() {
+  initializeGalaxyConfig();
+  checkAndExpandGalaxy();
+  const currentMapSize = state.galaxyConfig?.currentGalaxySize || 15;
+  return currentMapSize - 1;
+}
+function getRandomCoordinates(maxCoord) {
+  const margin = maxCoord <= 20 ? 1 : 5;
+  const range = maxCoord - margin * 2;
+  if (range <= 0) {
+    return {
+      x: Math.floor(Math.random() * maxCoord),
+      y: Math.floor(Math.random() * maxCoord)
+    };
+  }
+  const x = Math.floor(Math.random() * range) + margin;
+  const y = Math.floor(Math.random() * range) + margin;
+  return { x, y };
+}
+function getPlayerSpawnCoordinates(maxCoord) {
+  initializeGalaxyConfig();
+  const config = state.galaxyConfig;
+  const currentMapSize = maxCoord + 1;
+  const cx = config.reservedCenterSector ? config.reservedCenterSector.x : Math.floor(currentMapSize / 2);
+  const cy = config.reservedCenterSector ? config.reservedCenterSector.y : Math.floor(currentMapSize / 2);
+  const zoneSize = config.currentColonizationZoneSize || config.initialColonizationZoneSize || 7;
+  const halfSize = Math.floor(zoneSize / 2);
+  const minX = Math.max(0, cx - halfSize);
+  const maxX = Math.min(maxCoord, cx + halfSize);
+  const minY = Math.max(0, cy - halfSize);
+  const maxY = Math.min(maxCoord, cy + halfSize);
+  const rangeX = maxX - minX + 1;
+  const rangeY = maxY - minY + 1;
+  const x = Math.floor(Math.random() * rangeX) + minX;
+  const y = Math.floor(Math.random() * rangeY) + minY;
+  return { x, y };
+}
+function findClusterCoordinate(targetX, targetY) {
+  const limit = getCurrentMapLimits();
+  for (let d = 0; d < 100; d++) {
+    for (let dx = -d; dx <= d; dx++) {
+      const dy1 = d - Math.abs(dx);
+      const dy2 = -dy1;
+      const candidateYVals = dy1 === dy2 ? [dy1] : [dy1, dy2];
+      for (const dy of candidateYVals) {
+        const cx = targetX + dx;
+        const cy = targetY + dy;
+        if (cx < 0 || cx > limit || cy < 0 || cy > limit) {
+          continue;
+        }
+        let overlapPlayer = false;
+        if (state.players) {
+          for (const player of Object.values(state.players)) {
+            if (player.planets && player.planets.some((pl) => pl.sectorX === cx && pl.sectorY === cy)) {
+              overlapPlayer = true;
+              break;
+            }
+          }
+        }
+        if (overlapPlayer) continue;
+        const overlapHabitable = state.habitablePlanets?.some((hp) => hp.coords.x === cx && hp.coords.y === cy);
+        if (overlapHabitable) continue;
+        return { x: cx, y: cy };
+      }
+    }
+  }
+  return null;
+}
+function getSafeRandomCoordinates(maxCoord) {
+  initializeGalaxyConfig();
+  const config = state.galaxyConfig;
+  const currentMapSize = maxCoord + 1;
+  const cx = config.reservedCenterSector ? config.reservedCenterSector.x : Math.floor(currentMapSize / 2);
+  const cy = config.reservedCenterSector ? config.reservedCenterSector.y : Math.floor(currentMapSize / 2);
+  const minDistance = config.spawnDistance !== void 0 ? config.spawnDistance : 2;
+  let attempts = 0;
+  while (attempts < 1e3) {
+    attempts++;
+    const coords = getPlayerSpawnCoordinates(maxCoord);
+    if (coords.x === cx && coords.y === cy) {
+      continue;
+    }
+    let overlap = false;
+    if (state && state.players) {
+      for (const player of Object.values(state.players)) {
+        if (player && player.planets) {
+          if (player.planets.some((pl) => pl.sectorX === coords.x && pl.sectorY === coords.y)) {
+            overlap = true;
+            break;
+          }
+        }
+      }
+    }
+    if (overlap) continue;
+    if (state && state.habitablePlanets) {
+      const overlapHabitable = state.habitablePlanets.some((hp) => hp.coords.x === coords.x && hp.coords.y === coords.y);
+      if (overlapHabitable) continue;
+    }
+    let tooClose = false;
+    if (state && state.players) {
+      for (const player of Object.values(state.players)) {
+        if (player && player.planets) {
+          for (const pl of player.planets) {
+            const dist = Math.hypot(coords.x - pl.sectorX, coords.y - pl.sectorY);
+            if (dist < minDistance) {
+              tooClose = true;
+              break;
+            }
+          }
+        }
+        if (tooClose) break;
+      }
+    }
+    if (tooClose) continue;
+    return coords;
+  }
+  attempts = 0;
+  while (attempts < 500) {
+    attempts++;
+    const coords = getPlayerSpawnCoordinates(maxCoord);
+    if (coords.x === cx && coords.y === cy) {
+      continue;
+    }
+    let overlap = false;
+    if (state && state.players) {
+      for (const player of Object.values(state.players)) {
+        if (player && player.planets) {
+          if (player.planets.some((pl) => pl.sectorX === coords.x && pl.sectorY === coords.y)) {
+            overlap = true;
+            break;
+          }
+        }
+      }
+    }
+    if (overlap) continue;
+    if (state && state.habitablePlanets) {
+      const overlapHabitable = state.habitablePlanets.some((hp) => hp.coords.x === coords.x && hp.coords.y === coords.y);
+      if (overlapHabitable) continue;
+    }
+    return coords;
+  }
+  const clusterCoords = findClusterCoordinate(cx, cy);
+  if (clusterCoords) return clusterCoords;
+  return getRandomCoordinates(maxCoord);
+}
 var TROOP_SPECS = {
-  defender: { name: "Interceptor", defenceHp: 18, attackHp: 10, carry: 600, speed: 7, waterConsumption: 0.05 },
-  attacker: { name: "Assault Drone", defenceHp: 9, attackHp: 30, carry: 400, speed: 11.662, waterConsumption: 0.1 },
-  tank: { name: "Disrupter", defenceHp: 5, attackHp: 5, carry: 0, speed: 3.5, waterConsumption: 0.2 },
-  looter: { name: "Matter Extractor", defenceHp: 4, attackHp: 4, carry: 1e3, speed: 23.331, waterConsumption: 0.15 },
-  drone: { name: "Missile Launcher", defenceHp: 120, attackHp: 120, carry: 200, speed: 17.5, waterConsumption: 0.02 },
-  settlementShip: { name: "Settlement Ship", defenceHp: 50, attackHp: 0, carry: 5e3, speed: 4.662, waterConsumption: 0.25 }
+  defender: { name: "Interceptor", defenceHp: 18, attackHp: 10, carry: 600, speed: 75, waterConsumption: 1 },
+  attacker: { name: "Assault Drone", defenceHp: 9, attackHp: 30, carry: 400, speed: 85, waterConsumption: 2 },
+  tank: { name: "Disrupter", defenceHp: 5, attackHp: 5, carry: 0, speed: 40, waterConsumption: 4 },
+  looter: { name: "Matter Extractor", defenceHp: 4, attackHp: 4, carry: 1e3, speed: 110, waterConsumption: 3 },
+  drone: { name: "Missile Launcher", defenceHp: 120, attackHp: 120, carry: 200, speed: 80, waterConsumption: 0.4 },
+  settlementShip: { name: "Settlement Ship", defenceHp: 50, attackHp: 0, carry: 5e3, speed: 25, waterConsumption: 5 }
 };
 function getRepositoryCapacity(level) {
   if (level <= 1) return 1e4;
@@ -667,7 +725,7 @@ function getRepositoryCapacity(level) {
   return Math.round(1e4 * Math.pow(5e6 / 1e4, (level - 1) / 44));
 }
 function getMineProductionPerHour(level, type) {
-  if (level <= 0) return 100;
+  if (level <= 0) return 0;
   if (type === "water") {
     return Math.round(level / 15 * 14e3);
   }
@@ -680,33 +738,356 @@ function saveState() {
   } catch (err) {
     console.error("Failed to save state", err);
   }
-  saveStateToDB(state).catch((err) => {
-    console.error("Failed async Cloud SQL save session:", err);
+}
+function ensureAIsCount(count, s) {
+  if (!s.players) s.players = {};
+  const existingAIs = Object.values(s.players).filter((p) => p.id.startsWith("ai_"));
+  const needToAdd = count - existingAIs.length;
+  if (needToAdd <= 0) return;
+  console.log(`Topping up AI players from ${existingAIs.length} to ${count}...`);
+  const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
+  const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
+  const prefixes = ["Nebula", "Star", "Void", "Quantum", "Cosmo", "Solar", "Nova", "Titan", "Xenon", "Galaxy", "Eclipse", "Astro", "Alpha", "Omega", "Hyper", "Cyber", "Orion", "Shadow", "Vector", "Spectral", "Iron", "Steel", "Dark", "Light", "Proton"];
+  const suffixes = ["Lord", "Hunter", "Knight", "Slayer", "Warden", "Reaper", "Vanguard", "Centurion", "Raider", "Specter", "Shade", "Emperor", "Gladiator", "Pilot", "Drifter", "Pioneer", "Enforcer", "Sentinel", "Cruiser", "Stalker", "Corsair", "Rebel", "Phantom", "Ranger", "Sovereign"];
+  const usedNames = new Set(Object.values(s.players).map((p) => p.username.toLowerCase()));
+  let added = 0;
+  let idx = 1;
+  while (added < needToAdd) {
+    while (s.players[`ai_${idx}`]) {
+      idx++;
+    }
+    const id = `ai_${idx}`;
+    let name = "";
+    let attempts = 0;
+    do {
+      const pref = prefixes[Math.floor(Math.random() * prefixes.length)];
+      const suff = suffixes[Math.floor(Math.random() * suffixes.length)];
+      name = `${pref}${suff}`;
+      attempts++;
+    } while (usedNames.has(name.toLowerCase()) && attempts < 100);
+    if (attempts >= 100) {
+      name = `AI_Commander_${idx}`;
+    }
+    usedNames.add(name.toLowerCase());
+    const factionIdx = Math.floor(Math.random() * factions.length);
+    const limit = getCurrentMapLimits();
+    const coords = getSafeRandomCoordinates(limit);
+    const x = coords.x;
+    const y = coords.y;
+    const planet = createInitialPlanet(`${name}'s Station`, x, y);
+    const randomLvl = () => Math.floor(Math.random() * 11) + 15;
+    for (const key of Object.keys(planet.mines)) {
+      planet.mines[key].forEach((m) => m.level = randomLvl());
+    }
+    planet.buildings.commsHub.level = Math.floor(Math.random() * 10) + 10;
+    planet.buildings.researchCenter.level = Math.floor(Math.random() * 12) + 15;
+    planet.buildings.radar.level = Math.floor(Math.random() * 8) + 10;
+    planet.buildings.repository.level = Math.floor(Math.random() * 11) + 30;
+    for (const resKey of Object.keys(planet.resources)) {
+      planet.resources[resKey] = Math.floor(Math.random() * 3e5) + 1e5;
+    }
+    const player = {
+      id,
+      username: name,
+      faction: factions[factionIdx],
+      factionColor: factionColors[factionIdx],
+      allianceId: null,
+      allianceRole: null,
+      planets: [planet],
+      scores: {
+        population: Math.floor(Math.random() * 1e3) + 200,
+        attack: Math.floor(Math.random() * 8e3),
+        defence: Math.floor(Math.random() * 6e3),
+        raiders: Math.floor(Math.random() * 500)
+      },
+      achievements: ["First Mine", "Fleet Commander"],
+      skinId: "default",
+      bannerId: "default",
+      lastDailyRewardClaim: Date.now() - 864e5,
+      credits: 1e4
+    };
+    s.players[id] = player;
+    added++;
+  }
+}
+function ensureAdminMaxed(p) {
+  if (!p || !p.googleEmail) return;
+  const email = p.googleEmail.toLowerCase();
+  if (email !== "banele180@gmail.com" && email !== "banzz1918@gmail.com") return;
+  p.credits = 1e6;
+  if (!p.planets) p.planets = [];
+  p.planets.forEach((pl, planetIndex) => {
+    if (!pl) return;
+    const buildingDefaults = {
+      fabricator: { maxLevel: 10 },
+      commsHub: { maxLevel: 5 },
+      researchCenter: { maxLevel: 20 },
+      armyBase: { maxLevel: 22 },
+      repository: { maxLevel: 45 },
+      radar: { maxLevel: 15 },
+      supplyNexus: { maxLevel: 50 },
+      bunker: { maxLevel: 25 },
+      magneticShield: { maxLevel: 12 }
+    };
+    if (!pl.buildings) pl.buildings = {};
+    Object.entries(buildingDefaults).forEach(([bKey, bDef]) => {
+      pl.buildings[bKey] = {
+        level: bDef.maxLevel,
+        maxLevel: bDef.maxLevel,
+        isUpgrading: false,
+        upgradeEnd: null,
+        health: 100
+      };
+    });
+    const maxExtractorLevel = planetIndex === 0 ? 25 : planetIndex === 1 ? 20 : 15;
+    if (!pl.mines) pl.mines = {};
+    const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"];
+    resourceKeys.forEach((rKey) => {
+      let mineCount = rKey === "water" ? 6 : 3;
+      if (pl.mines[rKey] && pl.mines[rKey].length > 0) {
+        mineCount = pl.mines[rKey].length;
+      } else if (state && state.habitablePlanets) {
+        const hp = state.habitablePlanets.find((item) => Number(item.coords.x) === Number(pl.sectorX) && Number(item.coords.y) === Number(pl.sectorY));
+        if (hp && hp.extractors && hp.extractors[rKey] !== void 0) {
+          mineCount = hp.extractors[rKey];
+        }
+      }
+      pl.mines[rKey] = Array.from({ length: mineCount }, (_, i) => {
+        const existing = pl.mines[rKey]?.[i];
+        return {
+          index: i,
+          level: maxExtractorLevel,
+          isUpgrading: existing ? existing.isUpgrading : false,
+          upgradeEnd: existing ? existing.upgradeEnd : null,
+          health: existing && existing.health !== void 0 ? existing.health : 100
+        };
+      });
+    });
+    pl.resources = {
+      water: 99999999,
+      plasma: 99999999,
+      fuel: 99999999,
+      food: 99999999,
+      respirant: 99999999
+    };
+    if (!pl.troops) {
+      pl.troops = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 1 };
+    } else {
+      if (pl.troops.settlementShip === void 0 || pl.troops.settlementShip < 1) {
+        pl.troops.settlementShip = 1;
+      }
+    }
+    if (!p.techLevels) p.techLevels = {};
+    p.techLevels[pl.id] = {
+      defense_shields: 1,
+      manufacturing_speed: 1,
+      troop_speed: 1
+    };
   });
+}
+function normalizeState(s) {
+  if (!s) return;
+  initializeGalaxyConfig();
+  const limit = getCurrentMapLimits();
+  if (s.players) {
+    Object.values(s.players).forEach((p) => {
+      if (p && p.planets) {
+        p.planets.forEach((pl) => {
+          if (pl.sectorX > limit || pl.sectorY > limit) {
+            const oldX = pl.sectorX;
+            const oldY = pl.sectorY;
+            const coords = getRandomCoordinates(limit);
+            pl.sectorX = coords.x;
+            pl.sectorY = coords.y;
+            if (s.habitablePlanets) {
+              const hp = s.habitablePlanets.find((item) => item.coords.x === oldX && item.coords.y === oldY);
+              if (hp) {
+                hp.coords.x = coords.x;
+                hp.coords.y = coords.y;
+                hp.id = `hab_${coords.x}_${coords.y}`;
+              }
+            }
+          }
+        });
+      }
+    });
+  }
+  if (s.habitablePlanets) {
+    s.habitablePlanets = s.habitablePlanets.filter((hp) => {
+      if (hp.isColonized) return true;
+      return hp.coords.x <= limit && hp.coords.y <= limit;
+    });
+  }
+  if (s.fleets) {
+    s.fleets.forEach((f) => {
+      if (f.targetCoords && (f.targetCoords.x > limit || f.targetCoords.y > limit)) {
+        const coords = getRandomCoordinates(limit);
+        f.targetCoords.x = coords.x;
+        f.targetCoords.y = coords.y;
+      }
+      if (f.senderCoords && (f.senderCoords.x > limit || f.senderCoords.y > limit)) {
+        const coords = getRandomCoordinates(limit);
+        f.senderCoords.x = coords.x;
+        f.senderCoords.y = coords.y;
+      }
+    });
+  }
+  ensureMinimumHabitablePlanets();
+  if (!s.players) s.players = {};
+  if (!s.alliances) s.alliances = {};
+  if (!s.chatMessages) s.chatMessages = [];
+  if (!s.fleets) s.fleets = [];
+  if (!s.battleReports) s.battleReports = [];
+  if (!s.newsEvents) s.newsEvents = [];
+  if (!s.feedbacks) s.feedbacks = [];
+  Object.values(s.players).forEach((p) => {
+    if (!p) return;
+    if (!p.scores) {
+      p.scores = { population: 100, attack: 0, defence: 0, raiders: 0 };
+    }
+    if (!p.achievements) {
+      p.achievements = [];
+    }
+    if (!p.commandMessages) {
+      p.commandMessages = [];
+    }
+    if (!p.credits || p.credits < 1e4) {
+      p.credits = 1e4;
+    }
+    if (!Array.isArray(p.planets)) {
+      p.planets = [];
+    }
+    p.planets.forEach((pl, plIdx) => {
+      if (!pl) return;
+      if (pl.name && typeof pl.name === "string" && pl.name.includes("Outpost")) {
+        pl.name = pl.name.replace(/Outpost/g, "Station");
+      }
+      const isFirst = plIdx === 0;
+      if (!pl.troops) pl.troops = {};
+      const troopDefaults = {
+        defender: 0,
+        attacker: 0,
+        tank: 0,
+        looter: 0,
+        drone: 0,
+        settlementShip: 0
+      };
+      Object.keys(troopDefaults).forEach((tKey) => {
+        if (pl.troops[tKey] === void 0) {
+          pl.troops[tKey] = troopDefaults[tKey];
+        }
+      });
+      if (!pl.trainingQueue) {
+        pl.trainingQueue = [];
+      }
+      if (!pl.upgradeQueue) {
+        pl.upgradeQueue = [];
+      }
+      if (!pl.researchQueue) {
+        pl.researchQueue = [];
+      }
+      if (!pl.buildings) pl.buildings = {};
+      const buildingDefaults = {
+        fabricator: { level: 0, maxLevel: 10 },
+        commsHub: { level: 0, maxLevel: 5 },
+        researchCenter: { level: 0, maxLevel: 20 },
+        armyBase: { level: 0, maxLevel: 22 },
+        repository: { level: 0, maxLevel: 45 },
+        radar: { level: 0, maxLevel: 15 },
+        supplyNexus: { level: 0, maxLevel: 50 },
+        bunker: { level: 0, maxLevel: 25 },
+        magneticShield: { level: 0, maxLevel: 12 }
+      };
+      Object.entries(buildingDefaults).forEach(([bKey, bDef]) => {
+        const defaultLvl = bDef.level;
+        if (!pl.buildings[bKey]) {
+          pl.buildings[bKey] = {
+            level: defaultLvl,
+            maxLevel: bDef.maxLevel,
+            isUpgrading: false,
+            upgradeEnd: null,
+            health: 100
+          };
+        } else {
+          const bObj = pl.buildings[bKey];
+          if (bObj.level === void 0) bObj.level = defaultLvl;
+          bObj.maxLevel = bDef.maxLevel;
+          if (bObj.level > bDef.maxLevel) bObj.level = bDef.maxLevel;
+          if (bObj.isUpgrading === void 0) bObj.isUpgrading = false;
+          if (bObj.upgradeEnd === void 0) bObj.upgradeEnd = null;
+          if (bObj.health === void 0) bObj.health = 100;
+        }
+      });
+      if (!pl.mines) pl.mines = {};
+      const mineKeys = ["water", "plasma", "fuel", "food", "respirant"];
+      const mineCounts = { water: 6, plasma: 3, fuel: 3, food: 3, respirant: 3 };
+      mineKeys.forEach((mKey) => {
+        const count = mineCounts[mKey];
+        if (!pl.mines[mKey]) {
+          pl.mines[mKey] = Array.from({ length: count }, (_, i) => ({
+            index: i,
+            level: 0,
+            isUpgrading: false,
+            upgradeEnd: null,
+            health: 100
+          }));
+        } else {
+          pl.mines[mKey].forEach((mine) => {
+            if (mine.level === void 0) {
+              mine.level = 0;
+            }
+            if (mine.isUpgrading === void 0) mine.isUpgrading = false;
+            if (mine.upgradeEnd === void 0) mine.upgradeEnd = null;
+            if (mine.health === void 0) mine.health = 100;
+          });
+        }
+      });
+      ensureAdminMaxed(p);
+    });
+  });
+  ensureAIsCount(50, s);
 }
 async function loadState() {
   try {
-    console.log("Attempting to restore active state from Cloud SQL...");
-    const dbState = await loadStateFromDB();
-    if (dbState && Object.keys(dbState.players).length > 0) {
-      state = dbState;
-      console.log("Successfully restored active state from Cloud SQL! Players count:", Object.keys(state.players).length);
-      return;
-    }
-    console.log("Cloud SQL database is empty. Fallback seeding...");
-  } catch (err) {
-    console.error("Cloud SQL load failed, preparing backup files restore...", err);
-  }
-  try {
     if (import_fs.default.existsSync(STATE_FILE)) {
       const data = import_fs.default.readFileSync(STATE_FILE, "utf8");
-      state = JSON.parse(data);
+      try {
+        state = JSON.parse(data);
+      } catch (parseErr) {
+        console.warn("Warning: Failed to parse state file JSON, falling back to a fresh default state.", parseErr.message);
+        state = { players: {} };
+      }
       if (!state.feedbacks) {
         state.feedbacks = [];
       }
+      if (!state.customTasks) {
+        state.customTasks = {};
+      }
       if (state && state.players) {
         Object.values(state.players).forEach((p) => {
-          if (p && Array.isArray(p.planets)) {
+          if (p) {
+            if (p.username === "123345") {
+              p.googleEmail = "banzz1918@gmail.com";
+              console.log("MIGRATION: Successfully bound player 123345 to banzz1918@gmail.com");
+            }
+            if (!p.planets || !Array.isArray(p.planets) || p.planets.length === 0) {
+              const limit = getCurrentMapLimits();
+              const coords = getRandomCoordinates(limit);
+              const startX = coords.x;
+              const startY = coords.y;
+              const planet = createInitialPlanet(`${p.username || "Commander"}'s Station`, startX, startY, true);
+              planet.resources.water = 5e6;
+              planet.resources.plasma = 5e6;
+              planet.resources.fuel = 5e6;
+              planet.resources.food = 5e6;
+              planet.resources.respirant = 5e6;
+              p.planets = [planet];
+              if (!p.scores) {
+                p.scores = { population: 10, attack: 0, defence: 0, raiders: 0 };
+              } else if (p.scores.population <= 0) {
+                p.scores.population = 10;
+              }
+            }
             p.planets.forEach((pl) => {
               if (pl && typeof pl.name === "string" && pl.name.includes("Outpost")) {
                 pl.name = pl.name.replace(/Outpost/g, "Station");
@@ -715,11 +1096,11 @@ async function loadState() {
                 if (pl.troops.settlementShip === void 0) {
                   pl.troops.settlementShip = 0;
                 }
-                pl.troops.defender = 12500;
-                pl.troops.attacker = 28600;
-                pl.troops.tank = 100;
-                pl.troops.looter = 1e3;
-                pl.troops.drone = 100;
+                if (pl.troops.defender === void 0) pl.troops.defender = 0;
+                if (pl.troops.attacker === void 0) pl.troops.attacker = 0;
+                if (pl.troops.tank === void 0) pl.troops.tank = 0;
+                if (pl.troops.looter === void 0) pl.troops.looter = 0;
+                if (pl.troops.drone === void 0) pl.troops.drone = 0;
               }
               if (pl && !pl.trainingQueue) {
                 pl.trainingQueue = [];
@@ -727,6 +1108,9 @@ async function loadState() {
               if (pl && pl.buildings) {
                 if (!pl.buildings.supplyNexus) {
                   pl.buildings.supplyNexus = { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null };
+                }
+                if (!pl.buildings.fabricator) {
+                  pl.buildings.fabricator = { level: 1, maxLevel: 10, isUpgrading: false, upgradeEnd: null, health: 100 };
                 }
               }
             });
@@ -736,37 +1120,130 @@ async function loadState() {
       if (!state.habitablePlanets) {
         state.habitablePlanets = [
           { id: "hab_12_18", name: "Habitable Gaia Aurelia", coords: { x: 12, y: 18 }, isColonized: false },
-          { id: "hab_34_72", name: "Habitable Station Kepler-Prime", coords: { x: 34, y: 72 }, isColonized: false },
-          { id: "hab_45_19", name: "Habitable Outpost Gliese-91", coords: { x: 45, y: 19 }, isColonized: false },
-          { id: "hab_67_82", name: "Habitable Station New Hope", coords: { x: 67, y: 82 }, isColonized: false },
-          { id: "hab_15_55", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 55 }, isColonized: false },
-          { id: "hab_85_44", name: "Habitable Station Zephyr-9", coords: { x: 85, y: 44 }, isColonized: false },
-          { id: "hab_52_63", name: "Habitable Planet Arcadia", coords: { x: 52, y: 63 }, isColonized: false },
-          { id: "hab_29_31", name: "Habitable Core Dome-A", coords: { x: 29, y: 31 }, isColonized: false },
-          { id: "hab_73_25", name: "Habitable Station Oasis-1", coords: { x: 73, y: 25 }, isColonized: false },
-          { id: "hab_91_85", name: "Habitable Planet Eden-X", coords: { x: 91, y: 85 }, isColonized: false },
-          { id: "hab_8_92", name: "Habitable Outpost Genesis", coords: { x: 8, y: 92 }, isColonized: false },
-          { id: "hab_40_40", name: "Habitable Station Midway", coords: { x: 40, y: 40 }, isColonized: false }
+          { id: "hab_14_8", name: "Habitable Station Kepler-Prime", coords: { x: 14, y: 8 }, isColonized: false },
+          { id: "hab_5_15", name: "Habitable Outpost Gliese-91", coords: { x: 5, y: 15 }, isColonized: false },
+          { id: "hab_17_12", name: "Habitable Station New Hope", coords: { x: 17, y: 12 }, isColonized: false },
+          { id: "hab_15_5", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 5 }, isColonized: false },
+          { id: "hab_3_14", name: "Habitable Station Zephyr-9", coords: { x: 3, y: 14 }, isColonized: false },
+          { id: "hab_8_3", name: "Habitable Planet Arcadia", coords: { x: 8, y: 3 }, isColonized: false },
+          { id: "hab_9_9", name: "Habitable Core Dome-A", coords: { x: 9, y: 9 }, isColonized: false },
+          { id: "hab_13_15", name: "Habitable Station Oasis-1", coords: { x: 13, y: 15 }, isColonized: false },
+          { id: "hab_11_15", name: "Habitable Planet Eden-X", coords: { x: 11, y: 15 }, isColonized: false },
+          { id: "hab_8_12", name: "Habitable Outpost Genesis", coords: { x: 8, y: 12 }, isColonized: false },
+          { id: "hab_10_10", name: "Habitable Station Midway", coords: { x: 10, y: 10 }, isColonized: false }
         ];
+      }
+      normalizeState(state);
+      if (state && state.habitablePlanets && state.players) {
+        state.habitablePlanets.forEach((hp) => {
+          if (hp.isColonized && hp.extractors) {
+            for (const player of Object.values(state.players)) {
+              if (player && player.planets) {
+                const planet = player.planets.find((pl) => Number(pl.sectorX) === Number(hp.coords.x) && Number(pl.sectorY) === Number(hp.coords.y));
+                if (planet && planet.mines) {
+                  const currentWater = planet.mines.water?.length || 0;
+                  const currentPlasma = planet.mines.plasma?.length || 0;
+                  const targetWater = hp.extractors.water || 6;
+                  const targetPlasma = hp.extractors.plasma || 3;
+                  if (currentWater !== targetWater || currentPlasma !== targetPlasma) {
+                    console.log(`[Auto-Heal Planet Extractors] Repairing ${planet.name} at [${planet.sectorX}, ${planet.sectorY}]. Water: ${currentWater} -> ${targetWater}, Plasma: ${currentPlasma} -> ${targetPlasma}`);
+                    const createMines = (count, existingArray = []) => {
+                      return Array.from({ length: count }, (_, i) => {
+                        const existing = existingArray[i];
+                        return {
+                          index: i,
+                          level: existing ? existing.level : 0,
+                          isUpgrading: existing ? existing.isUpgrading : false,
+                          upgradeEnd: existing ? existing.upgradeEnd : null,
+                          health: existing && existing.health !== void 0 ? existing.health : 100
+                        };
+                      });
+                    };
+                    planet.mines = {
+                      water: createMines(hp.extractors.water || 6, planet.mines.water),
+                      plasma: createMines(hp.extractors.plasma || 3, planet.mines.plasma),
+                      fuel: createMines(hp.extractors.fuel || 3, planet.mines.fuel),
+                      food: createMines(hp.extractors.food || 3, planet.mines.food),
+                      respirant: createMines(hp.extractors.respirant || 3, planet.mines.respirant)
+                    };
+                  }
+                }
+              }
+            }
+          }
+        });
       }
       saveState();
       console.log("backup state loaded successfully. Players count:", Object.keys(state.players).length);
     } else {
       console.log("No existing state file found. Bootstrapping universe...");
       bootstrapUniverse();
+      normalizeState(state);
       saveState();
     }
   } catch (err) {
     console.error("Failed to load state", err);
     bootstrapUniverse();
+    normalizeState(state);
     saveState();
   }
 }
-function createInitialPlanet(name, sectorX, sectorY) {
+function findNearestUnoccupiedCoordinate(targetX, targetY) {
+  const limit = getCurrentMapLimits();
+  for (let d = 0; d <= limit * 2; d++) {
+    for (let dx = -d; dx <= d; dx++) {
+      const dy1 = d - Math.abs(dx);
+      const dy2 = -dy1;
+      const candidateYVals = dy1 === dy2 ? [dy1] : [dy1, dy2];
+      for (const dy of candidateYVals) {
+        const cx = targetX + dx;
+        const cy = targetY + dy;
+        if (cx < 0 || cx > limit || cy < 0 || cy > limit) {
+          continue;
+        }
+        let overlap = false;
+        if (state && state.players) {
+          for (const player of Object.values(state.players)) {
+            if (player && player.planets) {
+              if (player.planets.some((pl) => pl.sectorX === cx && pl.sectorY === cy)) {
+                overlap = true;
+                break;
+              }
+            }
+          }
+        }
+        if (!overlap) {
+          return { x: cx, y: cy };
+        }
+      }
+    }
+  }
+  return { x: targetX, y: targetY };
+}
+function createInitialPlanet(name, sectorX, sectorY, isFirstStation = false, customMinesCount) {
+  let finalX = sectorX;
+  let finalY = sectorY;
+  let occupied = false;
+  if (state && state.players) {
+    for (const player of Object.values(state.players)) {
+      if (player && player.planets) {
+        if (player.planets.some((pl) => pl.sectorX === sectorX && pl.sectorY === sectorY)) {
+          occupied = true;
+          break;
+        }
+      }
+    }
+  }
+  if (occupied) {
+    const nearest = findNearestUnoccupiedCoordinate(sectorX, sectorY);
+    finalX = nearest.x;
+    finalY = nearest.y;
+    console.log(`[Collision Resolver] Coordinate [${sectorX}, ${sectorY}] is already occupied. Placing ${name} at nearest unoccupied coordinate [${finalX}, ${finalY}].`);
+  }
   const createMines = (count) => {
     return Array.from({ length: count }, (_, i) => ({
       index: i,
-      level: 1,
+      level: 0,
       isUpgrading: false,
       upgradeEnd: null,
       health: 100
@@ -775,37 +1252,40 @@ function createInitialPlanet(name, sectorX, sectorY) {
   return {
     id: `planet_${Math.random().toString(36).substr(2, 9)}`,
     name,
-    sectorX,
-    sectorY,
+    sectorX: finalX,
+    sectorY: finalY,
     skinId: "default",
     mines: {
-      water: createMines(6),
-      plasma: createMines(3),
-      fuel: createMines(3),
-      food: createMines(3),
-      respirant: createMines(3)
+      water: createMines(customMinesCount ? customMinesCount.water : 6),
+      plasma: createMines(customMinesCount ? customMinesCount.plasma : 3),
+      fuel: createMines(customMinesCount ? customMinesCount.fuel : 3),
+      food: createMines(customMinesCount ? customMinesCount.food : 3),
+      respirant: createMines(customMinesCount ? customMinesCount.respirant : 3)
     },
     buildings: {
-      commsHub: { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 },
-      researchCenter: { level: 1, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
-      armyBase: { level: 1, maxLevel: 30, isUpgrading: false, upgradeEnd: null, health: 100 },
-      repository: { level: 1, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
-      radar: { level: 1, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
-      supplyNexus: { level: 1, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 }
+      fabricator: { level: 0, maxLevel: 10, isUpgrading: false, upgradeEnd: null, health: 100 },
+      commsHub: { level: 0, maxLevel: 5, isUpgrading: false, upgradeEnd: null, health: 100 },
+      researchCenter: { level: 0, maxLevel: 20, isUpgrading: false, upgradeEnd: null, health: 100 },
+      armyBase: { level: 0, maxLevel: 22, isUpgrading: false, upgradeEnd: null, health: 100 },
+      repository: { level: 0, maxLevel: 45, isUpgrading: false, upgradeEnd: null, health: 100 },
+      radar: { level: 0, maxLevel: 15, isUpgrading: false, upgradeEnd: null, health: 100 },
+      supplyNexus: { level: 0, maxLevel: 50, isUpgrading: false, upgradeEnd: null, health: 100 },
+      bunker: { level: 0, maxLevel: 25, isUpgrading: false, upgradeEnd: null, health: 100 },
+      magneticShield: { level: 0, maxLevel: 12, isUpgrading: false, upgradeEnd: null, health: 100 }
     },
     resources: {
-      water: 5e3,
-      plasma: 5e3,
-      fuel: 5e3,
-      food: 5e3,
-      respirant: 5e3
+      water: isFirstStation ? 5e6 : 5e3,
+      plasma: isFirstStation ? 5e6 : 5e3,
+      fuel: isFirstStation ? 5e6 : 5e3,
+      food: isFirstStation ? 5e6 : 5e3,
+      respirant: isFirstStation ? 5e6 : 5e3
     },
     troops: {
-      defender: 12500,
-      attacker: 28600,
-      tank: 100,
-      looter: 1e3,
-      drone: 100,
+      defender: 0,
+      attacker: 0,
+      tank: 0,
+      looter: 0,
+      drone: 0,
       settlementShip: 0
     },
     trainingQueue: []
@@ -818,7 +1298,7 @@ function applyBomberDamage(defPlanet, numTanks, chosenTarget) {
   let targetType = "building";
   let mineType = "";
   if (target === "random") {
-    const choices = ["commsHub", "researchCenter", "armyBase", "repository", "radar", "supplyNexus", "mines.water", "mines.plasma", "mines.fuel", "mines.food", "mines.respirant"];
+    const choices = ["commsHub", "researchCenter", "armyBase", "repository", "radar", "supplyNexus", "bunker", "mines.water", "mines.plasma", "mines.fuel", "mines.food", "mines.respirant"];
     target = choices[Math.floor(Math.random() * choices.length)];
   }
   let finalName = target;
@@ -849,12 +1329,17 @@ function applyBomberDamage(defPlanet, numTanks, chosenTarget) {
   if (targetState) {
     const prevLvl = targetState.level;
     const prevHealth = targetState.health !== void 0 ? targetState.health : 100;
-    const damage = numTanks;
+    let damageReduction = 0;
+    const magShieldLvl = defPlanet.buildings?.magneticShield?.level || 0;
+    if (magShieldLvl > 0) {
+      damageReduction = 0.3 * (Math.min(12, magShieldLvl) / 12);
+    }
+    const damage = numTanks * (1 - damageReduction);
     const computedHealth = prevHealth - damage;
     if (computedHealth > 0) {
       targetState.health = computedHealth;
       buildingDamageReports.push({
-        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Repository" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName,
+        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName === "bunker" ? "Bunker" : finalName === "magneticShield" ? "Magnetic Shield" : finalName,
         levelsDestroyed: 0,
         previousLevel: prevLvl,
         newLevel: prevLvl
@@ -869,7 +1354,7 @@ function applyBomberDamage(defPlanet, numTanks, chosenTarget) {
       const newHealth = newLvl === 1 ? Math.max(0, 100 - remainingDamage) : 100 - remainingDamage;
       targetState.health = newHealth;
       buildingDamageReports.push({
-        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Repository" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName,
+        buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName === "bunker" ? "Bunker" : finalName === "magneticShield" ? "Magnetic Shield" : finalName,
         levelsDestroyed: levelsLost,
         previousLevel: prevLvl,
         newLevel: newLvl
@@ -877,6 +1362,131 @@ function applyBomberDamage(defPlanet, numTanks, chosenTarget) {
     }
   }
   return buildingDamageReports;
+}
+function getOrGenerateHabitableExtractors(hp, indexForProportion) {
+  if (hp.extractors) return hp.extractors;
+  let isOneThird = false;
+  if (typeof indexForProportion === "number") {
+    isOneThird = indexForProportion % 3 === 0;
+  } else {
+    isOneThird = Math.random() < 0.35;
+  }
+  if (isOneThird) {
+    hp.extractors = {
+      water: 14,
+      plasma: 1,
+      fuel: 1,
+      food: 1,
+      respirant: 1
+    };
+  } else {
+    const counts = { water: 4, plasma: 1, fuel: 1, food: 1, respirant: 1 };
+    let remaining = 10;
+    const keys = ["water", "plasma", "fuel", "food", "respirant"];
+    while (remaining > 0) {
+      const k = keys[Math.floor(Math.random() * keys.length)];
+      counts[k]++;
+      remaining--;
+    }
+    hp.extractors = counts;
+  }
+  return hp.extractors;
+}
+function ensureMinimumHabitablePlanets() {
+  if (!state.habitablePlanets) {
+    state.habitablePlanets = [];
+  }
+  const limit = getCurrentMapLimits();
+  state.habitablePlanets = state.habitablePlanets.filter((p) => {
+    if (p.isColonized) return true;
+    if (p.coords.x > limit || p.coords.y > limit) return false;
+    let overlap = false;
+    if (state && state.players) {
+      for (const player of Object.values(state.players)) {
+        if (player && player.planets) {
+          if (player.planets.some((pl) => pl.sectorX === p.coords.x && pl.sectorY === p.coords.y)) {
+            overlap = true;
+            break;
+          }
+        }
+      }
+    }
+    return !overlap;
+  });
+  state.habitablePlanets.forEach((p, index) => {
+    if (!p.isColonized && !p.extractors) {
+      getOrGenerateHabitableExtractors(p, index);
+    }
+  });
+  const uncolonized = state.habitablePlanets.filter((p) => !p.isColonized);
+  if (uncolonized.length >= 50) return;
+  const countNeeded = 50 - uncolonized.length;
+  const namesPool = [
+    "Gaia Aurelia",
+    "Kepler-Prime",
+    "Gliese-91",
+    "New Hope",
+    "Epsilon-D",
+    "Zephyr-9",
+    "Arcadia",
+    "Core Dome-A",
+    "Oasis-1",
+    "Eden-X",
+    "Genesis",
+    "Midway",
+    "Vanguard Outpost",
+    "Nova Sol",
+    "Horizon Delta",
+    "Apex Hub",
+    "Thera Prime",
+    "Verdant Reach",
+    "Seraphim V",
+    "Titan Alpha",
+    "Nexus Beta",
+    "Elysium VI",
+    "Hyperion",
+    "Astraea",
+    "Polaris Junction",
+    "Chronos III",
+    "Solaris Sector",
+    "Sentinel Dome",
+    "Obsidian Station",
+    "Olympus Basin"
+  ];
+  for (let i = 0; i < countNeeded; i++) {
+    let foundCoords = false;
+    let targetX = 0;
+    let targetY = 0;
+    let attempts = 0;
+    while (!foundCoords && attempts < 200) {
+      attempts++;
+      const limit2 = getCurrentMapLimits();
+      const coords = getRandomCoordinates(limit2);
+      targetX = coords.x;
+      targetY = coords.y;
+      const overlapHabitable = state.habitablePlanets.some((hp2) => hp2.coords.x === targetX && hp2.coords.y === targetY);
+      if (overlapHabitable) continue;
+      let overlapPlayer = false;
+      for (const player of Object.values(state.players)) {
+        if (player.planets && player.planets.some((pl) => pl.sectorX === targetX && pl.sectorY === targetY)) {
+          overlapPlayer = true;
+          break;
+        }
+      }
+      if (overlapPlayer) continue;
+      foundCoords = true;
+    }
+    const name = "Habitable " + namesPool[Math.floor(Math.random() * namesPool.length)];
+    const id = `hab_${targetX}_${targetY}`;
+    const hp = {
+      id,
+      name,
+      coords: { x: targetX, y: targetY },
+      isColonized: false
+    };
+    getOrGenerateHabitableExtractors(hp, state.habitablePlanets.length);
+    state.habitablePlanets.push(hp);
+  }
 }
 function bootstrapUniverse() {
   state.players = {};
@@ -886,17 +1496,17 @@ function bootstrapUniverse() {
   state.battleReports = [];
   state.habitablePlanets = [
     { id: "hab_12_18", name: "Habitable Gaia Aurelia", coords: { x: 12, y: 18 }, isColonized: false },
-    { id: "hab_34_72", name: "Habitable Station Kepler-Prime", coords: { x: 34, y: 72 }, isColonized: false },
-    { id: "hab_45_19", name: "Habitable Outpost Gliese-91", coords: { x: 45, y: 19 }, isColonized: false },
-    { id: "hab_67_82", name: "Habitable Station New Hope", coords: { x: 67, y: 82 }, isColonized: false },
-    { id: "hab_15_55", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 55 }, isColonized: false },
-    { id: "hab_85_44", name: "Habitable Station Zephyr-9", coords: { x: 85, y: 44 }, isColonized: false },
-    { id: "hab_52_63", name: "Habitable Planet Arcadia", coords: { x: 52, y: 63 }, isColonized: false },
-    { id: "hab_29_31", name: "Habitable Core Dome-A", coords: { x: 29, y: 31 }, isColonized: false },
-    { id: "hab_73_25", name: "Habitable Station Oasis-1", coords: { x: 73, y: 25 }, isColonized: false },
-    { id: "hab_91_85", name: "Habitable Planet Eden-X", coords: { x: 91, y: 85 }, isColonized: false },
-    { id: "hab_8_92", name: "Habitable Outpost Genesis", coords: { x: 8, y: 92 }, isColonized: false },
-    { id: "hab_40_40", name: "Habitable Station Midway", coords: { x: 40, y: 40 }, isColonized: false }
+    { id: "hab_14_8", name: "Habitable Station Kepler-Prime", coords: { x: 14, y: 8 }, isColonized: false },
+    { id: "hab_5_15", name: "Habitable Outpost Gliese-91", coords: { x: 5, y: 15 }, isColonized: false },
+    { id: "hab_17_12", name: "Habitable Station New Hope", coords: { x: 17, y: 12 }, isColonized: false },
+    { id: "hab_15_5", name: "Habitable Planet Epsilon-D", coords: { x: 15, y: 5 }, isColonized: false },
+    { id: "hab_3_14", name: "Habitable Station Zephyr-9", coords: { x: 3, y: 14 }, isColonized: false },
+    { id: "hab_8_3", name: "Habitable Planet Arcadia", coords: { x: 8, y: 3 }, isColonized: false },
+    { id: "hab_9_9", name: "Habitable Core Dome-A", coords: { x: 9, y: 9 }, isColonized: false },
+    { id: "hab_13_15", name: "Habitable Station Oasis-1", coords: { x: 13, y: 15 }, isColonized: false },
+    { id: "hab_11_15", name: "Habitable Planet Eden-X", coords: { x: 11, y: 15 }, isColonized: false },
+    { id: "hab_8_12", name: "Habitable Outpost Genesis", coords: { x: 8, y: 12 }, isColonized: false },
+    { id: "hab_10_10", name: "Habitable Station Midway", coords: { x: 10, y: 10 }, isColonized: false }
   ];
   state.newsEvents = [
     {
@@ -907,76 +1517,59 @@ function bootstrapUniverse() {
       timestamp: Date.now()
     }
   ];
-  const factions = ["Solar Alliance", "Nexus Syndicate", "Eclipse Vanguard"];
+  const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
   const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
-  const voidAlliance = {
-    id: "alliance_void",
-    name: "VOID SYNDICATE",
-    tag: "VOID",
-    leaderId: "ai_1",
-    leaderName: "VoidLord",
-    members: [
-      { playerId: "ai_1", username: "VoidLord", role: "leader" },
-      { playerId: "ai_2", username: "XenonHunter", role: "officer" },
-      { playerId: "ai_3", username: "NebulaKnight", role: "member" }
-    ],
-    wars: [],
-    bannerColor: "#FF007A",
-    bannerSymbol: "\u25B2"
-  };
-  const empireAlliance = {
-    id: "alliance_empire",
-    name: "SOLAR EMPIRE",
-    tag: "SOL",
-    leaderId: "ai_4",
-    leaderName: "Astraea",
-    members: [
-      { playerId: "ai_4", username: "Astraea", role: "leader" },
-      { playerId: "ai_5", username: "TitanKing", role: "officer" },
-      { playerId: "ai_6", username: "StarEclipse", role: "member" }
-    ],
-    wars: [],
-    bannerColor: "#00F0FF",
-    bannerSymbol: "\u25C8"
-  };
-  state.alliances[voidAlliance.id] = voidAlliance;
-  state.alliances[empireAlliance.id] = empireAlliance;
-  const aiNames = [
-    { name: "VoidLord", coords: { x: 12, y: 34 }, allianceId: "alliance_void", faction: factions[1], color: factionColors[1] },
-    { name: "XenonHunter", coords: { x: 18, y: 40 }, allianceId: "alliance_void", faction: factions[1], color: factionColors[1] },
-    { name: "NebulaKnight", coords: { x: 8, y: 22 }, allianceId: "alliance_void", faction: factions[1], color: factionColors[1] },
-    { name: "Astraea", coords: { x: 55, y: 78 }, allianceId: "alliance_empire", faction: factions[0], color: factionColors[0] },
-    { name: "TitanKing", coords: { x: 62, y: 82 }, allianceId: "alliance_empire", faction: factions[0], color: factionColors[0] },
-    { name: "StarEclipse", coords: { x: 50, y: 70 }, allianceId: "alliance_empire", faction: factions[0], color: factionColors[0] },
-    { name: "CosmoPirate", coords: { x: 88, y: 15 }, allianceId: null, faction: factions[2], color: factionColors[2] },
-    { name: "NovaSlayer", coords: { x: 42, y: 45 }, allianceId: null, faction: factions[2], color: factionColors[2] },
-    { name: "SolarWing", coords: { x: 30, y: 90 }, allianceId: null, faction: factions[0], color: factionColors[0] },
-    { name: "Stardust", coords: { x: 75, y: 25 }, allianceId: null, faction: factions[1], color: factionColors[1] }
-  ];
+  const prefixes = ["Nebula", "Star", "Void", "Quantum", "Cosmo", "Solar", "Nova", "Titan", "Xenon", "Galaxy", "Eclipse", "Astro", "Alpha", "Omega", "Hyper", "Cyber", "Orion", "Shadow", "Vector", "Spectral", "Iron", "Steel", "Dark", "Light", "Proton"];
+  const suffixes = ["Lord", "Hunter", "Knight", "Slayer", "Warden", "Reaper", "Vanguard", "Centurion", "Raider", "Specter", "Shade", "Emperor", "Gladiator", "Pilot", "Drifter", "Pioneer", "Enforcer", "Sentinel", "Cruiser", "Stalker", "Corsair", "Rebel", "Phantom", "Ranger", "Sovereign"];
+  const aiNames = [];
+  const usedNames = /* @__PURE__ */ new Set();
+  while (aiNames.length < 50) {
+    const pref = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const suff = suffixes[Math.floor(Math.random() * suffixes.length)];
+    const name = `${pref}${suff}`;
+    if (!usedNames.has(name)) {
+      usedNames.add(name);
+      const factionIdx = Math.floor(Math.random() * factions.length);
+      const limit = getCurrentMapLimits();
+      const coords = getRandomCoordinates(limit);
+      const x = coords.x;
+      const y = coords.y;
+      aiNames.push({
+        name,
+        coords: { x, y },
+        allianceId: null,
+        faction: factions[factionIdx],
+        color: factionColors[factionIdx]
+      });
+    }
+  }
   aiNames.forEach((ai, idx) => {
     const id = `ai_${idx + 1}`;
     const planet = createInitialPlanet(`${ai.name}'s Station`, ai.coords.x, ai.coords.y);
-    const randomLvl = () => Math.floor(Math.random() * 8) + 2;
+    const randomLvl = () => Math.floor(Math.random() * 11) + 15;
     for (const key of Object.keys(planet.mines)) {
       planet.mines[key].forEach((m) => m.level = randomLvl());
     }
-    planet.buildings.commsHub.level = Math.floor(Math.random() * 10) + 1;
-    planet.buildings.researchCenter.level = Math.floor(Math.random() * 12) + 1;
-    planet.buildings.radar.level = Math.floor(Math.random() * 8) + 1;
-    planet.buildings.repository.level = Math.floor(Math.random() * 15) + 1;
+    planet.buildings.commsHub.level = Math.floor(Math.random() * 10) + 10;
+    planet.buildings.researchCenter.level = Math.floor(Math.random() * 12) + 15;
+    planet.buildings.radar.level = Math.floor(Math.random() * 8) + 10;
+    planet.buildings.repository.level = Math.floor(Math.random() * 11) + 30;
+    for (const resKey of Object.keys(planet.resources)) {
+      planet.resources[resKey] = Math.floor(Math.random() * 3e5) + 1e5;
+    }
     const player = {
       id,
       username: ai.name,
       faction: ai.faction,
       factionColor: ai.color,
-      allianceId: ai.allianceId,
-      allianceRole: ai.allianceId ? "member" : null,
+      allianceId: null,
+      allianceRole: null,
       planets: [planet],
       scores: {
         population: Math.floor(Math.random() * 1e3) + 200,
         attack: Math.floor(Math.random() * 8e3),
         defence: Math.floor(Math.random() * 6e3),
-        raiders: Math.floor(Math.random() * 5e5)
+        raiders: Math.floor(Math.random() * 500)
       },
       achievements: ["First Mine", "Fleet Commander"],
       skinId: "default",
@@ -984,22 +1577,9 @@ function bootstrapUniverse() {
       lastDailyRewardClaim: Date.now() - 864e5,
       credits: 1e4
     };
-    if (id === voidAlliance.leaderId) player.allianceRole = "leader";
-    if (id === empireAlliance.leaderId) player.allianceRole = "leader";
     state.players[id] = player;
   });
-  voidAlliance.wars.push({
-    targetAllianceId: empireAlliance.id,
-    targetAllianceName: empireAlliance.name,
-    declaredAt: Date.now() - 36e5
-  });
-  state.newsEvents.push({
-    id: "news_war_bootstrap",
-    title: "War Declared!",
-    content: "The VOID SYNDICATE has officially declared war against the SOLAR EMPIRE! Alliance boundaries are now borders under attack.",
-    type: "war",
-    timestamp: Date.now() - 36e5
-  });
+  ensureMinimumHabitablePlanets();
   saveState();
 }
 function tickPlayerState(playerId, now) {
@@ -1010,16 +1590,89 @@ function tickPlayerState(playerId, now) {
     const repositoryLvl = planet.buildings.repository.level;
     const storageLimit = getRepositoryCapacity(repositoryLvl);
     let waterConsumptionPerHour = 0;
-    Object.entries(planet.troops).forEach(([troopId, count]) => {
+    const combinedTroops = { ...planet.troops };
+    Object.values(state.players).forEach((otherPlayer) => {
+      if (otherPlayer.createdFleets) {
+        otherPlayer.createdFleets.forEach((fleet) => {
+          const activeMission = state.fleets.find((m) => m.createdFleetId === fleet.id);
+          if (activeMission) {
+            if (activeMission.missionType === "attack") {
+              if (fleet.planetId === planet.id) {
+                Object.entries(fleet.troops).forEach(([troopId, count]) => {
+                  const qty = Number(count) || 0;
+                  combinedTroops[troopId] = (combinedTroops[troopId] || 0) + qty;
+                });
+              }
+            } else if (activeMission.isReturning) {
+              if (fleet.planetId === planet.id) {
+                Object.entries(fleet.troops).forEach(([troopId, count]) => {
+                  const qty = Number(count) || 0;
+                  combinedTroops[troopId] = (combinedTroops[troopId] || 0) + qty;
+                });
+              }
+            } else {
+              const hasArrivedAtTarget = now >= activeMission.arrivesAt;
+              if (hasArrivedAtTarget) {
+                if (activeMission.targetCoords.x === planet.sectorX && activeMission.targetCoords.y === planet.sectorY) {
+                  Object.entries(fleet.troops).forEach(([troopId, count]) => {
+                    const qty = Number(count) || 0;
+                    combinedTroops[troopId] = (combinedTroops[troopId] || 0) + qty;
+                  });
+                }
+              } else {
+                if (fleet.planetId === planet.id) {
+                  Object.entries(fleet.troops).forEach(([troopId, count]) => {
+                    const qty = Number(count) || 0;
+                    combinedTroops[troopId] = (combinedTroops[troopId] || 0) + qty;
+                  });
+                }
+              }
+            }
+          } else {
+            if (fleet.planetId === planet.id) {
+              Object.entries(fleet.troops).forEach(([troopId, count]) => {
+                const qty = Number(count) || 0;
+                combinedTroops[troopId] = (combinedTroops[troopId] || 0) + qty;
+              });
+            }
+          }
+        });
+      }
+    });
+    state.fleets.forEach((mission) => {
+      if (!mission.createdFleetId) {
+        if (!mission.isReturning && now >= mission.arrivesAt && mission.missionType !== "attack") {
+          if (mission.targetCoords.x === planet.sectorX && mission.targetCoords.y === planet.sectorY) {
+            Object.entries(mission.troops).forEach(([troopId, count]) => {
+              const qty = Number(count) || 0;
+              combinedTroops[troopId] = (combinedTroops[troopId] || 0) + qty;
+            });
+          }
+        }
+      }
+    });
+    Object.entries(combinedTroops).forEach(([troopId, count]) => {
       const spec = TROOP_SPECS[troopId];
       if (spec) {
         waterConsumptionPerHour += count * spec.waterConsumption;
       }
     });
-    const lastTick = planet._lastTick || now;
+    if (!player.lastActive || typeof player.lastActive !== "number" || player.lastActive <= 0 || isNaN(player.lastActive)) {
+      player.lastActive = now;
+    }
+    let lastTick = planet._lastTick || player.lastActive || now;
+    if (!lastTick || typeof lastTick !== "number" || lastTick <= 0 || isNaN(lastTick)) {
+      lastTick = now;
+    }
     planet._lastTick = now;
     let lastCompletedUpgradeTime = 0;
-    const deltaMs = now - lastTick;
+    let deltaMs = now - lastTick;
+    const MAX_CATCHUP_MS = 3600 * 1e3;
+    if (deltaMs > MAX_CATCHUP_MS) {
+      deltaMs = MAX_CATCHUP_MS;
+    } else if (deltaMs < 0) {
+      deltaMs = 0;
+    }
     if (deltaMs > 0) {
       const deltaHours = deltaMs / 36e5;
       for (const resKey of Object.keys(planet.mines)) {
@@ -1031,37 +1684,39 @@ function tickPlayerState(playerId, now) {
             lastCompletedUpgradeTime = Math.max(lastCompletedUpgradeTime, mine.upgradeEnd);
             mine.upgradeEnd = null;
             changed = true;
+            if (!planet.upgradeQueue || planet.upgradeQueue.length === 0) {
+              const resNames = { water: "Water Extractor", plasma: "Plasma Extractor", fuel: "Fuel Extractor", food: "Food Extractor", respirant: "Respirant Extractor" };
+              const name = resNames[resKey] || `${resKey} Mine`;
+              sendNotificationWithFallback(
+                player.id,
+                mine.level === 1 ? "\u2699\uFE0F Extractor Construction Completed" : "\u2699\uFE0F Extractor Upgrade Completed",
+                mine.level === 1 ? `${name} (Slot ${mine.index + 1}) has successfully completed construction on ${planet.name}!` : `${name} (Slot ${mine.index + 1}) has successfully completed upgrading to Level ${mine.level} on ${planet.name}!`
+              );
+            }
           }
           const isOtherMaxed = planet.resources.plasma >= storageLimit && planet.resources.fuel >= storageLimit && planet.resources.food >= storageLimit && planet.resources.respirant >= storageLimit;
           const isMineBoosted = mine.boostedUntil && now < Number(mine.boostedUntil);
-          let hourlyProd = isOtherMaxed ? resKey === "water" ? 14e3 : 42e3 : getMineProductionPerHour(mine.level, resKey);
+          let hourlyProd = isOtherMaxed ? 14e3 : getMineProductionPerHour(mine.level, resKey);
           if (isMineBoosted) {
             hourlyProd = hourlyProd * 1.14;
           }
           const accumulated = hourlyProd * deltaHours;
-          if (resKey === "water") {
-            planet.resources.water += accumulated;
-          } else {
-            planet.resources[resKey] = Math.min(
-              storageLimit,
-              planet.resources[resKey] + accumulated
-            );
-          }
+          planet.resources[resKey] += accumulated;
         });
       }
       const waterConsumed = waterConsumptionPerHour * deltaHours;
-      const respirantConsumed = waterConsumptionPerHour * 0.4 * deltaHours;
-      const foodConsumed = waterConsumptionPerHour * 0.15 * deltaHours;
+      const respirantConsumed = waterConsumptionPerHour * 0.28 * deltaHours;
+      const foodConsumed = waterConsumptionPerHour * 0.18 * deltaHours;
       planet.resources.water = planet.resources.water - waterConsumed;
       planet.resources.respirant = planet.resources.respirant - respirantConsumed;
       planet.resources.food = planet.resources.food - foodConsumed;
-      const hourlyMinesProd = { water: 0, respirant: 0, food: 0 };
-      for (const resKey of ["water", "respirant", "food"]) {
+      const hourlyMinesProd = { water: 0, plasma: 0, fuel: 0, respirant: 0, food: 0 };
+      for (const resKey of ["water", "plasma", "fuel", "respirant", "food"]) {
         const mines = planet.mines[resKey] || [];
         const isOtherMaxed = planet.resources.plasma >= storageLimit && planet.resources.fuel >= storageLimit && planet.resources.food >= storageLimit && planet.resources.respirant >= storageLimit;
         mines.forEach((mine) => {
           const isMineBoosted = mine.boostedUntil && now < Number(mine.boostedUntil);
-          let hourlyProd = isOtherMaxed ? resKey === "water" ? 14e3 : 42e3 : getMineProductionPerHour(mine.level, resKey);
+          let hourlyProd = isOtherMaxed ? 14e3 : getMineProductionPerHour(mine.level, resKey);
           if (isMineBoosted) {
             hourlyProd = hourlyProd * 1.14;
           }
@@ -1069,9 +1724,8 @@ function tickPlayerState(playerId, now) {
         });
       }
       const netWaterProdHourly = hourlyMinesProd.water - waterConsumptionPerHour;
-      const netRespirantProdHourly = hourlyMinesProd.respirant - waterConsumptionPerHour * 0.4;
-      const netFoodProdHourly = hourlyMinesProd.food - waterConsumptionPerHour * 0.15;
-      const isAnyProdNegative = netWaterProdHourly < 0 || netRespirantProdHourly < 0 || netFoodProdHourly < 0;
+      const netRespirantProdHourly = hourlyMinesProd.respirant - waterConsumptionPerHour * 0.28;
+      const netFoodProdHourly = hourlyMinesProd.food - waterConsumptionPerHour * 0.18;
       if (netWaterProdHourly < 0) {
         planet.resources.water = Math.min(storageLimit, planet.resources.water);
       } else {
@@ -1087,7 +1741,9 @@ function tickPlayerState(playerId, now) {
       } else {
         planet.resources.food = Math.max(0, Math.min(storageLimit, planet.resources.food));
       }
-      const triggerAttrition = isAnyProdNegative || planet.resources.water < 0 || planet.resources.respirant < 0 || planet.resources.food < 0;
+      planet.resources.plasma = Math.max(0, Math.min(storageLimit, planet.resources.plasma));
+      planet.resources.fuel = Math.max(0, Math.min(storageLimit, planet.resources.fuel));
+      const triggerAttrition = planet.resources.water < 0 || planet.resources.respirant < 0 || planet.resources.food < 0;
       if (triggerAttrition) {
         const attritionRate = 0.15;
         if (deltaHours > 0) {
@@ -1112,10 +1768,45 @@ function tickPlayerState(playerId, now) {
           lastCompletedUpgradeTime = Math.max(lastCompletedUpgradeTime, building.upgradeEnd);
           building.upgradeEnd = null;
           changed = true;
+          if (!planet.upgradeQueue || planet.upgradeQueue.length === 0) {
+            const bNames = { commsHub: "Communications Hub", researchCenter: "Research Center", armyBase: "War Room", repository: "Silo", radar: "Radar Array", supplyNexus: "Supply Nexus", fabricator: "Fabricator", bunker: "Bunker", magneticShield: "Magnetic Shield" };
+            const name = bNames[bKey] || bKey;
+            sendNotificationWithFallback(
+              player.id,
+              "\u{1F3D7}\uFE0F Station Upgrade Completed",
+              `${name} has successfully completed upgrading to Level ${building.level} on ${planet.name}!`
+            );
+          }
+        }
+      }
+      if (planet.activeResearch && planet.activeResearch.endAt && now >= planet.activeResearch.endAt) {
+        const techId = planet.activeResearch.techId;
+        const targetLvl = planet.activeResearch.targetLevel;
+        if (!player.techLevels) {
+          player.techLevels = {};
+        }
+        if (!player.techLevels[planet.id]) {
+          player.techLevels[planet.id] = {};
+        }
+        player.techLevels[planet.id][techId] = targetLvl;
+        lastCompletedUpgradeTime = Math.max(lastCompletedUpgradeTime, planet.activeResearch.endAt);
+        planet.activeResearch = null;
+        changed = true;
+        if (!planet.researchQueue || planet.researchQueue.length === 0) {
+          const techNames = { defense_shields: "Defense Shields", manufacturing_speed: "Manufacturing Speed", troop_speed: "Troop Speed" };
+          const name = techNames[techId] || techId;
+          sendNotificationWithFallback(
+            player.id,
+            "\u{1F52C} Research Project Completed",
+            `${name} has successfully reached Level ${targetLvl} in the Research Center of ${planet.name}!`
+          );
         }
       }
       if (!planet.upgradeQueue) {
         planet.upgradeQueue = [];
+      }
+      if (!planet.researchQueue) {
+        planet.researchQueue = [];
       }
       let isUpgradeActive = false;
       for (const rKey of Object.keys(planet.mines)) {
@@ -1158,6 +1849,16 @@ function tickPlayerState(playerId, now) {
               planet.upgradeQueue.shift();
               referenceTime = expectedEnd;
               changed = true;
+              if (planet.upgradeQueue.length === 0) {
+                const bNames = { commsHub: "Communications Hub", researchCenter: "Research Center", armyBase: "War Room", repository: "Silo", radar: "Radar Array", supplyNexus: "Supply Nexus", fabricator: "Fabricator", bunker: "Bunker", magneticShield: "Magnetic Shield" };
+                const resNames = { water: "Water Extractor", plasma: "Plasma Extractor", fuel: "Fuel Extractor", food: "Food Extractor", respirant: "Respirant Extractor" };
+                const name = nextUp.type === "mine" ? resNames[nextUp.key] || `${nextUp.key} Mine` : bNames[nextUp.key] || nextUp.key;
+                sendNotificationWithFallback(
+                  player.id,
+                  "\u{1F3D7}\uFE0F Queue Upgrades Completed",
+                  `Your construction queue has completed. Final item: '${name}' successfully reached Level ${targetLvl} on ${planet.name}!`
+                );
+              }
             } else {
               targetObj.isUpgrading = true;
               targetObj.upgradeEnd = expectedEnd;
@@ -1167,6 +1868,45 @@ function tickPlayerState(playerId, now) {
             }
           } else {
             planet.upgradeQueue.shift();
+          }
+        }
+      }
+      if (!planet.activeResearch && planet.researchQueue.length > 0) {
+        let referenceTime = lastCompletedUpgradeTime > 0 ? lastCompletedUpgradeTime : now;
+        while (planet.researchQueue.length > 0) {
+          const nextResearch = planet.researchQueue[0];
+          const targetLvl = nextResearch.targetLevel;
+          const durationMs = targetLvl * 60 * 1e3;
+          const expectedEnd = referenceTime + durationMs;
+          if (now >= expectedEnd) {
+            if (!player.techLevels) {
+              player.techLevels = {};
+            }
+            if (!player.techLevels[planet.id]) {
+              player.techLevels[planet.id] = {};
+            }
+            player.techLevels[planet.id][nextResearch.key] = targetLvl;
+            planet.researchQueue.shift();
+            referenceTime = expectedEnd;
+            changed = true;
+            if (planet.researchQueue.length === 0) {
+              const techNames = { defense_shields: "Defense Shields", manufacturing_speed: "Manufacturing Speed", troop_speed: "Troop Speed" };
+              const name = techNames[nextResearch.key] || nextResearch.key;
+              sendNotificationWithFallback(
+                player.id,
+                "\u{1F52C} Research Queue Completed",
+                `Your research queue has completed. Final item: '${name}' successfully reached Level ${targetLvl} in the Research Center of ${planet.name}!`
+              );
+            }
+          } else {
+            planet.activeResearch = {
+              techId: nextResearch.key,
+              targetLevel: targetLvl,
+              endAt: expectedEnd
+            };
+            planet.researchQueue.shift();
+            changed = true;
+            break;
           }
         }
       }
@@ -1245,12 +1985,13 @@ function simulateMoonbaseCombat(attackerName, defenderName, attTroops, defTroops
   let attSurvivalFloor = 0;
   let defSurvivalFloor = 0;
   if (initialAttHp > 0 && initialDefHp > 0) {
-    if (initialAttHp > initialDefHp) {
-      const diffPct = (initialAttHp - initialDefHp) / initialDefHp;
-      attSurvivalFloor = Math.min(0.3, diffPct * 0.5);
-    } else if (initialDefHp > initialAttHp) {
-      const diffPct = (initialDefHp - initialAttHp) / initialAttHp;
-      defSurvivalFloor = Math.min(0.3, diffPct * 0.5);
+    const defToAttRatio = initialDefHp / initialAttHp;
+    if (defToAttRatio <= 2.5) {
+      attSurvivalFloor = Math.max(0.1, 0.4 * (2.5 - defToAttRatio) / 1.5);
+    }
+    const attToDefRatio = initialAttHp / initialDefHp;
+    if (attToDefRatio <= 2.5) {
+      defSurvivalFloor = Math.max(0.1, 0.4 * (2.5 - attToDefRatio) / 1.5);
     }
   }
   const TARGET_PRIORITIES = {
@@ -1500,6 +2241,54 @@ function simulateMoonbaseCombat(attackerName, defenderName, attTroops, defTroops
       rounds[rounds.length - 1].logs.push(...salvageLogs);
     }
   }
+  if (initialAttHp > 2.5 * initialDefHp && initialDefHp > 0) {
+    Object.entries(defTroops).forEach(([tId, count]) => {
+      defRemaining[tId] = 0;
+      defenderLosses[tId] = count;
+    });
+    defenceHpKilled = initialDefHp;
+    if (rounds.length > 0) {
+      rounds[rounds.length - 1].logs.push(`\u{1F4A5} [TACTICAL OVERWHELM] Attacker's initial force HP of ${initialAttHp.toLocaleString()} exceeded 150% more than the defender's total involved HP (${initialDefHp.toLocaleString()}). Absolute overwhelm triggered; all defender defending forces have been wiped out with ZERO survivors!`);
+    }
+  } else if (initialDefHp > 2.5 * initialAttHp && initialAttHp > 0) {
+    Object.entries(attTroops).forEach(([tId, count]) => {
+      attRemaining[tId] = 0;
+      attackerLosses[tId] = count;
+    });
+    attackHpKilled = initialAttHp;
+    if (rounds.length > 0) {
+      rounds[rounds.length - 1].logs.push(`\u{1F4A5} [TACTICAL OVERWHELM] Defender's initial force HP of ${initialDefHp.toLocaleString()} exceeded 150% more than the attacker's total involved HP (${initialAttHp.toLocaleString()}). Absolute overwhelm triggered; all attacking squadron forces have been wiped out with ZERO survivors!`);
+    }
+  } else {
+    if (initialAttHp > 0 && initialDefHp > 0) {
+      const finalAttCountTemp = Object.values(attRemaining).reduce((s, v) => s + v, 0);
+      const finalDefCountTemp = Object.values(defRemaining).reduce((s, v) => s + v, 0);
+      if (finalDefCountTemp === 0) {
+        Object.entries(defTroops).forEach(([tId, count]) => {
+          if (count > 0) {
+            const minQty = Math.max(1, Math.ceil(count * 0.1));
+            defRemaining[tId] = minQty;
+            defenderLosses[tId] = Math.max(0, count - minQty);
+          }
+        });
+        if (rounds.length > 0) {
+          rounds[rounds.length - 1].logs.push(`\u{1F6E1}\uFE0F [MINIMUM SAFETY SECURITY] Because the attacker did not have >150% more relevant HP involved, defender was saved from total annihilation by local garrison shields!`);
+        }
+      }
+      if (finalAttCountTemp === 0) {
+        Object.entries(attTroops).forEach(([tId, count]) => {
+          if (count > 0) {
+            const minQty = Math.max(1, Math.ceil(count * 0.1));
+            attRemaining[tId] = minQty;
+            attackerLosses[tId] = Math.max(0, count - minQty);
+          }
+        });
+        if (rounds.length > 0) {
+          rounds[rounds.length - 1].logs.push(`\u{1F6E1}\uFE0F [MINIMUM SAFETY SECURITY] Because the defender did not have >150% more relevant HP involved, attacker was saved from total annihilation by tactical jump shields!`);
+        }
+      }
+    }
+  }
   const finalAttCount = Object.values(attRemaining).reduce((s, v) => s + v, 0);
   const finalDefCount = Object.values(defRemaining).reduce((s, v) => s + v, 0);
   const finalAttHp = Object.entries(attRemaining).reduce((sum, [tId, qty]) => {
@@ -1513,12 +2302,20 @@ function simulateMoonbaseCombat(attackerName, defenderName, attTroops, defTroops
     return sum + qty * Math.round(totalUnitHP * defMult);
   }, 0);
   let winner = "defender";
-  if (finalAttHp > finalDefHp) {
+  if (finalAttCount === 0 && finalDefCount > 0) {
+    winner = "defender";
+  } else if (finalDefCount === 0 && finalAttCount > 0) {
     winner = "attacker";
-  } else if (finalAttHp < finalDefHp) {
+  } else if (finalAttCount === 0 && finalDefCount === 0) {
     winner = "defender";
   } else {
-    winner = finalAttCount >= finalDefCount ? "attacker" : "defender";
+    if (finalAttHp > finalDefHp) {
+      winner = "attacker";
+    } else if (finalAttHp < finalDefHp) {
+      winner = "defender";
+    } else {
+      winner = finalAttCount >= finalDefCount ? "attacker" : "defender";
+    }
   }
   return {
     winner,
@@ -1558,19 +2355,60 @@ function resolveFleetMission(fleet, now, remainingFleets) {
   if (fleet.isReturning) {
     const sender = state.players[fleet.senderId];
     if (sender) {
-      const homePlanet = sender.planets[0];
+      const homePlanet = sender.planets.find((p) => p.sectorX === fleet.senderCoords.x && p.sectorY === fleet.senderCoords.y) || sender.planets[0];
       if (homePlanet) {
-        Object.entries(fleet.troops).forEach(([tId, count]) => {
-          homePlanet.troops[tId] += count;
-        });
-        if (fleet.lootCarried) {
-          const cap = getRepositoryCapacity(homePlanet.buildings.repository.level);
-          Object.entries(fleet.lootCarried).forEach(([res, amt]) => {
-            homePlanet.resources[res] = Math.min(
-              cap,
-              homePlanet.resources[res] + amt
-            );
+        const autoUnload = sender.autoUnloadResources !== false;
+        if (autoUnload) {
+          Object.entries(fleet.troops).forEach(([tId, count]) => {
+            homePlanet.troops[tId] += count;
           });
+          if (fleet.lootCarried) {
+            const cap = getRepositoryCapacity(homePlanet.buildings.repository.level);
+            Object.entries(fleet.lootCarried).forEach(([res, amt]) => {
+              homePlanet.resources[res] = Math.min(
+                cap,
+                homePlanet.resources[res] + amt
+              );
+            });
+          }
+        } else {
+          if (fleet.createdFleetId) {
+            Object.entries(fleet.troops).forEach(([tId, count]) => {
+              homePlanet.troops[tId] += count;
+            });
+            const cf = sender.createdFleets?.find((f) => f.id === fleet.createdFleetId);
+            if (cf) {
+              if (!cf.resources) {
+                cf.resources = { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
+              }
+              if (fleet.lootCarried) {
+                Object.entries(fleet.lootCarried).forEach(([res, amt]) => {
+                  cf.resources[res] = (cf.resources[res] || 0) + amt;
+                });
+              }
+            }
+          } else {
+            const newFleetId = `fleet_${Math.random().toString(36).substr(2, 9)}`;
+            const newFleet = {
+              id: newFleetId,
+              name: `Returned Fleet (${fleet.targetName})`,
+              subsidiary: sender.faction,
+              troops: { ...fleet.troops },
+              planetId: homePlanet.id,
+              activeMissionId: null,
+              isTraveling: false,
+              resources: fleet.lootCarried ? {
+                water: fleet.lootCarried.water || 0,
+                plasma: fleet.lootCarried.plasma || 0,
+                fuel: fleet.lootCarried.fuel || 0,
+                food: fleet.lootCarried.food || 0,
+                respirant: fleet.lootCarried.respirant || 0
+              } : { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 }
+            };
+            if (!sender.createdFleets) sender.createdFleets = [];
+            sender.createdFleets.push(newFleet);
+            fleet.troops = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+          }
         }
       }
     }
@@ -1580,19 +2418,40 @@ function resolveFleetMission(fleet, now, remainingFleets) {
   const defender = fleet.targetId ? state.players[fleet.targetId] : null;
   if (fleet.missionType === "move") {
     if (attacker) {
-      const targetPlanet = attacker.planets.find((pl) => pl.sectorX === fleet.targetCoords.x && pl.sectorY === fleet.targetCoords.y);
+      let targetPlanet = attacker.planets.find((pl) => pl.sectorX === fleet.targetCoords.x && pl.sectorY === fleet.targetCoords.y);
+      let targetOwner = attacker;
+      if (!targetPlanet && attacker.allianceId) {
+        for (const playerObj of Object.values(state.players)) {
+          if (playerObj.allianceId === attacker.allianceId) {
+            const pl = playerObj.planets.find((p) => p.sectorX === fleet.targetCoords.x && p.sectorY === fleet.targetCoords.y);
+            if (pl) {
+              targetPlanet = pl;
+              targetOwner = playerObj;
+              break;
+            }
+          }
+        }
+      }
       if (targetPlanet) {
-        Object.entries(fleet.troops).forEach(([tId, count]) => {
-          targetPlanet.troops[tId] = (targetPlanet.troops[tId] || 0) + count;
-        });
+        const cf = fleet.createdFleetId ? attacker.createdFleets?.find((f) => f.id === fleet.createdFleetId) : null;
+        if (cf) {
+          cf.planetId = targetPlanet.id;
+          cf.isTraveling = false;
+          cf.activeMissionId = null;
+        } else {
+          Object.entries(fleet.troops).forEach(([tId, count]) => {
+            targetPlanet.troops[tId] = (targetPlanet.troops[tId] || 0) + count;
+          });
+        }
         const report = {
           id: `battle_${Math.random().toString(36).substr(2, 9)}`,
           timestamp: now,
           attackerId: fleet.senderId,
           attackerName: fleet.senderName,
-          defenderId: fleet.senderId,
+          defenderId: targetOwner.id,
           defenderName: targetPlanet.name,
           isRecon: false,
+          isMove: true,
           attackerCoords: fleet.senderCoords,
           defenderCoords: fleet.targetCoords,
           attackerInitialTroops: { ...fleet.troops },
@@ -1609,7 +2468,7 @@ function resolveFleetMission(fleet, now, remainingFleets) {
               logs: [
                 "--- SECURE FLEET TRANSIT RELOCATION ---",
                 `All relocated squadrons have safely made orbital insertion at '${targetPlanet.name}'.`,
-                "Troops have been successfully deployed and integrated into the local defense network.",
+                cf ? "Reserve fleet container has docked locally, keeping all transport cargo resources and forces structured." : "Troops have been successfully deployed and integrated into the local defense network.",
                 `Arriving payload: ${Object.entries(fleet.troops).filter(([_, q]) => q > 0).map(([t, q]) => `${q} ${t}`).join(", ") || "No spacecraft"}`
               ],
               attackerRemaining: { ...fleet.troops },
@@ -1618,13 +2477,18 @@ function resolveFleetMission(fleet, now, remainingFleets) {
           ]
         };
         state.battleReports.unshift(report);
+        sendNotificationWithFallback(
+          fleet.senderId,
+          "\u{1F680} Fleet Relocation Completed",
+          `Your relocation fleet has completed transit and safely landed at '${targetPlanet.name}'.`
+        );
       } else {
         const totalDist = Math.hypot(fleet.targetCoords.x - fleet.senderCoords.x, fleet.targetCoords.y - fleet.senderCoords.y);
         const slowestTroopSpeed = Object.entries(fleet.troops).filter(([_, qty]) => qty > 0).reduce((slowest, [tId, _]) => {
           const sp = TROOP_SPECS[tId]?.speed || 5;
           return sp < slowest ? sp : slowest;
         }, 100);
-        const travelTimeMs = Math.round(totalDist / slowestTroopSpeed * 6e4);
+        const travelTimeMs = Math.round(totalDist / slowestTroopSpeed * 36e5);
         remainingFleets.push({
           ...fleet,
           isReturning: true,
@@ -1711,6 +2575,18 @@ function resolveFleetMission(fleet, now, remainingFleets) {
       }
     ];
     state.battleReports.unshift(report);
+    sendNotificationWithFallback(
+      report.attackerId,
+      "\u{1F4E1} Intelligence Sweep Complete",
+      `Your recon drones have returned orbital scanner data of Commander ${report.defenderName || "Unknown"}'s station.`
+    );
+    if (report.defenderId) {
+      sendNotificationWithFallback(
+        report.defenderId,
+        "\u26A0\uFE0F SENSORS ALERT: Scanner Detected",
+        `Proximity alarms triggered: An unauthorized scouting drone sent by Commander ${report.attackerName} has completed a scan of your station!`
+      );
+    }
     if (didScoutsDie) {
       fleet.troops.drone = Math.max(0, (fleet.troops.drone || 0) - dronesDiedCount);
     }
@@ -1719,7 +2595,7 @@ function resolveFleetMission(fleet, now, remainingFleets) {
     const boostPct = Math.max(0, Math.min(35, (speedLvl - 1) * (35 / 19))) / 100;
     const multiplier = 1 + boostPct;
     const speed = TROOP_SPECS.drone.speed * multiplier;
-    const travelTimeMs = Math.round(totalDist / speed * 6e4);
+    const travelTimeMs = Math.round(totalDist / speed * 36e5);
     remainingFleets.push({
       ...fleet,
       isReturning: true,
@@ -1731,13 +2607,28 @@ function resolveFleetMission(fleet, now, remainingFleets) {
   if (fleet.missionType === "colonize") {
     if (attacker) {
       const hasLvl20 = attacker.planets.some((p) => p.buildings.researchCenter.level >= 20);
-      if (hasLvl20 && attacker.planets.length < 5) {
+      if (hasLvl20 && attacker.planets.length < 20) {
+        let customExt = void 0;
+        if (state.habitablePlanets) {
+          const matchedHp = state.habitablePlanets.find((item) => Number(item.coords.x) === Number(fleet.targetCoords.x) && Number(item.coords.y) === Number(fleet.targetCoords.y));
+          if (matchedHp) {
+            customExt = getOrGenerateHabitableExtractors(matchedHp);
+            matchedHp.isColonized = true;
+          }
+        }
         const planetNum = attacker.planets.length + 1;
-        const newPlanet = createInitialPlanet(`${attacker.username}'s Colony ${planetNum}`, fleet.targetCoords.x, fleet.targetCoords.y);
+        const newPlanet = createInitialPlanet(`${attacker.username}'s Colony ${planetNum}`, fleet.targetCoords.x, fleet.targetCoords.y, false, customExt);
         Object.entries(fleet.troops).forEach(([tId, count]) => {
           newPlanet.troops[tId] = count;
         });
+        const isAdminPlayer = attacker && attacker.googleEmail && (attacker.googleEmail.toLowerCase() === "banele180@gmail.com" || attacker.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+        if (!isAdminPlayer) {
+          newPlanet.troops.settlementShip = 0;
+        } else {
+          newPlanet.troops.settlementShip = 1;
+        }
         attacker.planets.push(newPlanet);
+        ensureAdminMaxed(attacker);
         state.newsEvents.unshift({
           id: `news_${Math.random().toString(36).substr(2, 9)}`,
           title: "Planet Colonized",
@@ -1767,14 +2658,23 @@ function resolveFleetMission(fleet, now, remainingFleets) {
       });
       return;
     }
-    const defPlanet = defender.planets[0];
+    const defPlanet = defender.planets.find((pl) => pl.sectorX === fleet.targetCoords.x && pl.sectorY === fleet.targetCoords.y) || defender.planets[0];
     const attTroops = { ...fleet.troops };
-    const defTroops = defPlanet ? { ...defPlanet.troops } : { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0 };
+    const dockingDefenderReserveFleets = (defender.createdFleets || []).filter(
+      (cf) => cf.planetId === (defPlanet ? defPlanet.id : "") && (!cf.isTraveling || !cf.activeMissionId)
+    );
+    const defTroops = defPlanet ? { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0, ...defPlanet.troops } : { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+    dockingDefenderReserveFleets.forEach((cf) => {
+      Object.entries(cf.troops).forEach(([tId, count]) => {
+        const qty = Number(count) || 0;
+        defTroops[tId] = (defTroops[tId] || 0) + qty;
+      });
+    });
     const attShieldLvl = fleet.defenseShieldsLevel || 10;
-    let defShieldLvl = 10;
-    if (defender) {
-      const defRc = defender.planets[0]?.buildings.researchCenter;
-      if (defRc) defShieldLvl = defRc.level;
+    let defShieldLvl = 0;
+    if (defender && defPlanet) {
+      const isFirstDefPlanet = defender.planets[0]?.id === defPlanet.id;
+      defShieldLvl = defender.techLevels?.[defPlanet.id]?.defense_shields ?? (isFirstDefPlanet ? 20 : 0);
     }
     const combat = simulateMoonbaseCombat(
       fleet.senderName,
@@ -1785,12 +2685,61 @@ function resolveFleetMission(fleet, now, remainingFleets) {
       defShieldLvl
     );
     if (defPlanet) {
-      Object.entries(combat.defenderLosses).forEach(([tId, count]) => {
-        defPlanet.troops[tId] -= count;
+      Object.entries(combat.defenderLosses).forEach(([tId, totalLoss]) => {
+        if (totalLoss <= 0) return;
+        const sources = [];
+        const garrisonCount = defPlanet.troops[tId] || 0;
+        if (garrisonCount > 0) {
+          sources.push({
+            name: "garrison",
+            type: "garrison",
+            currentCount: garrisonCount,
+            deduct: (qty) => {
+              defPlanet.troops[tId] = Math.max(0, defPlanet.troops[tId] - qty);
+            }
+          });
+        }
+        dockingDefenderReserveFleets.forEach((cf) => {
+          const count = cf.troops[tId] || 0;
+          if (count > 0) {
+            sources.push({
+              name: cf.id,
+              type: "reserve",
+              currentCount: count,
+              deduct: (qty) => {
+                cf.troops[tId] = Math.max(0, cf.troops[tId] - qty);
+              }
+            });
+          }
+        });
+        const totalAvailable = sources.reduce((sum, s) => sum + s.currentCount, 0);
+        if (totalAvailable <= 0) return;
+        let lossesToDistribute = Math.min(totalLoss, totalAvailable);
+        sources.forEach((source, index) => {
+          if (lossesToDistribute <= 0) return;
+          if (index === sources.length - 1) {
+            source.deduct(lossesToDistribute);
+          } else {
+            const share = Math.round(source.currentCount / totalAvailable * totalLoss);
+            const applied = Math.min(lossesToDistribute, share, source.currentCount);
+            source.deduct(applied);
+            lossesToDistribute -= applied;
+          }
+        });
       });
+      if (defender.createdFleets) {
+        defender.createdFleets = defender.createdFleets.filter((cf) => {
+          const totalTroops = Object.values(cf.troops).reduce((sum, count) => sum + (Number(count) || 0), 0);
+          return totalTroops > 0;
+        });
+      }
     }
-    attacker.scores.attack += combat.defenceHpKilled;
-    defender.scores.defence += combat.attackHpKilled;
+    if (combat.winner === "attacker") {
+      attacker.scores.attack += combat.defenceHpKilled;
+    }
+    if (combat.winner === "defender") {
+      defender.scores.defence += combat.attackHpKilled;
+    }
     const loot = { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
     let totalLootCapacity = 0;
     Object.entries(combat.attackerRemaining).forEach(([tId, count]) => {
@@ -1799,17 +2748,27 @@ function resolveFleetMission(fleet, now, remainingFleets) {
     });
     if (combat.winner === "attacker" && totalLootCapacity > 0 && defPlanet) {
       const items = ["water", "plasma", "fuel", "food", "respirant"];
-      let defenseTotalResources = items.reduce((sum, item) => sum + defPlanet.resources[item], 0);
-      if (defenseTotalResources > 0) {
-        const stealAmount = Math.min(totalLootCapacity, defenseTotalResources);
-        const stealFrac = stealAmount / defenseTotalResources;
+      const bunkerLevel = defPlanet.buildings && defPlanet.buildings.bunker ? defPlanet.buildings.bunker.level : 0;
+      const protectedAmountPerType = Math.round(5e5 * (bunkerLevel / 25));
+      const availableResources = items.reduce((acc, item) => {
+        acc[item] = Math.max(0, defPlanet.resources[item] - protectedAmountPerType);
+        return acc;
+      }, {});
+      let defenseTotalAvailableResources = items.reduce((sum, item) => sum + availableResources[item], 0);
+      if (defenseTotalAvailableResources > 0) {
+        const stealAmount = Math.min(totalLootCapacity, defenseTotalAvailableResources);
+        const stealFrac = stealAmount / defenseTotalAvailableResources;
         items.forEach((item) => {
-          const stolen = Math.floor(defPlanet.resources[item] * stealFrac);
+          const stolen = Math.min(
+            availableResources[item],
+            // Can't steal more than what is available (outside bunker)
+            Math.floor(availableResources[item] * stealFrac)
+          );
           defPlanet.resources[item] -= stolen;
           loot[item] = stolen;
         });
         const totalStolen = Object.values(loot).reduce((sum, val) => sum + val, 0);
-        attacker.scores.raiders += totalStolen;
+        attacker.scores.raiders += totalStolen / 1e3;
       }
     }
     const buildingDamageReports = combat.winner === "attacker" && combat.attackerRemaining.tank > 0 && defPlanet ? applyBomberDamage(defPlanet, combat.attackerRemaining.tank, fleet.targetBuilding || "random") : [];
@@ -1836,6 +2795,19 @@ function resolveFleetMission(fleet, now, remainingFleets) {
       battleRounds: combat.rounds
     };
     state.battleReports.unshift(report);
+    const lootSumTotal = Object.values(loot).reduce((s, v) => s + v, 0);
+    sendNotificationWithFallback(
+      report.attackerId,
+      combat.winner === "attacker" ? "\u{1F3C6} Raid Victory!" : "\u274C Raid Repelled",
+      combat.winner === "attacker" ? `Your raid on Commander ${report.defenderName}'s station was successful! Plundered ${lootSumTotal.toLocaleString()} resources.` : `Your raiding fleet on Commander ${report.defenderName}'s station was defeated.`
+    );
+    if (report.defenderId) {
+      sendNotificationWithFallback(
+        report.defenderId,
+        combat.winner === "attacker" ? "\u{1F6A8} STATION BREACH ALERT!" : "\u{1F6E1}\uFE0F Station Defended!",
+        combat.winner === "attacker" ? `Commander ${report.attackerName} breached your defenses, plundering ${lootSumTotal.toLocaleString()} resources!` : `Your security systems successfully repelled a raid by Commander ${report.attackerName}!`
+      );
+    }
     const lootSum = Object.values(loot).reduce((s, v) => s + v, 0);
     const destructionDetails = buildingDamageReports.length > 0 ? ` damaging defenses by ${buildingDamageReports.length} levels.` : ".";
     state.newsEvents.unshift({
@@ -1856,7 +2828,7 @@ function resolveFleetMission(fleet, now, remainingFleets) {
         const sp = TROOP_SPECS[tId]?.speed || 50;
         return sp < slowest ? sp : slowest;
       }, 100) * multiplier;
-      const travelTimeMs = Math.round(totalDist / slowestTroopSpeed * 6e4);
+      const travelTimeMs = Math.round(totalDist / slowestTroopSpeed * 36e5);
       remainingFleets.push({
         ...fleet,
         isReturning: true,
@@ -1870,41 +2842,20 @@ function resolveFleetMission(fleet, now, remainingFleets) {
   }
 }
 function runAISimulatedActivity(now) {
-  const players2 = Object.values(state.players).filter((p) => p.id.startsWith("ai_"));
-  if (players2.length === 0) return;
-  const luckyAI = players2[Math.floor(Math.random() * players2.length)];
+  const players = Object.values(state.players).filter((p) => p.id.startsWith("ai_"));
+  if (players.length === 0) return;
+  const luckyAI = players[Math.floor(Math.random() * players.length)];
   const actionType = Math.random();
   if (actionType < 0.25) {
-    const banter = [
-      "Securing boundaries in sector " + luckyAI.planets[0].sectorX + ", peace is a planetary illusion.",
-      "Any active alliance looking for a strong merger? VOID is recruiting officers.",
-      "Just upgraded my research center! The speed of light is no longer a restriction.",
-      "Scouting for coordinates coordinates. Watch your back!",
-      "Water consumption is getting tight, need to construct more water pumps!"
-    ];
-    const message = {
-      id: `chat_${Math.random().toString(36).substr(2, 9)}`,
-      channel: "global",
-      senderId: luckyAI.id,
-      senderName: luckyAI.username,
-      senderFaction: luckyAI.faction,
-      senderFactionColor: luckyAI.factionColor,
-      allianceTag: luckyAI.allianceId ? state.alliances[luckyAI.allianceId]?.tag : null,
-      receiverId: null,
-      content: banter[Math.floor(Math.random() * banter.length)],
-      timestamp: now
-    };
-    state.chatMessages.push(message);
-    if (state.chatMessages.length > 100) state.chatMessages.shift();
   } else if (actionType < 0.45) {
-    const defender = players2[Math.floor(Math.random() * players2.length)];
+    const defender = players[Math.floor(Math.random() * players.length)];
     if (defender && defender.id !== luckyAI.id) {
       const p = luckyAI.planets[0];
       const targetP = defender.planets[0];
       const missionType = Math.random() > 0.4 ? "attack" : "recon";
       const totalDist = Math.hypot(targetP.sectorX - p.sectorX, targetP.sectorY - p.sectorY);
       const fleetSpeed = missionType === "recon" ? 75 : 40;
-      const travelTimeMs = Math.round(totalDist / fleetSpeed * 6e4);
+      const travelTimeMs = Math.round(totalDist / fleetSpeed * 36e5);
       const mission = {
         id: `fleet_${Math.random().toString(36).substr(2, 9)}`,
         senderId: luckyAI.id,
@@ -1952,6 +2903,8 @@ function runAISimulatedActivity(now) {
 }
 loadState().then(() => {
   console.log("Game Engine database/file systems synced and initialized!");
+}).catch((err) => {
+  console.error("Game Engine CRITICAL sync error on startup:", err);
 });
 setInterval(() => {
   const now = Date.now();
@@ -1963,6 +2916,146 @@ setInterval(() => {
     runAISimulatedActivity(now);
   }
 }, 4e3);
+var activeSseClients = /* @__PURE__ */ new Map();
+var firebaseAdminApp = null;
+function getFirebaseAdmin() {
+  if (firebaseAdminApp) return firebaseAdminApp;
+  const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT;
+  const projectId = process.env.FIREBASE_PROJECT_ID || "space-station-498022";
+  try {
+    const apps = (0, import_app.getApps)();
+    if (apps.length > 0) {
+      firebaseAdminApp = apps[0];
+      return firebaseAdminApp;
+    }
+    if (serviceAccountVar) {
+      const serviceAccount = JSON.parse(serviceAccountVar);
+      firebaseAdminApp = (0, import_app.initializeApp)({
+        credential: (0, import_app.cert)(serviceAccount)
+      });
+      console.log("[Firebase Admin] Initialized with Service Account cert.");
+    } else if (projectId) {
+      firebaseAdminApp = (0, import_app.initializeApp)({
+        projectId
+      });
+      console.log(`[Firebase Admin] Initialized with Project ID: ${projectId}`);
+    } else {
+      console.warn("[Firebase Admin] Missing FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID in environment. FCM notifications will be simulated / logged in development.");
+    }
+  } catch (err) {
+    console.error("[Firebase Admin] Error initializing Firebase Admin SDK:", err);
+  }
+  return firebaseAdminApp;
+}
+function sendNotificationWithFallback(userId, title, body) {
+  if (userId && userId.startsWith("ai_")) {
+    return;
+  }
+  const activeSse = activeSseClients.get(userId);
+  if (activeSse) {
+    console.log(`[Notifications] Active SSE client found for user ${userId}. Dispatching live event.`);
+    try {
+      activeSse.write(`data: ${JSON.stringify({ title, body, timestamp: Date.now() })}
+
+`);
+      return;
+    } catch (err) {
+      console.warn(`[Notifications] Failed to write to active SSE stream for ${userId}. Connection probably broke. Falling back to FCM.`, err);
+      activeSseClients.delete(userId);
+    }
+  }
+  console.log(`[Notifications] User ${userId} has no active real-time SSE stream. Executing FCM push notification fallback...`);
+  const player = state.players[userId];
+  if (player && player.fcmToken) {
+    const adminApp = getFirebaseAdmin();
+    if (adminApp) {
+      const message = {
+        token: player.fcmToken,
+        notification: {
+          title,
+          body
+        },
+        android: {
+          priority: "high"
+        },
+        apns: {
+          payload: {
+            aps: {
+              contentAvailable: true,
+              sound: "default"
+            }
+          }
+        },
+        data: {
+          click_action: "FLUTTER_NOTIFICATION_CLICK",
+          title,
+          body
+        }
+      };
+      const messaging = (0, import_messaging.getMessaging)(adminApp);
+      messaging.send(message).then((response) => {
+        console.log(`[Notifications] Successfully sent system-level fallback FCM push notification to ${userId}:`, response);
+      }).catch((error) => {
+        console.error(`[Notifications] FCM delivery failure to ${userId}:`, error);
+        if (error.code === "messaging/invalid-registration-token" || error.code === "messaging/registration-token-not-registered") {
+          console.log(`[Notifications] Removing invalid FCM registration token for ${userId}`);
+          player.fcmToken = void 0;
+          saveState();
+        }
+      });
+    } else {
+      console.warn(`[Notifications] Push Notification fallback triggered for ${userId}, but firebase-admin is not authenticated. Message text: "${title}: ${body}"`);
+    }
+  } else {
+    console.log(`[Notifications] No registered native FCM Token found for user ${userId}. Fallback push notification cannot be delivered.`);
+  }
+}
+app.post("/api/notifications/register-token", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) {
+    return res.status(401).json({ error: "Unauthenticated" });
+  }
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: "Registration token is required" });
+  }
+  p.fcmToken = token;
+  saveState();
+  console.log(`[Notifications] Registered native FCM Token for player ${p.username} (${p.id}): ${token.substring(0, 15)}...`);
+  res.json({ success: true, message: "Native FCM Registration token stored successfully." });
+});
+app.get("/api/notifications/stream", (req, res) => {
+  const userId = req.query.userId;
+  if (!userId || !state.players[userId]) {
+    res.status(400).end("Invalid or missing userId query parameter");
+    return;
+  }
+  const p = state.players[userId];
+  console.log(`[Notifications] Established active SSE real-time stream for player ${p.username} (${userId})`);
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive"
+  });
+  res.write(":\n\n");
+  activeSseClients.set(userId, res);
+  req.on("close", () => {
+    console.log(`[Notifications] Active SSE session closed for player ${p.username} (${userId})`);
+    activeSseClients.delete(userId);
+  });
+});
+function getUniqueUsername(baseName) {
+  let name = baseName.trim();
+  if (!name) name = "Commander";
+  let uniqueName = name;
+  let suffix = 1;
+  const lowercaseNames = new Set(Object.values(state.players).map((p) => p.username.toLowerCase()));
+  while (lowercaseNames.has(uniqueName.toLowerCase())) {
+    uniqueName = `${name}_${suffix}`;
+    suffix++;
+  }
+  return uniqueName;
+}
 function getLoggedPlayer(req) {
   const userId = req.headers["x-user-id"];
   if (!userId || !state.players[userId]) return null;
@@ -1981,31 +3074,22 @@ app.post("/api/register", (req, res) => {
   if (exists) {
     return res.status(400).json({ error: "Commander username already registered" });
   }
-  const factions = ["Solar Alliance", "Nexus Syndicate", "Eclipse Vanguard"];
+  const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
   const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
   const selectFaction = factions.includes(faction) ? faction : factions[0];
   const idx = factions.indexOf(selectFaction);
   const selectColor = factionColors[idx];
   const id = `user_${Math.random().toString(36).substr(2, 9)}`;
-  const startX = Math.floor(Math.random() * 90) + 5;
-  const startY = Math.floor(Math.random() * 90) + 5;
-  const planet = createInitialPlanet(`${username}'s Station`, startX, startY);
-  planet.buildings.commsHub.level = planet.buildings.commsHub.maxLevel;
-  planet.buildings.researchCenter.level = planet.buildings.researchCenter.maxLevel;
-  planet.buildings.armyBase.level = planet.buildings.armyBase.maxLevel;
-  planet.buildings.repository.level = planet.buildings.repository.maxLevel;
-  planet.buildings.radar.level = planet.buildings.radar.maxLevel;
-  planet.buildings.supplyNexus.level = planet.buildings.supplyNexus.maxLevel;
-  for (const key of Object.keys(planet.mines)) {
-    planet.mines[key].forEach((m) => m.level = 25);
-  }
-  const maxCap = getRepositoryCapacity(planet.buildings.repository.level);
-  planet.resources.water = maxCap;
-  planet.resources.plasma = maxCap;
-  planet.resources.fuel = maxCap;
-  planet.resources.food = maxCap;
-  planet.resources.respirant = maxCap;
-  planet.troops.settlementShip = 1;
+  const limit = getCurrentMapLimits();
+  const coords = getSafeRandomCoordinates(limit);
+  const startX = coords.x;
+  const startY = coords.y;
+  const planet = createInitialPlanet(`${username}'s Station`, startX, startY, true);
+  planet.resources.water = 5e6;
+  planet.resources.plasma = 5e6;
+  planet.resources.fuel = 5e6;
+  planet.resources.food = 5e6;
+  planet.resources.respirant = 5e6;
   const newPlayer = {
     id,
     username,
@@ -2036,18 +3120,21 @@ app.post("/api/register", (req, res) => {
     type: "discovery",
     timestamp: Date.now()
   });
-  state.chatMessages.push({
-    id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
-    channel: "global",
-    senderId: "system",
-    senderName: "CENTRAL COMMAND",
-    senderFaction: "System",
-    senderFactionColor: "#7F8C8D",
-    allianceTag: "SYS",
-    receiverId: null,
-    content: `Welcome Commander ${username} to active duty in sector [${startX}, ${startY}]! Ensure your water production exceeds consumption!`,
-    timestamp: Date.now()
-  });
+  if (!newPlayer.welcomeMessageSent) {
+    newPlayer.welcomeMessageSent = true;
+    state.chatMessages.push({
+      id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
+      channel: "global",
+      senderId: "system",
+      senderName: "CENTRAL COMMAND",
+      senderFaction: "System",
+      senderFactionColor: "#7F8C8D",
+      allianceTag: "SYS",
+      receiverId: null,
+      content: `Welcome to the galaxy Beta Test, ${username}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+      timestamp: Date.now()
+    });
+  }
   saveState();
   res.json({ player: newPlayer });
 });
@@ -2062,95 +3149,311 @@ app.post("/api/login", (req, res) => {
   }
   res.json({ player });
 });
-app.post("/api/auth/google", (req, res) => {
-  const { email, username, faction } = req.body;
+app.post("/api/auth/check-email", (req, res) => {
+  const { email } = req.body;
   if (!email) {
-    return res.status(400).json({ error: "Google credentials authorization failed. Email is required." });
+    return res.status(400).json({ error: "Email is required." });
   }
-  let player = Object.values(state.players).find((p) => p.googleEmail?.toLowerCase() === email.toLowerCase());
+  const player = Object.values(state.players).find(
+    (p) => p.googleEmail && p.googleEmail.toLowerCase() === email.toLowerCase()
+  );
   if (player) {
-    return res.json({ player, isNew: false });
+    return res.json({ exists: true, username: player.username });
+  } else {
+    return res.json({ exists: false });
   }
-  if (username) {
-    player = Object.values(state.players).find((p) => p.username.toLowerCase() === username.toLowerCase());
-    if (player) {
-      player.googleEmail = email;
-      if (!player.achievements.includes("Google Verified Commander")) {
-        player.achievements.push("Google Verified Commander");
+});
+app.post("/api/auth/google", async (req, res) => {
+  const { idToken, email, username, faction } = req.body;
+  if (!idToken) {
+    if (!email) {
+      return res.status(400).json({ error: "Google credentials authorization failed. ID Token or Email is required." });
+    }
+    try {
+      const player = Object.values(state.players).find(
+        (p) => p.googleEmail && p.googleEmail.toLowerCase() === email.toLowerCase()
+      );
+      if (player) {
+        return res.json({ player, isNew: false });
+      }
+      const uid = `google_sim_${Math.random().toString(36).substring(2, 10)}`;
+      const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
+      const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
+      const selectFaction = faction || factions[0];
+      const selectColor = selectFaction === "Nexus Syndicate" ? factionColors[1] : selectFaction === "Eclipse Vanguard" ? factionColors[2] : factionColors[0];
+      const defaultUsername = getUniqueUsername(username || email.split("@")[0]);
+      const limit = getCurrentMapLimits();
+      const coords = getSafeRandomCoordinates(limit);
+      const startX = coords.x;
+      const startY = coords.y;
+      const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY, true);
+      planet.resources.water = 5e6;
+      planet.resources.plasma = 5e6;
+      planet.resources.fuel = 5e6;
+      planet.resources.food = 5e6;
+      planet.resources.respirant = 5e6;
+      const newPlayer = {
+        id: uid,
+        username: defaultUsername,
+        faction: selectFaction,
+        factionColor: selectColor,
+        allianceId: null,
+        allianceRole: null,
+        planets: [planet],
+        scores: {
+          population: 10,
+          attack: 0,
+          defence: 0,
+          raiders: 0
+        },
+        achievements: ["Google Verified Commander"],
+        skinId: "default",
+        bannerId: "default",
+        lastDailyRewardClaim: Date.now(),
+        credits: 1e4,
+        googleEmail: email
+      };
+      state.players[uid] = newPlayer;
+      ensureAdminMaxed(newPlayer);
+      state.newsEvents.unshift({
+        id: `news_${Math.random().toString(36).substr(2, 9)}`,
+        title: "Google Commander Registered",
+        content: `Commander ${defaultUsername} synced via secure quantum keys!`,
+        type: "discovery",
+        timestamp: Date.now()
+      });
+      if (!newPlayer.welcomeMessageSent) {
+        newPlayer.welcomeMessageSent = true;
+        state.chatMessages.push({
+          id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
+          channel: "global",
+          senderId: "system",
+          senderName: "CENTRAL COMMAND",
+          senderFaction: "System",
+          senderFactionColor: "#7F8C8D",
+          allianceTag: "SYS",
+          receiverId: null,
+          content: `Welcome to the galaxy Beta Test, ${defaultUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+          timestamp: Date.now()
+        });
       }
       saveState();
-      return res.json({ player, isNew: false, linked: true });
+      return res.json({ player: newPlayer, isNew: true });
+    } catch (e) {
+      console.error("[Google Simulation Error]", e);
+      return res.status(500).json({ error: "Failed to simulate Google Sign-in on active station." });
     }
   }
-  const factions = ["Solar Alliance", "Nexus Syndicate", "Eclipse Vanguard"];
-  const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
-  const selectFaction = factions.includes(faction) ? faction : factions[0];
-  const idx = factions.indexOf(selectFaction);
-  const selectColor = factionColors[idx];
-  const id = `google_${Math.random().toString(36).substr(2, 9)}`;
-  const startX = Math.floor(Math.random() * 90) + 5;
-  const startY = Math.floor(Math.random() * 90) + 5;
-  const defaultUsername = username || email.split("@")[0];
-  const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY);
-  planet.buildings.commsHub.level = planet.buildings.commsHub.maxLevel;
-  planet.buildings.researchCenter.level = planet.buildings.researchCenter.maxLevel;
-  planet.buildings.armyBase.level = planet.buildings.armyBase.maxLevel;
-  planet.buildings.repository.level = planet.buildings.repository.maxLevel;
-  planet.buildings.radar.level = planet.buildings.radar.maxLevel;
-  planet.buildings.supplyNexus.level = planet.buildings.supplyNexus.maxLevel;
-  for (const key of Object.keys(planet.mines)) {
-    planet.mines[key].forEach((m) => m.level = 25);
+  try {
+    const adminApp = getFirebaseAdmin();
+    if (!adminApp) {
+      return res.status(500).json({ error: "Firebase Admin SDK could not be initialized." });
+    }
+    const admin = {
+      auth: () => (0, import_auth.getAuth)(adminApp)
+    };
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const { uid, email: email2, name } = decodedToken;
+    const player = state.players[uid];
+    if (player) {
+      return res.json({ player, isNew: false });
+    }
+    const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
+    const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
+    const selectFaction = factions[0];
+    const selectColor = factionColors[0];
+    const defaultUsername = getUniqueUsername(name || (email2 ? email2.split("@")[0] : `Commander_${uid.substring(0, 5)}`));
+    const limit = getCurrentMapLimits();
+    const coords = getSafeRandomCoordinates(limit);
+    const startX = coords.x;
+    const startY = coords.y;
+    const planet = createInitialPlanet(`${defaultUsername}'s Station`, startX, startY, true);
+    planet.resources.water = 5e6;
+    planet.resources.plasma = 5e6;
+    planet.resources.fuel = 5e6;
+    planet.resources.food = 5e6;
+    planet.resources.respirant = 5e6;
+    const newPlayer = {
+      id: uid,
+      username: defaultUsername,
+      faction: selectFaction,
+      factionColor: selectColor,
+      allianceId: null,
+      allianceRole: null,
+      planets: [planet],
+      scores: {
+        population: 10,
+        attack: 0,
+        defence: 0,
+        raiders: 0
+      },
+      achievements: ["Google Verified Commander"],
+      skinId: "default",
+      bannerId: "default",
+      lastDailyRewardClaim: Date.now(),
+      credits: 1e4,
+      googleEmail: email2
+    };
+    state.players[uid] = newPlayer;
+    state.newsEvents.unshift({
+      id: `news_${Math.random().toString(36).substr(2, 9)}`,
+      title: "Google Commander Registered",
+      content: `Commander ${defaultUsername} synced via secure quantum keys!`,
+      type: "discovery",
+      timestamp: Date.now()
+    });
+    if (!newPlayer.welcomeMessageSent) {
+      newPlayer.welcomeMessageSent = true;
+      state.chatMessages.push({
+        id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
+        channel: "global",
+        senderId: "system",
+        senderName: "CENTRAL COMMAND",
+        senderFaction: "System",
+        senderFactionColor: "#7F8C8D",
+        allianceTag: "SYS",
+        receiverId: null,
+        content: `Welcome to the galaxy Beta Test, ${defaultUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+        timestamp: Date.now()
+      });
+    }
+    saveState();
+    return res.json({ player: newPlayer, isNew: true });
+  } catch (err) {
+    console.error("[Google Auth Error]", err);
+    return res.status(401).json({ error: `Google login verification failed: ${err.message}` });
   }
-  const maxCap = getRepositoryCapacity(planet.buildings.repository.level);
-  planet.resources.water = maxCap;
-  planet.resources.plasma = maxCap;
-  planet.resources.fuel = maxCap;
-  planet.resources.food = maxCap;
-  planet.resources.respirant = maxCap;
-  planet.troops.settlementShip = 1;
-  const newPlayer = {
-    id,
-    username: defaultUsername,
-    faction: selectFaction,
-    factionColor: selectColor,
-    allianceId: null,
-    allianceRole: null,
-    planets: [planet],
-    scores: {
-      population: 7500,
-      attack: 0,
-      defence: 0,
-      raiders: 0
-    },
-    achievements: ["First Mine Started", "Google Verified Commander"],
-    skinId: "default",
-    bannerId: "default",
-    lastDailyRewardClaim: Date.now(),
-    credits: 1e4,
-    googleEmail: email
-  };
-  state.players[id] = newPlayer;
-  state.newsEvents.unshift({
-    id: `news_${Math.random().toString(36).substr(2, 9)}`,
-    title: "Google Commander Registered",
-    content: `Commander ${defaultUsername} synced via Google keys and established command in Sector [${startX}, ${startY}]!`,
-    type: "discovery",
-    timestamp: Date.now()
-  });
-  state.chatMessages.push({
-    id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
-    channel: "global",
-    senderId: "system",
-    senderName: "CENTRAL COMMAND",
-    senderFaction: "System",
-    senderFactionColor: "#7F8C8D",
-    allianceTag: "SYS",
-    receiverId: null,
-    content: `Google Secure sync approved. Welcome Commander ${defaultUsername} to active space duty!`,
-    timestamp: Date.now()
-  });
-  saveState();
-  res.json({ player: newPlayer, isNew: true });
+});
+app.post("/api/auth/google-play", async (req, res) => {
+  const { authCode, isSimulated, simulatedProfile } = req.body;
+  if (!authCode) {
+    return res.status(400).json({ error: "Google Play Games authorization code is required." });
+  }
+  try {
+    let playerId = "";
+    let displayName = "GPGS Commander";
+    if (isSimulated && (process.env.NODE_ENV !== "production" || !process.env.GOOGLE_PLAY_CLIENT_ID)) {
+      console.log("[GPGS Auth] Simulating Google Play Games sign-in for development...");
+      playerId = simulatedProfile?.playerId || `gpay_${Math.random().toString(36).substring(2, 10)}`;
+      displayName = simulatedProfile?.displayName || `Commander GPGS`;
+    } else {
+      const clientId = process.env.GOOGLE_PLAY_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_PLAY_CLIENT_SECRET;
+      if (!clientId || !clientSecret) {
+        return res.status(500).json({
+          error: "Google Play Games integration is not configured on the server. Please set GOOGLE_PLAY_CLIENT_ID and GOOGLE_PLAY_CLIENT_SECRET in your settings/environment."
+        });
+      }
+      const oauth2Client = new import_google_auth_library.OAuth2Client({
+        clientId,
+        clientSecret,
+        redirectUri: "postmessage"
+        // Standard for server-side auth exchange from mobile clients
+      });
+      const { tokens } = await oauth2Client.getToken(authCode);
+      oauth2Client.setCredentials(tokens);
+      if (tokens.id_token) {
+        const ticket = await oauth2Client.verifyIdToken({
+          idToken: tokens.id_token,
+          audience: clientId
+        });
+        const payload = ticket.getPayload();
+        if (payload) {
+          playerId = payload.sub;
+          displayName = payload.name || `GPGS_${playerId.substring(0, 5)}`;
+        }
+      }
+      if (!playerId && tokens.access_token) {
+        const response = await fetch("https://www.googleapis.com/games/v1/players/me", {
+          headers: {
+            Authorization: `Bearer ${tokens.access_token}`
+          }
+        });
+        if (response.ok) {
+          const profileData = await response.json();
+          playerId = profileData.playerId || profileData.playerId;
+          displayName = profileData.displayName || displayName;
+        } else {
+          throw new Error("Unable to fetch GPGS profile with access token.");
+        }
+      }
+      if (!playerId) {
+        throw new Error("Failed to verify Google Play Player ID.");
+      }
+    }
+    let player = Object.values(state.players).find((p) => p.gpgsPlayerId === playerId);
+    if (player) {
+      console.log(`[GPGS Auth] Existing user found: ${player.username} (ID: ${player.id})`);
+      return res.json({ player, isNew: false });
+    }
+    const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
+    const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
+    const selectFaction = factions[0];
+    const selectColor = factionColors[0];
+    const rawUsername = displayName.replace(/[^a-zA-Z0-9_ ]/g, "").substring(0, 15) || `Commander_${playerId.substring(0, 5)}`;
+    const cleanUsername = getUniqueUsername(rawUsername);
+    const uid = `gpgs_${playerId}`;
+    const limit = getCurrentMapLimits();
+    const coords = getSafeRandomCoordinates(limit);
+    const startX = coords.x;
+    const startY = coords.y;
+    const planet = createInitialPlanet(`${cleanUsername}'s Station`, startX, startY, true);
+    planet.resources.water = 5e6;
+    planet.resources.plasma = 5e6;
+    planet.resources.fuel = 5e6;
+    planet.resources.food = 5e6;
+    planet.resources.respirant = 5e6;
+    const newPlayer = {
+      id: uid,
+      username: cleanUsername,
+      faction: selectFaction,
+      factionColor: selectColor,
+      allianceId: null,
+      allianceRole: null,
+      planets: [planet],
+      scores: {
+        population: 10,
+        attack: 0,
+        defence: 0,
+        raiders: 0
+      },
+      achievements: ["GPGS Connected", "Google Verified Commander"],
+      skinId: "default",
+      bannerId: "default",
+      lastDailyRewardClaim: Date.now(),
+      credits: 1e4,
+      gpgsPlayerId: playerId,
+      gpgsDisplayName: displayName
+    };
+    state.players[uid] = newPlayer;
+    state.newsEvents.unshift({
+      id: `news_${Math.random().toString(36).substr(2, 9)}`,
+      title: "GPGS Commander Joined",
+      content: `Commander ${cleanUsername} authorized via Google Play Games!`,
+      type: "discovery",
+      timestamp: Date.now()
+    });
+    if (!newPlayer.welcomeMessageSent) {
+      newPlayer.welcomeMessageSent = true;
+      state.chatMessages.push({
+        id: `chat_welcome_${Math.random().toString(36).substr(2, 9)}`,
+        channel: "global",
+        senderId: "system",
+        senderName: "CENTRAL COMMAND",
+        senderFaction: "System",
+        senderFactionColor: "#7F8C8D",
+        allianceTag: "SYS",
+        receiverId: null,
+        content: `Welcome to the galaxy Beta Test, ${cleanUsername}! The Galactic Federation welcomes you to Space Station, wishes you a great success in your journey, and appreciates to have you in our ranks. Remember, completing tasks inside your Commander Academy (Station Roadmap) is vital to stabilize the station, each task has claimable rewards with some Space Gold rewarded too! Also, please feel free to send us your thoughts and feedback via the Suggestion Station located in your Settings tab. Good luck, Commander!`,
+        timestamp: Date.now()
+      });
+    }
+    saveState();
+    return res.json({ player: newPlayer, isNew: true });
+  } catch (err) {
+    console.error("[GPGS Auth Error]", err);
+    return res.status(401).json({ error: `Google Play Games verification failed: ${err.message}` });
+  }
 });
 app.post("/api/player/link-google", (req, res) => {
   const p = getLoggedPlayer(req);
@@ -2171,16 +3474,34 @@ app.post("/api/player/link-google", (req, res) => {
   res.json({ player: p, success: true });
 });
 app.post("/api/dev/reset-universe", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.googleEmail || p.googleEmail.toLowerCase() !== "banele180@gmail.com" && p.googleEmail.toLowerCase() !== "banzz1918@gmail.com") {
+    return res.status(403).json({ error: "Access Denied: Server reset is only permitted for the system administrator." });
+  }
   bootstrapUniverse();
   saveState();
   res.json({ success: true, message: "Universe successfully reset to initial clean data!" });
 });
+app.post("/api/dev/reset-my-player", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.googleEmail || p.googleEmail.toLowerCase() !== "banele180@gmail.com" && p.googleEmail.toLowerCase() !== "banzz1918@gmail.com") {
+    return res.status(403).json({ error: "Access Denied: Player profile reset is restricted to administrator accounts only." });
+  }
+  delete state.players[p.id];
+  saveState();
+  res.json({ success: true, message: "Your player profile has been completely removed from the universe." });
+});
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: Date.now() });
 });
-app.get("/api/state", (req, res) => {
+app.all("/api/state", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (req.method === "POST" && req.body && Array.isArray(req.body.createdFleets)) {
+    p.createdFleets = req.body.createdFleets;
+  }
   const now = Date.now();
   p.lastActive = now;
   tickPlayerState(p.id, now);
@@ -2198,6 +3519,7 @@ app.get("/api/state", (req, res) => {
     scores: pl.scores || { population: 0, attack: 0, defence: 0, raiders: 0 },
     achievements: pl.achievements || [],
     planetsCount: pl.planets?.length || 1,
+    planets: (pl.planets || []).map((plt) => ({ id: plt.id, name: plt.name, sectorX: plt.sectorX, sectorY: plt.sectorY })),
     lastActive: pl.lastActive || now - 6e5
   }));
   const relevantFleets = state.fleets.filter((f) => {
@@ -2212,23 +3534,47 @@ app.get("/api/state", (req, res) => {
   res.json({
     player: p,
     alliances: state.alliances,
-    chatMessages: state.chatMessages,
+    chatMessages: state.chatMessages.map((msg) => {
+      const senderPlayer = state.players[msg.senderId];
+      if (senderPlayer && senderPlayer.googleEmail) {
+        const email = senderPlayer.googleEmail.toLowerCase();
+        if (email === "banele180@gmail.com" || email === "banzz1918@gmail.com") {
+          return {
+            ...msg,
+            senderName: "Galactic Federation",
+            senderFaction: "System"
+          };
+        }
+      }
+      return msg;
+    }),
     fleets: relevantFleets,
     battleReports: state.battleReports.filter((r) => r.attackerId === p.id || r.defenderId === p.id),
     newsEvents: state.newsEvents,
     playersList,
-    serverTime: now
+    serverTime: now,
+    customTasks: state.customTasks || {},
+    maxCoord: getCurrentMapLimits(),
+    galaxyConfig: state.galaxyConfig || null
   });
 });
 app.post("/api/upgrade/mine", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
   const { planetId, resType, mineIndex, queue: reqQueue } = req.body;
+  const now = Date.now();
+  tickPlayerState(p.id, now);
   const planet = p.planets.find((pl) => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
+  const mineIndexNum = parseInt(String(mineIndex), 10);
+  if (isNaN(mineIndexNum)) return res.status(400).json({ error: "Invalid mine index" });
+  const fab = planet.buildings.fabricator;
+  if (!fab || fab.level < 1) {
+    return res.status(400).json({ error: "A Fabricator level 1 or higher is required to construct or upgrade resource extractors." });
+  }
   const mines = planet.mines[resType];
-  if (!mines || !mines[mineIndex]) return res.status(404).json({ error: "Mine not found" });
-  const mine = mines[mineIndex];
+  if (!mines || !mines[mineIndexNum]) return res.status(404).json({ error: "Mine not found" });
+  const mine = mines[mineIndexNum];
   const isBuildingUpgrading = Object.values(planet.buildings).some((b) => b.isUpgrading);
   let isMineUpgrading = false;
   for (const rKey of Object.keys(planet.mines)) {
@@ -2259,9 +3605,20 @@ app.post("/api/upgrade/mine", (req, res) => {
   let queuedCount = 0;
   if (mine.isUpgrading) queuedCount++;
   if (planet.upgradeQueue) {
-    queuedCount += planet.upgradeQueue.filter((q) => q.type === "mine" && q.key === resType && q.mineIndex === mineIndex).length;
+    queuedCount += planet.upgradeQueue.filter((q) => q.type === "mine" && q.key === resType && Number(q.mineIndex) === mineIndexNum).length;
   }
   const targetLevel = mine.level + queuedCount + 1;
+  if (targetLevel >= 2) {
+    const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"];
+    const hasAllExtractorsConstructed = resourceKeys.every((rKey) => {
+      const list = planet.mines[rKey];
+      if (!list || list.length === 0) return false;
+      return list.every((m) => m.level >= 1);
+    });
+    if (!hasAllExtractorsConstructed) {
+      return res.status(400).json({ error: "\u{1F512} Advanced extractor upgrade locked: All 5 resource extractor pump types must be operational (Level 1 or higher) before any extractor can be upgraded to Level 2 or higher!" });
+    }
+  }
   const planetIndex = p.planets.findIndex((pl) => pl.id === planetId);
   const maxExtractorLevel = planetIndex === 0 ? 25 : planetIndex === 1 ? 20 : 15;
   if (targetLevel > maxExtractorLevel) {
@@ -2280,11 +3637,13 @@ app.post("/api/upgrade/mine", (req, res) => {
     planet.resources[k] -= cost;
   });
   if (shouldQueue) {
+    p.credits = Math.max(0, (p.credits || 0) - 15);
     planet.upgradeQueue.push({
       type: "mine",
       key: resType,
-      mineIndex,
-      targetLevel
+      mineIndex: mineIndexNum,
+      targetLevel,
+      spaceGoldCost: 15
     });
     saveState();
     return res.json({ player: p, success: true, queued: true });
@@ -2354,10 +3713,39 @@ app.post("/api/upgrade/building", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
   const { planetId, buildingKey, queue: reqQueue } = req.body;
+  const now = Date.now();
+  tickPlayerState(p.id, now);
   const planet = p.planets.find((pl) => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
   const building = planet.buildings[buildingKey];
   if (!building) return res.status(404).json({ error: "Building not found" });
+  if (buildingKey !== "fabricator" && buildingKey !== "commsHub" && buildingKey !== "repository") {
+    const fab = planet.buildings.fabricator;
+    if (!fab || fab.level < 1) {
+      return res.status(400).json({ error: "A Fabricator level 1 or higher is required to construct or upgrade other modular structures." });
+    }
+  }
+  if (building.level === 0) {
+    const fabLevel = planet.buildings.fabricator?.level || 0;
+    if (buildingKey === "radar" && fabLevel < 2) {
+      return res.status(400).json({ error: "A Fabricator level 2 or higher is required to construct your Radar Array." });
+    }
+    if (buildingKey === "researchCenter" && fabLevel < 4) {
+      return res.status(400).json({ error: "A Fabricator level 4 or higher is required to construct your Research Center." });
+    }
+    if (buildingKey === "magneticShield" && fabLevel < 10) {
+      return res.status(400).json({ error: "A Fabricator level 10 or higher is required to construct your Magnetic Shield." });
+    }
+    if (buildingKey === "armyBase" && fabLevel < 7) {
+      return res.status(400).json({ error: "A Fabricator level 7 or higher is required to construct your War Room/Army Base." });
+    }
+    if (buildingKey === "supplyNexus" && fabLevel < 10) {
+      return res.status(400).json({ error: "A Fabricator level 10 or higher is required to construct your Supply Nexus." });
+    }
+    if (buildingKey === "bunker" && fabLevel < 10) {
+      return res.status(400).json({ error: "A Fabricator level 10 or higher is required to construct your Bunker." });
+    }
+  }
   const isBuildingUpgrading = Object.values(planet.buildings).some((b) => b.isUpgrading);
   let isMineUpgrading = false;
   for (const rKey of Object.keys(planet.mines)) {
@@ -2391,6 +3779,21 @@ app.post("/api/upgrade/building", (req, res) => {
     queuedCount += planet.upgradeQueue.filter((q) => q.type === "building" && q.key === buildingKey).length;
   }
   const targetLevel = building.level + queuedCount + 1;
+  if (targetLevel >= 2 || buildingKey !== "fabricator") {
+    const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"];
+    const hasAllExtractorsConstructed = resourceKeys.every((rKey) => {
+      const list = planet.mines[rKey];
+      if (!list || list.length === 0) return false;
+      return list.every((mine) => mine.level >= 1);
+    });
+    if (!hasAllExtractorsConstructed) {
+      if (targetLevel === 1) {
+        return res.status(400).json({ error: "\u{1F512} Facility construction locked: All 5 resource extractor pump types must be operational (Level 1 or higher) before any facility other than the Fabricator can be constructed!" });
+      } else {
+        return res.status(400).json({ error: "\u{1F512} Advanced construction/upgrade locked: All 5 resource extractor pump types must be operational (Level 1 or higher) before any facility can be upgraded to Level 2 or higher!" });
+      }
+    }
+  }
   if (targetLevel > building.maxLevel) return res.status(400).json({ error: `Building reaches max level (${building.maxLevel})` });
   if (building.health !== void 0 && building.health < 100) return res.status(400).json({ error: "Building is damaged. Restore it to 100% health first before upgrading." });
   const keys = ["water", "plasma", "fuel", "food", "respirant"];
@@ -2405,10 +3808,12 @@ app.post("/api/upgrade/building", (req, res) => {
     planet.resources[k] -= cost;
   });
   if (shouldQueue) {
+    p.credits = Math.max(0, (p.credits || 0) - 15);
     planet.upgradeQueue.push({
       type: "building",
       key: buildingKey,
-      targetLevel
+      targetLevel,
+      spaceGoldCost: 15
     });
     saveState();
     return res.json({ player: p, success: true, queued: true });
@@ -2432,6 +3837,194 @@ app.post("/api/upgrade/building/complete", (req, res) => {
   b.upgradeEnd = null;
   saveState();
   res.json({ player: p, success: true });
+});
+app.post("/api/upgrade/research/start", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { planetId, techId } = req.body;
+  const now = Date.now();
+  tickPlayerState(p.id, now);
+  const planet = p.planets.find((pl) => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+  const rc = planet.buildings.researchCenter;
+  if (!rc || rc.level < 1) {
+    return res.status(400).json({ error: "A Research Center level 1 or higher is required to start research projects." });
+  }
+  if (planet.activeResearch) {
+    return res.status(400).json({ error: "Another research project is already actively in progress on this planet." });
+  }
+  const currentLvl = Number(req.body.currentLevel) || 0;
+  const targetLevel = currentLvl + 1;
+  if (targetLevel >= 2) {
+    const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"];
+    const hasAllExtractorsConstructed = resourceKeys.every((rKey) => {
+      const list = planet.mines[rKey];
+      if (!list || list.length === 0) return false;
+      return list.every((m) => m.level >= 1);
+    });
+    if (!hasAllExtractorsConstructed) {
+      return res.status(400).json({ error: "\u{1F512} Advanced research locked: All 5 resource extractor pump types must be operational (Level 1 or higher) before any technology can be upgraded to Level 2 or higher!" });
+    }
+  }
+  if (targetLevel > 20) {
+    return res.status(400).json({ error: "Technology reaches max level (20)." });
+  }
+  const TECH_BASE_COSTS = {
+    defense_shields: { water: 8e3, plasma: 15e3, fuel: 6e3, food: 4e3, respirant: 12e3 },
+    manufacturing_speed: { water: 4e3, plasma: 8e3, fuel: 1e4, food: 2e3, respirant: 5e3 },
+    troop_speed: { water: 3e3, plasma: 4e3, fuel: 5e3, food: 2e3, respirant: 2e3 }
+  };
+  const baseCost = TECH_BASE_COSTS[techId];
+  if (!baseCost) return res.status(404).json({ error: "Tech not found" });
+  const scaleFactor = 1.15;
+  const multiplier = Math.pow(scaleFactor, targetLevel - 1);
+  const keys = ["water", "plasma", "fuel", "food", "respirant"];
+  for (const k of keys) {
+    const cost = Math.round((baseCost[k] || 0) * multiplier);
+    if (planet.resources[k] < cost) {
+      return res.status(400).json({ error: `Insufficient ${k}. Need ${cost} ${k} to start research.` });
+    }
+  }
+  keys.forEach((k) => {
+    const cost = Math.round((baseCost[k] || 0) * multiplier);
+    planet.resources[k] -= cost;
+  });
+  const durationMs = targetLevel * 60 * 1e3;
+  planet.activeResearch = {
+    techId,
+    targetLevel,
+    endAt: Date.now() + durationMs
+  };
+  saveState();
+  return res.json({ player: p, success: true });
+});
+app.post("/api/upgrade/research/queue", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { planetId, techId } = req.body;
+  const now = Date.now();
+  tickPlayerState(p.id, now);
+  const planet = p.planets.find((pl) => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+  const rc = planet.buildings.researchCenter;
+  if (!rc || rc.level < 1) {
+    return res.status(400).json({ error: "A Research Center level 1 or higher is required to queue research projects." });
+  }
+  if (!planet.researchQueue) {
+    planet.researchQueue = [];
+  }
+  if (planet.researchQueue.length >= 25) {
+    return res.status(400).json({ error: "Research queue is full (max 25 queued research projects allowed)!" });
+  }
+  if ((p.credits || 0) < 25) {
+    return res.status(400).json({ error: "Insufficient Space Gold credits available! Queuing a research upgrade costs 25 Space Gold." });
+  }
+  const currentLvl = Number(req.body.currentLevel) || 0;
+  let queuedCount = 0;
+  if (planet.activeResearch && planet.activeResearch.techId === techId) {
+    queuedCount++;
+  }
+  queuedCount += planet.researchQueue.filter((q) => q.key === techId).length;
+  const targetLevel = currentLvl + queuedCount + 1;
+  if (targetLevel >= 2) {
+    const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"];
+    const hasAllExtractorsConstructed = resourceKeys.every((rKey) => {
+      const list = planet.mines[rKey];
+      if (!list || list.length === 0) return false;
+      return list.every((m) => m.level >= 1);
+    });
+    if (!hasAllExtractorsConstructed) {
+      return res.status(400).json({ error: "\u{1F512} Advanced research locked: All 5 resource extractor pump types must be operational (Level 1 or higher) before any technology can be upgraded to Level 2 or higher!" });
+    }
+  }
+  if (targetLevel > 20) {
+    return res.status(400).json({ error: "Technology reaches max level (20)." });
+  }
+  const TECH_BASE_COSTS = {
+    defense_shields: { water: 8e3, plasma: 15e3, fuel: 6e3, food: 4e3, respirant: 12e3 },
+    manufacturing_speed: { water: 4e3, plasma: 8e3, fuel: 1e4, food: 2e3, respirant: 5e3 },
+    troop_speed: { water: 3e3, plasma: 4e3, fuel: 5e3, food: 2e3, respirant: 2e3 }
+  };
+  const baseCost = TECH_BASE_COSTS[techId];
+  if (!baseCost) return res.status(404).json({ error: "Tech not found" });
+  const scaleFactor = 1.15;
+  const multiplier = Math.pow(scaleFactor, targetLevel - 1);
+  const keys = ["water", "plasma", "fuel", "food", "respirant"];
+  for (const k of keys) {
+    const cost = Math.round((baseCost[k] || 0) * multiplier);
+    if (planet.resources[k] < cost) {
+      return res.status(400).json({ error: `Insufficient ${k}. Need ${cost} ${k} to queue research upgrade to level ${targetLevel}.` });
+    }
+  }
+  keys.forEach((k) => {
+    const cost = Math.round((baseCost[k] || 0) * multiplier);
+    planet.resources[k] -= cost;
+  });
+  p.credits = Math.max(0, (p.credits || 0) - 25);
+  planet.researchQueue.push({
+    type: "research",
+    key: techId,
+    targetLevel,
+    spaceGoldCost: 25
+  });
+  saveState();
+  return res.json({ player: p, success: true });
+});
+app.post("/api/upgrade/queue/cancel", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { planetId, queueIndex, queueType } = req.body;
+  const now = Date.now();
+  tickPlayerState(p.id, now);
+  const planet = p.planets.find((pl) => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+  const isResearch = queueType === "research";
+  const queue = isResearch ? planet.researchQueue : planet.upgradeQueue;
+  if (!queue || queueIndex === void 0 || queueIndex < 0 || queueIndex >= queue.length) {
+    return res.status(400).json({ error: "Invalid queue item index." });
+  }
+  const [cancelledItem] = queue.splice(queueIndex, 1);
+  const keys = ["water", "plasma", "fuel", "food", "respirant"];
+  const repositoryLvl = planet.buildings.repository.level;
+  const storageLimit = getRepositoryCapacity(repositoryLvl);
+  if (cancelledItem.type === "mine") {
+    keys.forEach((k) => {
+      const cost = getUpgradeResourceCost("mine", cancelledItem.key, cancelledItem.targetLevel, k);
+      planet.resources[k] = Math.min(storageLimit, planet.resources[k] + cost);
+    });
+  } else if (cancelledItem.type === "building") {
+    keys.forEach((k) => {
+      const cost = getUpgradeResourceCost("building", cancelledItem.key, cancelledItem.targetLevel, k);
+      planet.resources[k] = Math.min(storageLimit, planet.resources[k] + cost);
+    });
+  } else if (cancelledItem.type === "research") {
+    const TECH_BASE_COSTS = {
+      defense_shields: { water: 8e3, plasma: 15e3, fuel: 6e3, food: 4e3, respirant: 12e3 },
+      manufacturing_speed: { water: 4e3, plasma: 8e3, fuel: 1e4, food: 2e3, respirant: 5e3 },
+      troop_speed: { water: 3e3, plasma: 4e3, fuel: 5e3, food: 2e3, respirant: 2e3 }
+    };
+    const baseCost = TECH_BASE_COSTS[cancelledItem.key];
+    if (baseCost) {
+      const scaleFactor = 1.15;
+      const multiplier = Math.pow(scaleFactor, cancelledItem.targetLevel - 1);
+      keys.forEach((k) => {
+        const cost = Math.round((baseCost[k] || 0) * multiplier);
+        planet.resources[k] = Math.min(storageLimit, planet.resources[k] + cost);
+      });
+    }
+  }
+  const goldCost = cancelledItem.spaceGoldCost !== void 0 ? cancelledItem.spaceGoldCost : cancelledItem.type === "research" ? 25 : 15;
+  const refundAmount = Math.round(goldCost * 0.6);
+  p.credits = (p.credits || 0) + refundAmount;
+  state.newsEvents.unshift({
+    id: `cancel_${Math.random().toString(36).substring(2, 11)}`,
+    title: "Project De-authorization",
+    content: `Commander ${p.username} cancelled queued ${cancelledItem.type} upgrade for ${cancelledItem.key} (Lv. ${cancelledItem.targetLevel}). Resources restored. Refunded ${refundAmount} Space Gold.`,
+    type: "discovery",
+    timestamp: Date.now()
+  });
+  saveState();
+  return res.json({ player: p, success: true });
 });
 app.post("/api/restore/mine", (req, res) => {
   const p = getLoggedPlayer(req);
@@ -2495,33 +4088,37 @@ app.post("/api/restore/building", (req, res) => {
 app.post("/api/train/troop", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
-  const { planetId, troopId, quantity, manufacturingSpeedLevel } = req.body;
+  const { planetId, troopId, manufacturingSpeedLevel } = req.body;
+  const now = Date.now();
+  tickPlayerState(p.id, now);
   const planet = p.planets.find((pl) => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
+  const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"];
+  const hasAllExtractorsConstructed = resourceKeys.every((rKey) => {
+    const list = planet.mines[rKey];
+    if (!list || list.length === 0) return false;
+    return list.every((mine) => mine.level >= 1);
+  });
+  if (!hasAllExtractorsConstructed) {
+    return res.status(400).json({ error: "\u{1F512} Fabrication locked: All resource extractor pumps on this base must be constructed (Level 1 or higher) before you can fabricate tactical forces!" });
+  }
   const specs = TROOP_SPECS[troopId];
   if (!specs) return res.status(404).json({ error: "Troop spec not found" });
-  const count = parseInt(quantity, 10);
-  if (isNaN(count) || count <= 0) return res.status(400).json({ error: "Invalid quantity" });
-  if (troopId === "settlementShip") {
-    if (count > 1) {
-      return res.status(400).json({ error: "You can only construct one Settlement Ship at a time!" });
-    }
-    const currentShipCount = planet.troops.settlementShip || 0;
-    if (currentShipCount >= 1) {
-      return res.status(400).json({ error: "You can only have one Settlement Ship on each base!" });
-    }
-    const isAlreadyTraining = planet.trainingQueue.some((item) => item.troopId === "settlementShip");
-    if (isAlreadyTraining) {
-      return res.status(400).json({ error: "One Settlement Ship is already in the construction queue." });
-    }
+  const rawQuantity = req.body.count !== void 0 ? req.body.count : req.body.quantity;
+  const count = Math.floor(Number(rawQuantity));
+  if (isNaN(count) || count <= 0 || count > 1e6) {
+    return res.status(400).json({ error: "Invalid training quantity. Quantity must be a valid number between 1 and 1,000,000." });
+  }
+  if ((p.credits || 0) < 0) {
+    return res.status(400).json({ error: "Insufficient credits. Your commander keys report a negative balance!" });
   }
   const troopCosts = {
-    defender: { water: 150, plasma: 0, fuel: 0, food: 200, respirant: 100 },
-    attacker: { water: 300, plasma: 450, fuel: 450, food: 300, respirant: 0 },
-    tank: { water: 0, plasma: 800, fuel: 1200, food: 0, respirant: 400 },
-    looter: { water: 500, plasma: 0, fuel: 200, food: 400, respirant: 0 },
-    drone: { water: 1e3, plasma: 1e3, fuel: 1500, food: 0, respirant: 500 },
-    settlementShip: { water: 1500, plasma: 1e3, fuel: 2e3, food: 1500, respirant: 1e3 }
+    defender: { water: 750, plasma: 0, fuel: 0, food: 1e3, respirant: 500 },
+    attacker: { water: 1500, plasma: 2250, fuel: 2250, food: 1500, respirant: 0 },
+    tank: { water: 0, plasma: 4e3, fuel: 6e3, food: 0, respirant: 2e3 },
+    looter: { water: 2500, plasma: 0, fuel: 1e3, food: 2e3, respirant: 0 },
+    drone: { water: 5e3, plasma: 5e3, fuel: 7500, food: 0, respirant: 2500 },
+    settlementShip: { water: 7500, plasma: 5e3, fuel: 1e4, food: 7500, respirant: 5e3 }
   };
   const costMultiplier = count;
   const keys = ["water", "plasma", "fuel", "food", "respirant"];
@@ -2532,6 +4129,60 @@ app.post("/api/train/troop", (req, res) => {
       return res.status(400).json({ error: `Insufficient ${k}. Need ${required} to train ${count} troops.` });
     }
   }
+  const armyBaseLevel = planet.buildings.armyBase?.level || 0;
+  const troopLevelLocks = {
+    defender: 3,
+    // Interceptor
+    drone: 6,
+    // Missile Launcher
+    attacker: 10,
+    // Assault Drone
+    looter: 15,
+    // Matter Extractor
+    tank: 19,
+    // Disrupter
+    settlementShip: 1
+    // Settlement Ship
+  };
+  const requiredLevel = troopLevelLocks[troopId];
+  if (requiredLevel !== void 0 && armyBaseLevel < requiredLevel) {
+    return res.status(400).json({ error: `Requires War Room Level ${requiredLevel} (Your Level: ${armyBaseLevel}) to produce ${specs.name}!` });
+  }
+  if (troopId === "settlementShip") {
+    const allWarRoomsReached22 = p.planets.every((pl) => (pl.buildings.armyBase?.level || 0) >= 22);
+    if (!allWarRoomsReached22) {
+      return res.status(400).json({ error: "To queue/train a Settlement Ship, ALL of your War Rooms must be upgraded to Level 22 or higher!" });
+    }
+    const hasActiveBaseLevel1 = (planet.buildings.armyBase?.level || 0) >= 1;
+    if (!hasActiveBaseLevel1) {
+      return res.status(400).json({ error: "To build a Settlement Ship, this base's War Room must be upgraded to Level 1!" });
+    }
+    if (count > 1) {
+      return res.status(400).json({ error: "You can only construct one Settlement Ship at a time!" });
+    }
+    const isAdminPlayer = p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+    if (!isAdminPlayer) {
+      const totalBasesShipCount = p.planets.reduce((acc, pl) => acc + (pl.troops?.settlementShip || 0), 0);
+      const totalFleetsShipCount = state.fleets.filter((f) => f.senderId === p.id).reduce((acc, f) => acc + (f.troops?.settlementShip || 0), 0);
+      const totalTrainingShipCount = p.planets.reduce((acc, pl) => {
+        const trainingShips = pl.trainingQueue?.filter((item) => item.troopId === "settlementShip").reduce((sum, item) => sum + item.count, 0) || 0;
+        return acc + trainingShips;
+      }, 0);
+      const totalSettlementShips = totalBasesShipCount + totalFleetsShipCount + totalTrainingShipCount;
+      if (totalSettlementShips >= 1) {
+        return res.status(400).json({ error: "You cannot have more than 1 Settlement Ship in total across all bases, fleets, and construction queues!" });
+      }
+    } else {
+      const currentShipCount = planet.troops.settlementShip || 0;
+      if (currentShipCount >= 1) {
+        return res.status(400).json({ error: "You can only have one Settlement Ship on each base!" });
+      }
+      const isAlreadyTraining = planet.trainingQueue.some((item) => item.troopId === "settlementShip");
+      if (isAlreadyTraining) {
+        return res.status(400).json({ error: "One Settlement Ship is already in the construction queue." });
+      }
+    }
+  }
   keys.forEach((k) => {
     planet.resources[k] -= currentCosts[k] * costMultiplier;
   });
@@ -2540,7 +4191,8 @@ app.post("/api/train/troop", (req, res) => {
   const rcLevel = planet.buildings.researchCenter.level;
   const reductionFrac = Math.min(0.7, 0.7 * (rcLevel / 20));
   let buildDurationMs = Math.round(baseSecs * (1 - reductionFrac) * 1e3);
-  const mfgLvl = parseInt(String(manufacturingSpeedLevel || 10), 10) || 10;
+  const isFirstPlanet = p.planets[0]?.id === planet.id;
+  const mfgLvl = p.techLevels?.[planet.id]?.manufacturing_speed ?? (isFirstPlanet ? 20 : 0);
   const mfgReduction = Math.min(0.35, 0.35 * (mfgLvl / 20));
   buildDurationMs = Math.round(buildDurationMs * (1 - mfgReduction));
   const existingIndex = planet.trainingQueue.findIndex((item) => item.troopId === troopId);
@@ -2565,6 +4217,8 @@ app.post("/api/train/troop/complete", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
   const { planetId, queueIndex } = req.body;
+  const now = Date.now();
+  tickPlayerState(p.id, now);
   const planet = p.planets.find((pl) => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
   const queueItem = planet.trainingQueue[queueIndex];
@@ -2577,19 +4231,24 @@ app.post("/api/train/troop/complete", (req, res) => {
 app.post("/api/galaxy/scan", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  ensureMinimumHabitablePlanets();
+  saveState();
   const { centerX, centerY, planetId } = req.body;
+  const cx = parseInt(String(centerX || 0), 10);
+  const cy = parseInt(String(centerY || 0), 10);
   const planet = p.planets.find((pl) => pl.id === planetId);
   const radarLvl = planet?.buildings.radar.level || 1;
   const scanRadius = radarLvl;
   const allTargets = [];
   Object.values(state.players).forEach((player) => {
     player.planets.forEach((pl) => {
-      const dist = Math.hypot(pl.sectorX - centerX, pl.sectorY - centerY);
+      const dist = Math.hypot(pl.sectorX - cx, pl.sectorY - cy);
       allTargets.push({
         id: player.id,
         username: player.username,
         faction: player.faction,
         factionColor: player.factionColor,
+        allianceId: player.allianceId || null,
         allianceTag: player.allianceId ? state.alliances[player.allianceId]?.tag : null,
         planetId: pl.id,
         planetName: pl.name,
@@ -2600,10 +4259,51 @@ app.post("/api/galaxy/scan", (req, res) => {
       });
     });
   });
+  const hasSettlementShip = p.planets.some((pl) => (pl.troops?.settlementShip || 0) > 0) || state.fleets.some((f) => f.senderId === p.id && (f.troops?.settlementShip || 0) > 0);
+  const hasSettlementShipInStation = planet && (planet.troops?.settlementShip || 0) > 0;
+  if (hasSettlementShipInStation) {
+    const limit = getCurrentMapLimits();
+    const occupiedCoords = /* @__PURE__ */ new Set();
+    Object.values(state.players).forEach((player) => {
+      if (player.planets) {
+        player.planets.forEach((pl) => {
+          occupiedCoords.add(`${pl.sectorX}_${pl.sectorY}`);
+        });
+      }
+    });
+    if (state.habitablePlanets) {
+      state.habitablePlanets.forEach((hp) => {
+        occupiedCoords.add(`${hp.coords.x}_${hp.coords.y}`);
+      });
+    }
+    for (let x = 0; x <= limit; x++) {
+      for (let y = 0; y <= limit; y++) {
+        const coordKey = `${x}_${y}`;
+        if (!occupiedCoords.has(coordKey)) {
+          const dist = Math.hypot(x - cx, y - cy);
+          allTargets.push({
+            id: "unsettled",
+            username: "Uncharted Space",
+            faction: "Unsettled Grid Space",
+            factionColor: "#64748b",
+            // slate gray
+            allianceTag: null,
+            planetId: `unsettled_${x}_${y}`,
+            planetName: "Unsettled Coordinate",
+            coords: { x, y },
+            scores: { population: 0, attack: 0, defence: 0, raiders: 0 },
+            dist,
+            isUnsettled: true,
+            isHabitable: false
+          });
+        }
+      }
+    }
+  }
   if (state.habitablePlanets) {
     state.habitablePlanets.forEach((hp) => {
       if (hp.isColonized) return;
-      const dist = Math.hypot(hp.coords.x - centerX, hp.coords.y - centerY);
+      const dist = Math.hypot(hp.coords.x - cx, hp.coords.y - cy);
       allTargets.push({
         id: "habitable",
         username: "Uncharted Sector",
@@ -2616,16 +4316,26 @@ app.post("/api/galaxy/scan", (req, res) => {
         coords: hp.coords,
         scores: { population: 0, attack: 0, defence: 0, raiders: 0 },
         dist,
-        isHabitable: true
+        isHabitable: true,
+        extractors: getOrGenerateHabitableExtractors(hp)
       });
     });
   }
   allTargets.sort((a, b) => a.dist - b.dist);
   const maxScanDist = scanRadius * 10;
-  let targets = allTargets.filter((t) => t.dist <= maxScanDist);
-  if (targets.length < 5) {
-    targets = allTargets.slice(0, 6);
+  const habTargets = allTargets.filter((t) => t.isHabitable);
+  const unsettledTargets = allTargets.filter((t) => t.isUnsettled);
+  const otherTargets = allTargets.filter((t) => !t.isHabitable && !t.isUnsettled);
+  let visibleOthers = otherTargets.filter((t) => t.dist <= maxScanDist);
+  if (visibleOthers.length < 12) {
+    const remainingOthers = otherTargets.filter((t) => !visibleOthers.some((vo) => vo.planetId === t.planetId));
+    visibleOthers = [...visibleOthers, ...remainingOthers].slice(0, 15);
   }
+  const visibleHabs = habTargets;
+  const visibleUnsettled = unsettledTargets.slice(0, 50);
+  let targets = [...visibleOthers, ...visibleHabs, ...visibleUnsettled];
+  targets.sort((a, b) => a.dist - b.dist);
+  saveState();
   res.json({ targets, scanRadius });
 });
 app.post("/api/galaxy/intelligence", (req, res) => {
@@ -2650,15 +4360,17 @@ app.post("/api/galaxy/intelligence", (req, res) => {
       }
     });
   });
+  const hasSettlementShip = p.planets.some((pl) => (pl.troops?.settlementShip || 0) > 0) || state.fleets.some((f) => f.senderId === p.id && (f.troops?.settlementShip || 0) > 0);
   let report = null;
   const now = Date.now();
   const reportId = `battle_intel_${Math.random().toString(36).substr(2, 9)}`;
-  const isHab = state.habitablePlanets?.find((hp) => hp.coords.x === xVal && hp.coords.y === yVal);
+  const isHab = state.habitablePlanets?.find((hp) => hp.coords.x === xVal && hp.coords.y === yVal) || null;
   if (targetPlanet && targetUser) {
     report = {
       type: "occupied",
       planetName: targetPlanet.name,
       commander: targetUser.username,
+      commanderId: targetUser.id,
       faction: targetUser.faction,
       coords: { x: xVal, y: yVal },
       scores: targetUser.scores,
@@ -2678,7 +4390,28 @@ app.post("/api/galaxy/intelligence", (req, res) => {
         respirant: targetPlanet.mines?.respirant?.map((m) => m.level) || []
       },
       troops: targetPlanet.troops,
-      resources: targetPlanet.resources
+      dockedReserveFleets: (() => {
+        const fleetsList = [];
+        Object.values(state.players).forEach((pObj) => {
+          if (pObj.createdFleets) {
+            pObj.createdFleets.forEach((cf) => {
+              if (cf.planetId === targetPlanet.id && (!cf.isTraveling || !cf.activeMissionId)) {
+                fleetsList.push({
+                  id: cf.id,
+                  name: cf.name,
+                  ownerId: pObj.id,
+                  ownerName: pObj.username,
+                  allianceId: pObj.allianceId,
+                  troops: cf.troops
+                });
+              }
+            });
+          }
+        });
+        return fleetsList;
+      })(),
+      resources: targetPlanet.resources,
+      lastActive: targetUser.lastActive || now - 6e5
     };
   } else {
     if (isHab) {
@@ -2686,7 +4419,8 @@ app.post("/api/galaxy/intelligence", (req, res) => {
         type: "habitable",
         planetName: isHab.name,
         coords: { x: xVal, y: yVal },
-        description: "This is a pristine uncharted habitable planetary zone rich in basic elements. No planetary defense batteries or garrison troops detected. Clear for direct colony settlement ships."
+        description: "This is a pristine uncharted habitable planetary zone rich in basic elements. No planetary defense batteries or garrison troops detected. Clear for direct colony settlement ships.",
+        extractors: getOrGenerateHabitableExtractors(isHab)
       };
     } else {
       report = {
@@ -2703,12 +4437,33 @@ app.post("/api/galaxy/intelligence", (req, res) => {
     attackerName: p.username,
     defenderId: targetUser ? targetUser.id : "unknown",
     defenderName: targetPlanet ? targetPlanet.name : isHab ? isHab.name : "Deep Space Void",
+    defenderLastActive: targetUser ? targetUser.lastActive : void 0,
     isRecon: true,
     attackerCoords: p.planets[0] ? { x: p.planets[0].sectorX, y: p.planets[0].sectorY } : { x: 0, y: 0 },
     defenderCoords: { x: xVal, y: yVal },
     attackerInitialTroops: { drone: 1 },
     attackerLosses: { drone: 0 },
     defenderInitialTroops: targetPlanet ? { ...targetPlanet.troops } : { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
+    dockedReserveFleets: targetPlanet ? (() => {
+      const fleetsList = [];
+      Object.values(state.players).forEach((pObj) => {
+        if (pObj.createdFleets) {
+          pObj.createdFleets.forEach((cf) => {
+            if (cf.planetId === targetPlanet.id && (!cf.isTraveling || !cf.activeMissionId)) {
+              fleetsList.push({
+                id: cf.id,
+                name: cf.name,
+                ownerId: pObj.id,
+                ownerName: pObj.username,
+                allianceId: pObj.allianceId,
+                troops: cf.troops
+              });
+            }
+          });
+        }
+      });
+      return fleetsList;
+    })() : void 0,
     defenderLosses: { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 },
     winner: "attacker",
     resourcesStolen: { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 },
@@ -2736,7 +4491,7 @@ app.post("/api/galaxy/intelligence", (req, res) => {
         logs: targetPlanet ? [
           "--- COORDINATE TELEMETRY DECRYPTION ---",
           `Sector [${xVal}, ${yVal}] analyzed successfully.`,
-          `Detected station commander: ${targetUser.username} (${targetUser.faction})`,
+          `Detected station commander: ${targetUser.username}`,
           `Industrial building scans completed.`,
           `Combat garrison scanned successfully.`
         ] : [
@@ -2756,9 +4511,13 @@ app.post("/api/galaxy/intelligence", (req, res) => {
 app.post("/api/fleet/send", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
-  const { planetId, missionType, troops, targetId, targetName, targetBuilding } = req.body;
+  const { planetId, missionType, troops, targetId, targetName, targetBuilding, createdFleetId, landingTime } = req.body;
   const targetX = parseInt(String(req.body.targetX), 10);
   const targetY = parseInt(String(req.body.targetY), 10);
+  const limit = getCurrentMapLimits();
+  if (isNaN(targetX) || isNaN(targetY) || targetX < 0 || targetX > limit || targetY < 0 || targetY > limit) {
+    return res.status(400).json({ error: `Invalid target coordinates. Targeted sector must be within universe boundaries (0-${limit} allowed)` });
+  }
   const planet = p.planets.find((pl) => pl.id === planetId);
   if (!planet) return res.status(404).json({ error: "Planet not found" });
   const troopSend = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
@@ -2778,12 +4537,35 @@ app.post("/api/fleet/send", (req, res) => {
     if (troopSend.settlementShip !== 1) {
       return res.status(400).json({ error: "You must deploy exactly 1 Settlement Ship to colonize a new planet!" });
     }
-    if (p.planets.length >= 5) {
-      return res.status(400).json({ error: "Command limits reached. Max 5 colonized colony planets." });
+    if (p.planets.length >= 20) {
+      return res.status(400).json({ error: "Command limits reached. Max 20 colonized colony planets." });
     }
-    const targetHabitable = state.habitablePlanets?.find((hp) => hp.coords.x === targetX && hp.coords.y === targetY);
+    let targetHabitable = state.habitablePlanets?.find((hp) => hp.coords.x === targetX && hp.coords.y === targetY);
     if (!targetHabitable) {
-      return res.status(400).json({ error: "No habitable station or planet detected at these coordinates! Check your radar scanning array." });
+      let occupied = false;
+      for (const playerObj of Object.values(state.players)) {
+        if (playerObj.planets && playerObj.planets.some((pl) => pl.sectorX === targetX && pl.sectorY === targetY)) {
+          occupied = true;
+          break;
+        }
+      }
+      if (occupied) {
+        return res.status(400).json({ error: "These coordinates have already been colonized by another commander!" });
+      }
+      if (!state.habitablePlanets) {
+        state.habitablePlanets = [];
+      }
+      const namesPool = ["New Terra", "Genesis Prime", "Nova Aura", "Verdant Outpost", "Apex Junction"];
+      const randomName = namesPool[Math.floor(Math.random() * namesPool.length)] + ` [${targetX}, ${targetY}]`;
+      const newHab = {
+        id: `hab_${targetX}_${targetY}`,
+        name: randomName,
+        coords: { x: targetX, y: targetY },
+        isColonized: false,
+        extractors: { water: 1, plasma: 1, fuel: 1, food: 1, respirant: 1 }
+      };
+      state.habitablePlanets.push(newHab);
+      targetHabitable = newHab;
     }
     if (targetHabitable.isColonized) {
       return res.status(400).json({ error: "These coordinates have already been colonized by another commander!" });
@@ -2798,7 +4580,37 @@ app.post("/api/fleet/send", (req, res) => {
   if (missionType === "move") {
     const destPlanet = p.planets.find((pl) => pl.sectorX === targetX && pl.sectorY === targetY);
     if (!destPlanet) {
-      return res.status(400).json({ error: "Move relocation directives are only authorized to target your own colonized planets and moonbases!" });
+      let isAllianceMemberPlanet = false;
+      if (p.allianceId) {
+        for (const playerObj of Object.values(state.players)) {
+          if (playerObj.allianceId === p.allianceId) {
+            const memberPlanet = playerObj.planets.find((pl) => pl.sectorX === targetX && pl.sectorY === targetY);
+            if (memberPlanet) {
+              isAllianceMemberPlanet = true;
+              break;
+            }
+          }
+        }
+      }
+      if (!isAllianceMemberPlanet) {
+        return res.status(400).json({ error: "Move relocation directives are only authorized to target your own colonized planets and moonbases or an Alliance member's coordinates!" });
+      }
+    }
+  }
+  if (missionType === "attack") {
+    const destPlanet = p.planets.find((pl) => pl.sectorX === targetX && pl.sectorY === targetY);
+    if (destPlanet) {
+      return res.status(400).json({ error: "Friendly fire protocols active: You are strictly prohibited from attacking your own stations or colony bases!" });
+    }
+    if (p.allianceId) {
+      for (const playerObj of Object.values(state.players)) {
+        if (playerObj.id !== p.id && playerObj.allianceId === p.allianceId) {
+          const memberPlanet = playerObj.planets.find((pl) => pl.sectorX === targetX && pl.sectorY === targetY);
+          if (memberPlanet) {
+            return res.status(400).json({ error: `Alliance mutual non-aggression pact active: You cannot attack stations belonging to your own alliance member ${playerObj.username}!` });
+          }
+        }
+      }
     }
   }
   for (const [tId, qty] of Object.entries(troopSend)) {
@@ -2808,34 +4620,98 @@ app.post("/api/fleet/send", (req, res) => {
   const dy = targetY - planet.sectorY;
   const dist = Math.hypot(dx, dy);
   const now = Date.now();
-  const speedLvl = typeof req.body.troopSpeedLevel === "number" ? req.body.troopSpeedLevel : 1;
+  const isFirstPlanet = p.planets[0]?.id === planet.id;
+  const speedLvl = p.techLevels?.[planet.id]?.troop_speed ?? (isFirstPlanet ? 20 : 0);
+  const shieldsLvl = p.techLevels?.[planet.id]?.defense_shields ?? (isFirstPlanet ? 20 : 0);
   const boostPct = Math.max(0, Math.min(35, (speedLvl - 1) * (35 / 19))) / 100;
   const speedMultiplier = 1 + boostPct;
   const slowestTroopSpeed = Object.entries(troopSend).filter(([_, qty]) => qty > 0).reduce((slowest, [tId, _]) => {
     const sp = TROOP_SPECS[tId]?.speed || 5;
     return sp < slowest ? sp : slowest;
   }, 100) * speedMultiplier;
-  const travelTimeMs = Math.round(dist / slowestTroopSpeed * 6e4);
+  const travelTimeMs = Math.round(dist / slowestTroopSpeed * 36e5);
+  let resolvedTargetId = targetId || null;
+  let resolvedTargetName = targetName || `Sector [${targetX}, ${targetY}]`;
+  if (!resolvedTargetId) {
+    for (const playerObj of Object.values(state.players)) {
+      const pl = playerObj.planets.find((p2) => p2.sectorX === targetX && p2.sectorY === targetY);
+      if (pl) {
+        resolvedTargetId = playerObj.id;
+        resolvedTargetName = pl.name || `${playerObj.username}'s Station`;
+        break;
+      }
+    }
+  }
+  if (!resolvedTargetId && state.habitablePlanets) {
+    const hp = state.habitablePlanets.find((item) => item.coords.x === targetX && item.coords.y === targetY);
+    if (hp) {
+      resolvedTargetId = "habitable";
+      resolvedTargetName = hp.name;
+    }
+  }
+  let resolvedArrivesAt = now + travelTimeMs;
+  let isTimed = false;
+  if (landingTime) {
+    const requestedLandingTimeMs = parseInt(String(landingTime), 10);
+    if (!isNaN(requestedLandingTimeMs)) {
+      const minLandingTime = now + travelTimeMs - 15e3;
+      const maxLandingTime = now + 24 * 3600 * 1e3 + 6e4;
+      if (requestedLandingTimeMs < minLandingTime) {
+        return res.status(400).json({ error: "The coordinate landing time cannot be earlier than standard flight travel duration!" });
+      }
+      if (requestedLandingTimeMs > maxLandingTime) {
+        return res.status(400).json({ error: "The coordinate landing time cannot exceed the maximum 24 hour flight window!" });
+      }
+      resolvedArrivesAt = requestedLandingTimeMs;
+      isTimed = true;
+    }
+  }
   const mission = {
     id: `fleet_${Math.random().toString(36).substr(2, 9)}`,
     senderId: p.id,
     senderName: p.username,
     senderCoords: { x: planet.sectorX, y: planet.sectorY },
-    targetId: targetId || null,
-    targetName: targetName || `Sector [${targetX}, ${targetY}]`,
+    targetId: resolvedTargetId,
+    targetName: resolvedTargetName,
     targetCoords: { x: targetX, y: targetY },
     missionType,
     troops: troopSend,
     startedAt: now,
-    arrivesAt: now + travelTimeMs,
+    arrivesAt: resolvedArrivesAt,
     isReturning: false,
     isWaitingToSettle: false,
     targetBuilding: targetBuilding || void 0,
-    troopSpeedLevel: speedLvl
+    troopSpeedLevel: speedLvl,
+    defenseShieldsLevel: shieldsLvl,
+    createdFleetId: createdFleetId || void 0,
+    isTimed
   };
   state.fleets.push(mission);
   saveState();
   res.json({ player: p, success: true, fleets: state.fleets });
+});
+app.post("/api/troops/adjust", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { planetId, troopChanges } = req.body;
+  const planet = p.planets.find((pl) => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+  if (!troopChanges || typeof troopChanges !== "object") {
+    return res.status(400).json({ error: "Invalid troop changes payload" });
+  }
+  for (const [tId, change] of Object.entries(troopChanges)) {
+    const changeVal = parseInt(String(change), 10) || 0;
+    const current = planet.troops[tId] || 0;
+    if (current + changeVal < 0) {
+      return res.status(400).json({ error: `Not enough ${tId} on the station to fulfill this adjustment!` });
+    }
+  }
+  for (const [tId, change] of Object.entries(troopChanges)) {
+    const changeVal = parseInt(String(change), 10) || 0;
+    planet.troops[tId] = (planet.troops[tId] || 0) + changeVal;
+  }
+  saveState();
+  res.json({ player: p, success: true });
 });
 app.post("/api/fleet/settle", (req, res) => {
   const p = getLoggedPlayer(req);
@@ -2856,38 +4732,128 @@ app.post("/api/fleet/settle", (req, res) => {
   if (!fleet.isWaitingToSettle) {
     return res.status(400).json({ error: "This fleet has not arrived at its destination yet!" });
   }
-  if (p.planets.length >= 5) {
-    return res.status(400).json({ error: "Command limits reached. Max 5 colony planets." });
+  if (p.planets.length >= 20) {
+    return res.status(400).json({ error: "Command limits reached. Max 20 colony planets." });
   }
   const targetX = fleet.targetCoords.x;
   const targetY = fleet.targetCoords.y;
+  let customExt = void 0;
   if (state.habitablePlanets) {
-    const hp = state.habitablePlanets.find((item) => item.coords.x === targetX && item.coords.y === targetY);
+    const matchedHp = state.habitablePlanets.find((item) => Number(item.coords.x) === Number(targetX) && Number(item.coords.y) === Number(targetY));
+    if (matchedHp) {
+      customExt = getOrGenerateHabitableExtractors(matchedHp);
+      matchedHp.isColonized = true;
+    }
+  }
+  const newPlanet = createInitialPlanet(planetName, targetX, targetY, false, customExt);
+  const finalX = newPlanet.sectorX;
+  const finalY = newPlanet.sectorY;
+  if (state.habitablePlanets) {
+    const hp = state.habitablePlanets.find((item) => Number(item.coords.x) === Number(finalX) && Number(item.coords.y) === Number(finalY));
     if (hp) {
-      if (hp.isColonized) {
-        const alreadyMine = p.planets.some((pl) => pl.sectorX === targetX && pl.sectorY === targetY);
-        if (!alreadyMine) {
-          return res.status(400).json({ error: "These coordinates have already been colonized by another commander!" });
-        }
-      }
       hp.isColonized = true;
     }
   }
-  const newPlanet = createInitialPlanet(planetName, targetX, targetY);
   Object.entries(fleet.troops).forEach(([tId, count]) => {
     newPlanet.troops[tId] = count;
   });
+  const isAdminPlayer = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+  if (!isAdminPlayer) {
+    newPlanet.troops.settlementShip = 0;
+  } else {
+    newPlanet.troops.settlementShip = 1;
+  }
   p.planets.push(newPlanet);
+  ensureAdminMaxed(p);
   state.newsEvents.unshift({
     id: `news_${Math.random().toString(36).substr(2, 9)}`,
     title: "Planet Settled",
-    content: `${p.username} has established a new settled research colony at sector [${targetX}, ${targetY}]!`,
+    content: `${p.username} has established a new settled research colony at sector [${finalX}, ${finalY}]!`,
     type: "discovery",
     timestamp: Date.now()
   });
   state.fleets.splice(fleetIndex, 1);
+  ensureMinimumHabitablePlanets();
   saveState();
   return res.json({ player: p, success: true, fleets: state.fleets });
+});
+app.post("/api/colonize", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { planetId } = req.body;
+  const targetX = parseInt(String(req.body.targetX), 10);
+  const targetY = parseInt(String(req.body.targetY), 10);
+  const limit = getCurrentMapLimits();
+  if (isNaN(targetX) || isNaN(targetY) || targetX < 0 || targetX > limit || targetY < 0 || targetY > limit) {
+    return res.status(400).json({ error: `Invalid coordinates. Targeted sector must be within universe boundaries (0-${limit} allowed)` });
+  }
+  const planet = p.planets.find((pl) => pl.id === planetId);
+  if (!planet) {
+    return res.status(404).json({ error: "Sending planet or space station not found!" });
+  }
+  if ((planet.buildings.armyBase?.level || 0) < 22) {
+    return res.status(400).json({ error: "Colonization command requires a Level 22 War Room!" });
+  }
+  if ((planet.troops.settlementShip || 0) < 1) {
+    return res.status(400).json({ error: "You need at least 1 Settlement Ship in your station's army base to colonize!" });
+  }
+  if (p.planets.length >= 20) {
+    return res.status(400).json({ error: "Command limits reached. Max 20 colonized planets allowed." });
+  }
+  let isVacant = true;
+  for (const playerObj of Object.values(state.players)) {
+    if (playerObj.planets && playerObj.planets.some((pl) => pl.sectorX === targetX && pl.sectorY === targetY)) {
+      isVacant = false;
+      break;
+    }
+  }
+  if (isVacant) {
+    const isHabitableOccupied = state.habitablePlanets?.some((hp2) => hp2.coords.x === targetX && hp2.coords.y === targetY && hp2.isColonized);
+    if (isHabitableOccupied) {
+      isVacant = false;
+    }
+  }
+  let finalX = targetX;
+  let finalY = targetY;
+  if (!isVacant) {
+    const vacantCoords = findClusterCoordinate(targetX, targetY);
+    if (!vacantCoords) {
+      return res.status(400).json({ error: "All nearby coordinates in the star system cluster are fully colonized!" });
+    }
+    finalX = vacantCoords.x;
+    finalY = vacantCoords.y;
+  }
+  planet.troops.settlementShip -= 1;
+  let hp = state.habitablePlanets?.find((item) => Number(item.coords.x) === Number(targetX) && Number(item.coords.y) === Number(targetY));
+  if (!hp) {
+    hp = state.habitablePlanets?.find((item) => Number(item.coords.x) === Number(finalX) && Number(item.coords.y) === Number(finalY));
+  }
+  if (hp) {
+    hp.isColonized = true;
+  }
+  const newColonyName = hp ? hp.name : `${p.username}'s Colony [${finalX}, ${finalY}]`;
+  let customExt = void 0;
+  if (hp) {
+    customExt = getOrGenerateHabitableExtractors(hp);
+  }
+  const newPlanet = createInitialPlanet(newColonyName, finalX, finalY, false, customExt);
+  p.planets.push(newPlanet);
+  ensureAdminMaxed(p);
+  state.newsEvents.unshift({
+    id: `news_${Math.random().toString(36).substr(2, 9)}`,
+    title: "Quantum Colony Established",
+    content: `${p.username} has established a new settled research colony at sector [${finalX}, ${finalY}]!`,
+    type: "discovery",
+    timestamp: Date.now()
+  });
+  ensureMinimumHabitablePlanets();
+  saveState();
+  return res.json({
+    success: true,
+    planet: newPlanet,
+    player: p,
+    message: isVacant ? `Successfully colonized sector [${finalX}, ${finalY}]!` : `Target sector was occupied. Auto-rerouted and colonized vacant sector [${finalX}, ${finalY}]!`
+  });
 });
 app.post("/api/fleet/reroute", (req, res) => {
   const p = getLoggedPlayer(req);
@@ -2895,12 +4861,23 @@ app.post("/api/fleet/reroute", (req, res) => {
   const { fleetId, missionType } = req.body;
   const targetX = parseInt(String(req.body.targetX), 10);
   const targetY = parseInt(String(req.body.targetY), 10);
-  if (isNaN(targetX) || isNaN(targetY) || targetX < 0 || targetX > 100 || targetY < 0 || targetY > 100) {
-    return res.status(400).json({ error: "Invalid target grid coordinates (0-100 allowed)" });
+  const limit = getCurrentMapLimits();
+  if (isNaN(targetX) || isNaN(targetY) || targetX < 0 || targetX > limit || targetY < 0 || targetY > limit) {
+    return res.status(400).json({ error: `Invalid target grid coordinates (0-${limit} allowed)` });
   }
   const fleet = state.fleets.find((f) => f.id === fleetId && f.senderId === p.id);
   if (!fleet) {
     return res.status(404).json({ error: "Active mission fleet not found or not owned by you" });
+  }
+  if (fleet.missionType === "attack" && !fleet.isWaitingToSettle && !fleet.isReturning) {
+    const totalDuration = fleet.arrivesAt - fleet.startedAt;
+    const elapsed = Date.now() - fleet.startedAt;
+    const progressPercent = totalDuration > 0 ? elapsed / totalDuration * 100 : 0;
+    if (progressPercent > 45) {
+      return res.status(400).json({
+        error: `Reroute denied! Attack fleet has completed ${Math.round(progressPercent)}% of its journey (maximum 45% allowed for cancel or reroute).`
+      });
+    }
   }
   let targetId = null;
   let targetName = `Sector [${targetX}, ${targetY}]`;
@@ -2920,8 +4897,11 @@ app.post("/api/fleet/reroute", (req, res) => {
       targetName = hp.name || `Habitable Sector [${targetX}, ${targetY}]`;
     }
   }
-  const dx = targetX - fleet.senderCoords.x;
-  const dy = targetY - fleet.senderCoords.y;
+  const isLanded = !!fleet.isWaitingToSettle;
+  const originX = isLanded ? fleet.targetCoords.x : fleet.senderCoords.x;
+  const originY = isLanded ? fleet.targetCoords.y : fleet.senderCoords.y;
+  const dx = targetX - originX;
+  const dy = targetY - originY;
   const dist = Math.hypot(dx, dy);
   const speedLvl = fleet.troopSpeedLevel || 1;
   const boostPct = Math.max(0, Math.min(35, (speedLvl - 1) * (35 / 19))) / 100;
@@ -2930,8 +4910,11 @@ app.post("/api/fleet/reroute", (req, res) => {
     const sp = TROOP_SPECS[tId]?.speed || 5;
     return sp < slowest ? sp : slowest;
   }, 100) * speedMultiplier;
-  const travelTimeMs = Math.round(dist / slowestTroopSpeed * 6e4);
+  const travelTimeMs = Math.round(dist / slowestTroopSpeed * 36e5);
   const now = Date.now();
+  if (isLanded) {
+    fleet.senderCoords = { x: originX, y: originY };
+  }
   fleet.targetId = targetId;
   fleet.targetName = targetName;
   fleet.targetCoords = { x: targetX, y: targetY };
@@ -2953,6 +4936,203 @@ app.post("/api/fleet/reroute", (req, res) => {
   saveState();
   res.json({ player: p, success: true, fleets: state.fleets });
 });
+app.post("/api/fleet/cancel", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { fleetId } = req.body;
+  const fleet = state.fleets.find((f) => f.id === fleetId && f.senderId === p.id);
+  if (!fleet) {
+    return res.status(404).json({ error: "Active mission fleet not found or not owned by you" });
+  }
+  if (fleet.isReturning) {
+    return res.status(400).json({ error: "This fleet is already returning to its home coordinates!" });
+  }
+  const now = Date.now();
+  if (fleet.missionType === "attack" && !fleet.isWaitingToSettle) {
+    const totalDuration = fleet.arrivesAt - fleet.startedAt;
+    const elapsed = now - fleet.startedAt;
+    const progressPercent = totalDuration > 0 ? elapsed / totalDuration * 100 : 0;
+    if (progressPercent > 45) {
+      return res.status(400).json({
+        error: `Recall denied! Attack fleet has completed ${Math.round(progressPercent)}% of its journey (maximum 45% allowed for cancel/recall).`
+      });
+    }
+  }
+  if (fleet.isWaitingToSettle) {
+    const dx = fleet.senderCoords.x - fleet.targetCoords.x;
+    const dy = fleet.senderCoords.y - fleet.targetCoords.y;
+    const dist = Math.hypot(dx, dy);
+    const speedLvl = fleet.troopSpeedLevel || 1;
+    const boostPct = Math.max(0, Math.min(35, (speedLvl - 1) * (35 / 19))) / 100;
+    const speedMultiplier = 1 + boostPct;
+    const slowestTroopSpeed = Object.entries(fleet.troops).filter(([_, qty]) => qty > 0).reduce((slowest, [tId, _]) => {
+      const sp = TROOP_SPECS[tId]?.speed || 5;
+      return sp < slowest ? sp : slowest;
+    }, 100) * speedMultiplier;
+    const travelTimeMs = Math.round(dist / slowestTroopSpeed * 36e5);
+    fleet.isReturning = true;
+    fleet.isWaitingToSettle = false;
+    fleet.startedAt = now;
+    fleet.arrivesAt = now + travelTimeMs;
+  } else {
+    const elapsed = now - fleet.startedAt;
+    const returnDuration = Math.max(0, elapsed);
+    fleet.isReturning = true;
+    fleet.startedAt = now;
+    fleet.arrivesAt = now + returnDuration;
+  }
+  saveState();
+  res.json({ player: p, success: true, fleets: state.fleets });
+});
+app.post("/api/player/settings", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { autoUnloadResources } = req.body;
+  p.autoUnloadResources = !!autoUnloadResources;
+  state.players[p.id].autoUnloadResources = !!autoUnloadResources;
+  saveState();
+  res.json({ player: p, success: true });
+});
+app.post("/api/fleet/unload", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { fleetId, createdFleets } = req.body;
+  if (Array.isArray(createdFleets)) {
+    p.createdFleets = createdFleets;
+  }
+  if (!p.createdFleets) p.createdFleets = [];
+  const fleet = p.createdFleets.find((f) => f.id === fleetId);
+  if (!fleet) return res.status(404).json({ error: "Reserve fleet not found" });
+  if (fleet.isTraveling) {
+    return res.status(400).json({ error: "Cannot unload resources from a traveling fleet!" });
+  }
+  let planet = p.planets.find((pl) => pl.id === fleet.planetId);
+  let recipientPlayer = p;
+  if (!planet && p.allianceId) {
+    for (const otherPlayer of Object.values(state.players)) {
+      if (otherPlayer.allianceId === p.allianceId) {
+        const foundPlanet = otherPlayer.planets.find((pl) => pl.id === fleet.planetId);
+        if (foundPlanet) {
+          const senderHasLvl8Nexus = p.planets.some((pl) => (pl.buildings.supplyNexus?.level || 0) >= 8);
+          if (!senderHasLvl8Nexus) {
+            return res.status(400).json({ error: "You must upgrade your Supply Nexus to Level 8 or higher on your station to drop/unload resources at alliance members!" });
+          }
+          planet = foundPlanet;
+          recipientPlayer = otherPlayer;
+          break;
+        }
+      }
+    }
+  }
+  if (!planet) return res.status(404).json({ error: "Destination station not found or not in your alliance!" });
+  const cap = getRepositoryCapacity(planet.buildings.repository.level);
+  if (fleet.resources) {
+    Object.entries(fleet.resources).forEach(([resName, amt]) => {
+      const amount = Number(amt) || 0;
+      if (amount > 0) {
+        const current = planet.resources[resName] || 0;
+        const addable = Math.min(cap - current, amount);
+        planet.resources[resName] = current + addable;
+        fleet.resources[resName] = amount - addable;
+      }
+    });
+  }
+  saveState();
+  res.json({ player: p, success: true });
+});
+app.post("/api/fleet/transfer-resources", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { fleetId, transfers, createdFleets } = req.body;
+  if (Array.isArray(createdFleets)) {
+    p.createdFleets = createdFleets;
+  }
+  if (!p.createdFleets) p.createdFleets = [];
+  const fleet = p.createdFleets.find((f) => f.id === fleetId);
+  if (!fleet) return res.status(404).json({ error: "Reserve fleet not found" });
+  if (fleet.isTraveling) {
+    return res.status(400).json({ error: "Cannot transfer resources with a traveling fleet!" });
+  }
+  const planet = p.planets.find((pl) => pl.id === fleet.planetId);
+  if (!planet) return res.status(404).json({ error: "Home station not found" });
+  const supplyNexusLvl = planet.buildings.supplyNexus?.level || 0;
+  if (supplyNexusLvl < 5) {
+    return res.status(400).json({ error: "You must upgrade your Supply Nexus to Level 5 or higher to load/carry cargo on fleets!" });
+  }
+  const cap = getRepositoryCapacity(planet.buildings.repository.level);
+  if (!fleet.resources) {
+    fleet.resources = { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
+  }
+  let fleetCapacity = 0;
+  Object.entries(fleet.troops).forEach(([tId, qty]) => {
+    const spec = TROOP_SPECS[tId];
+    if (spec) {
+      fleetCapacity += (Number(qty) || 0) * spec.carry;
+    }
+  });
+  let currentTotalFleetResources = Object.values(fleet.resources).reduce((sum, v) => sum + (Number(v) || 0), 0);
+  for (const [resName, value] of Object.entries(transfers || {})) {
+    const val = parseInt(String(value), 10) || 0;
+    if (val === 0) continue;
+    const key = resName;
+    if (planet.resources[key] === void 0) continue;
+    const currentPlanetAmt = planet.resources[key] || 0;
+    const currentFleetAmt = fleet.resources[key] || 0;
+    if (val > 0) {
+      const spaceLeft = Math.max(0, fleetCapacity - currentTotalFleetResources);
+      const toTransfer = Math.min(val, currentPlanetAmt, spaceLeft);
+      planet.resources[key] = currentPlanetAmt - toTransfer;
+      fleet.resources[key] = currentFleetAmt + toTransfer;
+      currentTotalFleetResources += toTransfer;
+    } else {
+      const toTransfer = Math.min(Math.abs(val), currentFleetAmt);
+      const planetSpace = Math.max(0, cap - currentPlanetAmt);
+      const actualTransfer = Math.min(toTransfer, planetSpace);
+      planet.resources[key] = currentPlanetAmt + actualTransfer;
+      fleet.resources[key] = currentFleetAmt - actualTransfer;
+      currentTotalFleetResources -= actualTransfer;
+    }
+  }
+  saveState();
+  res.json({ player: p, success: true });
+});
+app.post("/api/fleet/disassemble-all", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { planetId, createdFleets } = req.body;
+  if (Array.isArray(createdFleets)) {
+    p.createdFleets = createdFleets;
+  }
+  const planet = p.planets.find((pl) => pl.id === planetId);
+  if (!planet) return res.status(404).json({ error: "Planet not found" });
+  if (!p.createdFleets) p.createdFleets = [];
+  const dockedFleets = p.createdFleets.filter((f) => f.planetId === planetId && !f.isTraveling);
+  if (dockedFleets.length === 0) {
+    return res.status(400).json({ error: "No docked fleets to disassemble on this station." });
+  }
+  const cap = getRepositoryCapacity(planet.buildings.repository.level);
+  dockedFleets.forEach((fleet) => {
+    for (const [tId, qty] of Object.entries(fleet.troops)) {
+      const q = Number(qty) || 0;
+      if (q > 0) {
+        planet.troops[tId] = (planet.troops[tId] || 0) + q;
+      }
+    }
+    if (fleet.resources) {
+      Object.entries(fleet.resources).forEach(([resName, amt]) => {
+        const amount = Number(amt) || 0;
+        if (amount > 0) {
+          const current = planet.resources[resName] || 0;
+          const addable = Math.min(Math.max(0, cap - current), amount);
+          planet.resources[resName] = current + addable;
+        }
+      });
+    }
+  });
+  p.createdFleets = p.createdFleets.filter((f) => !(f.planetId === planetId && !f.isTraveling));
+  saveState();
+  res.json({ player: p, success: true });
+});
 app.post("/api/player/rename", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
@@ -2970,8 +5150,22 @@ app.post("/api/player/rename", (req, res) => {
   if (exists) {
     return res.status(400).json({ error: "That commander name is already registered in the database!" });
   }
+  const currentCount = p.renameCount || 0;
+  let chargeAmount = 0;
+  if (currentCount >= 2) {
+    chargeAmount = 1e3;
+    if ((p.credits || 0) < chargeAmount) {
+      return res.status(400).json({ error: `Insufficient Space gold. Renaming costs 1,000 Space gold (Current: ${p.credits || 0}).` });
+    }
+  }
+  if (chargeAmount > 0) {
+    p.credits = (p.credits || 0) - chargeAmount;
+  }
+  p.renameCount = currentCount + 1;
   p.username = desiredName;
   state.players[p.id].username = desiredName;
+  state.players[p.id].renameCount = p.renameCount;
+  state.players[p.id].credits = p.credits;
   if (p.allianceId && state.alliances[p.allianceId]) {
     const alliance = state.alliances[p.allianceId];
     const member = alliance.members.find((m) => m.playerId === p.id);
@@ -3005,11 +5199,13 @@ app.post("/api/chat/send", (req, res) => {
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
   const { channel, content, receiverId } = req.body;
   if (!content) return res.status(400).json({ error: "Message content required" });
+  const email = (p.googleEmail || "").toLowerCase();
+  const isAdmin = email === "banele180@gmail.com" || email === "banzz1918@gmail.com";
   const message = {
     id: `chat_${Math.random().toString(36).substr(2, 9)}`,
     channel,
     senderId: p.id,
-    senderName: p.username,
+    senderName: isAdmin ? "Galactic Federation" : p.username,
     senderFaction: p.faction,
     senderFactionColor: p.factionColor,
     allianceTag: p.allianceId ? state.alliances[p.allianceId]?.tag : null,
@@ -3025,6 +5221,10 @@ app.post("/api/alliance/create", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
   if (p.allianceId) return res.status(400).json({ error: "Already member of an Alliance" });
+  const maxCommsHubLvl = Math.max(...p.planets.map((pl) => pl.buildings.commsHub?.level || 0));
+  if (maxCommsHubLvl < 5) {
+    return res.status(400).json({ error: "Creating an Alliance requires Communications Hub Level 5 or higher." });
+  }
   const { name, tag, bannerColor, bannerSymbol } = req.body;
   if (!name || !tag) return res.status(400).json({ error: "Alliance Name and Tag required" });
   const exists = Object.values(state.alliances).some((a) => a.name.toLowerCase() === name.toLowerCase() || a.tag.toUpperCase() === tag.toUpperCase());
@@ -3049,7 +5249,7 @@ app.post("/api/alliance/create", (req, res) => {
   state.newsEvents.unshift({
     id: `news_${Math.random().toString(36).substr(2, 9)}`,
     title: "New Alliance Formed",
-    content: `${p.username} has launched a new military faction: [${tag.toUpperCase()}] ${name.toUpperCase()}!`,
+    content: `${p.username} has launched a new military Alliance: [${tag.toUpperCase()}] ${name.toUpperCase()}!`,
     type: "system",
     timestamp: Date.now()
   });
@@ -3060,9 +5260,16 @@ app.post("/api/alliance/join", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
   if (p.allianceId) return res.status(400).json({ error: "Already registered in an Alliance." });
+  const maxCommsHubLvl = Math.max(...p.planets.map((pl) => pl.buildings.commsHub?.level || 0));
+  if (maxCommsHubLvl < 2) {
+    return res.status(400).json({ error: "Joining an Alliance requires Communications Hub Level 2 or higher." });
+  }
   const { allianceId } = req.body;
   const alliance = state.alliances[allianceId];
   if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+  if (alliance.members && alliance.members.length >= 10) {
+    return res.status(400).json({ error: "Alliance registry is full. Maximum capacity is 10 commanders!" });
+  }
   alliance.members.push({
     playerId: p.id,
     username: p.username,
@@ -3077,6 +5284,249 @@ app.post("/api/alliance/join", (req, res) => {
     type: "system",
     timestamp: Date.now()
   });
+  saveState();
+  res.json({ player: p, success: true, alliance });
+});
+app.post("/api/alliance/apply", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (p.allianceId) return res.status(400).json({ error: "Already registered in an Alliance." });
+  const maxCommsHubLvl = Math.max(...p.planets.map((pl) => pl.buildings.commsHub?.level || 0));
+  if (maxCommsHubLvl < 2) {
+    return res.status(400).json({ error: "Applying to an Alliance requires Communications Hub Level 2 or higher." });
+  }
+  const { allianceId } = req.body;
+  const alliance = state.alliances[allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+  if (alliance.members && alliance.members.length >= 10) {
+    return res.status(400).json({ error: "Cannot apply: This Alliance has already reached its maximum capacity of 10 commanders!" });
+  }
+  if (!alliance.applications) {
+    alliance.applications = [];
+  }
+  const alreadyApplied = alliance.applications.some((app2) => app2.playerId === p.id);
+  if (alreadyApplied) {
+    return res.status(400).json({ error: "Pending application already exists for this alliance." });
+  }
+  alliance.applications.push({
+    playerId: p.id,
+    username: p.username,
+    timestamp: Date.now()
+  });
+  saveState();
+  res.json({ player: p, success: true, alliance });
+});
+app.post("/api/alliance/invite", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.allianceId) {
+    return res.status(400).json({ error: "You must be in an Alliance to invite players." });
+  }
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Your Alliance was not found." });
+  if (p.allianceRole !== "leader" && p.allianceRole !== "officer") {
+    return res.status(403).json({ error: "Only Alliance Leaders or Officers can invite players." });
+  }
+  const { targetPlayerId } = req.body;
+  if (!targetPlayerId) {
+    return res.status(400).json({ error: "Target player ID is required." });
+  }
+  const receiver = state.players[targetPlayerId];
+  if (!receiver) {
+    return res.status(404).json({ error: "Target player not found." });
+  }
+  if (receiver.id === p.id) {
+    return res.status(400).json({ error: "You cannot invite yourself." });
+  }
+  if (receiver.allianceId) {
+    return res.status(400).json({ error: "Target player is already in an Alliance." });
+  }
+  if (alliance.members && alliance.members.length >= 10) {
+    return res.status(400).json({ error: "Your Alliance is full. Maximum capacity is 10 commanders!" });
+  }
+  if (!receiver.commandMessages) {
+    receiver.commandMessages = [];
+  }
+  const existingInvite = receiver.commandMessages.some((m) => m.isAllianceInvite && m.allianceId === alliance.id && m.inviteStatus === "pending");
+  if (existingInvite) {
+    return res.status(400).json({ error: "A pending invitation from your Alliance has already been dispatched to this commander." });
+  }
+  const inviteMsgId = `msg_invite_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`;
+  const inviteMessage = {
+    id: inviteMsgId,
+    senderId: p.id,
+    senderName: p.username,
+    senderFaction: p.faction,
+    senderFactionColor: p.factionColor,
+    receiverId: receiver.id,
+    receiverName: receiver.username,
+    content: `ALLIANCE ENLISTMENT OFFER: Commander ${p.username} has invited you to join their elite Alliance: [${alliance.tag}] ${alliance.name}! Use the response terminal buttons below to accept or decline.`,
+    timestamp: Date.now(),
+    isRead: false,
+    isSaved: false,
+    isAllianceInvite: true,
+    allianceId: alliance.id,
+    allianceName: alliance.name,
+    allianceTag: alliance.tag,
+    inviteStatus: "pending"
+  };
+  receiver.commandMessages.push(inviteMessage);
+  if (!p.commandMessages) {
+    p.commandMessages = [];
+  }
+  const senderMessage = { ...inviteMessage, isSent: true };
+  p.commandMessages.push(senderMessage);
+  saveState();
+  res.json({ success: true, message: `Alliance invitation successfully transmitted to Commander ${receiver.username}!` });
+});
+app.post("/api/alliance/invite/respond", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { messageId, action } = req.body;
+  if (!messageId || !action) {
+    return res.status(400).json({ error: "Message ID and response action are required." });
+  }
+  if (!p.commandMessages) {
+    p.commandMessages = [];
+  }
+  const msgIndex = p.commandMessages.findIndex((m) => m.id === messageId);
+  if (msgIndex === -1) {
+    return res.status(404).json({ error: "Invitation transmission not found in your log records." });
+  }
+  const msg = p.commandMessages[msgIndex];
+  if (!msg.isAllianceInvite) {
+    return res.status(400).json({ error: "Target transmission is not an alliance invitation." });
+  }
+  if (msg.inviteStatus !== "pending") {
+    return res.status(400).json({ error: `This invitation has already been ${msg.inviteStatus}.` });
+  }
+  const allianceId = msg.allianceId;
+  const alliance = state.alliances[allianceId];
+  if (action === "accept") {
+    if (p.allianceId) {
+      return res.status(400).json({ error: "You are already a member of an Alliance. You must leave your current Alliance first." });
+    }
+    if (!alliance) {
+      msg.inviteStatus = "declined";
+      msg.content += " [ALLIANCE NO LONGER EXISTS]";
+      saveState();
+      return res.status(404).json({ error: "The inviting Alliance no longer exists." });
+    }
+    if (alliance.members && alliance.members.length >= 10) {
+      return res.status(400).json({ error: "The Alliance has already reached its maximum capacity of 10 commanders!" });
+    }
+    alliance.members.push({
+      playerId: p.id,
+      username: p.username,
+      role: "member"
+    });
+    p.allianceId = alliance.id;
+    p.allianceRole = "member";
+    msg.inviteStatus = "accepted";
+    msg.content += " [ACCEPTED]";
+    Object.values(state.alliances).forEach((all) => {
+      if (all.applications) {
+        all.applications = all.applications.filter((app2) => app2.playerId !== p.id);
+      }
+    });
+    state.newsEvents.unshift({
+      id: `news_${Math.random().toString(36).substr(2, 9)}`,
+      title: "Member Joined Alliance",
+      content: `${p.username} has joined ${alliance.name} [${alliance.tag}] via invitation!`,
+      type: "system",
+      timestamp: Date.now()
+    });
+    const sender = state.players[msg.senderId];
+    if (sender && sender.commandMessages) {
+      const senderMsg = sender.commandMessages.find((m) => m.id === messageId);
+      if (senderMsg) {
+        senderMsg.inviteStatus = "accepted";
+        senderMsg.content += " [ACCEPTED]";
+      }
+    }
+  } else if (action === "decline") {
+    msg.inviteStatus = "declined";
+    msg.content += " [DECLINED]";
+    const sender = state.players[msg.senderId];
+    if (sender && sender.commandMessages) {
+      const senderMsg = sender.commandMessages.find((m) => m.id === messageId);
+      if (senderMsg) {
+        senderMsg.inviteStatus = "declined";
+        senderMsg.content += " [DECLINED]";
+      }
+    }
+  } else {
+    return res.status(400).json({ error: "Invalid response action directive." });
+  }
+  saveState();
+  res.json({ success: true, player: p, message: `Successfully responded: ${action.toUpperCase()}` });
+});
+app.post("/api/alliance/approve", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.allianceId) return res.status(400).json({ error: "Not in an Alliance." });
+  if (p.allianceRole !== "leader" && p.allianceRole !== "officer") {
+    return res.status(403).json({ error: "Only the Alliance Founder (leader) or Officer can approve application requests." });
+  }
+  const { targetPlayerId } = req.body;
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+  if (!alliance.applications) {
+    alliance.applications = [];
+  }
+  const appIndex = alliance.applications.findIndex((app2) => app2.playerId === targetPlayerId);
+  if (appIndex === -1) {
+    return res.status(404).json({ error: "Application request not found." });
+  }
+  const targetPlayer = state.players[targetPlayerId];
+  if (!targetPlayer) {
+    alliance.applications.splice(appIndex, 1);
+    saveState();
+    return res.status(404).json({ error: "Target player profile not found." });
+  }
+  if (targetPlayer.allianceId) {
+    alliance.applications.splice(appIndex, 1);
+    saveState();
+    return res.status(400).json({ error: "Player has already joined another alliance." });
+  }
+  if (alliance.members && alliance.members.length >= 10) {
+    return res.status(400).json({ error: "Cannot approve: This Alliance has already reached its maximum capacity of 10 commanders!" });
+  }
+  alliance.members.push({
+    playerId: targetPlayer.id,
+    username: targetPlayer.username,
+    role: "member"
+  });
+  targetPlayer.allianceId = alliance.id;
+  targetPlayer.allianceRole = "member";
+  alliance.applications.splice(appIndex, 1);
+  state.newsEvents.unshift({
+    id: `news_${Math.random().toString(36).substr(2, 9)}`,
+    title: "Application Approved",
+    content: `${targetPlayer.username}'s application was approved to join ${alliance.name} [${alliance.tag}]!`,
+    type: "system",
+    timestamp: Date.now()
+  });
+  saveState();
+  res.json({ player: p, success: true, alliance });
+});
+app.post("/api/alliance/decline", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.allianceId) return res.status(400).json({ error: "Not in an Alliance." });
+  if (p.allianceRole !== "leader" && p.allianceRole !== "officer") {
+    return res.status(403).json({ error: "Only the Alliance Founder or Officer can decline requests." });
+  }
+  const { targetPlayerId } = req.body;
+  const alliance = state.alliances[p.allianceId];
+  if (!alliance) return res.status(404).json({ error: "Alliance not found" });
+  if (!alliance.applications) {
+    alliance.applications = [];
+  }
+  const appIndex = alliance.applications.findIndex((app2) => app2.playerId === targetPlayerId);
+  if (appIndex !== -1) {
+    alliance.applications.splice(appIndex, 1);
+  }
   saveState();
   res.json({ player: p, success: true, alliance });
 });
@@ -3254,35 +5704,62 @@ app.get("/api/alliance/member-reports", (req, res) => {
       }))
     };
   });
-  res.json({ success: true, members: reports });
+  const allianceMemberIds = alliance.members.map((mbr) => mbr.playerId);
+  const relevantBattleReports = (state.battleReports || []).filter(
+    (report) => allianceMemberIds.includes(report.attackerId) || allianceMemberIds.includes(report.defenderId)
+  );
+  res.json({ success: true, members: reports, battleReports: relevantBattleReports });
 });
 app.post("/api/resources/send", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
-  const { targetId, resources } = req.body;
-  if (p.id === targetId) {
-    return res.status(400).json({ error: "You cannot transmit resources to your own coordinates!" });
-  }
-  const targetPlayer = state.players[targetId] || Object.values(state.players).find((u) => u.id === targetId);
-  if (!targetPlayer) {
-    return res.status(404).json({ error: "Recipient commander coordinates not found" });
-  }
-  const senderPlanet = p.planets[0];
-  const targetPlanet = targetPlayer.planets[0];
+  const { targetId, resources, sourcePlanetId } = req.body;
+  const targetX = parseInt(req.body.targetX, 10);
+  const targetY = parseInt(req.body.targetY, 10);
+  const senderPlanet = p.planets.find((pl) => pl.id === sourcePlanetId) || p.planets[0];
   if (!senderPlanet) {
     return res.status(400).json({ error: "Sender starbase planet configuration mismatch." });
   }
-  if (!targetPlanet) {
-    return res.status(400).json({ error: "Recipient starbase planet configuration mismatch." });
+  let targetPlanet = null;
+  let targetPlayer = null;
+  if (targetId) {
+    for (const player of Object.values(state.players)) {
+      const pl = player.planets.find((item) => item.id === targetId || player.id === targetId);
+      if (pl) {
+        targetPlanet = pl;
+        targetPlayer = player;
+        break;
+      }
+    }
+  } else if (!isNaN(targetX) && !isNaN(targetY)) {
+    for (const player of Object.values(state.players)) {
+      const pl = player.planets.find((item) => item.sectorX === targetX && item.sectorY === targetY);
+      if (pl) {
+        targetPlanet = pl;
+        targetPlayer = player;
+        break;
+      }
+    }
+  }
+  if (!targetPlanet || !targetPlayer) {
+    return res.status(404).json({ error: "Recipient coordinates or target Space Station not detected! Double check coordinates scanner." });
+  }
+  if (senderPlanet.id === targetPlanet.id) {
+    return res.status(400).json({ error: "You cannot transmit resources to the same space station!" });
   }
   const keys = ["water", "plasma", "fuel", "food", "respirant"];
+  let hasItems = false;
   for (const k of keys) {
     const qty = Math.max(0, parseInt(resources[k], 10) || 0);
     if (qty > 0) {
       if ((senderPlanet.resources[k] || 0) < qty) {
-        return res.status(400).json({ error: `Not enough ${k} on your active moonbase planetary reserves.` });
+        return res.status(400).json({ error: `Not enough ${k} on your active planetary reserves.` });
       }
+      hasItems = true;
     }
+  }
+  if (!hasItems) {
+    return res.status(400).json({ error: "You must specify at least one resource quantity to transmit." });
   }
   keys.forEach((k) => {
     const qty = Math.max(0, parseInt(resources[k], 10) || 0);
@@ -3294,7 +5771,7 @@ app.post("/api/resources/send", (req, res) => {
   state.newsEvents.push({
     id: `news_trade_${Date.now()}`,
     title: "Quantum Trade Portal Activated!",
-    content: `Commander ${p.username} successfully transmitted a massive payload cargo shipment to Commander ${targetPlayer.username}!`,
+    content: `Commander ${p.username} successfully transmitted resources from ${senderPlanet.name} to ${targetPlayer.username}'s ${targetPlanet.name}!`,
     type: "system",
     timestamp: Date.now()
   });
@@ -3353,6 +5830,91 @@ app.post("/api/daily-reward/claim", (req, res) => {
   saveState();
   res.json({ player: p, s_amount: 8e3, success: true });
 });
+app.post("/api/tutorial/claim", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { taskId, planetId, allowOverflow } = req.body;
+  if (taskId === void 0 || !planetId) {
+    return res.status(400).json({ error: "Invalid parameters" });
+  }
+  const planet = p.planets.find((pl) => pl.id === planetId) || p.planets[0];
+  if (!planet) {
+    return res.status(404).json({ error: "Colony planet not found" });
+  }
+  const rewards = {};
+  for (let i = 1; i <= 32; i++) {
+    const taskReward = getTaskResourceReward(i);
+    rewards[i] = {
+      water: taskReward.water,
+      plasma: taskReward.plasma,
+      fuel: taskReward.fuel,
+      food: taskReward.food,
+      respirant: taskReward.respirant,
+      credits: i === 32 ? 1500 : 50
+    };
+  }
+  let rawId = taskId;
+  if (rawId && typeof rawId === "object") {
+    rawId = rawId.id || rawId.taskId || rawId.task || JSON.stringify(rawId);
+  }
+  let idNum = parseInt(String(rawId), 10);
+  if (isNaN(idNum) || !rewards[idNum]) {
+    const digits = String(rawId).match(/\d+/);
+    if (digits) {
+      idNum = parseInt(digits[0], 10);
+    }
+  }
+  console.log(`[Tutorial Claim] Raw taskId:`, taskId, `Parsed idNum:`, idNum);
+  if (isNaN(idNum) || !rewards[idNum]) {
+    const completed = p.completedTutorialTasks || [];
+    for (let i = 1; i <= 32; i++) {
+      if (!completed.includes(i)) {
+        idNum = i;
+        break;
+      }
+    }
+  }
+  if (isNaN(idNum) || !rewards[idNum]) {
+    idNum = 32;
+  }
+  const reward = rewards[idNum];
+  if (!reward) {
+    return res.status(400).json({ error: "Invalid tutorial task ID" });
+  }
+  if (!p.completedTutorialTasks) {
+    p.completedTutorialTasks = [];
+  }
+  if (p.completedTutorialTasks.includes(idNum)) {
+    return res.json({
+      success: true,
+      player: p,
+      message: `Academy reward already claimed on ${planet.name}! Received custom resource crates and Speed Credits.`
+    });
+  }
+  const repositoryLvl = planet.buildings.repository ? planet.buildings.repository.level : 1;
+  const cap = getRepositoryCapacity(repositoryLvl);
+  if (allowOverflow === true) {
+    planet.resources.water = planet.resources.water + reward.water;
+    planet.resources.plasma = planet.resources.plasma + reward.plasma;
+    planet.resources.fuel = planet.resources.fuel + reward.fuel;
+    planet.resources.food = planet.resources.food + reward.food;
+    planet.resources.respirant = planet.resources.respirant + reward.respirant;
+  } else {
+    planet.resources.water = Math.min(cap, planet.resources.water + reward.water);
+    planet.resources.plasma = Math.min(cap, planet.resources.plasma + reward.plasma);
+    planet.resources.fuel = Math.min(cap, planet.resources.fuel + reward.fuel);
+    planet.resources.food = Math.min(cap, planet.resources.food + reward.food);
+    planet.resources.respirant = Math.min(cap, planet.resources.respirant + reward.respirant);
+  }
+  p.credits = (p.credits || 0) + reward.credits;
+  p.completedTutorialTasks.push(idNum);
+  saveState();
+  res.json({
+    success: true,
+    player: p,
+    message: `Academy reward claimed on ${planet.name}! Received custom resource crates and +${reward.credits.toLocaleString()} Speed Credits.`
+  });
+});
 app.post("/api/planet/claim-supply-nexus", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
@@ -3399,19 +5961,111 @@ app.post("/api/buy-credits", (req, res) => {
   if (!amount || typeof amount !== "number" || amount <= 0) {
     return res.status(400).json({ error: "Invalid credit request amount." });
   }
+  const validTiers = [
+    { amount: 1500, label: "Bronze Cargo Carrier" },
+    { amount: 6e3, label: "Commander's Tactical Cache" },
+    { amount: 25e3, label: "Supreme Emperor's Core Vault" }
+  ];
+  const matchedTier = validTiers.find((t) => t.amount === amount && t.label === tierLabel);
+  if (!matchedTier) {
+    console.warn(`[Security Blocked] Unverified credit tier purchase attempted by user ${p.id}: amount=${amount}, label=${tierLabel}`);
+    return res.status(400).json({ error: "Purchase verification failed: unauthorized credit tier allocation attempt blocked." });
+  }
   if (p.credits === void 0) {
     p.credits = 1250;
   }
-  p.credits += amount;
+  p.credits += matchedTier.amount;
   state.newsEvents.unshift({
     id: `credit_${Math.random().toString(36).substr(2, 9)}`,
     title: "Galactic Funding Secured",
-    content: `Commander ${p.username} authorized security transmission of +${amount.toLocaleString()} Galactic Credits under [${tierLabel || "Premium Gateway"}].`,
+    content: `Commander ${p.username} authorized security transmission of +${matchedTier.amount.toLocaleString()} Galactic Credits under [${matchedTier.label}].`,
     type: "discovery",
     timestamp: Date.now()
   });
   saveState();
   res.json({ player: p, success: true });
+});
+app.post("/api/messages/send", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { receiverId, content } = req.body;
+  if (!receiverId || !content || typeof content !== "string" || !content.trim()) {
+    return res.status(400).json({ error: "Invalid receiver or empty transmission content." });
+  }
+  const receiver = state.players[receiverId];
+  if (!receiver) {
+    return res.status(404).json({ error: "Target transmitter station not found." });
+  }
+  if (!receiver.commandMessages) {
+    receiver.commandMessages = [];
+  }
+  const newMessage = {
+    id: `msg_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`,
+    senderId: p.id,
+    senderName: p.username,
+    senderFaction: p.faction,
+    senderFactionColor: p.factionColor,
+    receiverId: receiver.id,
+    receiverName: receiver.username,
+    content: content.trim(),
+    timestamp: Date.now(),
+    isRead: false,
+    isSaved: false
+  };
+  receiver.commandMessages.push(newMessage);
+  if (!p.commandMessages) {
+    p.commandMessages = [];
+  }
+  const sentCopy = {
+    ...newMessage,
+    isSent: true,
+    isRead: true
+    // Sender has already read their own sent message
+  };
+  p.commandMessages.push(sentCopy);
+  sendNotificationWithFallback(
+    receiver.id,
+    "\u{1F4EC} New Secure Message",
+    `Commander ${p.username} sent you a message: ${content.trim().substring(0, 60)}${content.trim().length > 60 ? "..." : ""}`
+  );
+  saveState();
+  res.json({ success: true, message: "Holographic command transmission dispatched!" });
+});
+app.post("/api/messages/mark-read", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { messageId, isRead } = req.body;
+  if (!messageId) return res.status(400).json({ error: "Transmission ID required" });
+  if (!p.commandMessages) p.commandMessages = [];
+  const msg = p.commandMessages.find((m) => m.id === messageId);
+  if (msg) {
+    msg.isRead = isRead !== void 0 ? isRead : true;
+    saveState();
+  }
+  res.json({ success: true, player: p });
+});
+app.post("/api/messages/save", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { messageId, isSaved } = req.body;
+  if (!messageId) return res.status(400).json({ error: "Transmission ID required" });
+  if (!p.commandMessages) p.commandMessages = [];
+  const msg = p.commandMessages.find((m) => m.id === messageId);
+  if (msg) {
+    msg.isSaved = isSaved !== void 0 ? isSaved : true;
+    saveState();
+  }
+  res.json({ success: true, player: p });
+});
+app.post("/api/messages/delete", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  const { messageId } = req.body;
+  if (!messageId) return res.status(400).json({ error: "Transmission ID required" });
+  if (!p.commandMessages) p.commandMessages = [];
+  p.commandMessages = p.commandMessages.filter((m) => m.id !== messageId);
+  saveState();
+  res.json({ success: true, player: p });
 });
 app.post("/api/feedback/send", (req, res) => {
   const p = getLoggedPlayer(req);
@@ -3438,7 +6092,7 @@ app.post("/api/feedback/send", (req, res) => {
 app.post("/api/feedback/private-list", (req, res) => {
   const p = getLoggedPlayer(req);
   const { adminKey } = req.body;
-  const isEmailOwner = p && p.googleEmail && p.googleEmail.toLowerCase() === "banele180@gmail.com";
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
   const isValidPass = adminKey === "991807" || adminKey === "banele-admin-secret" || isEmailOwner;
   if (!isValidPass) {
     return res.status(403).json({ error: "Access Denied. Holographic decryption key incorrect." });
@@ -3447,6 +6101,165 @@ app.post("/api/feedback/private-list", (req, res) => {
     state.feedbacks = [];
   }
   res.json({ success: true, feedbacks: state.feedbacks });
+});
+app.get("/api/admin/galaxy-config", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+  initializeGalaxyConfig();
+  res.json({ success: true, galaxyConfig: state.galaxyConfig });
+});
+app.post("/api/admin/galaxy-config", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+  initializeGalaxyConfig();
+  const config = state.galaxyConfig;
+  const {
+    initialGalaxySize,
+    reservedCenterSector,
+    initialColonizationZoneSize,
+    spawnDistance,
+    zoneGrowthOccupancyThreshold,
+    galaxyOccupancyThreshold,
+    expansionIncrement,
+    currentGalaxySize,
+    currentColonizationZoneSize
+  } = req.body;
+  if (initialGalaxySize !== void 0) config.initialGalaxySize = Number(initialGalaxySize);
+  if (reservedCenterSector !== void 0) config.reservedCenterSector = { x: Number(reservedCenterSector.x), y: Number(reservedCenterSector.y) };
+  if (initialColonizationZoneSize !== void 0) config.initialColonizationZoneSize = Number(initialColonizationZoneSize);
+  if (spawnDistance !== void 0) config.spawnDistance = Number(spawnDistance);
+  if (zoneGrowthOccupancyThreshold !== void 0) config.zoneGrowthOccupancyThreshold = Number(zoneGrowthOccupancyThreshold);
+  if (galaxyOccupancyThreshold !== void 0) config.galaxyOccupancyThreshold = Number(galaxyOccupancyThreshold);
+  if (expansionIncrement !== void 0) config.expansionIncrement = Number(expansionIncrement);
+  if (currentGalaxySize !== void 0) config.currentGalaxySize = Number(currentGalaxySize);
+  if (currentColonizationZoneSize !== void 0) config.currentColonizationZoneSize = Number(currentColonizationZoneSize);
+  saveState();
+  res.json({ success: true, message: "Galaxy Configuration successfully updated!", galaxyConfig: config });
+});
+app.post("/api/admin/galaxy-config/trigger", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+  initializeGalaxyConfig();
+  const config = state.galaxyConfig;
+  const { action } = req.body;
+  if (action === "grow-zone") {
+    const prevSize = config.currentColonizationZoneSize || config.initialColonizationZoneSize || 7;
+    const currentMapSize = config.currentGalaxySize || 15;
+    const nextSize = prevSize + 2;
+    config.currentColonizationZoneSize = Math.min(nextSize, currentMapSize);
+    saveState();
+    return res.json({ success: true, message: `Manually grew colonization zone from ${prevSize} to ${config.currentColonizationZoneSize}` });
+  } else if (action === "expand-galaxy") {
+    const oldSize = config.currentGalaxySize || 15;
+    const increment = config.expansionIncrement || 5;
+    const newSize = oldSize + increment;
+    config.currentGalaxySize = newSize;
+    if (config.currentColonizationZoneSize >= oldSize) {
+      config.currentColonizationZoneSize = newSize;
+    }
+    const BROADCAST_TEMPLATES = [
+      "GALACTIC COMMAND\n\nLong-range sensor arrays have successfully mapped new regions beyond the known frontier. Navigation systems have been updated. Previously unreachable sectors are now open for exploration.",
+      "GALACTIC COMMAND\n\nCenturies of research have culminated in a breakthrough in deep-space navigation. New sectors have been charted and are now available for colonization.",
+      "GALACTIC COMMAND\n\nExploration fleets have returned with confirmed hyperspace routes beyond the current frontier. Galactic Command authorizes expansion into newly discovered space.",
+      "GALACTIC COMMAND\n\nOur civilizations have reached another milestone in interstellar exploration. Additional sectors have been integrated into the Galactic Navigation Network.",
+      "GALACTIC COMMAND\n\nAdvanced radar arrays have extended humanity's vision deeper into the galaxy. Frontier sectors are now accessible to all commanders."
+    ];
+    const randomMsg = BROADCAST_TEMPLATES[Math.floor(Math.random() * BROADCAST_TEMPLATES.length)];
+    if (!state.chatMessages) state.chatMessages = [];
+    state.chatMessages.push({
+      id: `chat_expansion_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      channel: "global",
+      senderId: "system",
+      senderName: "GALACTIC COMMAND",
+      senderFaction: "System",
+      senderFactionColor: "#F1C40F",
+      allianceTag: "GAL",
+      receiverId: null,
+      content: randomMsg,
+      timestamp: Date.now()
+    });
+    if (state.chatMessages.length > 200) state.chatMessages.shift();
+    if (!state.newsEvents) state.newsEvents = [];
+    state.newsEvents.push({
+      id: `news_expansion_${Date.now()}`,
+      title: "\u{1F30C} New Frontiers Charted!",
+      content: `Galactic Command has expanded the known sector coordinates to ${newSize}x${newSize} space. High-resolution navigation channels are now online!`,
+      type: "system",
+      timestamp: Date.now()
+    });
+    saveState();
+    return res.json({ success: true, message: `Manually expanded galaxy from ${oldSize} to ${newSize}` });
+  } else {
+    return res.status(400).json({ error: "Invalid action. Choose 'grow-zone' or 'expand-galaxy'." });
+  }
+});
+app.get("/api/admin/tasks", (req, res) => {
+  if (!state.customTasks) {
+    state.customTasks = {};
+  }
+  res.json({ success: true, customTasks: state.customTasks });
+});
+app.post("/api/admin/update-task", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+  const { taskId, title, shortDesc, requirementHtml, hint, howToGetThere, commanderTip, congratsMessage, encouragementQuote } = req.body;
+  if (!taskId) {
+    return res.status(400).json({ error: "Task ID is required." });
+  }
+  if (!state.customTasks) {
+    state.customTasks = {};
+  }
+  state.customTasks[taskId] = {
+    title,
+    shortDesc,
+    requirementHtml,
+    hint,
+    howToGetThere,
+    commanderTip,
+    congratsMessage,
+    encouragementQuote
+  };
+  saveState();
+  res.json({ success: true, message: `Task ${taskId} text successfully updated for the whole game!`, customTasks: state.customTasks });
+});
+app.post("/api/admin/pm2-flush", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const bodyEmail = req.body?.email || req.query?.email || req.headers["x-admin-email"];
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com") || typeof bodyEmail === "string" && (bodyEmail.toLowerCase() === "banele180@gmail.com" || bodyEmail.toLowerCase() === "banzz1918@gmail.com");
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+  console.log("[PM2 EMERGENCY RELOAD] Received command from authorized admin. Executing 'pm2 restart all --update-env'...");
+  (0, import_child_process.exec)("pm2 restart all --update-env", (error, stdout, stderr) => {
+    if (error) {
+      console.error(`[PM2 EMERGENCY RELOAD ERROR] ${error.message}`);
+      return res.status(500).json({
+        success: false,
+        error: "PM2 execution failed",
+        details: error.message,
+        stderr
+      });
+    }
+    console.log(`[PM2 EMERGENCY RELOAD SUCCESS] stdout: ${stdout}`);
+    res.json({
+      success: true,
+      message: "Emergency programmatic reload completed. All PM2 processes restarted with updated environment variables.",
+      stdout,
+      stderr
+    });
+  });
 });
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
@@ -3467,5 +6280,7 @@ async function startServer() {
     console.log(`Universe active. Server listening on http://0.0.0.0:${PORT}`);
   });
 }
-startServer();
+startServer().catch((err) => {
+  console.error("CRITICAL: Failed to start server:", err);
+});
 //# sourceMappingURL=server.cjs.map

@@ -1,7 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 
-const srcIcon = path.join(process.cwd(), 'src', 'assets', 'images', 'station_icon_1780937637889.png');
+let srcIcon = path.join(process.cwd(), 'src', 'assets', 'images', 'space_station_commander_icon_under_256kb-1.png');
+if (!fs.existsSync(srcIcon)) {
+  srcIcon = path.join(process.cwd(), 'src', 'assets', 'images', 'space_station_commander_icon_under_256kb.png');
+}
+if (!fs.existsSync(srcIcon)) {
+  srcIcon = path.join(process.cwd(), 'src', 'assets', 'images', 'station_icon_1780937637889.png');
+}
 const publicDir = path.join(process.cwd(), 'public');
 
 if (!fs.existsSync(publicDir)) {

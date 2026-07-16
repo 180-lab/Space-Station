@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import welcomeBanner from './assets/images/welcome_banner_clean_1780971855115.png';
+import gameIcon from './assets/images/space_station_commander_icon_under_256kb-1.png';
 import { 
   Alliance, 
   BattleReport, 
@@ -1042,7 +1043,7 @@ export default function App() {
       } catch (err: any) {
         if (active) {
           consecutiveErrorsRef.current += 1;
-          if (consecutiveErrorsRef.current >= 12) {
+          if (consecutiveErrorsRef.current >= 25) {
             // If connection is broken, set readable warning descriptor
             setConnectionError(err?.message || 'Gateway connection timeout');
           }
@@ -1600,13 +1601,13 @@ export default function App() {
         }
       }
 
-      if (consecutiveErrorsRef.current >= 12) {
+      if (consecutiveErrorsRef.current >= 25) {
         setConnectionError(err?.message || 'Gateway connection error');
       }
       if (err?.message?.includes('security check') || err?.message?.includes('cookie') || err?.message?.includes('stabilizing')) {
         console.warn("Connection warning:", err.message);
       } else {
-        console.error(err);
+        console.warn("Connection status (fetchState):", err?.message || err);
       }
     }
   };
@@ -2604,6 +2605,24 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {/* New Branded App Logo & Title */}
+          <div className="flex items-center gap-4 mb-6 border-b border-[#1E293B]/60 pb-5">
+            <img 
+              src={gameIcon} 
+              alt="Space Station Commander Logo" 
+              className="w-16 h-16 rounded-xl border border-cyan-500/30 shadow-[0_0_15px_rgba(34,211,238,0.2)] object-cover"
+              referrerPolicy="no-referrer"
+            />
+            <div>
+              <h1 className="text-xl font-extrabold text-slate-100 tracking-wider uppercase bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400 bg-clip-text text-transparent">
+                Space Station Commander
+              </h1>
+              <p className="text-[10px] text-cyan-400/80 font-bold uppercase tracking-widest mt-0.5">
+                Galactic Command Gateway
+              </p>
+            </div>
+          </div>
           
           <div className="mb-8 relative">
             <div className="text-left font-sans text-xs sm:text-sm text-slate-300 space-y-3.5 mb-4 leading-relaxed border-b border-[#1E293B]/40 pb-4 pr-1 select-text">
@@ -3274,8 +3293,11 @@ export default function App() {
       {/* Main Top Header Navbar info */}
       <header className="sticky top-0 z-40 h-20 bg-[#0A0F1D] border-b border-[#1E293B] flex items-center justify-between px-6 shrink-0 backdrop-blur-md bg-opacity-95">
         <div className="flex items-center gap-3">
-          <div 
-            className="w-2.5 h-2.5 rounded-full animate-pulse bg-cyan-400 shadow-[0_0_10px_#22d3ee] shrink-0" 
+          <img 
+            src={gameIcon} 
+            alt="Space Station Commander Logo" 
+            className="w-10 h-10 rounded-lg border border-cyan-500/30 shadow-[0_0_10px_rgba(34,211,238,0.15)] object-cover shrink-0"
+            referrerPolicy="no-referrer"
           />
           {/* Slick unified Custom Station Selector Dropdown */}
           <div className="relative font-mono leading-none flex items-center">
