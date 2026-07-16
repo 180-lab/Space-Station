@@ -474,6 +474,50 @@ export default function App() {
     return saved === null ? true : saved === 'true';
   });
 
+  const isInitialLoadRef = useRef(true);
+  const prevMessagesLengthRef = useRef(0);
+  const prevMessagesRef = useRef<ChatMessage[]>([]);
+
+  useEffect(() => {
+    if (!chatMessages || chatMessages.length === 0) return;
+
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      prevMessagesLengthRef.current = chatMessages.length;
+      prevMessagesRef.current = chatMessages;
+      return;
+    }
+
+    if (activeTab === 'chat') {
+      if (hasUnreadChat) {
+        setHasUnreadChat(false);
+        localStorage.setItem('moonbase_has_unread_chat', 'false');
+      }
+      prevMessagesLengthRef.current = chatMessages.length;
+      prevMessagesRef.current = chatMessages;
+      return;
+    }
+
+    if (chatMessages.length > prevMessagesLengthRef.current) {
+      const oldIds = new Set(prevMessagesRef.current.map(m => m.id));
+      const newMessages = chatMessages.filter(m => !oldIds.has(m.id));
+      
+      const hasNewSystemMessage = newMessages.some(m => 
+        m.senderId === 'system' || 
+        m.senderName === 'GALACTIC COMMAND' || 
+        m.senderName === 'CENTRAL COMMAND'
+      );
+
+      if (hasNewSystemMessage) {
+        setHasUnreadChat(true);
+        localStorage.setItem('moonbase_has_unread_chat', 'true');
+      }
+    }
+
+    prevMessagesLengthRef.current = chatMessages.length;
+    prevMessagesRef.current = chatMessages;
+  }, [chatMessages, activeTab, hasUnreadChat]);
+
   useEffect(() => {
     if (activeTab === 'chat') {
       setHasUnreadChat(false);

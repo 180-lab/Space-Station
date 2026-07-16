@@ -657,6 +657,14 @@ function ensureAdminMaxed(p: any) {
         pl.troops.settlementShip = 1;
       }
     }
+
+    // Set admin's research center technologies to Level 1
+    if (!p.techLevels) p.techLevels = {};
+    p.techLevels[pl.id] = {
+      defense_shields: 1,
+      manufacturing_speed: 1,
+      troop_speed: 1
+    };
   });
 }
 
