@@ -2878,18 +2878,6 @@ export default function App() {
             </button>
           ))}
 
-          {/* Branded Google Play Games Login button */}
-          <button 
-            type="button"
-            onClick={triggerGooglePlayGamesSignIn}
-            className="w-full mt-3 py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs tracking-wider uppercase rounded-xl flex items-center justify-center gap-3 active:scale-[0.98] transition duration-150 cursor-pointer shadow-md"
-          >
-            <Gamepad2 className="w-4 h-4 text-emerald-100" />
-            <span>Sign in with Play Games</span>
-          </button>
-
-
-
         </div>
 
         {/* Google Authentication Dialog Overlay */}
