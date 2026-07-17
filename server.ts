@@ -3528,9 +3528,23 @@ app.post("/api/auth/google", async (req, res) => {
     
     try {
       // Check if player with this googleEmail already exists (case-insensitive)
-      const player = Object.values(state.players).find(
+      let player = Object.values(state.players).find(
         p => p.googleEmail && p.googleEmail.toLowerCase() === email.toLowerCase()
       );
+      
+      // Or find by matching username
+      if (!player) {
+        player = Object.values(state.players).find(
+          p => p.username && (
+            p.username.toLowerCase() === email.toLowerCase() ||
+            p.username.toLowerCase() === (username || email.split("@")[0]).toLowerCase()
+          )
+        );
+        if (player) {
+          player.googleEmail = email;
+          console.log(`[Google Sim] Linked existing user ${player.username} to googleEmail ${email}`);
+        }
+      }
       
       if (player) {
         return res.json({ player, isNew: false });
@@ -3635,7 +3649,38 @@ app.post("/api/auth/google", async (req, res) => {
     const { uid, email, name } = decodedToken;
 
     // Check if player with that uid exists
-    const player = state.players[uid];
+    let player = state.players[uid];
+
+    if (!player && email) {
+      // 1. Find by matching googleEmail (case-insensitive)
+      player = Object.values(state.players).find(
+        p => p.googleEmail && p.googleEmail.toLowerCase() === email.toLowerCase()
+      );
+
+      // 2. Find by matching username (case-insensitive)
+      if (!player) {
+        const defaultName = name || email.split("@")[0];
+        player = Object.values(state.players).find(
+          p => p.username && (
+            p.username.toLowerCase() === email.toLowerCase() ||
+            p.username.toLowerCase() === defaultName.toLowerCase()
+          )
+        );
+      }
+
+      if (player) {
+        // Link Google account to existing player
+        player.googleEmail = email;
+        const oldId = player.id;
+        
+        if (oldId !== uid) {
+          player.id = uid;
+          state.players[uid] = player;
+          delete state.players[oldId];
+          console.log(`[Google Auth] Linked existing player ${player.username} (${oldId}) to Google UID: ${uid}`);
+        }
+      }
+    }
 
     if (player) {
       return res.json({ player, isNew: false });
@@ -3980,7 +4025,9 @@ app.all("/api/state", (req, res) => {
     achievements: pl.achievements || [],
     planetsCount: pl.planets?.length || 1,
     planets: (pl.planets || []).map(plt => ({ id: plt.id, name: plt.name, sectorX: plt.sectorX, sectorY: plt.sectorY })),
-    lastActive: pl.lastActive || now - 600000
+    lastActive: pl.lastActive || now - 600000,
+    isChatBlocked: pl.isChatBlocked || false,
+    blockedPlayers: pl.blockedPlayers || []
   }));
 
   const relevantFleets = state.fleets.filter(f => {
@@ -6169,6 +6216,10 @@ app.post("/api/chat/send", (req, res) => {
   const p = getLoggedPlayer(req);
   if (!p) return res.status(401).json({ error: "Unauthenticated" });
 
+  if (p.isChatBlocked) {
+    return res.status(403).json({ error: "Your access to chat wavelengths is currently restricted by Galactic Federation Command." });
+  }
+
   const { channel, content, receiverId } = req.body;
   if (!content) return res.status(400).json({ error: "Message content required" });
 
@@ -7222,6 +7273,14 @@ app.post("/api/messages/send", (req, res) => {
     return res.status(404).json({ error: "Target transmitter station not found." });
   }
 
+  // Blocking Check
+  if (receiver.blockedPlayers && receiver.blockedPlayers.includes(p.id)) {
+    return res.status(403).json({ error: "Your transmission frequency has been locked/muted by the recipient station." });
+  }
+  if (p.blockedPlayers && p.blockedPlayers.includes(receiverId)) {
+    return res.status(403).json({ error: "You have locked/muted transmissions with this station. Unblock them first to transmit." });
+  }
+
   if (!receiver.commandMessages) {
     receiver.commandMessages = [];
   }
@@ -7545,6 +7604,87 @@ app.post("/api/admin/pm2-flush", (req, res) => {
       stderr: stderr
     });
   });
+});
+
+
+// Admin block player from chat
+app.post("/api/admin/chat-block", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+
+  const { playerId } = req.body;
+  if (!playerId || !state.players[playerId]) {
+    return res.status(404).json({ error: "Player profile not found." });
+  }
+
+  state.players[playerId].isChatBlocked = true;
+  saveState();
+  res.json({ success: true, message: `Commander ${state.players[playerId].username} is now blocked from global communications.` });
+});
+
+// Admin unblock player from chat
+app.post("/api/admin/chat-unblock", (req, res) => {
+  const p = getLoggedPlayer(req);
+  const isEmailOwner = p && p.googleEmail && (p.googleEmail.toLowerCase() === "banele180@gmail.com" || p.googleEmail.toLowerCase() === "banzz1918@gmail.com");
+  if (!isEmailOwner) {
+    return res.status(403).json({ error: "Access Denied. Admin privilege required." });
+  }
+
+  const { playerId } = req.body;
+  if (!playerId || !state.players[playerId]) {
+    return res.status(404).json({ error: "Player profile not found." });
+  }
+
+  state.players[playerId].isChatBlocked = false;
+  saveState();
+  res.json({ success: true, message: `Commander ${state.players[playerId].username} is unblocked from global communications.` });
+});
+
+// Block user in direct messages
+app.post("/api/messages/block-user", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { targetId } = req.body;
+  if (!targetId || !state.players[targetId]) {
+    return res.status(404).json({ error: "Target transmitter station not found." });
+  }
+
+  if (targetId === p.id) {
+    return res.status(400).json({ error: "You cannot block yourself." });
+  }
+
+  if (!p.blockedPlayers) {
+    p.blockedPlayers = [];
+  }
+
+  if (!p.blockedPlayers.includes(targetId)) {
+    p.blockedPlayers.push(targetId);
+  }
+
+  saveState();
+  res.json({ success: true, message: `Transmissions from ${state.players[targetId].username} have been locked/blocked.` });
+});
+
+// Unblock user in direct messages
+app.post("/api/messages/unblock-user", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { targetId } = req.body;
+  if (!targetId) {
+    return res.status(400).json({ error: "Target transmitter ID required." });
+  }
+
+  if (p.blockedPlayers) {
+    p.blockedPlayers = p.blockedPlayers.filter(id => id !== targetId);
+  }
+
+  saveState();
+  res.json({ success: true, message: `Transmissions unblocked.` });
 });
 
 

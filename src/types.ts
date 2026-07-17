@@ -125,6 +125,8 @@ export interface PlayerProfile {
   autoUnloadResources?: boolean;
   welcomeMessageSent?: boolean;
   renameCount?: number;
+  isChatBlocked?: boolean;
+  blockedPlayers?: string[];
 }
 
 export interface CommandMessage {

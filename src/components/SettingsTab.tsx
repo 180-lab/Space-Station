@@ -98,6 +98,7 @@ interface SettingsTabProps {
   populationRank?: number;
   customTasks?: Record<string, any>;
   galaxyConfig?: any;
+  playersList?: any[];
 }
 
 const COSMETIC_SKINS = [
@@ -126,7 +127,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onNavigateToLeaderboard,
   populationRank,
   customTasks = {},
-  galaxyConfig
+  galaxyConfig,
+  playersList = []
 }) => {
   // Rename commander name and base colony names state
   const [commanderName, setCommanderName] = useState(player.username);
@@ -1846,6 +1848,131 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   CONFIRM ACTION
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* PERSONAL BLOCKED FREQUENCIES (DMs) & ADMIN CHAT BLOCKS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
+        {/* Personal Blocked DM List */}
+        <div className="p-5 bg-[#0A0F1D] border border-cyan-500/10 rounded-2xl space-y-3 shadow-lg text-left relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-full blur-xl pointer-events-none" />
+          <h3 className="text-xs font-extrabold text-rose-400 font-mono tracking-widest uppercase flex items-center gap-2">
+            🛡️ Personal Blocked Frequencies
+          </h3>
+          <p className="text-[10px] text-slate-500 leading-relaxed font-mono">
+            Commanders you have muted from your direct secure field transmissions inbox.
+          </p>
+
+          <div className="bg-slate-950/60 border border-[#1E293B] rounded-xl p-3 h-48 overflow-y-auto space-y-2">
+            {!player.blockedPlayers || player.blockedPlayers.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center text-slate-600 font-mono text-[10px]">
+                <span>No stations blocked.</span>
+              </div>
+            ) : (
+              player.blockedPlayers.map((blockedId: string) => {
+                const blockedUser = playersList.find(u => u.id === blockedId) || { id: blockedId, username: `Station [${blockedId.slice(0, 5)}]` };
+                return (
+                  <div key={blockedId} className="flex items-center justify-between p-2 bg-[#05070A] border border-[#1E293B]/40 rounded-lg">
+                    <span className="text-xs font-bold text-slate-300 font-mono">
+                      📡 {blockedUser.username}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch('/api/messages/unblock-user', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'x-user-id': player.id
+                            },
+                            body: JSON.stringify({ targetId: blockedId })
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            showToast(data.message || 'Station unblocked.', 'success');
+                            if (onRefreshState) onRefreshState();
+                          } else {
+                            showToast(data.error || 'Failed to unblock.', 'error');
+                          }
+                        } catch (err) {
+                          showToast('Network link unstable.', 'error');
+                        }
+                      }}
+                      className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-bold font-mono uppercase tracking-wider rounded transition cursor-pointer"
+                    >
+                      UNBLOCK
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Admin Chat Block List */}
+        {player?.googleEmail && (player.googleEmail.toLowerCase() === 'banele180@gmail.com' || player.googleEmail.toLowerCase() === 'banzz1918@gmail.com') && (
+          <div className="p-5 bg-[#0A0F1D] border border-cyan-500/10 rounded-2xl space-y-3 shadow-lg text-left relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-xl pointer-events-none" />
+            <h3 className="text-xs font-extrabold text-red-400 font-mono tracking-widest uppercase flex items-center gap-2">
+              🚫 Admin Chat Moderation
+            </h3>
+            <p className="text-[10px] text-slate-500 leading-relaxed font-mono">
+              Commanders currently barred from transmitting on sector global chat wavelengths.
+            </p>
+
+            <div className="bg-slate-950/60 border border-[#1E293B] rounded-xl p-3 h-48 overflow-y-auto space-y-2">
+              {(() => {
+                const blockedPlayersList = playersList.filter(u => u.isChatBlocked === true);
+                if (blockedPlayersList.length === 0) {
+                  return (
+                    <div className="h-full flex flex-col items-center justify-center text-center text-slate-600 font-mono text-[10px]">
+                      <span>No commanders currently blocked from chat.</span>
+                    </div>
+                  );
+                }
+                return blockedPlayersList.map((blockedUser) => (
+                  <div key={blockedUser.id} className="flex items-center justify-between p-2 bg-[#05070A] border border-red-500/10 rounded-lg">
+                    <div>
+                      <div className="text-xs font-bold text-slate-300 font-mono">
+                        🚫 {blockedUser.username}
+                      </div>
+                      <div className="text-[8.5px] text-slate-500 font-mono uppercase tracking-tight">
+                        ID: {blockedUser.id.slice(0, 10)}...
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch('/api/admin/chat-unblock', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'x-user-id': player.id
+                            },
+                            body: JSON.stringify({ playerId: blockedUser.id })
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            showToast(data.message || 'Commander unblocked.', 'success');
+                            if (onRefreshState) onRefreshState();
+                          } else {
+                            showToast(data.error || 'Failed to unblock.', 'error');
+                          }
+                        } catch (err) {
+                          showToast('Network link unstable.', 'error');
+                        }
+                      }}
+                      className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-bold font-mono uppercase tracking-wider rounded transition cursor-pointer"
+                    >
+                      UNBLOCK
+                    </button>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         )}

@@ -12,5 +12,12 @@
       "*.run.app",
       "*.onrender.com"
     ]
+  },
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "serverClientId": "592965643440-qf9d3vj67gksisdt9nd0m892l49n44b6.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
   }
 }

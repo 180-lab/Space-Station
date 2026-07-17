@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import welcomeBanner from './assets/images/welcome_banner_clean_1780971855115.png';
 import gameIcon from './assets/images/space_station_commander_icon_under_256kb-1.png';
 import { 
@@ -1680,6 +1682,78 @@ export default function App() {
     }
   };
 
+  // Auth: Native Google Sign-In using official Capacitor plugin
+  const handleNativeGoogleSignIn = async () => {
+    try {
+      showToast('Opening Google Account Picker...', 'info');
+      
+      try {
+        GoogleAuth.initialize({
+          clientId: googleClientId || '592965643440-qf9d3vj67gksisdt9nd0m892l49n44b6.apps.googleusercontent.com',
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true,
+        });
+      } catch (initErr) {
+        console.warn('GoogleAuth init warning:', initErr);
+      }
+
+      const googleUser: any = await GoogleAuth.signIn();
+      if (!googleUser) {
+        showToast('Google Sign-In was cancelled or failed.', 'error');
+        return;
+      }
+
+      const idToken = googleUser.authentication?.idToken || googleUser.idToken;
+      const email = googleUser.email;
+      const username = googleUser.displayName || googleUser.givenName || (email ? email.split('@')[0] : '');
+
+      if (!idToken && !email) {
+        showToast('Failed to retrieve credentials from Google account.', 'error');
+        return;
+      }
+
+      showToast('Authenticating with station core...', 'info');
+      
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          idToken: idToken || undefined,
+          email: email,
+          username: username,
+          faction: faction
+        })
+      });
+
+      const data = await safeParseJson(res);
+      if (res.ok) {
+        localStorage.setItem('moonbase_userId', data.player.id);
+        setUserId(data.player.id);
+        setPlayer(data.player);
+        if (email) {
+          addDeviceGoogleAccount(email, data.player.username);
+        }
+        showToast(`Access granted! Welcome, Commander ${data.player.username}.`, 'success');
+        setShowGoogleDialog(false);
+        if (data.isNew) {
+          setInitialStationName(`${data.player.username}'s Station`);
+          setShowInitialStationNaming(true);
+        }
+      } else {
+        showToast(data.error || 'Identity keys verification rejected.', 'error');
+      }
+    } catch (err: any) {
+      console.error('Native Google Sign-In Error:', err);
+      if (err.message && (err.message.includes('cancel') || err.message.includes('12501') || err.message.includes('picker'))) {
+        showToast('Google Sign-In cancelled.', 'info');
+      } else {
+        showToast(`Google Sign-In failed: ${err.message || err}`, 'error');
+      }
+    }
+  };
+
   // Auth: Google Sign-In
   const handleGoogleSignIn = async (email: string, selectName?: string, selectFaction?: string) => {
     try {
@@ -2759,7 +2833,21 @@ export default function App() {
           </div>
 
           {/* Branded Google Login button */}
-          {googleClientId && gisLoaded ? (
+          {Capacitor.isNativePlatform() ? (
+            <button 
+              type="button"
+              onClick={handleNativeGoogleSignIn}
+              className="w-full py-3 px-4 bg-white hover:bg-slate-100 text-[#1F2937] font-bold text-xs tracking-wider uppercase rounded-xl flex items-center justify-center gap-3 active:scale-[0.98] transition duration-150 cursor-pointer shadow-md"
+            >
+              <svg className="w-4 h-4 text-rose-500" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.13-.07-.25-.15-.35-.22" fill="#FBBC05" />
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+              </svg>
+              <span>Continue with Google Account</span>
+            </button>
+          ) : (googleClientId && gisLoaded ? (
             <div className="w-full flex justify-center py-1">
               <div id="main-google-signin-button" className="w-full min-h-[44px] flex justify-center"></div>
             </div>
@@ -2785,7 +2873,7 @@ export default function App() {
               </svg>
               <span>Continue with Google Account</span>
             </button>
-          )}
+          ))}
 
           {/* Branded Google Play Games Login button */}
           <button 
@@ -3855,6 +3943,7 @@ export default function App() {
             }}
             populationRank={myPopulationRankIndex}
             customTasks={customTasks}
+            playersList={playersList}
           />
         )}
       </main>
@@ -4606,6 +4695,92 @@ export default function App() {
                     </div>
                   )}
                 </div>
+
+                {/* Security & Blocking Controls */}
+                {!isSelf && (
+                  <div className="pt-3 border-t border-[#1E293B] space-y-2.5">
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-rose-500 font-mono">
+                      Security & Frequency Interceptors
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {/* DM Block/Unblock Button */}
+                      {(() => {
+                        const isBlocked = player?.blockedPlayers?.includes(targetPlayer.id);
+                        return (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const endpoint = isBlocked ? '/api/messages/unblock-user' : '/api/messages/block-user';
+                                const res = await fetch(endpoint, {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'x-user-id': player.id
+                                  },
+                                  body: JSON.stringify({ targetId: targetPlayer.id })
+                                });
+                                const data = await safeParseJson(res);
+                                if (res.ok) {
+                                  showToast(data.message || 'Frequency modified successfully.', 'success');
+                                  fetchState();
+                                } else {
+                                  showToast(data.error || 'Failed to modify frequency.', 'error');
+                                }
+                              } catch (err) {
+                                showToast('Network link failure.', 'error');
+                              }
+                            }}
+                            className={`flex-1 px-3 py-2 border rounded-xl text-[10px] font-bold uppercase tracking-wider transition cursor-pointer text-center ${
+                              isBlocked
+                                ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10'
+                                : 'bg-rose-950/20 border-rose-500/30 text-rose-400 hover:bg-rose-500/10'
+                            }`}
+                          >
+                            {isBlocked ? '🔓 Unblock direct DMs' : '🔒 Block direct DMs'}
+                          </button>
+                        );
+                      })()}
+
+                      {/* Admin Chat Block/Unblock Button */}
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const isChatBlocked = targetPlayer.isChatBlocked;
+                              const endpoint = isChatBlocked ? '/api/admin/chat-unblock' : '/api/admin/chat-block';
+                              const res = await fetch(endpoint, {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'x-user-id': player.id
+                                  },
+                                  body: JSON.stringify({ playerId: targetPlayer.id })
+                              });
+                              const data = await safeParseJson(res);
+                              if (res.ok) {
+                                showToast(data.message || 'Chat privilege modified.', 'success');
+                                fetchState();
+                              } else {
+                                showToast(data.error || 'Privilege modification failed.', 'error');
+                              }
+                            } catch (err) {
+                              showToast('Quantum terminal link offline.', 'error');
+                            }
+                          }}
+                          className={`flex-1 px-3 py-2 border rounded-xl text-[10px] font-bold uppercase tracking-wider transition cursor-pointer text-center ${
+                            targetPlayer.isChatBlocked
+                              ? 'bg-amber-950/20 border-amber-500/30 text-amber-400 hover:bg-amber-500/10'
+                              : 'bg-red-950/20 border-red-500/30 text-red-400 hover:bg-red-500/10'
+                          }`}
+                        >
+                          {targetPlayer.isChatBlocked ? '⚡ Unblock Global Chat' : '🚫 Block Global Chat'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Last Detected Activity */}
                 <div className="pt-3 border-t border-[#1E293B] text-[10px] text-slate-500 flex justify-between items-center text-right sm:text-left gap-2 flex-wrap">
