@@ -29,7 +29,8 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
-  AlertTriangle
+  AlertTriangle,
+  Clock
 } from 'lucide-react';
 
 interface GalaxyTabProps {
@@ -1102,6 +1103,150 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
       {/* SUB TAB 1: RADAR SCANNER */}
       {subTab === 'scanner' && (
         <div className="space-y-1.5">
+
+          {/* Radar Array Upgrade & Status Control */}
+          {(() => {
+            const radarState = activePlanet?.buildings?.radar || { level: 0, maxLevel: 15, isUpgrading: false, upgradeEnd: null };
+            
+            const buildingQueueCount = activePlanet?.upgradeQueue?.filter((item: any) => item.type === 'building' && item.key === 'radar').length || 0;
+            const activeUpgradeCount = radarState.isUpgrading ? 1 : 0;
+            const currentTotalUpgrades = activeUpgradeCount + buildingQueueCount;
+            const nextTargetLvl = radarState.level + currentTotalUpgrades + 1;
+            const nextUpgradeTimeMins = nextTargetLvl * 2;
+
+            const targetLvl = radarState.level + 1;
+            const upgradeTimeMins = targetLvl * 2;
+
+            const fabLevel = activePlanet?.buildings?.fabricator?.level || 0;
+            const isFabricatorRequiredMissing = fabLevel < 2;
+
+            const isAnyUpgradeInProgress = activePlanet?.buildings ? (
+              Object.values(activePlanet.buildings).some((b: any) => b.isUpgrading) ||
+              (activePlanet.mines && Object.keys(activePlanet.mines).some(mKey => 
+                activePlanet.mines[mKey as ResourceType]?.some((m: any) => m.isUpgrading)
+              ))
+            ) : false;
+
+            const getTimerString = (endTimestamp: number | null) => {
+              if (!endTimestamp) return '';
+              const diff = Math.max(0, endTimestamp - serverTime);
+              const secs = Math.floor(diff / 1000);
+              const h = Math.floor(secs / 3600);
+              const m = Math.floor((secs % 3600) / 60);
+              const s = secs % 60;
+              const hText = h === 1 ? 'hr' : 'hrs';
+              const mText = m === 1 ? 'min' : 'mins';
+              const sText = s === 1 ? 'sec' : 'secs';
+              if (h > 0) {
+                return `${h} ${hText}, ${m} ${mText}, ${s} ${sText}`;
+              }
+              return `${m} ${mText}, ${s} ${sText}`;
+            };
+
+            const renderRadarCostBar = (targetLevel: number) => {
+              const resourceTypes: ResourceType[] = ['water', 'plasma', 'fuel', 'food', 'respirant'];
+              const infoMap = {
+                water: { label: 'Water', color: 'bg-cyan-400' },
+                plasma: { label: 'Plasma', color: 'bg-purple-400' },
+                fuel: { label: 'Fuel', color: 'bg-amber-400' },
+                food: { label: 'Food', color: 'bg-emerald-400' },
+                respirant: { label: 'Respirant', color: 'bg-blue-400' }
+              };
+
+              return (
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  {resourceTypes.map((rKey) => {
+                    const cost = getUpgradeResourceCost('building', 'radar', targetLevel, rKey);
+                    const { label, color } = infoMap[rKey];
+                    const isShort = localResources ? (localResources[rKey] || 0) < cost : false;
+                    return (
+                      <div 
+                        key={rKey} 
+                        className={`flex items-center gap-1 px-1.5 py-0.5 bg-white/[0.02] border rounded text-[9px] font-mono font-bold ${isShort ? 'border-red-500/30 bg-red-950/10' : 'border-white/5'}`}
+                        title={isShort ? `Short of ${label} (Have ${Math.round(localResources?.[rKey] || 0).toLocaleString()}, need ${cost.toLocaleString()})` : `${label} requirements met`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${color}`} />
+                        <span className={isShort ? 'text-red-400 font-extrabold animate-pulse' : 'text-slate-400'}>{cost.toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            };
+
+            return (
+              <div id="radar-array-control-panel" className="p-4 bg-[#0A0F1D]/95 border border-[#1E293B] rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl mb-3">
+                <div className="space-y-1 text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+                      <Radar size={16} className="text-cyan-400 animate-pulse" />
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                        Planetary Radar Array <span className="text-cyan-400 font-mono text-xs ml-1 bg-cyan-950/40 border border-cyan-500/20 px-1.5 py-0.5 rounded">Lv. {radarState.level}</span>
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-sans mt-0.5">
+                        Current Radius: <span className="text-cyan-300 font-bold">{radarRadius} sector{radarRadius !== 1 ? 's' : ''}</span>. Expands tactical telemetry scans.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Active upgrade or queued upgrade display */}
+                  {radarState.isUpgrading && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-amber-400 mt-2 bg-amber-950/20 border border-amber-500/15 px-2 py-1 rounded-lg">
+                      <Clock size={11} className="animate-spin" />
+                      <span>Upgrading: {getTimerString(radarState.upgradeEnd)}</span>
+                    </div>
+                  )}
+
+                  {buildingQueueCount > 0 && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400 mt-1 bg-emerald-950/20 border border-emerald-500/15 px-2 py-1 rounded-lg">
+                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                      <span>{buildingQueueCount} Upgrade project{buildingQueueCount > 1 ? 's' : ''} queued (Target: Lv. {radarState.level + currentTotalUpgrades})</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="w-full md:w-auto flex flex-col items-stretch md:items-end gap-1.5 self-stretch justify-center">
+                  {radarState.level >= radarState.maxLevel ? (
+                    <span className="text-[10px] text-slate-500 font-bold tracking-widest uppercase font-mono bg-slate-900 border border-slate-850 px-3 py-1.5 rounded-xl text-center">
+                      MAX CAP
+                    </span>
+                  ) : isFabricatorRequiredMissing ? (
+                    <span className="text-[9px] text-red-400 font-bold tracking-widest uppercase font-mono bg-red-950/25 border border-red-500/25 px-2.5 py-1.5 rounded-xl text-center" title="Requires Fabricator Level 2 or higher to upgrade Radar Array">
+                      🔒 REQUIRES FABRICATOR LV. 2
+                    </span>
+                  ) : (radarState.isUpgrading || isAnyUpgradeInProgress) ? (
+                    <div className="flex flex-col items-stretch md:items-end gap-1 w-full">
+                      <button
+                        onClick={() => onUpgradeBuilding?.('radar', true)}
+                        disabled={isUpgrading}
+                        className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/35 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] rounded-xl transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        type="button"
+                      >
+                        <span>Queue Upgrade</span>
+                        <span className="text-amber-400 font-extrabold">(Lv. {nextTargetLvl})</span>
+                      </button>
+                      {renderRadarCostBar(nextTargetLvl)}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-stretch md:items-end gap-1 w-full">
+                      <button
+                        onClick={() => onUpgradeBuilding?.('radar', false)}
+                        disabled={isUpgrading}
+                        className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest bg-pink-500/10 text-pink-400 border border-pink-500/35 hover:bg-pink-500/20 hover:shadow-[0_0_12px_rgba(236,72,153,0.25)] rounded-xl transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        type="button"
+                      >
+                        <span>Upgrade Radar</span>
+                        <span className="text-slate-450 text-pink-400 font-bold">({upgradeTimeMins}m)</span>
+                      </button>
+                      {renderRadarCostBar(nextTargetLvl)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
             {/* Coordinates Search */}
           <form onSubmit={handleSearchSubmit} className="p-4 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
