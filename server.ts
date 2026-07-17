@@ -7688,6 +7688,60 @@ app.post("/api/messages/unblock-user", (req, res) => {
 });
 
 
+// Report player to admins (sent to admins as DMs)
+app.post("/api/players/report", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { targetId, reason } = req.body;
+  if (!targetId || !reason || typeof reason !== "string" || !reason.trim()) {
+    return res.status(400).json({ error: "Target player ID and report statement are required." });
+  }
+
+  const targetPlayer = state.players[targetId];
+  if (!targetPlayer) {
+    return res.status(404).json({ error: "Target player not found." });
+  }
+
+  // Find all admin players by matching email (banele180@gmail.com or banzz1918@gmail.com)
+  const adminPlayers = Object.values(state.players).filter(
+    ap => ap.googleEmail && (ap.googleEmail.toLowerCase() === "banele180@gmail.com" || ap.googleEmail.toLowerCase() === "banzz1918@gmail.com")
+  );
+
+  const reportMessageContent = `[INCIDENT REPORT] Reporter: "${p.username}" (ID: ${p.id}). Reported Target: "${targetPlayer.username}" (ID: ${targetPlayer.id}). Statement: "${reason.trim()}"`;
+
+  adminPlayers.forEach(admin => {
+    if (!admin.commandMessages) {
+      admin.commandMessages = [];
+    }
+    const reportMessage: CommandMessage = {
+      id: `report_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`,
+      senderId: "system",
+      senderName: "Galactic Security Office",
+      senderFaction: "System Security",
+      senderFactionColor: "#EF4444",
+      receiverId: admin.id,
+      receiverName: admin.username,
+      content: reportMessageContent,
+      timestamp: Date.now(),
+      isRead: false,
+      isSaved: false
+    };
+    admin.commandMessages.push(reportMessage);
+
+    // Send real-time notification
+    sendNotificationWithFallback(
+      admin.id,
+      "🚨 Incident Report Submitted",
+      `Reported: ${targetPlayer.username} by ${p.username}. Statement: ${reason.trim().substring(0, 30)}...`
+    );
+  });
+
+  saveState();
+  res.json({ success: true, message: "Incident report transmitted securely to Galactic Federation command authority." });
+});
+
+
 // Serve Static Assets & SPA Router
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {

@@ -465,6 +465,9 @@ export default function App() {
   const [commDeckTab, setCommDeckTab] = useState<'incoming' | 'saved' | 'sent' | 'compose'>('incoming');
   const [profileMsgText, setProfileMsgText] = useState("");
   const [isSendingMsg, setIsSendingMsg] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [isReporting, setIsReporting] = useState(false);
+  const [showReportForm, setShowReportForm] = useState(false);
   const [forwardingMsgId, setForwardingMsgId] = useState<string | null>(null);
   const [forwardTargetId, setForwardTargetId] = useState("");
   const [directMsgTargetId, setDirectMsgTargetId] = useState("");
@@ -4778,7 +4781,84 @@ export default function App() {
                           {targetPlayer.isChatBlocked ? '⚡ Unblock Global Chat' : '🚫 Block Global Chat'}
                         </button>
                       )}
+
+                      {/* Report Player Toggle Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowReportForm(!showReportForm);
+                          setReportReason("");
+                        }}
+                        className={`flex-1 px-3 py-2 border rounded-xl text-[10px] font-bold uppercase tracking-wider transition cursor-pointer text-center ${
+                          showReportForm
+                            ? 'bg-amber-950/40 border-amber-500/50 text-amber-300'
+                            : 'bg-[#1e293b]/30 border-slate-700 text-slate-300 hover:bg-[#1e293b]/60'
+                        }`}
+                      >
+                        ⚠️ Report Player
+                      </button>
                     </div>
+
+                    {showReportForm && (
+                      <div className="p-3 bg-red-950/10 border border-red-500/20 rounded-xl space-y-2.5 animate-fadeIn mt-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9.5px] font-bold text-red-400 font-mono">INCIDENT REPORT STATEMENT</span>
+                          <span className="text-[8.5px] text-slate-500 font-mono">TRANSMITTED TO ADMINS</span>
+                        </div>
+                        <textarea
+                          value={reportReason}
+                          onChange={(e) => setReportReason(e.target.value)}
+                          placeholder="Please provide a detailed statement of the violation (e.g. chat spam, abusive behavior)..."
+                          className="w-full h-16 bg-[#05070A] border border-red-500/20 focus:border-red-500/50 text-slate-100 rounded-xl p-2.5 text-xs focus:outline-none font-mono"
+                          maxLength={400}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowReportForm(false);
+                              setReportReason("");
+                            }}
+                            className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold uppercase tracking-wider rounded-lg transition cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isReporting || !reportReason.trim()}
+                            onClick={async () => {
+                              try {
+                                setIsReporting(true);
+                                const res = await fetch('/api/players/report', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'x-user-id': player.id
+                                  },
+                                  body: JSON.stringify({ targetId: targetPlayer.id, reason: reportReason })
+                                });
+                                const data = await safeParseJson(res);
+                                if (res.ok) {
+                                  showToast(data.message || 'Incident report transmitted to command authority.', 'success');
+                                  setShowReportForm(false);
+                                  setReportReason("");
+                                  fetchState();
+                                } else {
+                                  showToast(data.error || 'Failed to dispatch report.', 'error');
+                                }
+                              } catch (err) {
+                                showToast('Failed to link with quantum secure router.', 'error');
+                              } finally {
+                                setIsReporting(false);
+                              }
+                            }}
+                            className="flex-1 py-1.5 bg-gradient-to-r from-red-600 to-amber-600 hover:brightness-110 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-[0_0_8px_rgba(239,68,68,0.2)]"
+                          >
+                            {isReporting ? 'Transmitting...' : 'Submit Report'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
