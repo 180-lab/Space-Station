@@ -3073,7 +3073,13 @@ export default function App() {
                             }
                             setIsCheckingEmail(true);
                             try {
-                              const res = await fetch(`/api/auth/check-email?email=${encodeURIComponent(newAccountEmail)}`);
+                              const res = await fetch('/api/auth/check-email', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ email: newAccountEmail })
+                              });
                               const data = await safeParseJson(res);
                               if (res.ok && data.exists) {
                                 showToast('Google credential match! Establishing uplink...', 'success');
