@@ -647,6 +647,56 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     });
   };
 
+  const [runningChaosSimulation, setRunningChaosSimulation] = useState(false);
+  const handleRunChaosSimulation = async () => {
+    setRunningChaosSimulation(true);
+    try {
+      const res = await fetch('/api/dev/run-chaos-simulation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(data.message || 'Legends of Chaos simulation successfully initialized!', 'success');
+        if (onRefreshState) onRefreshState();
+      } else {
+        showToast(data.error || 'Failed to initialize Chaos simulation.', 'error');
+      }
+    } catch (err) {
+      showToast('Communications failure running simulation.', 'error');
+    } finally {
+      setRunningChaosSimulation(false);
+    }
+  };
+
+  const [leavingChaosSimulation, setLeavingChaosSimulation] = useState(false);
+  const handleLeaveChaosSimulation = async () => {
+    setLeavingChaosSimulation(true);
+    try {
+      const res = await fetch('/api/dev/leave-chaos-simulation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(data.message || 'Left simulation and cleared resources.', 'success');
+        if (onRefreshState) onRefreshState();
+      } else {
+        showToast(data.error || 'Failed to leave simulation.', 'error');
+      }
+    } catch (err) {
+      showToast('Communications failure leaving simulation.', 'error');
+    } finally {
+      setLeavingChaosSimulation(false);
+    }
+  };
+
   const handleApplySkin = (id: string, name: string) => {
     setSkinId(id);
     localStorage.setItem('moonbase_skin_id', id);
@@ -1068,6 +1118,26 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   >
                     <RefreshCw size={12} className={resettingServer ? 'animate-spin' : ''} /> 
                     {resettingServer ? 'Executing reset override...' : '🚨 Force Reset Server Database'}
+                  </button>
+
+                  <button
+                    onClick={handleRunChaosSimulation}
+                    disabled={runningChaosSimulation}
+                    className="w-full py-2.5 px-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500 text-amber-350 disabled:opacity-50 rounded-xl font-bold font-mono text-[10px] uppercase tracking-widest transition flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+                    type="button"
+                  >
+                    <RefreshCw size={12} className={runningChaosSimulation ? 'animate-spin' : ''} /> 
+                    {runningChaosSimulation ? 'Launching Simulation...' : '🔥 Spawn Legends of Chaos Simulation'}
+                  </button>
+
+                  <button
+                    onClick={handleLeaveChaosSimulation}
+                    disabled={leavingChaosSimulation}
+                    className="w-full py-2.5 px-3 bg-slate-500/10 hover:bg-slate-500/20 border border-slate-500 text-slate-350 disabled:opacity-50 rounded-xl font-bold font-mono text-[10px] uppercase tracking-widest transition flex items-center justify-center gap-2 cursor-pointer mt-2 shadow-[0_0_15px_rgba(100,116,139,0.1)]"
+                    type="button"
+                  >
+                    <RefreshCw size={12} className={leavingChaosSimulation ? 'animate-spin' : ''} /> 
+                    {leavingChaosSimulation ? 'Terminating Simulation...' : '🛑 Leave Chaos Simulation'}
                   </button>
 
                   {/* GALAXY EXPANSION ARCHITECTURE SETTINGS */}

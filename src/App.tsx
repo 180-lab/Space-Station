@@ -27,6 +27,7 @@ import { ChatTab } from './components/ChatTab';
 import { SettingsTab } from './components/SettingsTab';
 import { CommanderTutorial } from './components/CommanderTutorial';
 import { CommunicationsHubModal } from './components/CommunicationsHubModal';
+import { ClickFeedbackLoader } from './components/ClickFeedbackLoader';
 import { 
   Droplet, 
   Flame, 
@@ -2851,8 +2852,23 @@ export default function App() {
               <span>Continue with Google Account</span>
             </button>
           ) : (googleClientId && gisLoaded ? (
-            <div className="w-full flex justify-center py-1">
+            <div className="w-full flex flex-col items-center gap-2 py-1">
               <div id="main-google-signin-button" className="w-full min-h-[44px] flex justify-center"></div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (deviceGoogleAccounts && deviceGoogleAccounts.length > 0) {
+                    setGoogleDialogMode('choose');
+                  } else {
+                    setGoogleDialogMode('add');
+                  }
+                  setGoogleFlowStep('email');
+                  setShowGoogleDialog(true);
+                }}
+                className="text-[11px] text-cyan-400 hover:text-cyan-300 underline mt-1.5 cursor-pointer font-medium select-none"
+              >
+                Having trouble with Google Sign-In? Try Sandbox Bypass
+              </button>
             </div>
           ) : (
             <button 
@@ -3329,6 +3345,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen max-w-full overflow-x-hidden font-sans bg-[#05070A] text-slate-350 selection:bg-cyan-500/25 pb-24 theme-${theme} ${isVibrating ? (vibrateIntensity === 'heavy' ? 'animate-vibrate-heavy' : 'animate-vibrate') : ''}`}>
+      <ClickFeedbackLoader />
       
       {/* Toast Notice alerts */}
       {toast && (
@@ -5568,7 +5585,7 @@ export default function App() {
                                         </div>
                                         <div className="flex flex-wrap gap-1.5 text-slate-300 mt-1">
                                           {Object.entries(fleet.troops || {}).filter(([_, qty]) => (qty as number) > 0).map(([tId, qty]) => {
-                                            const label = tId === 'defender' ? 'Interceptor' : tId === 'attacker' ? 'Attacker' : tId === 'tank' ? 'Disrupter' : tId === 'looter' ? 'Matter Extractor' : tId === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                            const label = tId === 'defender' ? 'Interceptor' : tId === 'attacker' ? 'Assault Drone' : tId === 'tank' ? 'Disrupter' : tId === 'looter' ? 'Matter Extractor' : tId === 'drone' ? 'Missile Launcher' : 'Settlement Ship';
                                             return (
                                               <span key={tId} className="bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded text-[9px] uppercase font-bold text-red-300">{qty}x {label}</span>
                                             );

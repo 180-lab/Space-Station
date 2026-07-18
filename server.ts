@@ -1968,10 +1968,20 @@ function simulateMoonbaseCombat(
   attTroops: Record<string, number>,
   defTroops: Record<string, number>,
   attShieldLevel: number = 10,
-  defShieldLevel: number = 10
+  defShieldLevel: number = 10,
+  allianceTroops?: Record<string, number>
 ) {
   const attRemaining = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0, ...attTroops };
-  const defRemaining = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0, ...defTroops };
+  
+  // Track defender's own and alliance members' troops separately
+  const defOwnRemaining = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0, ...defTroops };
+  const defAllianceRemaining = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0, ...allianceTroops };
+
+  // Combine them into a single remaining count record for backward compatibility and general flow
+  const defRemaining = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+  Object.keys(defRemaining).forEach(tId => {
+    defRemaining[tId as keyof typeof defRemaining] = (defOwnRemaining[tId as keyof typeof defOwnRemaining] || 0) + (defAllianceRemaining[tId as keyof typeof defAllianceRemaining] || 0);
+  });
 
   const attackerLosses = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
   const defenderLosses = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
@@ -1993,9 +2003,15 @@ function simulateMoonbaseCombat(
   });
 
   let initialDefHp = 0;
-  Object.entries(defTroops).forEach(([tId, count]) => {
+  // Defender's own troops get boosted by defMult
+  Object.entries(defOwnRemaining).forEach(([tId, count]) => {
     const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
     if (spec) initialDefHp += count * Math.round(spec.defenceHp * defMult);
+  });
+  // Alliance members' troops do NOT get boosted by defMult (uses multiplier 1.0)
+  Object.entries(defAllianceRemaining).forEach(([tId, count]) => {
+    const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+    if (spec) initialDefHp += count * Math.round(spec.defenceHp * 1.0);
   });
 
   let attSurvivalFloor = 0;
@@ -2103,7 +2119,11 @@ function simulateMoonbaseCombat(
         // Process actual casualties per troop type based on their unit defense stats
         remainingTargets.forEach(tId => {
           const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-          const unitHp = Math.round((spec ? spec.defenceHp : 100) * defMult);
+          const totalSurviving = defOwnRemaining[tId] + defAllianceRemaining[tId];
+          const effectiveMult = totalSurviving > 0
+            ? (defOwnRemaining[tId] * defMult + defAllianceRemaining[tId] * 1.0) / totalSurviving
+            : defMult;
+          const unitHp = Math.round((spec ? spec.defenceHp : 100) * effectiveMult);
           const currentCount = defRemaining[tId];
           const allocatedDmg = damageToApply[tId];
 
@@ -2123,6 +2143,18 @@ function simulateMoonbaseCombat(
 
           if (killed > 0) {
             roundDefLosses[tId] += killed;
+
+            // Distribute killed units between defender own and alliance members proportionally
+            const totalSurv = defOwnRemaining[tId] + defAllianceRemaining[tId];
+            if (totalSurv > 0) {
+              const defenderShare = Math.round((defOwnRemaining[tId] / totalSurv) * killed);
+              const defenderKilled = Math.min(defOwnRemaining[tId], defenderShare);
+              const allianceKilled = Math.min(defAllianceRemaining[tId], killed - defenderKilled);
+              
+              defOwnRemaining[tId] -= defenderKilled;
+              defAllianceRemaining[tId] -= allianceKilled;
+            }
+
             defenderLosses[tId] += killed;
             defRemaining[tId] -= killed;
             defenceHpKilled += killed * unitHp;
@@ -2259,15 +2291,41 @@ function simulateMoonbaseCombat(
 
   if (defSurvivalFloor > 0) {
     let protectionTriggered = false;
-    Object.entries(defTroops).forEach(([tId, initialCount]) => {
+    const initialDefTroops: Record<string, number> = {};
+    Object.keys(defOwnRemaining).forEach(tId => {
+      initialDefTroops[tId] = (defTroops[tId] || 0) + (defAllianceRemaining[tId] ? (allianceTroops?.[tId] || 0) : 0);
+    });
+
+    Object.entries(initialDefTroops).forEach(([tId, initialCount]) => {
       if (initialCount > 0) {
         const minSurviving = Math.ceil(initialCount * defSurvivalFloor);
         if (defRemaining[tId] < minSurviving) {
           const shortage = minSurviving - defRemaining[tId];
           defRemaining[tId] = minSurviving;
           defenderLosses[tId] = Math.max(0, defenderLosses[tId] - shortage);
+
+          // Distribute the restored units proportionally based on initial counts
+          const initialOwn = defTroops[tId] || 0;
+          const initialAlliance = allianceTroops?.[tId] || 0;
+          const initialTotal = initialOwn + initialAlliance;
+          let ownRestored = shortage;
+          let allianceRestored = 0;
+          if (initialTotal > 0) {
+            const ownShare = Math.round((initialOwn / initialTotal) * shortage);
+            ownRestored = Math.min(initialOwn - defOwnRemaining[tId], ownShare);
+            allianceRestored = shortage - ownRestored;
+          }
+          defOwnRemaining[tId] += ownRestored;
+          defAllianceRemaining[tId] += allianceRestored;
+
           const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-          const unitHp = spec ? Math.round(spec.defenceHp * defMult) : 10;
+          // Use weighted average mult for the restored units
+          const totalSurviving = defOwnRemaining[tId] + defAllianceRemaining[tId];
+          const effectiveMult = totalSurviving > 0
+            ? (defOwnRemaining[tId] * defMult + defAllianceRemaining[tId] * 1.0) / totalSurviving
+            : defMult;
+          const unitHp = spec ? Math.round(spec.defenceHp * effectiveMult) : 10;
+
           defenceHpKilled = Math.max(0, defenceHpKilled - shortage * unitHp);
           protectionTriggered = true;
         }
@@ -2354,6 +2412,10 @@ function simulateMoonbaseCombat(
       defRemaining[tId as keyof typeof defRemaining] = 0;
       defenderLosses[tId as keyof typeof defenderLosses] = count;
     });
+    Object.keys(defOwnRemaining).forEach(tId => {
+      defOwnRemaining[tId] = 0;
+      defAllianceRemaining[tId] = 0;
+    });
     defenceHpKilled = initialDefHp;
     if (rounds.length > 0) {
       rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Attacker's initial force HP of ${initialAttHp.toLocaleString()} exceeded 150% more than the defender's total involved HP (${initialDefHp.toLocaleString()}). Absolute overwhelm triggered; all defender defending forces have been wiped out with ZERO survivors!`);
@@ -2381,6 +2443,20 @@ function simulateMoonbaseCombat(
             const minQty = Math.max(1, Math.ceil(count * 0.10));
             defRemaining[tId as keyof typeof defRemaining] = minQty;
             defenderLosses[tId as keyof typeof defenderLosses] = Math.max(0, count - minQty);
+
+            // Distribute the restored units proportionally based on initial counts
+            const initialOwn = defTroops[tId] || 0;
+            const initialAlliance = allianceTroops?.[tId] || 0;
+            const initialTotal = initialOwn + initialAlliance;
+            let ownRestored = minQty;
+            let allianceRestored = 0;
+            if (initialTotal > 0) {
+              const ownShare = Math.round((initialOwn / initialTotal) * minQty);
+              ownRestored = Math.min(initialOwn, ownShare);
+              allianceRestored = minQty - ownRestored;
+            }
+            defOwnRemaining[tId] = ownRestored;
+            defAllianceRemaining[tId] = allianceRestored;
           }
         });
         if (rounds.length > 0) {
@@ -2416,7 +2492,14 @@ function simulateMoonbaseCombat(
   const finalDefHp = Object.entries(defRemaining).reduce((sum, [tId, qty]) => {
     const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
     const totalUnitHP = spec ? spec.defenceHp : 0;
-    return sum + qty * Math.round(totalUnitHP * defMult);
+    
+    // Proportional calculation of surviving HP based on shield-boosting rules
+    const ownCount = defOwnRemaining[tId] || 0;
+    const allianceCount = defAllianceRemaining[tId] || 0;
+    
+    const ownHP = ownCount * Math.round(totalUnitHP * defMult);
+    const allianceHP = allianceCount * Math.round(totalUnitHP * 1.0);
+    return sum + ownHP + allianceHP;
   }, 0);
 
   let winner: "attacker" | "defender" = "defender";
@@ -2855,21 +2938,46 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
     const defPlanet = defender.planets.find(pl => pl.sectorX === fleet.targetCoords.x && pl.sectorY === fleet.targetCoords.y) || defender.planets[0];
     const attTroops = { ...fleet.troops };
     
-    // Find defender's docking reserve fleets on this planet (not traveling, or finished mission)
+    // Find defender's own docking reserve fleets on this planet (not traveling, or finished mission)
     const dockingDefenderReserveFleets = (defender.createdFleets || []).filter(cf => 
       cf.planetId === (defPlanet ? defPlanet.id : "") && (!cf.isTraveling || !cf.activeMissionId)
     );
 
-    const defTroops = defPlanet 
+    const defOwnTroops = defPlanet 
       ? { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0, ...defPlanet.troops } 
       : { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
 
-    // Combine docking reserve fleets into the defender troops
+    // Combine defender's own docking reserve fleets into defOwnTroops
     dockingDefenderReserveFleets.forEach(cf => {
       Object.entries(cf.troops).forEach(([tId, count]) => {
         const qty = Number(count) || 0;
-        defTroops[tId as keyof typeof defTroops] = (defTroops[tId as keyof typeof defTroops] || 0) + qty;
+        defOwnTroops[tId as keyof typeof defOwnTroops] = (defOwnTroops[tId as keyof typeof defOwnTroops] || 0) + qty;
       });
+    });
+
+    // Find alliance members' docking reserve fleets on this planet and combine them into defAllianceTroops
+    const defAllianceTroops = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+    const allDockedDefenderFleets: any[] = [...dockingDefenderReserveFleets];
+
+    Object.values(state.players).forEach(pObj => {
+      // Must be a different player, must be in same alliance
+      if (pObj.id !== defender.id && !!defender.allianceId && pObj.allianceId === defender.allianceId && pObj.createdFleets) {
+        pObj.createdFleets.forEach(cf => {
+          if (cf.planetId === (defPlanet ? defPlanet.id : "") && (!cf.isTraveling || !cf.activeMissionId)) {
+            allDockedDefenderFleets.push(cf);
+            Object.entries(cf.troops).forEach(([tId, count]) => {
+              const qty = Number(count) || 0;
+              defAllianceTroops[tId as keyof typeof defAllianceTroops] = (defAllianceTroops[tId as keyof typeof defAllianceTroops] || 0) + qty;
+            });
+          }
+        });
+      }
+    });
+
+    // Combined defTroops for any backwards-compatibility logging/calculations
+    const defTroops = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
+    Object.keys(defTroops).forEach(tId => {
+      defTroops[tId as keyof typeof defTroops] = (defOwnTroops[tId as keyof typeof defOwnTroops] || 0) + (defAllianceTroops[tId as keyof typeof defAllianceTroops] || 0);
     });
 
     // Execute Moonbase combat simulation
@@ -2884,12 +2992,13 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       fleet.senderName,
       fleet.targetName,
       attTroops,
-      defTroops,
+      defOwnTroops,
       attShieldLvl,
-      defShieldLvl
+      defShieldLvl,
+      defAllianceTroops
     );
 
-    // Apply casualties to defender (local garrison and docking reserve fleets)
+    // Apply casualties to defender (local garrison and all docking reserve fleets, including alliance members')
     if (defPlanet) {
       Object.entries(combat.defenderLosses).forEach(([tId, totalLoss]) => {
         if (totalLoss <= 0) return;
@@ -2915,8 +3024,8 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
           });
         }
 
-        // Source 2: Docking reserve fleets
-        dockingDefenderReserveFleets.forEach(cf => {
+        // Source 2: All docking reserve fleets (defender's own and alliance members'!)
+        allDockedDefenderFleets.forEach(cf => {
           const count = cf.troops[tId as keyof typeof cf.troops] || 0;
           if (count > 0) {
             sources.push({
@@ -2950,13 +3059,17 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
         });
       });
 
-      // Filter out empty reserve fleets from the defender
-      if (defender.createdFleets) {
-        defender.createdFleets = defender.createdFleets.filter(cf => {
-          const totalTroops = Object.values(cf.troops).reduce((sum, count) => sum + (Number(count) || 0), 0);
-          return totalTroops > 0;
-        });
-      }
+      // Filter out empty reserve fleets from defender and alliance members
+      Object.values(state.players).forEach(pObj => {
+        const isDefender = pObj.id === defender.id;
+        const isAllianceMember = !!defender.allianceId && pObj.allianceId === defender.allianceId;
+        if ((isDefender || isAllianceMember) && pObj.createdFleets) {
+          pObj.createdFleets = pObj.createdFleets.filter(cf => {
+            const totalTroops = Object.values(cf.troops).reduce((sum, count) => sum + (Number(count) || 0), 0);
+            return totalTroops > 0;
+          });
+        }
+      });
     }
 
     // Award scoring for actual units destroyed on both sides (loser of the attack does not get points)
@@ -4012,6 +4125,332 @@ app.post("/api/dev/reset-my-player", (req, res) => {
   delete state.players[p.id];
   saveState();
   res.json({ success: true, message: "Your player profile has been completely removed from the universe." });
+});
+
+// Custom Simulation: Legends of Chaos
+app.post("/api/dev/run-chaos-simulation", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.googleEmail || (p.googleEmail.toLowerCase() !== 'banele180@gmail.com' && p.googleEmail.toLowerCase() !== 'banzz1918@gmail.com')) {
+    return res.status(403).json({ error: "Access Denied: Simulation tools are restricted to system administrators." });
+  }
+
+  // 1. Ensure admin has a main planet/station
+  if (!p.planets || p.planets.length === 0) {
+    const limit = getCurrentMapLimits();
+    const coords = getSafeRandomCoordinates(limit);
+    p.planets = [createInitialPlanet(`${p.username}'s Station`, coords.x, coords.y)];
+  }
+  const adminPlanet = p.planets[0];
+
+  // 2. Spawn admin with exactly 10,000,000 Attack HP in garrison troops
+  // drone gives 120 attack HP, defender gives 10.
+  // 83333 * 120 + 4 * 10 = 9999960 + 40 = 10000000 ATK HP
+  adminPlanet.troops = {
+    defender: 4,
+    attacker: 0,
+    tank: 10000,
+    looter: 0,
+    drone: 83333,
+    settlementShip: 0
+  };
+
+  // Also set their attack score to 10000000
+  if (!p.scores) {
+    p.scores = { population: 21, attack: 10000000, defence: 0, raiders: 0 };
+  } else {
+    p.scores.attack = 10000000;
+  }
+
+  // 3. Admin MUST NOT be in an alliance in this simulation
+  if (p.allianceId) {
+    const oldAlliance = state.alliances[p.allianceId];
+    if (oldAlliance) {
+      oldAlliance.members = oldAlliance.members.filter((m: any) => m.playerId !== p.id);
+      if (oldAlliance.members.length === 0) {
+        delete state.alliances[p.allianceId];
+      } else if (oldAlliance.leaderId === p.id) {
+        oldAlliance.leaderId = oldAlliance.members[0].playerId;
+        oldAlliance.leaderName = oldAlliance.members[0].username;
+      }
+    }
+    p.allianceId = null;
+    p.allianceRole = null;
+  }
+
+  // 4. Create/update a 3-member AI alliance 'alliance_chaos'
+  const allianceId = "alliance_chaos";
+  const alliance = {
+    id: allianceId,
+    name: "Legends of Chaos Alliance",
+    tag: "CHAOS",
+    leaderId: "ai_legends_of_chaos",
+    leaderName: "Legends of Chaos",
+    members: [
+      { playerId: "ai_legends_of_chaos", username: "Legends of Chaos", role: 'leader' as const },
+      { playerId: "member_closest", username: "Alpha Member", role: 'member' as const },
+      { playerId: "ai_chaos_member_3", username: "Chaos Guardian", role: 'member' as const }
+    ],
+    wars: [],
+    bannerColor: "#FF007A",
+    bannerSymbol: "Shield",
+    highlights: "Legends of Chaos AI simulation team."
+  };
+  state.alliances[allianceId] = alliance;
+
+  // 5. Place Alpha Member at the closest station to admin station
+  const closestCoord = findClusterCoordinate(adminPlanet.sectorX, adminPlanet.sectorY) || { x: adminPlanet.sectorX + 1, y: adminPlanet.sectorY };
+  const memberId = "member_closest";
+  let memberPlayer = state.players[memberId];
+  if (!memberPlayer) {
+    const memberPlanet = createInitialPlanet("Fortress Vanguard", closestCoord.x, closestCoord.y);
+    memberPlayer = {
+      id: memberId,
+      username: "Alpha Member",
+      faction: p.faction || "Terran Order",
+      factionColor: p.factionColor || "#00E5FF",
+      allianceId: allianceId,
+      allianceRole: 'member',
+      planets: [memberPlanet],
+      scores: { population: 100, attack: 0, defence: 2500000, raiders: 0 },
+      achievements: ["Alliance Protector"],
+      skinId: "default",
+      bannerId: "default",
+      lastDailyRewardClaim: Date.now(),
+      credits: 5000
+    };
+    state.players[memberId] = memberPlayer;
+  } else {
+    memberPlayer.allianceId = allianceId;
+    memberPlayer.allianceRole = 'member';
+    if (memberPlayer.planets && memberPlayer.planets.length > 0) {
+      memberPlayer.planets[0].sectorX = closestCoord.x;
+      memberPlayer.planets[0].sectorY = closestCoord.y;
+      memberPlayer.planets[0].name = "Fortress Vanguard";
+    } else {
+      memberPlayer.planets = [createInitialPlanet("Fortress Vanguard", closestCoord.x, closestCoord.y)];
+    }
+  }
+
+  // Alpha has exactly 2,500,000 Defense HP at the station
+  // 20833 * 120 (Drone defenceHp) + 10 * 4 (Looter defenceHp) = 2,500,000 Defense HP
+  memberPlayer.planets[0].troops = {
+    defender: 0,
+    attacker: 0,
+    tank: 0,
+    looter: 10,
+    drone: 20833,
+    settlementShip: 0
+  };
+
+  // 6. Spawn member 2 (Legends of Chaos)
+  const chaosCoord2 = findClusterCoordinate(closestCoord.x, closestCoord.y) || { x: closestCoord.x + 1, y: closestCoord.y + 1 };
+  const aiId = "ai_legends_of_chaos";
+  let aiPlayer = state.players[aiId];
+  if (!aiPlayer) {
+    const aiPlanet = createInitialPlanet("Chaos Citadel", chaosCoord2.x, chaosCoord2.y);
+    aiPlayer = {
+      id: aiId,
+      username: "Legends of Chaos",
+      faction: "Eclipse Vanguard",
+      factionColor: "#FFC700",
+      allianceId: allianceId,
+      allianceRole: 'leader',
+      planets: [aiPlanet],
+      scores: { population: 500, attack: 0, defence: 2500000, raiders: 0 },
+      achievements: ["Chaos Spawn"],
+      skinId: "default",
+      bannerId: "default",
+      lastDailyRewardClaim: Date.now(),
+      credits: 100000
+    };
+    state.players[aiId] = aiPlayer;
+  } else {
+    aiPlayer.allianceId = allianceId;
+    aiPlayer.allianceRole = 'leader';
+    if (aiPlayer.planets && aiPlayer.planets.length > 0) {
+      aiPlayer.planets[0].sectorX = chaosCoord2.x;
+      aiPlayer.planets[0].sectorY = chaosCoord2.y;
+      aiPlayer.planets[0].name = "Chaos Citadel";
+    } else {
+      aiPlayer.planets = [createInitialPlanet("Chaos Citadel", chaosCoord2.x, chaosCoord2.y)];
+    }
+  }
+
+  // Ensure AI has some baseline remaining troops (now zero as they moved ALL to Alpha Member)
+  aiPlayer.planets[0].troops = {
+    defender: 0,
+    attacker: 0,
+    tank: 0,
+    looter: 0,
+    drone: 0,
+    settlementShip: 0
+  };
+
+  // 7. Spawn member 3 (Chaos Guardian)
+  const chaosCoord3 = findClusterCoordinate(chaosCoord2.x, chaosCoord2.y) || { x: chaosCoord2.x - 1, y: chaosCoord2.y + 1 };
+  const aiId3 = "ai_chaos_member_3";
+  let aiPlayer3 = state.players[aiId3];
+  if (!aiPlayer3) {
+    const aiPlanet3 = createInitialPlanet("Chaos Bastion", chaosCoord3.x, chaosCoord3.y);
+    aiPlayer3 = {
+      id: aiId3,
+      username: "Chaos Guardian",
+      faction: "Eclipse Vanguard",
+      factionColor: "#FFC700",
+      allianceId: allianceId,
+      allianceRole: 'member',
+      planets: [aiPlanet3],
+      scores: { population: 500, attack: 0, defence: 2500000, raiders: 0 },
+      achievements: ["Chaos Spawn"],
+      skinId: "default",
+      bannerId: "default",
+      lastDailyRewardClaim: Date.now(),
+      credits: 100000
+    };
+    state.players[aiId3] = aiPlayer3;
+  } else {
+    aiPlayer3.allianceId = allianceId;
+    aiPlayer3.allianceRole = 'member';
+    if (aiPlayer3.planets && aiPlayer3.planets.length > 0) {
+      aiPlayer3.planets[0].sectorX = chaosCoord3.x;
+      aiPlayer3.planets[0].sectorY = chaosCoord3.y;
+      aiPlayer3.planets[0].name = "Chaos Bastion";
+    } else {
+      aiPlayer3.planets = [createInitialPlanet("Chaos Bastion", chaosCoord3.x, chaosCoord3.y)];
+    }
+  }
+
+  // Baseline remaining troops for Chaos Guardian (now zero as they moved ALL to Alpha Member)
+  aiPlayer3.planets[0].troops = {
+    defender: 0,
+    attacker: 0,
+    tank: 0,
+    looter: 0,
+    drone: 0,
+    settlementShip: 0
+  };
+
+  // 8. Place Legends of Chaos & Chaos Guardian's troops as docked reserve fleets directly on Alpha Member's station
+  aiPlayer.createdFleets = [
+    {
+      id: "fleet_chaos_reinforce_2",
+      name: "Chaos Citadel Defense Division",
+      subsidiary: "Legends of Chaos",
+      troops: {
+        defender: 0,
+        attacker: 0,
+        tank: 0,
+        looter: 10,
+        drone: 20833,
+        settlementShip: 0
+      },
+      planetId: memberPlayer.planets[0].id,
+      activeMissionId: null,
+      isTraveling: false
+    }
+  ];
+
+  aiPlayer3.createdFleets = [
+    {
+      id: "fleet_chaos_reinforce_3",
+      name: "Chaos Bastion Shield Division",
+      subsidiary: "Chaos Guardian",
+      troops: {
+        defender: 0,
+        attacker: 0,
+        tank: 0,
+        looter: 10,
+        drone: 20833,
+        settlementShip: 0
+      },
+      planetId: memberPlayer.planets[0].id,
+      activeMissionId: null,
+      isTraveling: false
+    }
+  ];
+
+  // Remove any stale in-transit fleets
+  state.fleets = state.fleets.filter((f: any) => f.id !== "fleet_chaos_reinforce_2" && f.id !== "fleet_chaos_reinforce_3" && f.id !== "fleet_chaos_reinforce");
+
+  saveState();
+
+  res.json({
+    success: true,
+    message: "Legends of Chaos simulation successfully initialized! All alliance forces are stationed at Alpha Member's base.",
+    details: {
+      admin: {
+        username: p.username,
+        mainStation: adminPlanet.name,
+        coords: { x: adminPlanet.sectorX, y: adminPlanet.sectorY },
+        troops: adminPlanet.troops,
+        attackHp: 10000000,
+        alliance: "None"
+      },
+      allianceMember: {
+        username: "Alpha Member",
+        stationName: "Fortress Vanguard",
+        coords: closestCoord,
+        troops: memberPlayer.planets[0].troops,
+        defenseHp: 2500000,
+        relationToAdmin: "Closest coordinate to admin station"
+      },
+      dockedAllianceReserveFleets: [
+        {
+          owner: "Legends of Chaos",
+          troops: aiPlayer.createdFleets[0].troops,
+          defenseHp: 2500000
+        },
+        {
+          owner: "Chaos Guardian",
+          troops: aiPlayer3.createdFleets[0].troops,
+          defenseHp: 2500000
+        }
+      ]
+    }
+  });
+});
+
+app.post("/api/dev/leave-chaos-simulation", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+  if (!p.googleEmail || (p.googleEmail.toLowerCase() !== 'banele180@gmail.com' && p.googleEmail.toLowerCase() !== 'banzz1918@gmail.com')) {
+    return res.status(403).json({ error: "Access Denied: Simulation tools are restricted to system administrators." });
+  }
+
+  // Restore admin player's troops to a reasonable normal level
+  if (p.planets && p.planets.length > 0) {
+    p.planets[0].troops = {
+      defender: 10,
+      attacker: 10,
+      tank: 2,
+      looter: 5,
+      drone: 5,
+      settlementShip: 0
+    };
+  }
+
+  // Clear simulated AI players
+  delete state.players["member_closest"];
+  delete state.players["ai_legends_of_chaos"];
+  delete state.players["ai_chaos_member_3"];
+
+  // Clear simulated alliance
+  delete state.alliances["alliance_chaos"];
+
+  // Clear simulated fleets
+  state.fleets = state.fleets.filter((f: any) => 
+    f.id !== "fleet_chaos_reinforce_2" && 
+    f.id !== "fleet_chaos_reinforce_3" && 
+    f.id !== "fleet_chaos_reinforce"
+  );
+
+  saveState();
+
+  res.json({
+    success: true,
+    message: "Left Legends of Chaos simulation successfully. Simulated units and alliance cleared."
+  });
 });
 
 // Heartbeat test route
@@ -5178,6 +5617,8 @@ app.post("/api/galaxy/intelligence", (req, res) => {
       planetName: targetPlanet.name,
       commander: targetUser.username,
       commanderId: targetUser.id,
+      commanderAllianceId: targetUser.allianceId,
+      commanderAllianceName: targetUser.allianceId ? (state.alliances[targetUser.allianceId]?.name || "") : undefined,
       faction: targetUser.faction,
       coords: { x: xVal, y: yVal },
       scores: targetUser.scores,
@@ -5218,7 +5659,8 @@ app.post("/api/galaxy/intelligence", (req, res) => {
         return fleetsList;
       })(),
       resources: targetPlanet.resources,
-      lastActive: targetUser.lastActive || now - 600000
+      lastActive: targetUser.lastActive || now - 600000,
+      timestamp: now
     };
   } else {
     // Check if habitable uncharted sector
@@ -5228,13 +5670,15 @@ app.post("/api/galaxy/intelligence", (req, res) => {
         planetName: isHab.name,
         coords: { x: xVal, y: yVal },
         description: "This is a pristine uncharted habitable planetary zone rich in basic elements. No planetary defense batteries or garrison troops detected. Clear for direct colony settlement ships.",
-        extractors: getOrGenerateHabitableExtractors(isHab)
+        extractors: getOrGenerateHabitableExtractors(isHab),
+        timestamp: now
       };
     } else {
       report = {
         type: "void",
         coords: { x: xVal, y: yVal },
-        description: "Deep space coordinates. Absolute zero cold vacuum. Remote sensors indicate no industrial installations, troop radar footprints, or spacecraft energy signatures at these coordinates."
+        description: "Deep space coordinates. Absolute zero cold vacuum. Remote sensors indicate no industrial installations, troop radar footprints, or spacecraft energy signatures at these coordinates.",
+        timestamp: now
       };
     }
   }

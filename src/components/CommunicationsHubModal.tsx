@@ -1479,7 +1479,7 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                                                       if (q > 0) {
                                                         movingDefHp += q * (defHpMap[k] || 0);
                                                         movingAtkHp += q * (atkHpMap[k] || 0);
-                                                        const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                                        const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Assault Drone' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Missile Launcher' : 'Settlement Ship';
                                                         movingTroopsList.push(`${q}x ${label}`);
                                                       }
                                                     });
@@ -1703,7 +1703,7 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                                                 </div>
                                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[9.5px]">
                                                   {Object.entries(f.troops || {}).filter(([_, q]) => (Number(q) || 0) > 0).map(([k, q]) => {
-                                                    const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                                    const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Assault Drone' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Missile Launcher' : 'Settlement Ship';
                                                     return (
                                                       <div key={k} className="p-1 rounded bg-rose-950/20 border border-rose-500/10 text-slate-300">
                                                         • <span className="font-bold">{label}</span>: <span className="text-rose-400 font-extrabold">{q}</span>
@@ -1722,7 +1722,7 @@ export const CommunicationsHubModal: React.FC<CommunicationsHubModalProps> = ({
                                                 {hasDefendingUnits ? (
                                                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[9.5px]">
                                                     {Object.entries(targetTroops).filter(([_, q]) => (Number(q) || 0) > 0).map(([k, q]) => {
-                                                      const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Attacker' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Assault Drone' : 'Settlement Ship';
+                                                      const label = k === 'defender' ? 'Interceptor' : k === 'attacker' ? 'Assault Drone' : k === 'tank' ? 'Disrupter' : k === 'looter' ? 'Matter Extractor' : k === 'drone' ? 'Missile Launcher' : 'Settlement Ship';
                                                       return (
                                                         <div key={k} className="p-1 rounded bg-emerald-950/20 border border-emerald-500/10 text-slate-300">
                                                           • <span className="font-bold">{label}</span>: <span className="text-emerald-400 font-extrabold">{q}</span>
