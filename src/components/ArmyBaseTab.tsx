@@ -1243,7 +1243,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                 })}
               </div>
               <p className="text-[10px] text-slate-500 italic pt-1 font-sans">
-                Tip: Navigate to the XPL (Explore) tab to construct your missing extractor outposts first!
+                Tip: Navigate to the Home tab to construct your missing extractor outposts first!
               </p>
             </div>
           ) : showBuildForces && (
@@ -2712,11 +2712,11 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                           <div className="space-y-3 animate-fade-in text-left">
                             <div className="grid grid-cols-2 gap-4 text-[11px] leading-relaxed">
                               <div>
-                                <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide flex items-center justify-between">
+                                <p className="font-bold text-amber-400 uppercase tracking-wide flex items-center justify-between">
                                   <span>ATTACKER:{' '}
                                     <span 
                                       onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.attackerId)}
-                                      className="underline decoration-dotted cursor-pointer hover:text-red-300 font-bold text-red-400"
+                                      className="underline decoration-dotted cursor-pointer hover:text-amber-300 font-bold text-amber-400"
                                     >
                                       {report.attackerName}
                                     </span>
@@ -2753,7 +2753,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                     {report.defenderName}
                                   </span>
                                 </span>
-                                <span className="text-[10px] text-blue-400 font-bold bg-blue-950/25 px-1.5 py-0.5 rounded border border-blue-900/20 font-mono select-none">
+                                <span className="text-[10px] text-red-400 font-bold bg-red-950/25 px-1.5 py-0.5 rounded border border-red-900/20 font-mono select-none">
                                   Loss: {defLossPercent}%
                                 </span>
                               </p>

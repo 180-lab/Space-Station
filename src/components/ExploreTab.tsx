@@ -920,7 +920,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                             <span className="text-[10px] font-bold text-cyan-400">Pump #{mine.index + 1}</span>
                             <div className="flex items-center gap-1.5">
                               <span className="text-[9.5px] text-cyan-450 font-bold">
-                                {mine.level === 0 ? 'Not Built' : `Lv. ${mine.level}`}
+                                {mine.level === 0 ? 'Not Built' : mine.level >= maxExtractorLevel ? 'Max Cap' : `Lv. ${mine.level}`}
                               </span>
                             </div>
                           </div>
@@ -968,7 +968,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                                 )}
                               </div>
                             ) : mine.level >= maxExtractorLevel && !isDamaged ? (
-                              <span className="text-[9px] text-slate-500 font-bold block text-center bg-slate-900 py-0.5 rounded border border-slate-800">MAX LEVEL</span>
+                              <span className="text-[9px] text-slate-500 font-bold block text-center bg-slate-900 py-0.5 rounded border border-slate-800">Max Cap</span>
                             ) : isDamaged ? (
                               <button 
                                 onClick={() => handleRestoreMine(resKey, mine.index)}
@@ -1066,7 +1066,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
                     <div className="flex items-center gap-3 shrink-0 font-mono text-xs">
                       <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-850 text-cyan-400 font-bold">
-                        Lv. {bState.level}
+                        {bState.level >= bState.maxLevel ? "Max Cap" : `Lv. ${bState.level}`}
                       </span>
                       {isUpgradingThis && (
                         <span className="text-[9px] text-amber-500 font-bold animate-pulse">⏳ Upgrading</span>
@@ -1104,7 +1104,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                   >
                     <div className="flex items-center gap-1.5">
                       <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-850 text-cyan-400 font-bold">
-                        Lv. {bState.level}
+                        {bState.level >= bState.maxLevel ? "Max Cap" : `Lv. ${bState.level}`}
                       </span>
                       {isUpgradingThis && (
                         <span className="text-[9px] text-amber-500 font-bold animate-pulse">⏳ Upgrading</span>
@@ -1160,6 +1160,10 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                       >
                         🔧 Repair
                       </button>
+                    ) : bState.level >= bState.maxLevel ? (
+                      <span className="px-2.5 py-1 bg-slate-900 text-slate-500 border border-slate-800 text-[10px] font-bold uppercase rounded block text-center">
+                        Max Cap
+                      </span>
                     ) : isFabricatorRequiredMissing ? (
                       <span className="text-[8px] font-bold text-red-400 uppercase py-1 px-2 bg-red-950/20 border border-red-500/20 rounded" title="Fabricator modular structure at level 1 or higher is required.">
                         🔒 REQ FABRICATOR

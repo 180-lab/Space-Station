@@ -3310,11 +3310,11 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     const attLossPercent = totalAttInitial > 0 ? ((totalAttLosses / totalAttInitial) * 100).toFixed(1) : '0.0';
                                     return (
                                       <>
-                                        <p className="font-bold text-red-100 text-red-400 uppercase tracking-wide flex items-center justify-between">
+                                        <p className="font-bold text-amber-400 uppercase tracking-wide flex items-center justify-between">
                                           <span>ATTACKER:{' '}
                                             <span 
                                               onClick={() => onViewPlayerProfile && onViewPlayerProfile(report.attackerId)}
-                                              className="underline decoration-dotted cursor-pointer hover:text-red-300"
+                                              className="underline decoration-dotted cursor-pointer hover:text-amber-300"
                                             >
                                               {report.attackerName}
                                             </span>
@@ -3365,7 +3365,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                               {report.defenderName}
                                             </span>
                                           </span>
-                                          <span className="text-[10px] text-blue-400 font-bold bg-blue-950/25 px-1.5 py-0.5 rounded border border-blue-900/20 font-mono select-none">
+                                          <span className="text-[10px] text-red-400 font-bold bg-red-950/25 px-1.5 py-0.5 rounded border border-red-900/20 font-mono select-none">
                                             Loss: {defLossPercent}%
                                           </span>
                                         </p>

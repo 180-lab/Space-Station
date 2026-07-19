@@ -4015,7 +4015,7 @@ export default function App() {
           >
             {activeTab === 'explore' && <div className="absolute top-0 inset-x-0 h-[3px] bg-cyan-400 shadow-[0_0_10px_#22d3ee]"></div>}
             <span className="text-base sm:text-lg filter drop-shadow-[0_0_5px_rgba(34,211,238,0.5)] transform group-hover:scale-125 transition-transform duration-150 leading-none">🪐</span>
-            <span className={`text-[9px] font-bold tracking-widest ${activeTab === 'explore' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>XPL</span>
+            <span className={`text-[9px] font-bold tracking-widest ${activeTab === 'explore' ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>HOME</span>
           </button>
 
           {/* Tab 2: Army command */}
