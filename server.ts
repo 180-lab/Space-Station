@@ -487,6 +487,13 @@ function saveState() {
   }
 }
 
+// Foul language detection & replacement helper
+function censorFoulLanguage(text: string): string {
+  if (!text || typeof text !== "string") return text;
+  const regex = /\b(fucking|fucker|fuckers|fucked|fuck|fucks|shitting|shitted|shitty|shit|shits|bitch|bitches|bitching|asshole|assholes|cunt|cunts|dick|dicks|pussy|pussies|bastard|bastards|motherfucker|motherfuckers|cock|cocks|whore|whores|slut|sluts|crap|crappy)\b/gi;
+  return text.replace(regex, "pottymouth");
+}
+
 // Topping up AI players to maintain a full universe
 function ensureAIsCount(count: number, s: GameState) {
   if (!s.players) s.players = {};
@@ -6326,7 +6333,7 @@ app.post("/api/player/rename", (req, res) => {
     return res.status(400).json({ error: "Commander name is required" });
   }
 
-  const desiredName = newUsername.trim();
+  const desiredName = censorFoulLanguage(newUsername.trim());
   if (desiredName.length > 25) {
     return res.status(400).json({ error: "Commander name must be 25 characters or less" });
   }
@@ -6385,7 +6392,7 @@ app.post("/api/planet/rename", (req, res) => {
     return res.status(400).json({ error: "Base name is required" });
   }
 
-  const targetName = newName.trim();
+  const targetName = censorFoulLanguage(newName.trim());
   if (targetName.length > 30) {
     return res.status(400).json({ error: "Colony base name must be 30 characters or less" });
   }
@@ -6415,6 +6422,8 @@ app.post("/api/chat/send", (req, res) => {
   const email = (p.googleEmail || "").toLowerCase();
   const isAdmin = email === "banele180@gmail.com" || email === "banzz1918@gmail.com";
 
+  const cleanedContent = censorFoulLanguage(content);
+
   const message: ChatMessage = {
     id: `chat_${Math.random().toString(36).substr(2, 9)}`,
     channel,
@@ -6424,7 +6433,7 @@ app.post("/api/chat/send", (req, res) => {
     senderFactionColor: p.factionColor,
     allianceTag: p.allianceId ? state.alliances[p.allianceId]?.tag : null,
     receiverId: receiverId || null,
-    content,
+    content: cleanedContent,
     timestamp: Date.now()
   };
 
@@ -7474,6 +7483,8 @@ app.post("/api/messages/send", (req, res) => {
     receiver.commandMessages = [];
   }
 
+  const cleanedContent = censorFoulLanguage(content.trim());
+
   const newMessage: CommandMessage = {
     id: `msg_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`,
     senderId: p.id,
@@ -7482,7 +7493,7 @@ app.post("/api/messages/send", (req, res) => {
     senderFactionColor: p.factionColor,
     receiverId: receiver.id,
     receiverName: receiver.username,
-    content: content.trim(),
+    content: cleanedContent,
     timestamp: Date.now(),
     isRead: false,
     isSaved: false
@@ -7505,7 +7516,7 @@ app.post("/api/messages/send", (req, res) => {
   sendNotificationWithFallback(
     receiver.id, 
     "📬 New Secure Message", 
-    `Commander ${p.username} sent you a message: ${content.trim().substring(0, 60)}${content.trim().length > 60 ? "..." : ""}`,
+    `Commander ${p.username} sent you a message: ${cleanedContent.substring(0, 60)}${cleanedContent.length > 60 ? "..." : ""}`,
     "events"
   );
 

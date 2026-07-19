@@ -131,6 +131,7 @@ interface ExploreTabProps {
   onDeclareWar?: (targetAllianceId: string) => Promise<void>;
   onNavigateToGalaxySubTab?: (subTab: 'scanner' | 'ranking' | 'comms' | 'news' | 'fleets') => void;
   onOpenCommsHub?: () => void;
+  layoutMode?: 'classic' | 'datasaving';
 }
 
 const RESOURCE_INFO: Record<ResourceType, { name: string; color: string; icon: any; desc: string }> = {
@@ -190,7 +191,8 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   onLeaveAlliance,
   onDeclareWar,
   onNavigateToGalaxySubTab,
-  onOpenCommsHub
+  onOpenCommsHub,
+  layoutMode = 'classic'
 }) => {
   const [expandedCategory, setExpandedCategory] = useState<ResourceType | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -206,6 +208,11 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   const [isAlertsHUDMinimized, setIsAlertsHUDMinimized] = useState(false);
   const [minimizeAlertsIncoming, setMinimizeAlertsIncoming] = useState(false);
   const [minimizeAlertsMoving, setMinimizeAlertsMoving] = useState(false);
+  
+  // Collapsible states for data saving mode
+  const [expandedMines, setExpandedMines] = useState<Record<string, boolean>>({});
+  const [expandedResources, setExpandedResources] = useState<Record<string, boolean>>({});
+  const [expandedBuildings, setExpandedBuildings] = useState<Record<string, boolean>>({});
   
   const [isEditingName, setIsEditingName] = useState(false);
   const [newNameInput, setNewNameInput] = useState(activePlanet.name);
@@ -630,6 +637,674 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   let alertsLabel = 'SECURE';
   let alertsValue = 'OPTIMAL NO ACTIONS';
   let pulseDot = 'bg-emerald-500 shadow-[0_0_8px_#10b981]';
+
+  const renderDataSavingLayout = () => {
+    const resKeys: ResourceType[] = ['water', 'plasma', 'fuel', 'food', 'respirant'];
+
+    return (
+      <div className="space-y-4 pb-24" id="explore-tab-datasaving-view">
+        {/* Alerts HUD / Status header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#070c19]/90 border border-slate-800 rounded-xl text-left">
+          <div className="text-left flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_#22d3ee] shrink-0" />
+            <p className="text-xs text-slate-400 font-sans">
+              Active Outpost: <span className="text-cyan-400 font-bold font-mono">{activePlanet.name} ({activePlanet.sectorX}, {activePlanet.sectorY})</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {isRedAlertActive && (
+              <span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-red-950/40 text-red-400 border border-red-500/30 rounded-lg animate-pulse">
+                ⚠️ Attrition Active
+              </span>
+            )}
+            {!allExtractorsLevelOneOrMore && (
+              <span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-amber-950/40 text-amber-500 border border-amber-500/30 rounded-lg">
+                🔒 ADVANCED UPGRADES LOCKED
+              </span>
+            )}
+            <span className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg font-mono">
+              ⚡ Rank #{populationRank}
+            </span>
+          </div>
+        </div>
+
+        {/* Construction Queue */}
+        {(() => {
+          const queueList = (activePlanet.upgradeQueue || []).filter((item: any) => item.type !== 'research');
+          const activeUpgrades: any[] = [];
+          
+          for (const rKey of Object.keys(activePlanet.mines)) {
+            activePlanet.mines[rKey as ResourceType].forEach((m, idx) => {
+              if (m.isUpgrading && m.upgradeEnd) {
+                activeUpgrades.push({ type: 'mine', key: rKey, mineIndex: idx, upgradeEnd: m.upgradeEnd });
+              }
+            });
+          }
+          
+          for (const bKey of Object.keys(activePlanet.buildings)) {
+            const b = activePlanet.buildings[bKey as keyof typeof activePlanet.buildings] as BuildingState;
+            if (b && b.isUpgrading && b.upgradeEnd) {
+              activeUpgrades.push({ type: 'building', key: bKey, upgradeEnd: b.upgradeEnd });
+            }
+          }
+
+          if (activeUpgrades.length === 0 && queueList.length === 0) return null;
+
+          return (
+            <div className="p-3 bg-cyan-950/10 border border-cyan-500/25 rounded-xl font-mono text-[10px] text-slate-350 text-left">
+              <div className="flex items-center justify-between border-b border-cyan-500/10 pb-2 mb-2">
+                <span className="text-cyan-400 font-extrabold uppercase tracking-widest flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping" />
+                  Construction Queue ({activeUpgrades.length} active, {queueList.length} queued)
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {activeUpgrades.map((act, index) => {
+                  const bName = act.type === 'mine' 
+                    ? `${act.key.toUpperCase()} Pump #${act.mineIndex + 1}`
+                    : act.key.toUpperCase();
+                  return (
+                    <div key={`act-ds-${index}`} className="flex items-center justify-between bg-cyan-500/5 p-1.5 px-2.5 border border-cyan-500/10 rounded-lg">
+                      <span className="text-cyan-300 font-bold">[ACTIVE] {bName}</span>
+                      <span className="text-amber-400 font-bold">⏳ {getTimerString(act.upgradeEnd)}</span>
+                    </div>
+                  );
+                })}
+                {queueList.map((q, index) => {
+                  const bName = q.type === 'mine'
+                    ? `${q.key.toUpperCase()} Pump #${(q.mineIndex || 0) + 1}`
+                    : q.key.toUpperCase();
+                  return (
+                    <div key={`queue-ds-${index}`} className="flex items-center justify-between bg-slate-900/30 p-1.5 px-2.5 border border-slate-800 rounded-lg">
+                      <span className="text-slate-400">#{index + 1} QUEUED: {bName} &rarr; Lv. {q.targetLevel}</span>
+                      <span className="text-slate-500">⏳ {q.targetLevel * (q.type === 'building' ? 2 : 1)}m</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Real-time alerts / Incoming or Outgoing fleets */}
+        {(() => {
+          const outgoing = fleets.filter((f) => f.senderId === player.id);
+          const incoming = fleets.filter((f) => f.targetId === player.id && f.senderId !== player.id);
+          if (outgoing.length === 0 && incoming.length === 0) return null;
+
+          const isAttackIncoming = incoming.length > 0;
+          const containerBg = isAttackIncoming 
+            ? "bg-red-950/20 border-red-500/30 text-red-400" 
+            : "bg-blue-950/20 border-blue-500/30 text-blue-400";
+          const headerColor = isAttackIncoming ? "text-red-400 border-red-500/10" : "text-blue-400 border-blue-500/10";
+          const pingDot = isAttackIncoming ? "bg-red-500 animate-ping" : "bg-blue-500 animate-pulse";
+
+          return (
+            <div className={`p-3 border rounded-xl text-left font-mono text-[10.5px] ${containerBg}`}>
+              <div className={`font-black tracking-widest uppercase border-b pb-1.5 mb-1.5 flex items-center gap-1.5 ${headerColor}`}>
+                <span className={`w-2 h-2 rounded-full ${pingDot}`} />
+                TACTICAL RADAR TRANSITS ({incoming.length} hostile, {outgoing.length} friendly)
+              </div>
+              <div className="space-y-1">
+                {incoming.map((f, idx) => (
+                  <div key={`inc-ds-${idx}`} className="p-1.5 bg-red-950/10 border border-red-900/20 rounded-md flex items-center justify-between">
+                    <span className="text-red-400 font-bold">INCOMING ATTACK from {f.senderName}</span>
+                    <span className="text-amber-400 font-bold">⏳ {getTimerString(f.arrivesAt)}</span>
+                  </div>
+                ))}
+                {outgoing.map((f, idx) => (
+                  <div key={`out-ds-${idx}`} className="p-1.5 bg-blue-950/10 border border-blue-900/20 rounded-md flex items-center justify-between">
+                    <span className="text-blue-300">Outgoing {f.missionType.toUpperCase()} to ({f.targetCoords.x}, {f.targetCoords.y})</span>
+                    <span className="text-amber-400 font-bold">⏳ {getTimerString(f.arrivesAt)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Tasks / Commander Tutorial */}
+        <CommanderTutorial 
+          player={player}
+          activePlanet={activePlanet}
+          fleets={fleets}
+          onRefreshState={onRefreshState || (() => {})}
+          showToast={showToast}
+          setActiveTab={setActiveTab}
+          chatMessages={chatMessages}
+          customTasks={customTasks}
+        />
+
+        {/* 1. RESOURCE OUTPOSTS SECTION */}
+        <div className="border border-cyan-500/20 bg-[#060913]/90 p-3 rounded-xl shadow-lg">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-cyan-500/10 pb-2 mb-2 text-left">
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-cyan-400 font-mono">
+                ⛏️ RESOURCE EXTRACTOR PUMPS
+              </h3>
+              <p className="text-[10px] text-slate-500 font-sans mt-0.5">
+                Monitor and upgrade modular fluid extraction pumps. Expand silo storage capacity.
+              </p>
+            </div>
+            <button
+              onClick={() => handleOpenBoostModal("all", -1)}
+              className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/35 text-amber-400 text-[10px] font-bold font-mono uppercase tracking-wider rounded-lg transition"
+            >
+              ⚡ OVERDRIVE OVERALL BOOST (🪙 45)
+            </button>
+          </div>
+
+          <div className="space-y-1.5">
+            {resKeys.map((resKey) => {
+              const info = RESOURCE_INFO[resKey];
+              const config = [
+                { key: 'water', label: 'Water (H2O)', icon: Droplet, textColor: 'text-cyan-400' },
+                { key: 'plasma', label: 'Plasma', icon: Zap, textColor: 'text-purple-400' },
+                { key: 'fuel', label: 'Fuel', icon: Flame, textColor: 'text-amber-400' },
+                { key: 'food', label: 'Food', icon: Apple, textColor: 'text-emerald-400' },
+                { key: 'respirant', label: 'Respirant (O2)', icon: Wind, textColor: 'text-blue-400' }
+              ].find(c => c.key === resKey)!;
+
+              const mines = activePlanet.mines[resKey] || [];
+              const isOtherMaxed = 
+                activePlanet.resources.plasma >= repositoryLimit &&
+                activePlanet.resources.fuel >= repositoryLimit &&
+                activePlanet.resources.food >= repositoryLimit &&
+                activePlanet.resources.respirant >= repositoryLimit;
+
+              const totalProd = mines.reduce((sum, m) => {
+                const isMineBoosted = m.boostedUntil && Number(m.boostedUntil) > serverTime;
+                const baseOutput = isOtherMaxed
+                  ? 14000
+                  : Math.round((m.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
+                const output = isMineBoosted ? Math.round(baseOutput * 1.14) : baseOutput;
+                return sum + output;
+              }, 0);
+
+              let consumption = 0;
+              if (resKey === 'water') {
+                consumption = waterConsumption;
+              } else if (resKey === 'respirant') {
+                consumption = waterConsumption * 0.28;
+              } else if (resKey === 'food') {
+                consumption = waterConsumption * 0.18;
+              }
+              const netOutput = totalProd - consumption;
+
+              const isResourceExpanded = !!expandedResources[resKey];
+
+              if (!isResourceExpanded) {
+                return (
+                  <div 
+                    key={resKey} 
+                    onClick={() => setExpandedResources(prev => ({ ...prev, [resKey]: true }))}
+                    className="py-1.5 px-3 bg-[#03060c]/65 hover:bg-[#060b14]/90 border border-slate-800 hover:border-slate-700/80 rounded-lg text-left cursor-pointer transition duration-150 select-none group flex flex-col sm:flex-row sm:items-center justify-between gap-1.5"
+                  >
+                    <div className="flex items-center gap-2 font-mono">
+                      <config.icon size={13} className={`${config.textColor} group-hover:scale-110 transition-transform`} />
+                      <span className={`text-[11px] font-black uppercase tracking-wider ${config.textColor}`}>{config.label}</span>
+                      <span className="text-[10px] text-slate-400">
+                        ({Math.round(localResources[resKey]).toLocaleString()} / {formatLimit(repositoryLimit)})
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end gap-3 font-mono text-[10px] w-full sm:w-auto">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-500">Hourly Rate:</span>
+                        <span className={netOutput >= 0 ? "text-emerald-400 font-bold" : "text-red-400 font-bold animate-pulse"}>
+                          {netOutput >= 0 ? "+" : ""}{Math.round(netOutput).toLocaleString()}/hr
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <ChevronDown size={14} className="text-slate-500 group-hover:text-slate-300 transition" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={resKey} className="p-2 bg-[#03060c]/65 border border-cyan-500/25 rounded-lg text-left shadow-[0_0_12px_rgba(34,211,238,0.03)]">
+                  {/* Row Resource Headers */}
+                  <div 
+                    onClick={() => setExpandedResources(prev => ({ ...prev, [resKey]: false }))}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-900 pb-1.5 mb-1.5 cursor-pointer hover:opacity-85 select-none transition group"
+                  >
+                    <div className="flex items-center gap-2 font-mono">
+                      <config.icon size={13} className={config.textColor} />
+                      <span className={`text-[11px] font-black uppercase tracking-wider ${config.textColor} group-hover:text-cyan-400 transition`}>{config.label}</span>
+                      <span className="text-[10px] text-slate-400">
+                        ({Math.round(localResources[resKey]).toLocaleString()} / {formatLimit(repositoryLimit)})
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end gap-3 font-mono text-[10px] w-full sm:w-auto">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-500">Hourly Rate:</span>
+                        <span className={netOutput >= 0 ? "text-emerald-400 font-bold" : "text-red-400 font-bold animate-pulse"}>
+                          {netOutput >= 0 ? "+" : ""}{Math.round(netOutput).toLocaleString()}/hr
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenBoostModal(resKey, -1);
+                          }}
+                          className="text-[9px] font-bold text-amber-400 bg-amber-500/5 hover:bg-amber-500/15 border border-amber-500/20 px-1.5 py-0.5 rounded cursor-pointer shrink-0"
+                        >
+                          ⚡ Boost
+                        </button>
+                        <ChevronUp size={14} className="text-cyan-500 group-hover:scale-110 transition animate-pulse shrink-0" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pumps Cards inside the row (Always maximized inside expanded resource) */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-1">
+                    {mines.map((mine) => {
+                      const isMineBoosted = mine.boostedUntil && Number(mine.boostedUntil) > serverTime;
+                      const mineBaseOutput = Math.round((mine.level / 15) * (resKey === 'water' ? 14000 : 8333.33));
+                      const mineOutput = isMineBoosted ? Math.round(mineBaseOutput * 1.14) : mineBaseOutput;
+                      const mineQueueCount = (activePlanet.upgradeQueue || []).filter(
+                        (item: any) => item.type === 'mine' && item.key === resKey && item.mineIndex === mine.index
+                      ).length;
+                      const activeMineUpgradeCount = mine.isUpgrading ? 1 : 0;
+                      const currentTotalMineUpgrades = activeMineUpgradeCount + mineQueueCount;
+                      const nextMineTargetLvl = mine.level + currentTotalMineUpgrades + 1;
+                      const nextMineUpgradeTimeMins = nextMineTargetLvl * 1;
+                      const isDamaged = mine.health !== undefined && mine.health < 100;
+                      const targetLevel = mine.level + currentTotalMineUpgrades + 1;
+
+                      return (
+                        <div key={mine.index} className="p-1.5 bg-black/60 border border-cyan-500/30 rounded-md flex flex-col justify-between gap-1 text-xs font-mono text-left relative shadow-[0_0_10px_rgba(34,211,238,0.05)]">
+                          <div className="flex items-center justify-between border-b border-slate-950 pb-1">
+                            <span className="text-[10px] font-bold text-cyan-400">Pump #{mine.index + 1}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9.5px] text-cyan-450 font-bold">
+                                {mine.level === 0 ? 'Not Built' : `Lv. ${mine.level}`}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Pump status elements */}
+                          <div className="space-y-1 text-[10px] text-slate-400 text-left">
+                            {isDamaged && (
+                              <div className="text-red-400 font-bold animate-pulse">⚠️ Health {mine.health}%</div>
+                            )}
+                            {mine.isUpgrading && (
+                              <div className="text-amber-400 font-bold">⏳ Upgrading...</div>
+                            )}
+                            {isMineBoosted && (
+                              <div className="text-amber-300 font-extrabold flex items-center gap-0.5">⚡ Boosted</div>
+                            )}
+                            <div className="text-slate-500 text-[9px]">Rate: +{mineOutput.toLocaleString()}/h</div>
+                          </div>
+
+                          {/* Pump Cost and action button */}
+                          <div className="pt-1.5 border-t border-slate-950 text-left">
+                            {mine.level < maxExtractorLevel && (
+                              <div className="mb-1.5 scale-90 origin-left">
+                                {isDamaged ? (
+                                  <RestoreCostBar type="mine" upgradeKey={resKey} targetLevel={targetLevel} health={mine.health!} planetResources={localResources} />
+                                ) : (
+                                  <UpgradeCostBar type="mine" upgradeKey={resKey} targetLevel={nextMineTargetLvl} planetResources={localResources} />
+                                )
+                                }
+                              </div>
+                            )}
+
+                            {mine.isUpgrading ? (
+                              <div className="flex flex-col gap-1">
+                                {nextMineTargetLvl <= maxExtractorLevel && (nextMineTargetLvl < 2 || allExtractorsLevelOneOrMore) && (
+                                  <button 
+                                    onClick={() => onUpgradeMine(resKey, mine.index, true)}
+                                    disabled={isUpgrading}
+                                    className="w-full text-center py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-[#10b981] border border-emerald-500/20 text-[9px] font-bold uppercase rounded cursor-pointer"
+                                  >
+                                    Queue Lv.{nextMineTargetLvl}
+                                  </button>
+                                )}
+                                {nextMineTargetLvl <= maxExtractorLevel && nextMineTargetLvl >= 2 && !allExtractorsLevelOneOrMore && (
+                                  <span className="text-[8px] font-bold text-red-400 block text-center uppercase">🔒 Extractors Req</span>
+                                )}
+                              </div>
+                            ) : mine.level >= maxExtractorLevel && !isDamaged ? (
+                              <span className="text-[9px] text-slate-500 font-bold block text-center bg-slate-900 py-0.5 rounded border border-slate-800">MAX LEVEL</span>
+                            ) : isDamaged ? (
+                              <button 
+                                onClick={() => handleRestoreMine(resKey, mine.index)}
+                                className="w-full py-1 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 border border-red-500 text-white font-black text-[9px] uppercase tracking-wider rounded cursor-pointer transition"
+                              >
+                                🔧 Repair
+                              </button>
+                            ) : nextMineTargetLvl >= 2 && !allExtractorsLevelOneOrMore ? (
+                              <span className="text-[8.5px] font-bold text-red-400 block text-center bg-red-950/20 border border-red-500/20 py-0.5 rounded" title="All 5 resource extractor pumps must be at least Level 1.">
+                                🔒 LOCKED
+                              </span>
+                            ) : isAnyUpgradeInProgress ? (
+                              <button 
+                                onClick={() => onUpgradeMine(resKey, mine.index, true)}
+                                disabled={isUpgrading}
+                                className="w-full py-1 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-[#10b981] font-bold text-[9px] uppercase tracking-wider rounded cursor-pointer transition flex items-center justify-center gap-1"
+                              >
+                                <span>Queue Lv.{nextMineTargetLvl}</span>
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => onUpgradeMine(resKey, mine.index)}
+                                disabled={isUpgrading}
+                                className={`w-full py-1 font-black text-[9.5px] uppercase tracking-wider rounded transition duration-150 cursor-pointer ${
+                                  mine.level === 0
+                                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
+                                    : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-[0_0_8px_rgba(34,211,238,0.3)]'
+                                }`}
+                              >
+                                {mine.level === 0 ? `Build (${nextMineUpgradeTimeMins}m)` : `Lv.${nextMineTargetLvl} (${nextMineUpgradeTimeMins}m)`}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 2. BASE INFRASTRUCTURE & FACILITIES */}
+        <div className="border border-cyan-500/20 bg-[#060913]/90 p-3 rounded-xl shadow-lg">
+          <div className="border-b border-cyan-500/10 pb-2 mb-2 text-left">
+            <h3 className="text-xs font-black uppercase tracking-widest text-cyan-400 font-mono">
+              🏯 ESTABLISHED FACILITIES & PLANS
+            </h3>
+            <p className="text-[10px] text-slate-500 font-sans mt-0.5">
+              Construct strategic command and production grids on this outpost.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            {/* Table of facilities */}
+            <div className="hidden md:grid grid-cols-12 gap-1 px-3 py-1.5 bg-slate-950/60 border border-slate-900 rounded-lg text-slate-500 font-mono text-[9px] uppercase tracking-widest text-left">
+              <div className="col-span-3">Facility Name</div>
+              <div className="col-span-2">Level status</div>
+              <div className="col-span-4">Requirements & Costs</div>
+              <div className="col-span-3 text-right">Operational Actions</div>
+            </div>
+
+            {constructedBuildings.map(([bKey, val]) => {
+              const bState = val as any;
+              const info = BUILDING_INFO[bKey];
+              if (!info) return null;
+
+              const buildingQueueCount = activePlanet.upgradeQueue?.filter((item: any) => item.type === 'building' && item.key === bKey).length || 0;
+              const activeUpgradeCount = bState.isUpgrading ? 1 : 0;
+              const currentTotalUpgrades = activeUpgradeCount + buildingQueueCount;
+              const nextTargetLvl = bState.level + currentTotalUpgrades + 1;
+              const nextUpgradeTimeMins = nextTargetLvl * 2;
+
+              const targetLvl = bState.level + 1;
+              const isFabricatorRequiredMissing = bKey !== 'fabricator' && bKey !== 'commsHub' && bKey !== 'repository' && (!activePlanet.buildings.fabricator || activePlanet.buildings.fabricator.level < 1);
+              const isUpgradingThis = bState.isUpgrading;
+              const isDamaged = bState.health !== undefined && bState.health < 100;
+
+              const isExpanded = !!expandedBuildings[bKey];
+
+              if (!isExpanded) {
+                return (
+                  <div 
+                    key={bKey} 
+                    onClick={() => setExpandedBuildings(prev => ({ ...prev, [bKey]: true }))}
+                    className="py-1 px-3 bg-black/45 hover:bg-slate-900/45 border border-slate-900 hover:border-slate-800 rounded-lg transition duration-150 text-left flex items-center justify-between gap-2.5 cursor-pointer select-none group"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-lg select-none shrink-0">{info.icon}</span>
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-200 text-xs font-mono block group-hover:text-cyan-400 transition truncate">{info.name}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0 font-mono text-xs">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-850 text-cyan-400 font-bold">
+                        Lv. {bState.level}
+                      </span>
+                      {isUpgradingThis && (
+                        <span className="text-[9px] text-amber-500 font-bold animate-pulse">⏳ Upgrading</span>
+                      )}
+                      {isDamaged && (
+                        <span className="text-[9px] text-red-500 font-bold animate-pulse">⚠️ {bState.health}% Health</span>
+                      )}
+                      <ChevronDown size={14} className="text-slate-500 group-hover:text-slate-300 transition" />
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={bKey} className="p-2 bg-black/60 border border-cyan-500/20 rounded-lg text-left flex flex-col md:grid md:grid-cols-12 items-start md:items-center gap-2 relative shadow-[0_0_12px_rgba(34,211,238,0.03)]">
+                  {/* Clickable Header to collapse */}
+                  <div 
+                    onClick={() => setExpandedBuildings(prev => ({ ...prev, [bKey]: false }))}
+                    className="col-span-3 flex items-center gap-2.5 min-w-0 cursor-pointer hover:opacity-80 transition select-none w-full"
+                  >
+                    <span className="text-lg select-none shrink-0">{info.icon}</span>
+                    <div className="min-w-0 flex-1 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-cyan-400 text-xs font-mono block truncate">{info.name}</span>
+                        <p className="text-[9.5px] text-slate-450 line-clamp-1 font-sans">{info.desc}</p>
+                      </div>
+                      <ChevronUp size={14} className="text-cyan-500 md:hidden ml-2 shrink-0 animate-pulse" />
+                    </div>
+                  </div>
+
+                  {/* Level and status */}
+                  <div 
+                    onClick={() => setExpandedBuildings(prev => ({ ...prev, [bKey]: false }))}
+                    className="col-span-2 font-mono text-xs flex items-center justify-between md:justify-start gap-1.5 text-left w-full cursor-pointer hover:opacity-80 transition select-none"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-850 text-cyan-400 font-bold">
+                        Lv. {bState.level}
+                      </span>
+                      {isUpgradingThis && (
+                        <span className="text-[9px] text-amber-500 font-bold animate-pulse">⏳ Upgrading</span>
+                      )}
+                      {isDamaged && (
+                        <span className="text-[9px] text-red-500 font-bold animate-pulse">⚠️ {bState.health}% Health</span>
+                      )}
+                    </div>
+                    <ChevronUp size={14} className="text-cyan-500 hidden md:inline ml-auto shrink-0 animate-pulse" />
+                  </div>
+
+                  {/* Upgrade Costs */}
+                  <div className="col-span-4 scale-95 origin-left text-left">
+                    {isDamaged ? (
+                      <RestoreCostBar type="building" upgradeKey={bKey} targetLevel={nextTargetLvl} health={bState.health} planetResources={localResources} />
+                    ) : (
+                      <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={nextTargetLvl} planetResources={localResources} />
+                    )}
+                  </div>
+
+                  {/* Action Grid */}
+                  <div className="col-span-3 w-full flex flex-wrap md:justify-end gap-1.5 font-mono text-xs">
+                    {/* Navigation shortcut */}
+                    {(bKey === 'radar' || bKey === 'researchCenter' || bKey === 'armyBase' || bKey === 'commsHub') && (
+                      <button
+                        onClick={() => {
+                          if (bKey === 'radar') {
+                            localStorage.setItem(`moonbase_radar_clicked_${player.id}`, 'true');
+                            setHasClickedRadar(true);
+                            if (onNavigateToGalaxySubTab) {
+                              onNavigateToGalaxySubTab('scanner');
+                            } else {
+                              setActiveTab('galaxy');
+                            }
+                          } else if (bKey === 'researchCenter') {
+                            setActiveTab('research');
+                          } else if (bKey === 'armyBase') {
+                            setActiveTab('army');
+                          } else if (bKey === 'commsHub') {
+                            onOpenCommsHub ? onOpenCommsHub() : showToast?.('Communications hub details loaded.', 'info');
+                          }
+                        }}
+                        className="px-2 py-1 bg-cyan-950/30 hover:bg-cyan-900/40 border border-cyan-800/20 text-cyan-400 text-[10px] font-bold rounded cursor-pointer transition flex items-center gap-1 uppercase"
+                      >
+                        ⚡ Open
+                      </button>
+                    )}
+
+                    {isDamaged ? (
+                      <button
+                        onClick={() => handleRestoreBuilding(bKey)}
+                        className="px-2.5 py-1 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white border border-red-500 text-[10px] font-bold uppercase rounded cursor-pointer transition"
+                      >
+                        🔧 Repair
+                      </button>
+                    ) : isFabricatorRequiredMissing ? (
+                      <span className="text-[8px] font-bold text-red-400 uppercase py-1 px-2 bg-red-950/20 border border-red-500/20 rounded" title="Fabricator modular structure at level 1 or higher is required.">
+                        🔒 REQ FABRICATOR
+                      </span>
+                    ) : !((bState.level === 0 && bKey === 'fabricator') || allExtractorsLevelOneOrMore) ? (
+                      <span className="text-[8px] font-bold text-red-400 uppercase py-1 px-2 bg-red-950/20 border border-red-500/20 rounded" title="All 5 resource extractor pumps must be at least Level 1.">
+                        🔒 EXTRACTORS REQUISITE
+                      </span>
+                    ) : isAnyUpgradeInProgress ? (
+                      <button
+                        onClick={() => onUpgradeBuilding(bKey, true)}
+                        disabled={isUpgrading}
+                        className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-[#10b981] text-[10px] font-bold uppercase rounded cursor-pointer transition"
+                      >
+                        Queue Lv.{nextTargetLvl}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onUpgradeBuilding(bKey)}
+                        disabled={isUpgrading}
+                        className="px-2.5 py-1 bg-cyan-500 hover:bg-cyan-400 border border-cyan-400 text-slate-950 text-[10px] font-black uppercase rounded cursor-pointer transition flex items-center gap-1 shadow-[0_0_6px_rgba(34,211,238,0.2)]"
+                      >
+                        <span>Upgrade ({nextUpgradeTimeMins}m)</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Blueprints in the same unified list */}
+            {visibleBlueprints.length > 0 && (
+              <>
+                <div className="pt-4 border-t border-slate-900 text-left mt-4 mb-2">
+                  <h4 className="text-[9px] font-bold uppercase tracking-widest text-[#5bc0be] font-mono">
+                    🏗️ Available Construction Blueprints
+                  </h4>
+                </div>
+
+                {visibleBlueprints.map(([bKey, val]) => {
+                  const bState = val as any;
+                  const info = BUILDING_INFO[bKey];
+                  if (!info) return null;
+
+                  const targetLvl = bState.level + 1;
+                  const upgradeTimeMins = targetLvl * 2;
+                  const isFabricatorRequiredMissing = bKey !== 'fabricator' && bKey !== 'commsHub' && bKey !== 'repository' && (!activePlanet.buildings.fabricator || activePlanet.buildings.fabricator.level < 1);
+
+                  const isExpanded = !!expandedBuildings[bKey];
+
+                  if (!isExpanded) {
+                    return (
+                      <div 
+                        key={bKey} 
+                        onClick={() => setExpandedBuildings(prev => ({ ...prev, [bKey]: true }))}
+                        className="py-1 px-3 bg-black/30 hover:bg-slate-900/30 border border-dashed border-slate-800 hover:border-slate-700 rounded-lg transition duration-150 text-left flex items-center justify-between gap-2.5 cursor-pointer select-none group"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-lg select-none shrink-0 opacity-60">{info.icon}</span>
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-400 text-xs font-mono block group-hover:text-cyan-400 transition truncate">{info.name}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0 font-mono text-xs text-slate-500">
+                          <span>Not Built</span>
+                          <ChevronDown size={14} className="text-slate-600 group-hover:text-slate-400 transition" />
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={bKey} className="p-2 bg-black/45 border border-dashed border-cyan-500/10 rounded-lg text-left flex flex-col md:grid md:grid-cols-12 items-start md:items-center gap-2 relative">
+                      {/* Clickable Header to collapse */}
+                      <div 
+                        onClick={() => setExpandedBuildings(prev => ({ ...prev, [bKey]: false }))}
+                        className="col-span-3 flex items-center gap-2.5 min-w-0 cursor-pointer hover:opacity-80 transition select-none w-full"
+                      >
+                        <span className="text-lg select-none shrink-0 opacity-60">{info.icon}</span>
+                        <div className="min-w-0 flex-1 flex items-center justify-between">
+                          <div>
+                            <span className="font-bold text-slate-400 text-xs font-mono block truncate">{info.name}</span>
+                            <p className="text-[9.5px] text-slate-600 line-clamp-1 font-sans">{info.desc}</p>
+                          </div>
+                          <ChevronUp size={14} className="text-cyan-500 md:hidden ml-2 shrink-0 animate-pulse" />
+                        </div>
+                      </div>
+
+                      {/* Level and status */}
+                      <div 
+                        onClick={() => setExpandedBuildings(prev => ({ ...prev, [bKey]: false }))}
+                        className="col-span-2 font-mono text-xs flex items-center justify-between md:justify-start gap-1.5 text-slate-500 text-left w-full cursor-pointer hover:opacity-80 transition select-none"
+                      >
+                        <span>Not Built</span>
+                        <ChevronUp size={14} className="text-cyan-500 hidden md:inline ml-auto shrink-0 animate-pulse" />
+                      </div>
+
+                      {/* Upgrade Costs */}
+                      <div className="col-span-4 scale-95 origin-left opacity-80 text-left">
+                        <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={1} planetResources={localResources} />
+                      </div>
+
+                      {/* Action Grid */}
+                      <div className="col-span-3 w-full flex flex-wrap md:justify-end gap-1.5 font-mono text-xs">
+                        {isFabricatorRequiredMissing ? (
+                          <span className="text-[8px] font-bold text-red-400 uppercase py-1 px-2 bg-red-950/20 border border-red-500/20 rounded">
+                            🔒 REQ FABRICATOR
+                          </span>
+                        ) : bKey !== 'fabricator' && !allExtractorsLevelOneOrMore ? (
+                          <span className="text-[8px] font-bold text-red-400 uppercase py-1 px-2 bg-red-950/20 border border-red-500/20 rounded">
+                            🔒 EXTRACTORS REQUISITE
+                          </span>
+                        ) : isAnyUpgradeInProgress ? (
+                          <button
+                            onClick={() => onUpgradeBuilding(bKey, true)}
+                            disabled={isUpgrading}
+                            className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-[#10b981] text-[10px] font-bold uppercase rounded cursor-pointer transition"
+                          >
+                            Queue Const.
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => onUpgradeBuilding(bKey)}
+                            disabled={isUpgrading}
+                            className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 border border-amber-400 text-slate-950 text-[10px] font-black uppercase rounded cursor-pointer transition flex items-center gap-1"
+                          >
+                            <span>Construct (2m)</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (layoutMode === 'datasaving') {
+    return renderDataSavingLayout();
+  }
 
   if (incomingAttacks.length > 0) {
     alertsColor = 'border-red-500 text-red-500 bg-red-950/40 border-2 animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.3)]';
@@ -1599,33 +2274,32 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                     );
                   })}
                 </div>
-         
-            )}
-          </div>
-        );
-      })()}
+              )}
+            </div>
+          );
+        })()}
 
       {/* base buildings infrastructure */}
-      <div className="border border-indigo-500/35 bg-[#0C1425]/60 p-4 rounded-2xl shadow-[0_0_20px_rgba(99,102,241,0.12)] ring-1 ring-indigo-500/10 hover:shadow-[0_0_25px_rgba(99,102,241,0.22)] transition duration-300">
-        <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-indigo-500/25 pb-3 text-left">
-          <div>
-            <h3 className="text-xs font-black uppercase tracking-widest text-indigo-350 font-mono flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded bg-indigo-500/25 text-indigo-200 mr-1.5 animate-pulse border border-indigo-400/40 text-[9.5px]">🏯 INFRASTRUCTURE</span>
-              Established Structures ({constructedBuildings.length})
+      <div className="border border-cyan-500/30 bg-[#060913]/90 p-5 rounded-2xl shadow-[0_0_25px_rgba(34,211,238,0.1)] ring-1 ring-cyan-500/10 hover:shadow-[0_0_35px_rgba(34,211,238,0.15)] transition duration-300">
+        <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-cyan-500/20 pb-4 text-left">
+          <div className="space-y-1">
+            <h3 className="text-xs font-black uppercase tracking-widest text-cyan-400 font-mono flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/35 text-[9px] font-bold animate-pulse">🏯 INFRASTRUCTURE</span>
+              Established Structures
             </h3>
-            <p className="text-[10px] text-indigo-400/70 font-sans mt-1 leading-relaxed">
-              Sovereign base facilities, resource repositories, and control command matrices constructed on this site.
+            <p className="text-[10px] text-slate-400/80 font-sans leading-relaxed">
+              Sovereign base facilities, resource repositories, and command matrices constructed on this site.
             </p>
           </div>
-          <span className="text-[10.5px] text-indigo-300 font-mono font-bold bg-indigo-500/20 border border-indigo-500/30 px-2.5 py-1 rounded-xl shrink-0 self-start sm:self-auto">
-            ({constructedBuildings.length} Facilities Built)
+          <span className="text-[10px] text-cyan-400 font-mono font-bold bg-cyan-500/10 border border-cyan-500/20 px-3 py-1.5 rounded-lg shrink-0 self-start sm:self-auto uppercase tracking-wide">
+            {constructedBuildings.length} active facilities
           </span>
         </div>
 
         {!allExtractorsLevelOneOrMore && (
-          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-left space-y-2 font-mono">
+          <div className="mb-5 p-4 bg-red-950/20 border border-red-500/35 rounded-xl text-left space-y-2 font-mono">
             <div className="flex items-center gap-2 text-red-400 text-xs font-black uppercase tracking-wider">
-              <AlertTriangle size={15} />
+              <AlertTriangle size={14} className="text-red-500" />
               <span>Advanced Construction Projects Locked (Lvl 2+)</span>
             </div>
             <p className="text-[11px] text-slate-300 leading-relaxed font-sans">
@@ -1638,7 +2312,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
         )}
 
         {showStructures && (
-          <div className="space-y-4">
+          <div className="space-y-3.5">
             {constructedBuildings.map(([bKey, val]) => {
               const bState = val as any;
               const info = BUILDING_INFO[bKey];
@@ -1656,13 +2330,20 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
               const isExpanded = expandedBuilding === bKey;
               const isFabricatorRequiredMissing = bKey !== 'fabricator' && bKey !== 'commsHub' && bKey !== 'repository' && (!activePlanet.buildings.fabricator || activePlanet.buildings.fabricator.level < 1);
 
+              // Left accent color depending on status
+              const statusAccentClass = bState.health !== undefined && bState.health < 100
+                ? 'border-l-[3px] border-l-red-500'
+                : bState.isUpgrading
+                ? 'border-l-[3px] border-l-amber-500'
+                : 'border-l-[3px] border-l-cyan-500/50';
+
               return (
                 <div 
                   key={bKey}
-                  className={`border rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md overflow-hidden transition-all duration-200 ${
+                  className={`border rounded-xl bg-[#03060C]/90 border-slate-800 hover:border-slate-700/80 overflow-hidden transition-all duration-200 shadow-md ${statusAccentClass} ${
                     bKey === 'radar' && !hasClickedRadar
-                      ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.6)] animate-pulse'
-                      : 'border-[#1E293B]'
+                      ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.4)] animate-pulse'
+                      : ''
                   }`}
                   id={`building_${bKey}`}
                 >
@@ -1692,51 +2373,51 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         setExpandedBuilding(isExpanded ? null : bKey);
                       }
                     }}
-                    className="w-full p-4 flex items-center justify-between text-left transition hover:bg-white/[0.02]"
+                    className="w-full p-4 flex items-center justify-between text-left transition hover:bg-white/[0.01] gap-4"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="p-3.5 rounded-xl bg-[#05070A] border border-[#1E293B] text-2xl font-sans text-center shrink-0 shadow-lg select-none">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="p-3.5 rounded-xl bg-[#010408] border border-slate-800 text-2xl font-sans text-center shrink-0 shadow-lg select-none">
                         {info.icon}
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex items-center gap-2.5 flex-wrap">
-                          <span className="font-bold text-white text-base font-mono">{info.name}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                          <span className="font-bold text-slate-100 text-sm font-mono truncate">{info.name}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border ${
                             bState.level === 0 
                               ? 'bg-slate-950 text-slate-500 border-slate-800' 
-                              : 'bg-slate-900 text-pink-400 border-[#1E293B]'
+                              : 'bg-cyan-950/30 text-cyan-400 border-cyan-900/40'
                           }`}>
                             Lv. {bState.level} / {bState.maxLevel} {bState.level === 0 && '(Unconstructed)'}
                           </span>
                           {bState.health !== undefined && bState.health < 100 && (
-                            <span className="px-2 py-0.5 rounded bg-red-950/40 text-red-400 border border-red-900/30 text-[10px] font-mono font-bold animate-pulse">
+                            <span className="px-2 py-0.5 rounded bg-red-950/40 text-red-400 border border-red-900/30 text-[9px] font-mono font-bold animate-pulse">
                               ⚠️ DAMAGED: {bState.health}% Health
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-400 leading-relaxed font-sans">{info.desc}</p>
+                        <p className="text-[11px] text-slate-400 leading-normal font-sans line-clamp-1">{info.desc}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 ml-4 shrink-0">
+                    <div className="flex items-center gap-3 shrink-0">
                       {bState.isUpgrading && (
-                        <span className="text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-mono font-bold animate-pulse">
-                          {bState.level === 0 ? 'Constructing' : 'Upgrading'} {getTimerString(bState.upgradeEnd)}
+                        <span className="text-[9px] bg-amber-500/15 text-amber-400 border border-amber-500/35 px-2 py-0.5 rounded font-mono font-bold animate-pulse">
+                          {bState.level === 0 ? 'CONSTRUCTING' : 'UPGRADING'} {getTimerString(bState.upgradeEnd)}
                         </span>
                       )}
                       {isExpanded ? (
-                        <ChevronUp size={18} className="text-red-500 cursor-pointer" />
+                        <ChevronUp size={16} className="text-red-500 cursor-pointer" />
                       ) : (
-                        <ChevronDown size={18} className="text-emerald-500 cursor-pointer" />
+                        <ChevronDown size={16} className="text-emerald-500 cursor-pointer" />
                       )}
                     </div>
                   </button>
 
                   {/* Expanded Building Detail Panel */}
                   {isExpanded && (
-                    <div className="border-t border-[#1E293B]/60 p-4 bg-slate-950/20 space-y-4 animate-fade-in">
+                    <div className="border-t border-slate-850 p-4 bg-slate-950/25 space-y-4 animate-fade-in text-left">
                       {!((bState.level === 0 && bKey === 'fabricator') || allExtractorsLevelOneOrMore) && (
                         <div className="p-3 border border-red-500/20 bg-red-950/40 rounded-xl text-red-400 text-xs font-mono text-left space-y-1">
-                          <div className="font-extrabold flex items-center gap-1.5 uppercase text-[11px] tracking-wider">⚠️ EXTRACTORS REQUISITE MISSING</div>
+                          <div className="font-extrabold flex items-center gap-1.5 uppercase text-[10px] tracking-wider">⚠️ EXTRACTORS REQUISITE MISSING</div>
                           <p className="text-[10.5px] text-slate-300 font-sans leading-relaxed">
                             All 5 resource extractor types must be at least <span className="text-[#5bc0be] font-bold">Level 1</span> before you can build or upgrade base facilities!
                           </p>
@@ -1749,337 +2430,362 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         </div>
                       )}
 
-                      {bState.level < bState.maxLevel && (
-                        <div className="pt-0.5 select-none text-left">
-                          <span className="text-emerald-400 font-bold bg-emerald-950/30 border border-emerald-900/20 px-1.5 py-0.5 rounded text-[10px] font-mono inline-flex items-center gap-1.5" title="Every building upgrade increases your account population score by 30 points">
-                            🌾 Pop: +30
-                          </span>
-                        </div>
-                      )}
-                      
-                      {bKey === 'commsHub' && alliances && playersList && (
-                        <CommunicationsHubDetail
-                          player={player}
-                          alliances={alliances}
-                          playersList={playersList}
-                          chatMessages={chatMessages}
-                          onSendChat={onSendChat}
-                          onCreateAlliance={onCreateAlliance || (async () => {})}
-                          onJoinAlliance={onJoinAlliance || (async () => {})}
-                          onLeaveAlliance={onLeaveAlliance || (async () => {})}
-                          onDeclareWar={onDeclareWar || (async () => {})}
-                          onViewPlayerProfile={onViewPlayerProfile}
-                          showToast={showToast}
-                          onRefreshState={onRefreshState}
-                        />
-                      )}
-
-                      {bKey === 'repository' && (
-                        <div className="text-xs text-cyan-400 font-mono font-bold text-left">
-                          Current Store Capacity Limit: <span className="text-white bg-cyan-950/40 border border-cyan-800/30 px-1.5 py-0.5 rounded font-bold">{(Math.round(10000 * Math.pow(500, (bState.level - 1) / 44))).toLocaleString()}</span> units per resource
-                        </div>
-                      )}
-
-                      {bKey === 'bunker' && (
-                        <div className="text-xs text-[#5bc0be] font-mono font-bold text-left flex flex-col gap-1.5">
-                          <div>
-                            Current Protected Resource Limit: <span className="text-white bg-teal-950/40 border border-teal-800/30 px-1.5 py-0.5 rounded font-bold">{Math.round(500000 * (bState.level / 25)).toLocaleString()}</span> units of each type
-                          </div>
-                          {bState.level < 25 && (
-                            <div className="text-[11px] text-slate-450 font-sans font-normal">
-                              ↳ Next Level Protection: <strong className="text-emerald-400">{Math.round(500000 * ((bState.level + 1) / 25)).toLocaleString()}</strong> units
+                      {/* Main card dashboard content */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Left Side: Capabilities & Information */}
+                        <div className="space-y-3.5 bg-black/20 p-3.5 border border-slate-800/60 rounded-xl">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 block font-mono">Structure Specifications</span>
+                          
+                          <p className="text-[11px] text-slate-300 font-sans leading-relaxed">{info.desc}</p>
+                          
+                          {bState.level < bState.maxLevel && (
+                            <div className="select-none">
+                              <span className="text-emerald-400 font-bold bg-emerald-950/30 border border-emerald-900/30 px-2 py-0.5 rounded text-[9px] font-mono inline-flex items-center gap-1.5" title="Every building upgrade increases your account population score by 30 points">
+                                🌾 Population: +30 Rating points
+                              </span>
                             </div>
                           )}
-                        </div>
-                      )}
 
-                      {bKey === 'magneticShield' && (
-                        <div className="text-xs text-[#5bc0be] font-mono font-bold text-left flex flex-col gap-1.5">
-                          <div>
-                            Disruptor Building Damage Reduction: <span className="text-white bg-teal-950/40 border border-teal-800/30 px-1.5 py-0.5 rounded font-bold">{(bState.level * 2.5).toFixed(1)}%</span>
-                          </div>
-                          {bState.level < 12 && (
-                            <div className="text-[11px] text-slate-450 font-sans font-normal">
-                              ↳ Next Level Reduction: <strong className="text-emerald-400">{((bState.level + 1) * 2.5).toFixed(1)}%</strong>
+                          {bKey === 'repository' && (
+                            <div className="text-[11px] text-cyan-400 font-mono font-bold">
+                              Current Store Capacity Limit: <span className="text-white bg-cyan-950/40 border border-cyan-800/30 px-1.5 py-0.5 rounded font-bold">{(Math.round(10000 * Math.pow(500, (bState.level - 1) / 44))).toLocaleString()}</span> units per resource
                             </div>
                           )}
-                        </div>
-                      )}
 
-                      {bKey === 'supplyNexus' && (
-                        <div className="space-y-4 text-xs text-left">
-                          <div className="text-emerald-400 font-mono font-bold flex items-center gap-1">
-                            Supply Nexus Status: <span className="text-white bg-emerald-950/40 border border-emerald-800/30 px-1.5 py-0.5 rounded font-bold">Trading Network Link Level {bState.level}</span>
-                          </div>
-                          <div className="font-sans text-[11px] text-slate-400 bg-slate-950/60 p-2.5 border border-[#1E293B]/60 rounded-lg max-w-md">
-                            🌌 <span className="font-bold text-slate-200">Quantum Cargo Link:</span> Wire resources directly to other planets in the sector. Enter coordinates manually or select from your colonized space stations.
-                          </div>
+                          {bKey === 'bunker' && (
+                            <div className="text-[11px] text-[#5bc0be] font-mono font-bold flex flex-col gap-1.5">
+                              <div>
+                                Current Protected Resource Limit: <span className="text-white bg-teal-950/40 border border-teal-800/30 px-1.5 py-0.5 rounded font-bold">{Math.round(500000 * (bState.level / 25)).toLocaleString()}</span> units of each type
+                              </div>
+                              {bState.level < 25 && (
+                                <div className="text-[10px] text-slate-400 font-sans font-normal">
+                                  ↳ Next Level Protection: <strong className="text-emerald-400">{Math.round(500000 * ((bState.level + 1) / 25)).toLocaleString()}</strong> units
+                                </div>
+                              )}
+                            </div>
+                          )}
 
-                          {bState.level > 0 && (
-                            <div className="space-y-3 pt-1">
-                              <button
-                                type="button"
-                                onClick={() => setShowSendResources(!showSendResources)}
-                                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold font-mono text-[10px] uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95 hover:brightness-110"
-                              >
-                                📦 SEND RESOURCES
-                              </button>
+                          {bKey === 'magneticShield' && (
+                            <div className="text-[11px] text-[#5bc0be] font-mono font-bold flex flex-col gap-1.5">
+                              <div>
+                                Disruptor Building Damage Reduction: <span className="text-white bg-teal-950/40 border border-teal-800/30 px-1.5 py-0.5 rounded font-bold">{(bState.level * 2.5).toFixed(1)}%</span>
+                              </div>
+                              {bState.level < 12 && (
+                                <div className="text-[10px] text-slate-400 font-sans font-normal">
+                                  ↳ Next Level Reduction: <strong className="text-emerald-400">{((bState.level + 1) * 2.5).toFixed(1)}%</strong>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
-                              {showSendResources && (
-                                <div className="p-3 bg-[#0a0f18] border border-[#1e293b] rounded-lg max-w-md space-y-3">
-                                  {/* Target Selection Header */}
-                                  <div className="flex gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => { setUseCoords(false); setTransferTargetId(''); }}
-                                      className={`px-2 py-1 rounded text-[10px] font-mono font-bold ${!useCoords ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'}`}
-                                    >
-                                      MY STATIONS
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => { setUseCoords(true); setTransferTargetId(''); }}
-                                      className={`px-2 py-1 rounded text-[10px] font-mono font-bold ${useCoords ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'}`}
-                                    >
-                                      COORDINATES
-                                    </button>
-                                  </div>
+                          {bKey === 'commsHub' && alliances && playersList && (
+                            <CommunicationsHubDetail
+                              player={player}
+                              alliances={alliances}
+                              playersList={playersList}
+                              chatMessages={chatMessages}
+                              onSendChat={onSendChat}
+                              onCreateAlliance={onCreateAlliance || (async () => {})}
+                              onJoinAlliance={onJoinAlliance || (async () => {})}
+                              onLeaveAlliance={onLeaveAlliance || (async () => {})}
+                              onDeclareWar={onDeclareWar || (async () => {})}
+                              onViewPlayerProfile={onViewPlayerProfile}
+                              showToast={showToast}
+                              onRefreshState={onRefreshState}
+                            />
+                          )}
 
-                                  {/* Target inputs */}
-                                  {!useCoords ? (
-                                    <div className="space-y-1">
-                                      <label className="text-[10px] font-bold text-slate-400 uppercase">Select Target Space Station</label>
-                                      <select
-                                        value={transferTargetId}
-                                        onChange={(e) => setTransferTargetId(e.target.value)}
-                                        className="w-full bg-[#03070c] border border-[#1e293b] rounded p-1.5 text-xs text-slate-100"
-                                      >
-                                        <option value="">-- Choose target planet --</option>
-                                        {player.planets.filter(pl => pl.id !== activePlanet.id).map(pl => (
-                                          <option key={pl.id} value={pl.id}>
-                                            {pl.name} [{pl.sectorX}, {pl.sectorY}]
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                  ) : (
-                                    <div className="space-y-1">
-                                      <label className="text-[10px] font-bold text-slate-400 uppercase">Target sector coordinates</label>
-                                      <div className="flex gap-2">
-                                        <input
-                                          type="number"
-                                          placeholder="Sector X"
-                                          value={transferCoords.x}
-                                          onChange={(e) => setTransferCoords(prev => ({ ...prev, x: e.target.value }))}
-                                          className="w-1/2 bg-[#03070c] border border-[#1e293b] rounded p-1 text-slate-100 font-mono text-xs"
-                                        />
-                                        <input
-                                          type="number"
-                                          placeholder="Sector Y"
-                                          value={transferCoords.y}
-                                          onChange={(e) => setTransferCoords(prev => ({ ...prev, y: e.target.value }))}
-                                          className="w-1/2 bg-[#03070c] border border-[#1e293b] rounded p-1 text-slate-100 font-mono text-xs"
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
+                          {bKey === 'supplyNexus' && (
+                            <div className="space-y-4 text-xs">
+                              <div className="text-emerald-400 font-mono font-bold flex items-center gap-1">
+                                Supply Nexus Status: <span className="text-white bg-emerald-950/40 border border-emerald-800/30 px-1.5 py-0.5 rounded font-bold">Trading Network Link Level {bState.level}</span>
+                              </div>
+                              <div className="font-sans text-[11px] text-slate-450 bg-slate-950/60 p-2.5 border border-[#1E293B]/60 rounded-lg max-w-md">
+                                🌌 <span className="font-bold text-slate-350">Quantum Cargo Link:</span> Wire resources directly to other planets in the sector. Enter coordinates manually or select from your colonized space stations.
+                              </div>
 
-                                  {/* Resource inputs */}
-                                  <div className="space-y-2 border-t border-[#1e293b]/60 pt-2.5">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Specify Resource cargo load</span>
-                                    {['water', 'plasma', 'fuel', 'food', 'respirant'].map((resKey) => {
-                                      const label = resKey.charAt(0).toUpperCase() + resKey.slice(1);
-                                      const maxVal = Math.floor(localResources[resKey as ResourceType] || 0);
-                                      return (
-                                        <div key={resKey} className="flex items-center justify-between gap-2 bg-[#03070c] p-1.5 rounded border border-[#1e293b]/30">
-                                          <span className="text-slate-300 font-medium w-20">{label}</span>
-                                          <div className="flex items-center gap-1">
-                                            <input
-                                              type="number"
-                                              min="0"
-                                              max={maxVal}
-                                              value={transferResources[resKey] === '0' || transferResources[resKey] === '' ? '' : transferResources[resKey]}
-                                              placeholder="0"
-                                              onChange={(e) => {
-                                                const v = Math.min(maxVal, Math.max(0, parseInt(e.target.value, 10) || 0));
-                                                setTransferResources(prev => ({ ...prev, [resKey]: String(v) }));
-                                              }}
-                                              className="bg-[#0a101d] border border-[#1e293b] rounded text-slate-100 text-right w-24 p-1 text-xs font-mono"
-                                            />
-                                            <button
-                                              type="button"
-                                              onClick={() => setTransferResources(prev => ({ ...prev, [resKey]: String(maxVal) }))}
-                                              className="px-1.5 py-1 text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold uppercase rounded"
-                                            >
-                                              MAX
-                                            </button>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-
-                                  {/* Submit button */}
+                              {bState.level > 0 && (
+                                <div className="space-y-3 pt-1">
                                   <button
                                     type="button"
-                                    disabled={isTransmitting}
-                                    onClick={async () => {
-                                      if (!useCoords && !transferTargetId) {
-                                        showToast?.('Please select a target space station!', 'error');
-                                        return;
-                                      }
-                                      if (useCoords) {
-                                        if (!transferCoords.x || !transferCoords.y) {
-                                          showToast?.('Please specify target sector coordinates!', 'error');
-                                          return;
-                                        }
-                                        const txVal = parseInt(transferCoords.x, 10);
-                                        const tyVal = parseInt(transferCoords.y, 10);
-                                        if (isNaN(txVal) || isNaN(tyVal) || txVal < 0 || txVal > maxCoord || tyVal < 0 || tyVal > maxCoord) {
-                                          showToast?.(`Coordinates must be within universe boundaries (0-${maxCoord} allowed)!`, 'error');
-                                          return;
-                                        }
-                                      }
-                                      setIsTransmitting(true);
-                                      try {
-                                        const response = await fetch('/api/resources/send', {
-                                          method: 'POST',
-                                          headers: {
-                                            'Content-Type': 'application/json',
-                                            'x-user-id': player.id
-                                          },
-                                          body: JSON.stringify({
-                                            targetId: useCoords ? undefined : transferTargetId,
-                                            targetX: useCoords ? parseInt(transferCoords.x, 10) : undefined,
-                                            targetY: useCoords ? parseInt(transferCoords.y, 10) : undefined,
-                                            sourcePlanetId: activePlanet.id,
-                                            resources: {
-                                              water: parseInt(transferResources.water, 10) || 0,
-                                              plasma: parseInt(transferResources.plasma, 10) || 0,
-                                              fuel: parseInt(transferResources.fuel, 10) || 0,
-                                              food: parseInt(transferResources.food, 10) || 0,
-                                              respirant: parseInt(transferResources.respirant, 10) || 0
-                                            }
-                                          })
-                                        });
-                                        const data = await response.json();
-                                        if (response.ok) {
-                                          localStorage.setItem(`moonbase_resources_sent_${player.id}`, 'true');
-                                          showToast?.(data.message || 'Resources transmitted successfully via Quantum Cargo link!', 'success');
-                                          // Reset fields
-                                          setTransferResources({ water: '0', plasma: '0', fuel: '0', food: '0', respirant: '0' });
-                                          if (onRefreshState) onRefreshState();
-                                        } else {
-                                          showToast?.(data.error || 'Failed to transmit resource shipment.', 'error');
-                                        }
-                                      } catch (err) {
-                                        showToast?.('Network transmission failed.', 'error');
-                                      } finally {
-                                        setIsTransmitting(false);
-                                      }
-                                    }}
-                                    className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold uppercase font-mono tracking-wide rounded-md cursor-pointer text-center"
+                                    onClick={() => setShowSendResources(!showSendResources)}
+                                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold font-mono text-[10px] uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95 hover:brightness-110"
                                   >
-                                    {isTransmitting ? 'TRANSMITTING LINK...' : 'DISPATCH CARGO SHIPS'}
+                                    📦 SEND RESOURCES
                                   </button>
+
+                                  {showSendResources && (
+                                    <div className="p-3 bg-[#0a0f18] border border-[#1e293b] rounded-lg max-w-md space-y-3">
+                                      {/* Target Selection Header */}
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => { setUseCoords(false); setTransferTargetId(''); }}
+                                          className={`px-2 py-1 rounded text-[10px] font-mono font-bold ${!useCoords ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'}`}
+                                        >
+                                          MY STATIONS
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => { setUseCoords(true); setTransferTargetId(''); }}
+                                          className={`px-2 py-1 rounded text-[10px] font-mono font-bold ${useCoords ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'}`}
+                                        >
+                                          COORDINATES
+                                        </button>
+                                      </div>
+
+                                      {/* Target inputs */}
+                                      {!useCoords ? (
+                                        <div className="space-y-1">
+                                          <label className="text-[10px] font-bold text-slate-400 uppercase">Select Target Space Station</label>
+                                          <select
+                                            value={transferTargetId}
+                                            onChange={(e) => setTransferTargetId(e.target.value)}
+                                            className="w-full bg-[#03070c] border border-[#1e293b] rounded p-1.5 text-xs text-slate-100"
+                                          >
+                                            <option value="">-- Choose target planet --</option>
+                                            {player.planets.filter(pl => pl.id !== activePlanet.id).map(pl => (
+                                              <option key={pl.id} value={pl.id}>
+                                                {pl.name} [{pl.sectorX}, {pl.sectorY}]
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-1">
+                                          <label className="text-[10px] font-bold text-slate-400 uppercase">Target sector coordinates</label>
+                                          <div className="flex gap-2">
+                                            <input
+                                              type="number"
+                                              placeholder="Sector X"
+                                              value={transferCoords.x}
+                                              onChange={(e) => setTransferCoords(prev => ({ ...prev, x: e.target.value }))}
+                                              className="w-1/2 bg-[#03070c] border border-[#1e293b] rounded p-1 text-slate-100 font-mono text-xs"
+                                            />
+                                            <input
+                                              type="number"
+                                              placeholder="Sector Y"
+                                              value={transferCoords.y}
+                                              onChange={(e) => setTransferCoords(prev => ({ ...prev, y: e.target.value }))}
+                                              className="w-1/2 bg-[#03070c] border border-[#1e293b] rounded p-1 text-slate-100 font-mono text-xs"
+                                            />
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Resource inputs */}
+                                      <div className="space-y-2 border-t border-[#1e293b]/60 pt-2.5">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase">Specify Resource cargo load</span>
+                                        {['water', 'plasma', 'fuel', 'food', 'respirant'].map((resKey) => {
+                                          const label = resKey.charAt(0).toUpperCase() + resKey.slice(1);
+                                          const maxVal = Math.floor(localResources[resKey as ResourceType] || 0);
+                                          return (
+                                            <div key={resKey} className="flex items-center justify-between gap-2 bg-[#03070c] p-1.5 rounded border border-[#1e293b]/30">
+                                              <span className="text-slate-300 font-medium w-20">{label}</span>
+                                              <div className="flex items-center gap-1">
+                                                <input
+                                                  type="number"
+                                                  min="0"
+                                                  max={maxVal}
+                                                  value={transferResources[resKey] === '0' || transferResources[resKey] === '' ? '' : transferResources[resKey]}
+                                                  placeholder="0"
+                                                  onChange={(e) => {
+                                                    const v = Math.min(maxVal, Math.max(0, parseInt(e.target.value, 10) || 0));
+                                                    setTransferResources(prev => ({ ...prev, [resKey]: String(v) }));
+                                                  }}
+                                                  className="bg-[#0a101d] border border-[#1e293b] rounded text-slate-100 text-right w-24 p-1 text-xs font-mono"
+                                                />
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setTransferResources(prev => ({ ...prev, [resKey]: String(maxVal) }))}
+                                                  className="px-1.5 py-1 text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold uppercase rounded"
+                                                >
+                                                  MAX
+                                                </button>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+
+                                      {/* Submit button */}
+                                      <button
+                                        type="button"
+                                        disabled={isTransmitting}
+                                        onClick={async () => {
+                                          if (!useCoords && !transferTargetId) {
+                                            showToast?.('Please select a target space station!', 'error');
+                                            return;
+                                          }
+                                          if (useCoords) {
+                                            if (!transferCoords.x || !transferCoords.y) {
+                                              showToast?.('Please specify target sector coordinates!', 'error');
+                                              return;
+                                            }
+                                            const txVal = parseInt(transferCoords.x, 10);
+                                            const tyVal = parseInt(transferCoords.y, 10);
+                                            if (isNaN(txVal) || isNaN(tyVal) || txVal < 0 || txVal > maxCoord || tyVal < 0 || tyVal > maxCoord) {
+                                              showToast?.(`Coordinates must be within universe boundaries (0-${maxCoord} allowed)!`, 'error');
+                                              return;
+                                            }
+                                          }
+                                          setIsTransmitting(true);
+                                          try {
+                                            const response = await fetch('/api/resources/send', {
+                                              method: 'POST',
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                'x-user-id': player.id
+                                              },
+                                              body: JSON.stringify({
+                                                targetId: useCoords ? undefined : transferTargetId,
+                                                targetX: useCoords ? parseInt(transferCoords.x, 10) : undefined,
+                                                targetY: useCoords ? parseInt(transferCoords.y, 10) : undefined,
+                                                sourcePlanetId: activePlanet.id,
+                                                resources: {
+                                                  water: parseInt(transferResources.water, 10) || 0,
+                                                  plasma: parseInt(transferResources.plasma, 10) || 0,
+                                                  fuel: parseInt(transferResources.fuel, 10) || 0,
+                                                  food: parseInt(transferResources.food, 10) || 0,
+                                                  respirant: parseInt(transferResources.respirant, 10) || 0
+                                                }
+                                              })
+                                            });
+                                            const data = await response.json();
+                                            if (response.ok) {
+                                              localStorage.setItem(`moonbase_resources_sent_${player.id}`, 'true');
+                                              showToast?.(data.message || 'Resources transmitted successfully via Quantum Cargo link!', 'success');
+                                              // Reset fields
+                                              setTransferResources({ water: '0', plasma: '0', fuel: '0', food: '0', respirant: '0' });
+                                              if (onRefreshState) onRefreshState();
+                                            } else {
+                                              showToast?.(data.error || 'Failed to transmit resource shipment.', 'error');
+                                            }
+                                          } catch (err) {
+                                            showToast?.('Network transmission failed.', 'error');
+                                          } finally {
+                                            setIsTransmitting(false);
+                                          }
+                                        }}
+                                        className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold uppercase font-mono tracking-wide rounded-md cursor-pointer text-center"
+                                      >
+                                        {isTransmitting ? 'TRANSMITTING LINK...' : 'DISPATCH CARGO SHIPS'}
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
                           )}
                         </div>
-                      )}
 
-                      {bState.level < bState.maxLevel && (
-                        bState.health !== undefined && bState.health < 100 ? (
-                          <RestoreCostBar type="building" upgradeKey={bKey} targetLevel={nextTargetLvl} health={bState.health} planetResources={localResources} />
-                        ) : (
-                          <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={nextTargetLvl} planetResources={localResources} />
-                        )
-                      )}
-                      {(() => {
-                        const specificBuildingQueue = (activePlanet.upgradeQueue || []).filter(
-                          (item: any) => item.type === 'building' && item.key === bKey
-                        );
-                        if (specificBuildingQueue.length === 0) return null;
-                        return (
-                          <div className="mt-2 space-y-1 p-2 bg-slate-950/40 border border-[#1E293B]/60 rounded-lg max-w-sm text-left">
-                            <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-extrabold font-mono">Queued Upgrades:</div>
-                            {specificBuildingQueue.map((q, idx) => (
-                              <div key={idx} className="text-[10px] text-slate-400 font-mono flex items-center justify-between gap-4">
-                                <span className="text-slate-450">↳ Upgrade to Level {q.targetLevel}</span>
-                                <span className="text-amber-400 font-bold">⏳ {q.targetLevel * 2}m</span>
+                        {/* Right Side: Upgrade Cost / Requirements & Primary Action */}
+                        <div className="space-y-4 bg-black/20 p-3.5 border border-slate-800/60 rounded-xl flex flex-col justify-between">
+                          <div className="space-y-2">
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 block font-mono">Resource & Construction Requisites</span>
+                            {bState.level < bState.maxLevel && (
+                              <div className="pt-1.5">
+                                <span className="text-[10px] font-mono text-slate-400 block mb-1">Upgrade Costs for Level {nextTargetLvl}:</span>
+                                {bState.health !== undefined && bState.health < 100 ? (
+                                  <RestoreCostBar type="building" upgradeKey={bKey} targetLevel={nextTargetLvl} health={bState.health} planetResources={localResources} />
+                                ) : (
+                                  <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={nextTargetLvl} planetResources={localResources} />
+                                )}
                               </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
+                            )}
 
-                      <div className="pt-3 border-t border-white/5 flex items-center justify-between gap-2">
-                        <span className="text-[10px] text-slate-500 font-mono uppercase font-bold">Actions & Progress Control:</span>
-                        {bState.isUpgrading ? (
-                          <div className="flex flex-col items-end gap-1.5 font-mono">
-                            <div className="flex items-center gap-1.5 text-xs text-amber-400" title="Building progress in progress. Countdown until build completion.">
-                              <Clock size={12} className="animate-spin" title="Spinning build progress timer" />
-                              <span>{bState.level === 0 ? 'Constructing' : 'Upgrading'} {getTimerString(bState.upgradeEnd)}</span>
+                            {/* Construction Queue Sub-section */}
+                            {(() => {
+                              const specificBuildingQueue = (activePlanet.upgradeQueue || []).filter(
+                                (item: any) => item.type === 'building' && item.key === bKey
+                              );
+                              if (specificBuildingQueue.length === 0) return null;
+                              return (
+                                <div className="mt-3.5 space-y-1 p-2 bg-[#02050b] border border-[#1E293B]/60 rounded-lg font-mono">
+                                  <div className="text-[9px] text-[#5bc0be] uppercase tracking-wider font-extrabold">Queued Upgrades:</div>
+                                  {specificBuildingQueue.map((q, idx) => (
+                                    <div key={idx} className="text-[10px] text-slate-400 flex items-center justify-between gap-4">
+                                      <span className="text-slate-450">↳ Upgrade to Level {q.targetLevel}</span>
+                                      <span className="text-amber-400 font-bold">⏳ {q.targetLevel * 2}m</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
+
+                          <div className="pt-4 border-t border-slate-800/60 flex flex-col gap-2.5">
+                            <div className="flex justify-between items-center text-[10px] font-mono text-slate-450">
+                              <span>Action Control Terminal:</span>
+                              <span className="text-cyan-400 font-bold">STATUS // SECURE</span>
                             </div>
-                            {nextTargetLvl <= bState.maxLevel && (
-                              ((nextTargetLvl < 2 && bKey === 'fabricator') || allExtractorsLevelOneOrMore) ? (
-                                <button 
-                                  onClick={() => onUpgradeBuilding(bKey, true)}
-                                  disabled={isUpgrading}
-                                  className="px-3 py-1.5 mt-1 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                  type="button"
-                                >
-                                  <span className="text-emerald-400">Queue Upgrade</span>
-                                  <span className="text-amber-400 font-extrabold">(Lv. {nextTargetLvl}, {nextUpgradeTimeMins}m)</span>
-                                </button>
-                              ) : (
-                                <span className="text-[9px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-2.5 py-1 rounded mt-1 inline-block" title="All 5 resource extractor pumps must be at least Level 1.">
-                                  🔒 EXTRACTORS REQUISITE
-                                </span>
-                              )
+
+                            {bState.isUpgrading ? (
+                              <div className="flex flex-col items-stretch gap-1.5 font-mono">
+                                <div className="flex items-center justify-center gap-1.5 text-xs text-amber-400 bg-amber-950/20 py-2 border border-amber-500/20 rounded-xl" title="Building progress in progress. Countdown until build completion.">
+                                  <Clock size={12} className="animate-spin" />
+                                  <span className="font-bold text-[10px] uppercase tracking-wider">{bState.level === 0 ? 'CONSTRUCTING' : 'UPGRADING'} ({getTimerString(bState.upgradeEnd)})</span>
+                                </div>
+                                {nextTargetLvl <= bState.maxLevel && (
+                                  ((nextTargetLvl < 2 && bKey === 'fabricator') || allExtractorsLevelOneOrMore) ? (
+                                    <button 
+                                      onClick={() => onUpgradeBuilding(bKey, true)}
+                                      disabled={isUpgrading}
+                                      className="w-full py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                      type="button"
+                                    >
+                                      <span className="text-emerald-400">Queue Upgrade</span>
+                                      <span className="text-amber-400 font-extrabold">(Lv. {nextTargetLvl}, {nextUpgradeTimeMins}m)</span>
+                                    </button>
+                                  ) : (
+                                    <span className="text-[9px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-2.5 py-2 rounded mt-1 text-center" title="All 5 resource extractor pumps must be at least Level 1.">
+                                      🔒 EXTRACTORS REQUISITE
+                                    </span>
+                                  )
+                                )}
+                              </div>
+                            ) : !((nextTargetLvl < 2 && bKey === 'fabricator') || allExtractorsLevelOneOrMore) ? (
+                              <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 py-2.5 rounded text-center" title="All 5 resource extractor pumps must be at least Level 1.">
+                                🔒 EXTRACTORS REQUISITE (Lv 1)
+                              </span>
+                            ) : isFabricatorRequiredMissing ? (
+                              <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 py-2.5 rounded text-center" title="Fabricator modular structure at level 1 or higher is required.">
+                                🔒 FABRICATOR REQUIRED
+                              </span>
+                            ) : bState.level >= bState.maxLevel && !(bState.health !== undefined && bState.health < 100) ? (
+                              <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase font-mono bg-slate-900 border border-slate-850 py-2.5 rounded text-center">MAX CAPACITY</span>
+                            ) : bState.health !== undefined && bState.health < 100 ? (
+                              <button 
+                                onClick={() => handleRestoreBuilding(bKey)}
+                                disabled={restoringKeys[`building-${bKey}`]}
+                                className="w-full py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/35 rounded-xl transition duration-150 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                type="button"
+                              >
+                                <span>{restoringKeys[`building-${bKey}`] ? 'REPAIRING...' : '🛠️ RESTORE BUILDING'}</span>
+                              </button>
+                            ) : isAnyUpgradeInProgress ? (
+                              <button 
+                                onClick={() => onUpgradeBuilding(bKey, true)}
+                                disabled={isUpgrading}
+                                className="w-full py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                type="button"
+                              >
+                                <span className="text-emerald-400">{bState.level === 0 ? 'QUEUE CONSTRUCTION' : 'QUEUE UPGRADE'}</span>
+                                <span className="text-amber-400 font-extrabold">(Lv. {nextTargetLvl}, {nextUpgradeTimeMins}m)</span>
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => onUpgradeBuilding(bKey)}
+                                disabled={isUpgrading}
+                                className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-slate-950 hover:shadow-[0_0_15px_rgba(34,211,238,0.45)] rounded-xl transition duration-150 font-mono text-[10.5px] font-bold uppercase tracking-widest flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                type="button"
+                              >
+                                <span>{bState.level === 0 ? 'CONSTRUCT' : 'UPGRADE'}</span>
+                                <span className="text-slate-900 font-normal ml-1">({upgradeTimeMins}m)</span>
+                              </button>
                             )}
                           </div>
-                        ) : !((nextTargetLvl < 2 && bKey === 'fabricator') || allExtractorsLevelOneOrMore) ? (
-                          <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-3 py-1.5 rounded" title="All 5 resource extractor pumps must be at least Level 1.">
-                            🔒 EXTRACTORS REQUISITE
-                          </span>
-                        ) : isFabricatorRequiredMissing ? (
-                          <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-3 py-1.5 rounded" title="Fabricator modular structure at level 1 or higher is required.">
-                            🔒 FABRICATOR REQUIRED
-                          </span>
-                        ) : bState.level >= bState.maxLevel && !(bState.health !== undefined && bState.health < 100) ? (
-                          <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase font-mono bg-slate-900 border border-slate-850 px-2 py-1 rounded">MAX CAP</span>
-                        ) : bState.health !== undefined && bState.health < 100 ? (
-                          <button 
-                            onClick={() => handleRestoreBuilding(bKey)}
-                            disabled={restoringKeys[`building-${bKey}`]}
-                            className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:shadow-[0_0_12px_rgba(239,68,68,0.25)] border border-red-500/35 rounded-xl transition duration-150 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                            type="button"
-                          >
-                            <span>{restoringKeys[`building-${bKey}`] ? 'Repairing...' : '🛠️ Restore Building'}</span>
-                          </button>
-                        ) : isAnyUpgradeInProgress ? (
-                          <button 
-                            onClick={() => onUpgradeBuilding(bKey, true)}
-                            disabled={isUpgrading}
-                            className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 hover:shadow-[0_0_12px_rgba(16,185,129,0.25)] border border-emerald-500/35 rounded-xl transition duration-150 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            type="button"
-                          >
-                            <span className="text-emerald-400">{bState.level === 0 ? 'Queue Construction' : 'Queue Upgrade'}</span>
-                            <span className="text-amber-400 font-extrabold">(Lv. {nextTargetLvl}, {nextUpgradeTimeMins}m)</span>
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={() => onUpgradeBuilding(bKey)}
-                            disabled={isUpgrading}
-                            className="px-4 py-2 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 hover:shadow-[0_0_12px_rgba(236,72,153,0.25)] border border-pink-500/35 rounded-xl transition duration-150 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                            type="button"
-                          >
-                            <span>{bState.level === 0 ? 'Construct' : 'Upgrade'}</span>
-                            <span className="text-slate-500">({upgradeTimeMins}m)</span>
-                          </button>
-                        )}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -2091,7 +2797,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
         {/* Unlocked blueprints section for structures not yet constructed */}
         {showStructures && visibleBlueprints.length > 0 && (
-          <div className="mt-6 pt-6 border-t border-[#1E293B]/60 text-left">
+          <div className="mt-7 pt-7 border-t border-slate-800 text-left">
             <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#5bc0be] font-mono flex items-center gap-2 mb-4">
               🏗️ Unlocked Construction Blueprints ({visibleBlueprints.length})
             </h4>
@@ -2108,20 +2814,20 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                 return (
                   <div 
                     key={bKey}
-                    className={`border border-dashed rounded-xl bg-[#090D1A]/50 backdrop-blur-md overflow-hidden hover:border-[#5bc0be]/60 transition duration-150 ${
+                    className={`border border-dashed rounded-xl bg-[#03060C]/40 hover:border-cyan-500/50 transition duration-150 ${
                       bKey === 'radar' && !hasClickedRadar
-                        ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.6)] animate-pulse'
-                        : 'border-[#5bc0be]/30'
+                        ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.4)] animate-pulse'
+                        : 'border-slate-800'
                     }`}
                     id={`blueprint_${bKey}`}
                   >
                     <div className="p-4 flex items-center justify-between text-left gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-lg bg-[#05070A] border border-[#5bc0be]/25 text-xl font-sans text-center shrink-0 shadow-lg select-none">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="p-2.5 rounded-lg bg-[#010408] border border-slate-800 text-xl font-sans text-center shrink-0 shadow-lg select-none">
                           {info.icon}
                         </div>
-                        <div className="space-y-0.5">
-                          <span className="font-bold text-white text-sm font-mono block">{info.name}</span>
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                          <span className="font-bold text-slate-200 text-sm font-mono block truncate">{info.name}</span>
                           <p className="text-[10.5px] text-slate-400 leading-normal line-clamp-1">{info.desc}</p>
                         </div>
                       </div>
@@ -2145,7 +2851,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                             setExpandedBuilding(isExpanded ? null : bKey);
                           }
                         }}
-                        className="px-3 py-1.5 bg-[#5bc0be] hover:bg-[#5bc0be]/90 text-slate-950 font-bold font-mono text-[9px] uppercase tracking-wider rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-900/30 font-bold font-mono text-[9px] uppercase tracking-wider rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 shrink-0"
                       >
                         <span>Blueprint</span>
                         {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
@@ -2153,12 +2859,12 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                     </div>
 
                     {isExpanded && (
-                      <div className="border-t border-[#5bc0be]/20 p-4 bg-slate-950/40 space-y-3.5 text-left text-xs animate-fade-in">
+                      <div className="border-t border-slate-850 p-4 bg-slate-950/40 space-y-3.5 text-left text-xs animate-fade-in">
                         <p className="text-slate-350 leading-relaxed font-sans">{info.desc}</p>
                         <UpgradeCostBar type="building" upgradeKey={bKey} targetLevel={1} planetResources={localResources} />
 
-                        <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-2">
-                          <span className="text-[9.5px] text-slate-500 font-mono font-bold tracking-wider">REQUISITE FABRICATOR: Lv. {getRequiredFabricatorLevel(bKey)}</span>
+                        <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between gap-2">
+                          <span className="text-[9.5px] text-slate-500 font-mono font-bold tracking-wider">REQ FABRICATOR: Lv. {getRequiredFabricatorLevel(bKey)}</span>
                           {bKey !== 'fabricator' && !allExtractorsLevelOneOrMore ? (
                             <span className="text-[10px] font-bold tracking-widest text-red-400 uppercase font-mono bg-red-950/20 border border-red-500/30 px-3 py-1.5 rounded" title="All 5 resource extractor pumps must be at least Level 1.">
                               🔒 EXTRACTORS REQUISITE
@@ -2181,7 +2887,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                               type="button"
                             >
                               <span>Construct</span>
-                              <span className="text-slate-450 text-[8px]">({upgradeTimeMins}m)</span>
+                              <span className="text-slate-450 text-[8px] ml-1">({upgradeTimeMins}m)</span>
                             </button>
                           )}
                         </div>

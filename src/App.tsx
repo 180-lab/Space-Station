@@ -847,6 +847,9 @@ export default function App() {
   const [theme, setTheme] = useState<'normal' | 'light' | 'dark'>(() => {
     return (localStorage.getItem('moonbase_theme') as 'normal' | 'light' | 'dark') || 'normal';
   });
+  const [layoutMode, setLayoutMode] = useState<'classic' | 'datasaving'>(() => {
+    return (localStorage.getItem('moonbase_layout_mode') as 'classic' | 'datasaving') || 'classic';
+  });
   const [skinId, setSkinId] = useState<string>('default'); // Modern Cosmetics
   const [fontSizeScale, setFontSizeScale] = useState<string>(() => {
     return localStorage.getItem('moonbase_font_size') || '100%';
@@ -3796,7 +3799,7 @@ export default function App() {
       )}
 
       {/* Screen view router container */}
-      <main className="max-w-5xl mx-auto px-4 pt-8 pb-24 animate-fade-in animate-duration-500">
+      <main className={`max-w-5xl mx-auto px-4 ${layoutMode === 'datasaving' ? 'pt-1.5' : 'pt-3'} pb-24 animate-fade-in animate-duration-500`}>
         {activeTab === 'explore' && player && (() => {
           const sortedByPopulation = [...playersList].sort((a, b) => b.scores.population - a.scores.population);
           const populationRank = sortedByPopulation.findIndex(p => p.id === player.id) + 1 || 1;
@@ -3804,6 +3807,7 @@ export default function App() {
             <ExploreTab 
               player={player}
               activePlanet={activePlanet}
+              layoutMode={layoutMode}
               onUpgradeMine={handleUpgradeMine}
               onUpgradeBuilding={handleUpgradeBuilding}
               serverTime={serverTime}
@@ -3880,6 +3884,7 @@ export default function App() {
             onCancelFleet={handleCancelFleet}
             onRerouteFleet={handleRerouteFleet}
             maxCoord={maxCoord}
+            layoutMode={layoutMode}
           />
         )}
 
@@ -3925,6 +3930,7 @@ export default function App() {
               setIsDirectRadarView(false);
               setActiveTab('explore');
             }}
+            layoutMode={layoutMode}
           />
         )}
 
@@ -3988,6 +3994,8 @@ export default function App() {
             populationRank={myPopulationRankIndex}
             customTasks={customTasks}
             playersList={playersList}
+            layoutMode={layoutMode}
+            setLayoutMode={setLayoutMode}
           />
         )}
       </main>

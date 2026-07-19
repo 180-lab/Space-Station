@@ -99,6 +99,8 @@ interface SettingsTabProps {
   customTasks?: Record<string, any>;
   galaxyConfig?: any;
   playersList?: any[];
+  layoutMode?: 'classic' | 'datasaving';
+  setLayoutMode?: (mode: 'classic' | 'datasaving') => void;
 }
 
 const COSMETIC_SKINS = [
@@ -128,7 +130,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   populationRank,
   customTasks = {},
   galaxyConfig,
-  playersList = []
+  playersList = [],
+  layoutMode = 'classic',
+  setLayoutMode
 }) => {
   // Rename commander name and base colony names state
   const [commanderName, setCommanderName] = useState(player.username);
@@ -890,6 +894,41 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 </div>
               </div>
 
+              {/* Layout Mode Selector Option */}
+              <div className="space-y-2 pt-2 border-t border-[#1E293B]/40">
+                <label className="text-xs font-bold text-slate-300 block uppercase tracking-wide">
+                  Command Interface Layout
+                </label>
+                <p className="text-[10.5px] text-slate-500 leading-relaxed">
+                  Redesign the information density. Choose the newly requested layout option below.
+                </p>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  {[
+                    { id: 'classic', label: 'Classic Tactical Panel', emoji: '🎛️' },
+                    { id: 'datasaving', label: 'Data saving mode', emoji: '📊' }
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => {
+                        if (setLayoutMode) {
+                          setLayoutMode(opt.id as any);
+                          localStorage.setItem('moonbase_layout_mode', opt.id);
+                          showToast(`Command layout calibrated to: ${opt.label}`, 'success');
+                        }
+                      }}
+                      className={`py-2 px-1 text-center border text-[10.5px] font-bold rounded-xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                        layoutMode === opt.id 
+                          ? 'border-cyan-500 bg-cyan-950/20 text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.15)]' 
+                          : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:border-slate-700 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-sm">{opt.emoji}</span>
+                      <span>{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Typography accessibility scaling */}
               <div className="space-y-2 pt-2">
                 <label className="text-xs font-bold text-slate-300 block uppercase tracking-wide">
@@ -1560,6 +1599,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </div>
 
       </div>
+
       {/* SECURE GOOGLE ACCESS KEYS & DECOM STATUS */}
       <div className="p-5 bg-[#0A0F1D] border border-cyan-500/10 rounded-2xl space-y-5 shadow-lg text-left relative overflow-hidden">
         {/* Decorative corner accent */}
@@ -1570,71 +1610,114 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           className="w-full flex items-center justify-between text-left hover:text-white transition duration-150 cursor-pointer select-none border-b border-[#1E293B]/60 pb-2"
           type="button"
         >
-          <h3 className="text-xs font-bold uppercase tracking-widest text-cyan-400 flex items-center gap-2">
-            <CheckCircle size={14} className="text-cyan-500" /> Quantum Access Credentials & Synchronization
+          <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2">
+            <Key size={14} className="text-cyan-400" /> Quantum Access Credentials & Synchronization
             {showSync ? (
               <ChevronUp size={12} className="text-red-500" />
             ) : (
               <ChevronDown size={12} className="text-emerald-500" />
             )}
           </h3>
+          <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider font-extrabold hidden sm:inline">Active Status</span>
         </button>
  
         {showSync && (
-          <>
-            <div className="grid grid-cols-1 gap-6">
-          {/* Box 1: Google account sync status */}
-          <div className="space-y-3.5 bg-slate-950/40 p-4 border border-[#1E293B] rounded-xl flex flex-col justify-between">
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider">Device Sync Status</span>
-              <h4 className="text-xs font-bold text-white uppercase font-mono">Google Account Integrity Sync</h4>
-              <p className="text-[10px] text-slate-400 leading-normal font-sans mt-1">
-                Link this browser station to your unique Google credentials. Lets you instantly load status, credits, and fleets over multiple mobile devices.
-              </p>
-            </div>
+          <div className="space-y-5 pt-2 animate-fade-in">
+            {/* Bento Grid: 2 Columns on desktop, 1 on mobile */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* Column 1: Google account sync status */}
+              <div className="space-y-3.5 bg-slate-950/60 p-4 border border-slate-800/80 rounded-xl flex flex-col justify-between text-left">
+                <div className="space-y-1.5 text-left">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">INTEGRITY CLOUD LINK</span>
+                  </div>
+                  <h4 className="text-xs font-bold text-white uppercase font-mono">Google Account Sync</h4>
+                  <p className="text-[10.5px] text-slate-400 leading-relaxed font-sans">
+                    Bind this browser session to your unique Google credentials to instantly load status, credits, and fleets over multiple mobile devices.
+                  </p>
+                </div>
+     
+                <div className="pt-2 text-left">
+                  {player.googleEmail ? (
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg flex items-center flex-wrap gap-2.5">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></div>
+                      <div className="font-sans text-xs min-w-0 flex-1">
+                        <span className="font-bold text-slate-100 block uppercase text-[8px] tracking-wider font-mono">Verified Sync Locked</span>
+                        Linked Google Account: <span className="block sm:inline font-mono text-[10.5px] font-bold text-white break-all">{player.googleEmail}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 text-left">
+                      <div className="p-2.5 bg-amber-500/5 border border-amber-500/20 text-amber-500 rounded-lg text-[10px] leading-relaxed font-sans text-left">
+                        ⚠️ Terminal currently operates under offline cache keys!
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const email = window.prompt("Please enter your Google Email address to sync:", "banele180@gmail.com");
+                          if (email) {
+                            if (email.includes('@') && email.includes('.')) {
+                              if (onLinkGoogle) onLinkGoogle(email);
+                            } else {
+                              window.alert("Invalid Google Email security pattern format.");
+                            }
+                          }
+                        }}
+                        className="w-full py-2.5 px-3 bg-white hover:bg-slate-100 text-slate-950 font-bold font-mono text-[10px] uppercase tracking-wider rounded-lg transition active:scale-95 cursor-pointer shadow-md text-left flex items-center justify-center flex-wrap gap-2"
+                      >
+                        <svg className="w-3.5 h-3.5 mr-1 text-rose-600 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                          <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.13-.07-.25-.15-.35-.22" fill="#FBBC05" />
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                        </svg>
+                        <span>Link Active Google Account</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
  
-            <div className="pt-2">
-              {player.googleEmail ? (
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg flex items-center flex-wrap gap-2.5">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></div>
-                  <div className="font-sans text-xs min-w-0 flex-1">
-                    <span className="font-bold text-slate-100 block uppercase text-[9px] tracking-wider">Verified Sync Locked</span>
-                    Linked Google Account: <span className="block sm:inline font-mono text-[10.5px] font-bold text-white break-all">{player.googleEmail}</span>
+              {/* Column 2: Cryptographic Core Security Signature */}
+              <div className="space-y-3.5 bg-slate-950/60 p-4 border border-slate-800/80 rounded-xl flex flex-col justify-between text-left">
+                <div className="space-y-1.5 text-left">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">CRYPTOGRAPHIC SIGNATURE</span>
+                  </div>
+                  <h4 className="text-xs font-bold text-white uppercase font-mono">Tactical Terminal Key</h4>
+                  <p className="text-[10.5px] text-slate-400 leading-relaxed font-sans">
+                    This is your unique command cipher. Keep it secure as a backup or to request manual station recovery.
+                  </p>
+                </div>
+ 
+                <div className="space-y-2.5 text-left">
+                  <div className="flex items-center gap-1 bg-[#02050B] border border-slate-800/60 rounded-lg p-2.5 font-mono text-[9px] text-cyan-300 break-all select-all relative group">
+                    <span className="flex-1 select-all">{player.id}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(player.id);
+                        showToast("Cryptographic station key copied to clipboard!", "success");
+                      }}
+                      className="px-2 py-1 bg-cyan-950/40 border border-cyan-500/20 rounded hover:bg-cyan-500/20 text-[8px] uppercase tracking-wider font-extrabold cursor-pointer transition shrink-0 ml-1.5"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <div className="text-[9.5px] text-amber-500 font-mono flex items-start gap-1 bg-amber-950/10 border border-amber-950/30 p-2 rounded-lg text-left">
+                    <span className="shrink-0 font-bold select-none">⚠️</span>
+                    <p className="leading-relaxed font-sans">
+                      <strong>SECURITY PROTOCOL:</strong> Do not share this key with anyone. Anyone with this key can command your space fleets and consume resources.
+                    </p>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="p-2.5 bg-amber-500/5 border border-amber-500/20 text-amber-500 rounded-lg text-[10px] leading-relaxed font-sans">
-                    ⚠️ Terminal currently operates under offline cache keys!
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const email = window.prompt("Please enter your Google Email address to sync:", "banele180@gmail.com");
-                      if (email) {
-                        if (email.includes('@') && email.includes('.')) {
-                          if (onLinkGoogle) onLinkGoogle(email);
-                        } else {
-                          window.alert("Invalid Google Email security pattern format.");
-                        }
-                      }
-                    }}
-                    className="w-full py-2.5 px-3 bg-white hover:bg-slate-150 text-slate-950 font-bold font-mono text-[10px] uppercase tracking-wider rounded-lg transition active:scale-95 cursor-pointer shadow-md text-left flex items-center justify-center flex-wrap gap-2"
-                  >
-                    <svg className="w-3.5 h-3.5 mr-1 text-rose-600 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                      <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.13-.07-.25-.15-.35-.22" fill="#FBBC05" />
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
-                    </svg>
-                    <span>Link Active Google Account</span>
-                  </button>
-                </div>
-              )}
+              </div>
+ 
             </div>
           </div>
-        </div>
-          </>
         )}
       </div>
 

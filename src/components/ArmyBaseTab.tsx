@@ -75,6 +75,7 @@ interface ArmyBaseTabProps {
   onRerouteFleet?: (fleetId: string, targetX: number, targetY: number, missionType?: string) => Promise<void>;
   maxCoord?: number;
   onUpgradeBuilding?: (buildingKey: string) => void;
+  layoutMode?: 'classic' | 'datasaving';
 }
 
 const TROOP_DETAILS = {
@@ -181,7 +182,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   onCancelFleet,
   onRerouteFleet,
   maxCoord = 100,
-  onUpgradeBuilding
+  onUpgradeBuilding,
+  layoutMode = 'classic'
 }) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({
     defender: 0,
@@ -944,8 +946,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
       {subTab === 'troops' && (
         <div className="space-y-1.5 animate-fade-in">
           {/* Integrated Armed Force Tactical Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 bg-[#0A0F1D]/65 border border-[#1E293B] rounded-xl flex items-center gap-3.5" title="Defense Absorption: Defense/shield strength point total absorbing enemy scans and raids.">
+          <div className={`grid grid-cols-1 md:grid-cols-3 ${layoutMode === 'datasaving' ? 'gap-1.5' : 'gap-4'}`}>
+            <div className={`${layoutMode === 'datasaving' ? 'p-2 rounded-lg gap-2' : 'p-4 rounded-xl gap-3.5'} bg-[#0A0F1D]/65 border border-[#1E293B] flex items-center`} title="Defense Absorption: Defense/shield strength point total absorbing enemy scans and raids.">
               <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/15 text-blue-400">
                 <Shield size={16} title="Shield defensive icon" />
               </div>
@@ -957,7 +959,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
               </div>
             </div>
 
-            <div className="p-4 bg-[#0A0F1D]/65 border border-[#1E293B] rounded-xl flex items-center gap-3.5" title="Strike Firepower: Cumulative offensive combat capability total scoring planet raids.">
+            <div className={`${layoutMode === 'datasaving' ? 'p-2 rounded-lg gap-2' : 'p-4 rounded-xl gap-3.5'} bg-[#0A0F1D]/65 border border-[#1E293B] flex items-center`} title="Strike Firepower: Cumulative offensive combat capability total scoring planet raids.">
               <div className="p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/15 text-orange-400">
                 <Sword size={16} title="Sword weapon action icon" />
               </div>
@@ -969,7 +971,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
               </div>
             </div>
 
-            <div className="p-4 bg-[#0A0F1D]/65 border border-[#1E293B] rounded-xl flex items-center gap-3.5" title="Cargo Looting Pool: Ultimate cargo storage carrying weight of resources looted.">
+            <div className={`${layoutMode === 'datasaving' ? 'p-2 rounded-lg gap-2' : 'p-4 rounded-xl gap-3.5'} bg-[#0A0F1D]/65 border border-[#1E293B] flex items-center`} title="Cargo Looting Pool: Ultimate cargo storage carrying weight of resources looted.">
               <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/15 text-emerald-400">
                 <Truck size={16} title="Truck cargo carrier icon" />
               </div>
@@ -1012,7 +1014,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-4">
+                <div className={`grid grid-cols-1 ${layoutMode === 'datasaving' ? 'gap-1.5' : 'gap-4'}`}>
                   {(Object.entries(TROOP_DETAILS) as [string, any][]).map(([tId, details]) => {
                     const count = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
                     const Icon = details.icon;
@@ -1021,10 +1023,10 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                     return (
                       <div 
                         key={tId}
-                        className="p-4 border border-[#1E293B] rounded-xl bg-[#0A0F1D]/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition duration-200 hover:border-white/10"
+                        className={`${layoutMode === 'datasaving' ? 'p-1.5 gap-2 rounded-lg' : 'p-4 gap-4 rounded-xl'} border border-[#1E293B] bg-[#0A0F1D]/80 flex flex-col sm:flex-row sm:items-center justify-between transition duration-200 hover:border-white/10`}
                       >
-                        <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                          {details.image ? (
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          {details.image && layoutMode !== 'datasaving' ? (
                             <div 
                               onClick={() => setZoomedImage({ src: details.image, name: details.name })}
                               className="relative shrink-0 w-12 h-12 rounded-xl border border-[#1E293B] hover:border-cyan-500/50 overflow-hidden bg-[#05070a]/90 cursor-zoom-in group/smimg"
@@ -1037,11 +1039,11 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                                 referrerPolicy="no-referrer"
                               />
                             </div>
-                          ) : (
+                          ) : layoutMode !== 'datasaving' ? (
                             <div className={`p-3 rounded-xl border border-[#1E293B] shrink-0 ${details.color}`} title={`${details.name}: ${details.desc}. Hover/long press for stats.`}>
                               <Icon size={18} title={`${details.name}`} />
                             </div>
-                          )}
+                          ) : null}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-bold text-sm text-white font-mono">{details.name}</span>
@@ -1137,16 +1139,16 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
 
             {/* Accordion Content */}
             {isBuildQueueOpen && (
-              <div className="p-4 border-t border-[#1E293B] bg-black/20 space-y-4">
+              <div className={`p-2.5 border-t border-[#1E293B] bg-black/20 ${layoutMode === 'datasaving' ? 'space-y-1.5' : 'space-y-4'}`}>
                 {/* Summary Grid: Total queued vs Owned */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className={`grid grid-cols-2 md:grid-cols-3 ${layoutMode === 'datasaving' ? 'gap-1.5' : 'gap-3'}`}>
                   {(Object.entries(TROOP_DETAILS) as [string, any][]).map(([tId, details]) => {
                     const owned = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
                     const queued = queuedCounts[tId] || 0;
                     const Icon = details.icon;
 
                     return (
-                      <div key={tId} className="p-3 rounded-xl border border-[#1E293B]/70 bg-[#05070A]/90 hover:border-white/10 transition">
+                      <div key={tId} className={`${layoutMode === 'datasaving' ? 'p-1.5 rounded-lg' : 'p-3 rounded-xl'} border border-[#1E293B]/70 bg-[#05070A]/90 hover:border-white/10 transition`}>
                         <div className="flex items-center gap-2 mb-1.5">
                           <div className={`p-1.5 rounded-lg border border-white/5 ${details.color}`}>
                             <Icon size={12} />
@@ -1245,7 +1247,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
               </p>
             </div>
           ) : showBuildForces && (
-            <div className="grid grid-cols-1 gap-5">
+            <div className={`grid grid-cols-1 ${layoutMode === 'datasaving' ? 'gap-1.5' : 'gap-5'}`}>
               {(Object.entries(TROOP_DETAILS) as [string, any][]).map(([tId, details]) => {
                 const Icon = details.icon;
                 const currentCount = activePlanet.troops[tId as keyof typeof activePlanet.troops] || 0;
@@ -1259,13 +1261,13 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                 return (
                   <div 
                     key={tId}
-                    className={`p-5 border rounded-xl bg-[#0A0F1D]/80 backdrop-blur-md flex flex-col gap-4.5 transition duration-150 relative overflow-hidden ${
+                    className={`${layoutMode === 'datasaving' ? 'p-2 rounded-lg gap-1.5' : 'p-5 rounded-xl gap-4.5'} border bg-[#0A0F1D]/80 backdrop-blur-md flex flex-col transition duration-150 relative overflow-hidden ${
                       isLocked ? 'border-red-950/40 opacity-75' : 'border-[#1E293B] hover:border-white/10'
                     }`}
                     id={`troop_card_${tId}`}
                   >
                     {/* Aspect-Ratio Rich Troop Image Banner */}
-                    {details.image && (
+                    {details.image && layoutMode !== 'datasaving' && (
                       <div 
                         onClick={() => setZoomedImage({ src: details.image, name: details.name })}
                         className="relative h-28 w-full rounded-lg overflow-hidden border border-white/5 hover:border-cyan-500/30 bg-[#05070a] -mt-1 -mx-1 mb-2 group/img cursor-zoom-in"
@@ -1290,9 +1292,11 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
                   {/* Header info */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5">
-                      <div className={`p-3.5 rounded-xl border border-[#1E293B] shrink-0 shadow-lg select-none ${details.color}`}>
-                        <Icon size={20} />
-                      </div>
+                      {layoutMode !== 'datasaving' && (
+                        <div className={`p-3.5 rounded-xl border border-[#1E293B] shrink-0 shadow-lg select-none ${details.color}`}>
+                          <Icon size={20} />
+                        </div>
+                      )}
                       <div>
                         <div className="flex items-center gap-2.5 flex-wrap">
                           <span className="font-bold text-white text-base font-mono">{details.name}</span>

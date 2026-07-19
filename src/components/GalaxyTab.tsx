@@ -81,6 +81,7 @@ interface GalaxyTabProps {
   onUpgradeBuilding?: (buildingKey: string, queue?: boolean) => Promise<any> | any;
   isDirectRadarView?: boolean;
   onCloseRadarDirectView?: () => void;
+  layoutMode?: 'classic' | 'datasaving';
 }
 
 async function safeParseJson(res: Response): Promise<any> {
@@ -175,7 +176,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
   galaxyConfig,
   onUpgradeBuilding,
   isDirectRadarView,
-  onCloseRadarDirectView
+  onCloseRadarDirectView,
+  layoutMode = 'classic'
 }) => {
   // Sub-tabs
   const [subTab, setSubTab] = useState<'scanner' | 'ranking' | 'comms' | 'news' | 'fleets'>(
@@ -1175,7 +1177,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             };
 
             return (
-              <div id="radar-array-control-panel" className="p-4 bg-[#0A0F1D]/95 border border-[#1E293B] rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl mb-3">
+              <div id="radar-array-control-panel" className={`${layoutMode === 'datasaving' ? 'p-2 rounded-lg gap-2 mb-1.5' : 'p-4 rounded-xl gap-4 mb-3'} bg-[#0A0F1D]/95 border border-[#1E293B] flex flex-col md:flex-row items-start md:items-center justify-between shadow-xl`}>
                 <div className="space-y-1 text-left">
                   <div className="flex items-center gap-2">
                     <span className="p-1.5 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
@@ -1249,9 +1251,9 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
           })()}
 
             {/* Coordinates Search */}
-          <form onSubmit={handleSearchSubmit} className="p-4 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="flex-1 grid grid-cols-2 gap-3 text-xs">
-              <div className="flex items-center gap-2.5 bg-[#05070A] px-4 py-3 rounded-xl border border-[#1E293B] focus-within:border-cyan-500 transition-all">
+          <form onSubmit={handleSearchSubmit} className={`${layoutMode === 'datasaving' ? 'p-1.5 gap-2' : 'p-4 gap-3'} bg-[#0A0F1D]/90 border border-[#1E293B] rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center`}>
+            <div className={`flex-1 grid grid-cols-2 ${layoutMode === 'datasaving' ? 'gap-1.5' : 'gap-3'} text-xs`}>
+              <div className={`flex items-center gap-2 bg-[#05070A] ${layoutMode === 'datasaving' ? 'px-2.5 py-1.5 rounded-lg' : 'px-4 py-3 rounded-xl'} border border-[#1E293B] focus-within:border-cyan-500 transition-all`}>
                 <span className="text-slate-500 font-bold">X COORD</span>
                 <input 
                   type="number" 
@@ -1261,7 +1263,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   placeholder="0..100"
                 />
               </div>
-              <div className="flex items-center gap-2.5 bg-[#05070A] px-4 py-3 rounded-xl border border-[#1E293B] focus-within:border-cyan-500 transition-all">
+              <div className={`flex items-center gap-2 bg-[#05070A] ${layoutMode === 'datasaving' ? 'px-2.5 py-1.5 rounded-lg' : 'px-4 py-3 rounded-xl'} border border-[#1E293B] focus-within:border-cyan-500 transition-all`}>
                 <span className="text-slate-500 font-bold">Y COORD</span>
                 <input 
                   type="number" 
@@ -1275,7 +1277,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             <button 
               type="submit"
               disabled={isScanning}
-              className={`px-5 py-3.5 hover:bg-cyan-500/20 hover:shadow-[0_0_12px_rgba(34,211,238,0.25)] text-cyan-400 font-bold text-xs uppercase tracking-widest border rounded-xl transition flex items-center justify-center gap-2 whitespace-nowrap active:scale-[0.98] cursor-pointer ${
+              className={`${layoutMode === 'datasaving' ? 'px-3 py-2 rounded-lg' : 'px-5 py-3.5 rounded-xl'} hover:bg-cyan-500/20 hover:shadow-[0_0_12px_rgba(34,211,238,0.25)] text-cyan-400 font-bold text-xs uppercase tracking-widest border transition flex items-center justify-center gap-2 whitespace-nowrap active:scale-[0.98] cursor-pointer ${
                 !hasClickedScan
                   ? 'bg-cyan-500/25 border-cyan-300 animate-[pulse_1s_infinite] shadow-[0_0_20px_rgba(34,211,238,0.65)] scale-[1.03]'
                   : 'bg-cyan-500/10 border-cyan-500/40 animate-[pulse_4.5s_infinite] shadow-[0_0_15px_rgba(34,211,238,0.15)]'
@@ -1397,8 +1399,8 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                   }
 
                   return (
-                    <div className="space-y-4">
-                      <div className="space-y-4 pr-1">
+                    <div className={layoutMode === 'datasaving' ? "space-y-1.5" : "space-y-4"}>
+                      <div className={layoutMode === 'datasaving' ? "space-y-1.5 pr-1" : "space-y-4 pr-1"}>
                         {filteredResults.slice(radarPage * 10, (radarPage + 1) * 10).map((target) => {
                       const isUserSelf = target.id === player.id;
                       const targetDist = Math.hypot(target.coords.x - activePlanet.sectorX, target.coords.y - activePlanet.sectorY);
@@ -1408,7 +1410,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                       return (
                         <div 
                           key={target.planetId}
-                          className={`p-4 rounded-xl border flex flex-col transition duration-150 ${isUserSelf ? 'bg-indigo-950/10 border-indigo-500/30' : 'bg-[#05070A] border-[#1E293B] hover:border-white/15'}`}
+                          className={`${layoutMode === 'datasaving' ? 'p-2 rounded-lg' : 'p-4 rounded-xl'} border flex flex-col transition duration-150 ${isUserSelf ? 'bg-indigo-950/10 border-indigo-500/30' : 'bg-[#05070A] border-[#1E293B] hover:border-white/15'}`}
                         >
                           {/* Top Header Row (Always Visible) */}
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
@@ -1807,7 +1809,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
             </div>
 
             {isWatchlistOpen && (
-              <div className="pt-4 border-t border-white/5 space-y-4">
+              <div className={`pt-4 border-t border-white/5 ${layoutMode === 'datasaving' ? 'space-y-1.5' : 'space-y-4'}`}>
                 {/* Create Group Form & Filter Tabs */}
                 <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
                   {/* Quick Filter tabs by Group */}
@@ -1939,7 +1941,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                               No bookmarks in this group. Add stations from your active radar signature results!
                             </div>
                           ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className={`grid grid-cols-1 md:grid-cols-2 ${layoutMode === 'datasaving' ? 'gap-1.5' : 'gap-3'}`}>
                               {group.items.map((item: any) => {
                                 const dist = Math.hypot(item.coords.x - activePlanet.sectorX, item.coords.y - activePlanet.sectorY);
                                 const spaceMiles = dist * 1.917;
@@ -1947,7 +1949,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                 return (
                                   <div 
                                     key={item.planetId}
-                                    className="p-3.5 bg-[#030508]/80 border border-[#161E2E] rounded-xl flex flex-col justify-between space-y-3 hover:border-amber-500/30 transition duration-150"
+                                    className={`${layoutMode === 'datasaving' ? 'p-2 space-y-1 rounded-lg' : 'p-3.5 space-y-3 rounded-xl'} bg-[#030508]/80 border border-[#161E2E] flex flex-col justify-between hover:border-amber-500/30 transition duration-150`}
                                   >
                                     <div className="flex items-start justify-between">
                                       <div className="text-left space-y-0.5">
