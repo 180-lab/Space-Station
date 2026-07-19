@@ -680,6 +680,17 @@ function ensureAdminMaxed(p: any) {
   });
 }
 
+// Helper to get research technology level of a specific planet/station, capped by Research Center level.
+function getPlanetTechLevel(player: PlayerProfile, planetId: string, techId: string): number {
+  const planet = player.planets.find(pl => pl.id === planetId);
+  if (!planet) return 0;
+  const rcLevel = planet.buildings.researchCenter?.level || 0;
+  if (rcLevel === 0) return 0;
+  
+  const rawLvl = player.techLevels?.[planetId]?.[techId] ?? 0;
+  return Math.min(rcLevel, rawLvl);
+}
+
 // Normalize GameState to ensure all newly-added properties exist across legacy states
 function normalizeState(s: GameState) {
   if (!s) return;
@@ -1752,7 +1763,8 @@ function tickPlayerState(playerId: string, now: number): boolean {
         if (!player.techLevels[planet.id]) {
           player.techLevels[planet.id] = {};
         }
-        player.techLevels[planet.id][techId] = targetLvl;
+        const rcLevel = planet.buildings.researchCenter?.level || 0;
+        player.techLevels[planet.id][techId] = Math.min(rcLevel, targetLvl);
         
         lastCompletedUpgradeTime = Math.max(lastCompletedUpgradeTime, planet.activeResearch.endAt);
         planet.activeResearch = null;
@@ -1869,7 +1881,8 @@ function tickPlayerState(playerId: string, now: number): boolean {
             if (!player.techLevels[planet.id]) {
               player.techLevels[planet.id] = {};
             }
-            player.techLevels[planet.id][nextResearch.key] = targetLvl;
+            const rcLevel = planet.buildings.researchCenter?.level || 0;
+            player.techLevels[planet.id][nextResearch.key] = Math.min(rcLevel, targetLvl);
             planet.researchQueue.shift();
             referenceTime = expectedEnd;
             changed = true;
@@ -2637,8 +2650,7 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
     const attShieldLvl = fleet.defenseShieldsLevel || 10;
     let defShieldLvl = 0;
     if (defender && defPlanet) {
-      const isFirstDefPlanet = defender.planets[0]?.id === defPlanet.id;
-      defShieldLvl = defender.techLevels?.[defPlanet.id]?.defense_shields ?? (isFirstDefPlanet ? 20 : 0);
+      defShieldLvl = getPlanetTechLevel(defender, defPlanet.id, "defense_shields");
     }
 
     const combat = simulateMoonbaseCombat(
@@ -4603,6 +4615,11 @@ app.post("/api/upgrade/research/start", (req, res) => {
   const currentLvl = Number(req.body.currentLevel) || 0;
   const targetLevel = currentLvl + 1;
 
+  const rcLevel = rc.level;
+  if (targetLevel > rcLevel) {
+    return res.status(400).json({ error: `🔒 Research technology level cannot exceed your Research Center level of ${rcLevel}! Upgrade your Research Center first.` });
+  }
+
   if (targetLevel >= 2) {
     const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"] as const;
     const hasAllExtractorsConstructed = resourceKeys.every(rKey => {
@@ -4696,6 +4713,11 @@ app.post("/api/upgrade/research/queue", (req, res) => {
   }
   queuedCount += planet.researchQueue.filter(q => q.key === techId).length;
   const targetLevel = currentLvl + queuedCount + 1;
+
+  const rcLevel = rc.level;
+  if (targetLevel > rcLevel) {
+    return res.status(400).json({ error: `🔒 Research technology level cannot exceed your Research Center level of ${rcLevel}! Upgrade your Research Center first.` });
+  }
 
   if (targetLevel >= 2) {
     const resourceKeys = ["water", "plasma", "fuel", "food", "respirant"] as const;
@@ -5047,8 +5069,7 @@ app.post("/api/train/troop", (req, res) => {
   let buildDurationMs = Math.round(baseSecs * (1 - reductionFrac) * 1000);
 
   // Manufacturing speed upgrade decreases training speed by up to an additional 35% when lvl 20
-  const isFirstPlanet = p.planets[0]?.id === planet.id;
-  const mfgLvl = p.techLevels?.[planet.id]?.manufacturing_speed ?? (isFirstPlanet ? 20 : 0);
+  const mfgLvl = getPlanetTechLevel(p, planet.id, "manufacturing_speed");
   const mfgReduction = Math.min(0.35, 0.35 * (mfgLvl / 20));
   buildDurationMs = Math.round(buildDurationMs * (1 - mfgReduction));
 
@@ -5585,9 +5606,8 @@ app.post("/api/fleet/send", (req, res) => {
 
   const now = Date.now();
 
-  const isFirstPlanet = p.planets[0]?.id === planet.id;
-  const speedLvl = p.techLevels?.[planet.id]?.troop_speed ?? (isFirstPlanet ? 20 : 0);
-  const shieldsLvl = p.techLevels?.[planet.id]?.defense_shields ?? (isFirstPlanet ? 20 : 0);
+  const speedLvl = getPlanetTechLevel(p, planet.id, "troop_speed");
+  const shieldsLvl = getPlanetTechLevel(p, planet.id, "defense_shields");
   const boostPct = Math.max(0, Math.min(35, (speedLvl - 1) * (35 / 19))) / 100;
   const speedMultiplier = 1.0 + boostPct;
 

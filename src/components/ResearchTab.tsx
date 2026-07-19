@@ -97,9 +97,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
     });
   })();
 
-  // Local storage tech levels and current upgrades - starts fully maxed when game starts
+  // Local storage tech levels and current upgrades - starts at level 0 when game starts
   const [techLevels, setTechLevels] = useState<Record<string, number>>(() => {
-    const isFirstPlanet = player.planets[0]?.id === activePlanet.id;
     try {
       const data = localStorage.getItem(`moonbase_tech_${player.id}_${activePlanet.id}`);
       if (data) {
@@ -108,21 +107,21 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
         if (parsed.plating && !parsed.defense_shields) {
           parsed.defense_shields = Math.min(20, parsed.plating * 2);
         }
-        if (parsed.defense_shields === undefined) parsed.defense_shields = isFirstPlanet ? 20 : 0;
-        if (parsed.manufacturing_speed === undefined) parsed.manufacturing_speed = isFirstPlanet ? 20 : 0;
-        if (parsed.troop_speed === undefined) parsed.troop_speed = isFirstPlanet ? 20 : 0;
+        if (parsed.defense_shields === undefined) parsed.defense_shields = 0;
+        if (parsed.manufacturing_speed === undefined) parsed.manufacturing_speed = 0;
+        if (parsed.troop_speed === undefined) parsed.troop_speed = 0;
         return parsed;
       }
       return {
-        defense_shields: isFirstPlanet ? 20 : 0,
-        manufacturing_speed: isFirstPlanet ? 20 : 0,
-        troop_speed: isFirstPlanet ? 20 : 0
+        defense_shields: 0,
+        manufacturing_speed: 0,
+        troop_speed: 0
       };
     } catch {
       return {
-        defense_shields: isFirstPlanet ? 20 : 0,
-        manufacturing_speed: isFirstPlanet ? 20 : 0,
-        troop_speed: isFirstPlanet ? 20 : 0
+        defense_shields: 0,
+        manufacturing_speed: 0,
+        troop_speed: 0
       };
     }
   });
@@ -175,7 +174,6 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
 
   // Synchronize state when active planet changes, player's server-side tech levels, etc.
   useEffect(() => {
-    const isFirstPlanet = player.planets[0]?.id === activePlanet.id;
     let serverTechs: Record<string, number> = {};
     if (player.techLevels && player.techLevels[activePlanet.id]) {
       serverTechs = player.techLevels[activePlanet.id];
@@ -186,9 +184,9 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       let localTechs = data ? JSON.parse(data) : {};
       
       const mergedTechs = {
-        defense_shields: isFirstPlanet ? 20 : 0,
-        manufacturing_speed: isFirstPlanet ? 20 : 0,
-        troop_speed: isFirstPlanet ? 20 : 0,
+        defense_shields: 0,
+        manufacturing_speed: 0,
+        troop_speed: 0,
         ...localTechs,
         ...serverTechs
       };
@@ -196,9 +194,9 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       localStorage.setItem(`moonbase_tech_${player.id}_${activePlanet.id}`, JSON.stringify(mergedTechs));
     } catch {
       setTechLevels({
-        defense_shields: isFirstPlanet ? 20 : 0,
-        manufacturing_speed: isFirstPlanet ? 20 : 0,
-        troop_speed: isFirstPlanet ? 20 : 0,
+        defense_shields: 0,
+        manufacturing_speed: 0,
+        troop_speed: 0,
         ...serverTechs
       });
     }
@@ -273,6 +271,13 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
     const tech = TECHS.find(t => t.id === techId)!;
     const maxTechLvl = 20;
     const currentLvl = techLevels[techId] || 0;
+    
+    const rcLevel = activePlanet.buildings.researchCenter?.level || 0;
+    if (currentLvl + 1 > rcLevel) {
+      showToast(`🔒 Research technology level cannot exceed your Research Center level of ${rcLevel}! Upgrade your Research Center first.`, 'error');
+      return;
+    }
+
     if (currentLvl >= maxTechLvl) {
       showToast(`This technology has reached max core level of ${maxTechLvl}!`, 'error');
       return;
@@ -323,6 +328,12 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       queuedCount += activePlanet.researchQueue.filter(q => q.key === techId).length;
     }
     const targetLvl = currentLvl + queuedCount + 1;
+
+    const rcLevel = activePlanet.buildings.researchCenter?.level || 0;
+    if (targetLvl > rcLevel) {
+      showToast(`🔒 Research technology level cannot exceed your Research Center level of ${rcLevel}! Upgrade your Research Center first.`, 'error');
+      return;
+    }
 
     if (targetLvl > maxTechLvl) {
       showToast(`This technology has reached max core level of ${maxTechLvl}!`, 'error');
@@ -580,9 +591,12 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {TECHS.map(tech => {
-                const currentLvl = techLevels[tech.id] || 0;
+                const rcLevel = activePlanet.buildings.researchCenter?.level || 0;
+                const rawLvl = techLevels[tech.id] || 0;
+                const currentLvl = rcLevel === 0 ? 0 : Math.min(rcLevel, rawLvl);
                 const maxLvl = 20;
                 const isMax = currentLvl >= maxLvl;
+                const isCappedByRC = currentLvl >= rcLevel;
                 const costs = getTechCost(tech, currentLvl);
 
                 // Calculate next target level taking queue into account
@@ -638,7 +652,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
                         <div className="py-2 text-center bg-amber-950/30 border border-amber-900/20 rounded-xl text-amber-400 text-[10px] font-bold animate-pulse font-mono uppercase tracking-widest flex items-center justify-center gap-1.5">
                           <Clock size={11} className="animate-spin" /> Telemetry Processing ({getTimerString(activeResearch.endAt)})
                         </div>
-                        {targetLvl <= maxLvl && (
+                        {targetLvl <= rcLevel ? (
                           allExtractorsLevelOneOrMore ? (
                             <button
                               type="button"
@@ -654,11 +668,29 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
                               🔒 EXTRACTORS REQUISITE
                             </span>
                           )
+                        ) : (
+                          <div className="text-center py-2 px-3 border border-amber-500/30 bg-amber-950/20 rounded-xl space-y-1 font-mono">
+                            <span className="text-[10px] font-bold tracking-widest text-amber-400 uppercase block">
+                              🔒 QUEUE CAPPED
+                            </span>
+                            <span className="text-[9px] text-slate-400 block leading-normal font-sans">
+                              Upgrade Research Center to Level {targetLvl} to queue higher levels.
+                            </span>
+                          </div>
                         )}
                       </div>
                     ) : isMax ? (
                       <div className="py-2 text-center bg-emerald-950/20 border border-emerald-900/20 text-emerald-400 text-[10px] uppercase font-bold tracking-widest rounded-xl">
                         🏆 MAX EXPERTISE
+                      </div>
+                    ) : isCappedByRC ? (
+                      <div className="text-center py-2 px-3 border border-amber-500/30 bg-amber-950/20 rounded-xl space-y-1 font-mono">
+                        <span className="text-[10px] font-bold tracking-widest text-amber-400 uppercase block">
+                          🔒 RESEARCH CENTER CAPPED
+                        </span>
+                        <span className="text-[9px] text-slate-400 block leading-normal font-sans">
+                          Upgrade Research Center to Level {currentLvl + 1} to unlock further research.
+                        </span>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-2">

@@ -146,12 +146,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [showSync, setShowSync] = useState(false);
 
   // Server-side push notification channel preferences
-  const [prefIncomingAttacks, setPrefIncomingAttacks] = useState(true);
-  const [prefConstruction, setPrefConstruction] = useState(true);
-  const [prefResearch, setPrefResearch] = useState(true);
-  const [prefFleet, setPrefFleet] = useState(true);
-  const [prefEvents, setPrefEvents] = useState(true);
-  const [prefEconomy, setPrefEconomy] = useState(true);
+  const [prefIncomingAttacks, setPrefIncomingAttacks] = useState(() => player.notificationPreferences?.incomingAttacks !== false);
+  const [prefConstruction, setPrefConstruction] = useState(() => player.notificationPreferences?.construction !== false);
+  const [prefResearch, setPrefResearch] = useState(() => player.notificationPreferences?.research !== false);
+  const [prefFleet, setPrefFleet] = useState(() => player.notificationPreferences?.fleet !== false);
+  const [prefEvents, setPrefEvents] = useState(() => player.notificationPreferences?.events !== false);
+  const [prefEconomy, setPrefEconomy] = useState(() => player.notificationPreferences?.economy !== false);
   const [loadingPrefs, setLoadingPrefs] = useState(false);
 
   const fetchPrefs = async () => {
@@ -175,7 +175,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         }
       }
     } catch (err) {
-      console.error('Failed to fetch notification preferences:', err);
+      console.warn('Failed to fetch notification preferences (using offline or prop fallback):', err);
     } finally {
       setLoadingPrefs(false);
     }
