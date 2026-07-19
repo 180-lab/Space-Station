@@ -3325,7 +3325,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                         <div className="mt-2 space-y-1">
                                           <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
 
-                                            <div>Attacker HP (Firepower): <span className="text-orange-400 font-mono font-extrabold">{attAtkValue.toLocaleString()}</span></div>
+                                            <div>Fleet Combat Strength: <span className="text-orange-400 font-mono font-extrabold">{attAtkValue.toLocaleString()}</span></div>
                                           </div>
                                           <div className="flex flex-wrap gap-1.5 mt-1.5">
                                             {Object.entries(report.attackerInitialTroops).map(([type, qty]) => {
@@ -3370,7 +3370,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                         <p className="text-slate-500 text-[10px] mt-0.5">Target: [{report.defenderCoords.x}, {report.defenderCoords.y}]</p>
                                         <div className="mt-2 space-y-1">
                                           <div className="text-[10px] text-slate-400 font-bold uppercase flex flex-col gap-0.5">
-                                            <div>Defender HP (Defense Strength): <span className="text-cyan-400 font-mono font-extrabold">{defHpValue.toLocaleString()}</span></div>
+                                            <div>Planetary Defense Strength: <span className="text-cyan-400 font-mono font-extrabold">{defHpValue.toLocaleString()}</span></div>
                                             
                                           </div>
                                           <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -3436,6 +3436,9 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
                                     {report.buildingDamage.map((dmg, di) => (
                                       <li key={di}>
                                         {dmg.buildingName.toUpperCase()} damaged: Level {dmg.previousLevel} &rarr; {dmg.newLevel}
+                                        {dmg.remainingPercentage !== undefined && (
+                                          <span className="ml-1 px-1 py-0.5 rounded bg-red-950/40 text-red-400 font-bold">({dmg.remainingPercentage}% remaining)</span>
+                                        )}
                                       </li>
                                     ))}
                                   </ul>

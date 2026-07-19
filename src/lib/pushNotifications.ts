@@ -35,13 +35,11 @@ export const initializePushNotifications = async (userId: string) => {
       return;
     }
 
-    // Checking if FCM Push is explicitly configured (e.g. by setting enable_fcm_push to 'true' in localStorage).
-    // If running on Android without custom FCM configurations, calling PushNotifications.register()
-    // will result in a fatal JVM exception ("Default FirebaseApp is not initialized") and immediately crash the app.
-    const isFcmExplicitlyEnabled = typeof window !== 'undefined' && localStorage.getItem('enable_fcm_push') === 'true';
+    // For production reliability, FCM push notifications are enabled by default for all native wrap builds.
+    const isFcmEnabled = typeof window !== 'undefined' && localStorage.getItem('enable_fcm_push') !== 'false';
 
-    if (platform === 'android' && !isFcmExplicitlyEnabled) {
-      console.log('[PushNotifications] Safe bypass activated: skipped FCM registration on Android to prevent app crashes. Real-time notifications will seamlessly deliver via active SSE channel.');
+    if (platform === 'android' && !isFcmEnabled) {
+      console.log('[PushNotifications] FCM registration disabled by user preference. Real-time notifications will deliver via SSE channel.');
       return;
     }
 

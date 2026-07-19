@@ -138,7 +138,132 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
   const [showDisplayTheme, setShowDisplayTheme] = useState(false);
   const [showSoundFx, setShowSoundFx] = useState(false);
+  const [showPushSettings, setShowPushSettings] = useState(true);
   const [showSync, setShowSync] = useState(false);
+
+  // Server-side push notification channel preferences
+  const [prefIncomingAttacks, setPrefIncomingAttacks] = useState(true);
+  const [prefConstruction, setPrefConstruction] = useState(true);
+  const [prefResearch, setPrefResearch] = useState(true);
+  const [prefFleet, setPrefFleet] = useState(true);
+  const [prefEvents, setPrefEvents] = useState(true);
+  const [prefEconomy, setPrefEconomy] = useState(true);
+  const [loadingPrefs, setLoadingPrefs] = useState(false);
+
+  const fetchPrefs = async () => {
+    try {
+      setLoadingPrefs(true);
+      const res = await fetch('/api/player/notification-preferences', {
+        headers: {
+          'x-user-id': player.id
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.preferences) {
+          const p = data.preferences;
+          setPrefIncomingAttacks(p.incomingAttacks !== false);
+          setPrefConstruction(p.construction !== false);
+          setPrefResearch(p.research !== false);
+          setPrefFleet(p.fleet !== false);
+          setPrefEvents(p.events !== false);
+          setPrefEconomy(p.economy !== false);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch notification preferences:', err);
+    } finally {
+      setLoadingPrefs(false);
+    }
+  };
+
+  const savePrefs = async (updated: {
+    incomingAttacks: boolean;
+    construction: boolean;
+    research: boolean;
+    fleet: boolean;
+    events: boolean;
+    economy: boolean;
+  }) => {
+    try {
+      const res = await fetch('/api/player/notification-preferences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': player.id
+        },
+        body: JSON.stringify({ preferences: updated })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.preferences) {
+          const p = data.preferences;
+          setPrefIncomingAttacks(p.incomingAttacks !== false);
+          setPrefConstruction(p.construction !== false);
+          setPrefResearch(p.research !== false);
+          setPrefFleet(p.fleet !== false);
+          setPrefEvents(p.events !== false);
+          setPrefEconomy(p.economy !== false);
+          showToast('📡 Notification channels sync verified and stored on server.', 'success');
+        }
+      } else {
+        showToast('❌ Failed to synchronize settings with galactic core.', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to save notification preferences:', err);
+      showToast('❌ Network error syncing notification channels.', 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (player.id) {
+      fetchPrefs();
+    }
+  }, [player.id]);
+
+  const toggleIncomingAttacks = () => {
+    const newVal = !prefIncomingAttacks;
+    if (!newVal) {
+      // Show confirmation dialog before disabling!
+      setConfirmModal({
+        title: '⚠️ CRITICAL: COGNITIVE SYSTEM BREACH WARNING!',
+        message: 'WARNING: Disabling hostile incoming attack notifications could leave your outposts completely vulnerable to zero-hour surprise raids while you are sleeping or offline. Are you absolutely certain you want to suspend tactical attack alarms?',
+        onConfirm: () => {
+          const updated = {
+            incomingAttacks: false,
+            construction: prefConstruction,
+            research: prefResearch,
+            fleet: prefFleet,
+            events: prefEvents,
+            economy: prefEconomy
+          };
+          savePrefs(updated);
+        }
+      });
+    } else {
+      const updated = {
+        incomingAttacks: true,
+        construction: prefConstruction,
+        research: prefResearch,
+        fleet: prefFleet,
+        events: prefEvents,
+        economy: prefEconomy
+      };
+      savePrefs(updated);
+    }
+  };
+
+  const togglePref = (key: 'construction' | 'research' | 'fleet' | 'events' | 'economy') => {
+    const updated = {
+      incomingAttacks: prefIncomingAttacks,
+      construction: key === 'construction' ? !prefConstruction : prefConstruction,
+      research: key === 'research' ? !prefResearch : prefResearch,
+      fleet: key === 'fleet' ? !prefFleet : prefFleet,
+      events: key === 'events' ? !prefEvents : prefEvents,
+      economy: key === 'economy' ? !prefEconomy : prefEconomy
+    };
+    savePrefs(updated);
+  };
   const [showRegistryNames, setShowRegistryNames] = useState(false);
   const [showFeedbackConsole, setShowFeedbackConsole] = useState(false);
   const [showFaq, setShowFaq] = useState(false);
@@ -1038,38 +1163,208 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     {commsNotificationsEnabled ? 'ACTIVE' : 'BLOCKED'}
                   </button>
                 </div>
-
-                {/* Native Mobile Push Alerts */}
-                <div className="flex flex-col gap-2 pt-3 border-t border-[#1E293B]/40 mt-2">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-0.5 max-w-[70%]">
-                      <span className="text-xs font-bold text-slate-200 block uppercase flex items-center gap-1.5">
-                        <Bell size={13} className="text-cyan-400 animate-pulse" /> Native Device Notifications
-                      </span>
-                      <p className="text-[10.5px] text-slate-500 leading-relaxed font-sans">
-                        Enables native push vibration/sound chimes directly to your device (Android/Capacitor APK) during offline moments or critical incoming hostile orbital attacks.
-                      </p>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        const isGranted = await requestNotificationPermission();
-                        if (isGranted) {
-                          showToast("📱 Mobile Notifications enabled! Chime test queued.", "success");
-                          sendMobileNotification(
-                            "📡 Command Link Active", 
-                            "System keys verified! Tactical system notices will propagate directly here."
-                          );
-                        } else {
-                          showToast("❌ Permission denied. Enable manually in App Settings.", "error");
-                        }
-                      }}
-                      className="py-1.5 px-3 bg-cyan-950/25 hover:bg-cyan-950/45 text-cyan-400 border border-cyan-500/30 rounded-lg text-[10px] font-bold uppercase tracking-wider shrink-0 transition"
-                    >
-                      Test Sync
-                    </button>
-                  </div>
-                </div>
               </div>
+
+          {/* Push Notifications & Channels Settings */}
+          <button
+            onClick={() => setShowPushSettings(!showPushSettings)}
+            className="w-full flex items-center justify-between text-left hover:text-white transition duration-150 cursor-pointer select-none border-b border-[#1E293B]/60 pt-4 pb-2"
+            type="button"
+          >
+            <h3 className="text-xs font-bold uppercase tracking-widest text-[#5bc0be] flex items-center gap-2">
+              <Bell size={14} className="text-cyan-400 animate-pulse" /> PUSH NOTIFICATIONS
+              {showPushSettings ? (
+                <ChevronUp size={12} className="text-red-500" />
+              ) : (
+                <ChevronDown size={12} className="text-emerald-500" />
+              )}
+            </h3>
+          </button>
+
+          {showPushSettings && (
+            <div className="space-y-4 pt-2">
+              {/* Channel controls info */}
+              <p className="text-[10.5px] text-slate-500 leading-relaxed font-sans">
+                Configure your multi-channel hyper-wave receivers. Keep channels active to receive reliable real-time offline alerts directly from the station core.
+              </p>
+
+              {/* Server-side Channels List */}
+              <div className="space-y-3 border-t border-[#1E293B]/40 pt-3">
+                
+                {/* 1. Incoming Attacks */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-rose-400 block uppercase flex items-center gap-1">
+                      ⚠️ INCOMING ATTACK ALARMS
+                    </span>
+                    <p className="text-[10px] text-slate-500 leading-relaxed font-sans">
+                      Nuclear alerts, sirens, and zero-hour strike warnings. Highly recommended.
+                    </p>
+                  </div>
+                  <button
+                    onClick={toggleIncomingAttacks}
+                    className={`py-1.5 px-3 rounded-lg border text-[10px] font-bold uppercase tracking-wider shrink-0 transition ${
+                      prefIncomingAttacks 
+                        ? 'bg-rose-950/20 text-rose-400 border-rose-500/30' 
+                        : 'bg-slate-950 text-slate-500 border-slate-900'
+                    }`}
+                  >
+                    {prefIncomingAttacks ? 'ACTIVE' : 'MUTED'}
+                  </button>
+                </div>
+
+                {/* 2. Construction */}
+                <div className="flex items-start justify-between gap-4 pt-1">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-200 block uppercase">
+                      Construction Completions
+                    </span>
+                    <p className="text-[10px] text-slate-500 leading-relaxed font-sans">
+                      Notifies when facility structures and defenses complete constructing or upgrading.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => togglePref('construction')}
+                    className={`py-1.5 px-3 rounded-lg border text-[10px] font-bold uppercase tracking-wider shrink-0 transition ${
+                      prefConstruction 
+                        ? 'bg-emerald-950/20 text-emerald-400 border-emerald-500/30' 
+                        : 'bg-slate-950 text-slate-500 border-slate-900'
+                    }`}
+                  >
+                    {prefConstruction ? 'ACTIVE' : 'MUTED'}
+                  </button>
+                </div>
+
+                {/* 3. Research */}
+                <div className="flex items-start justify-between gap-4 pt-1">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-200 block uppercase">
+                      Research Accomplishments
+                    </span>
+                    <p className="text-[10px] text-slate-500 leading-relaxed font-sans">
+                      Notifies when deep-space laboratory technology research is finalized.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => togglePref('research')}
+                    className={`py-1.5 px-3 rounded-lg border text-[10px] font-bold uppercase tracking-wider shrink-0 transition ${
+                      prefResearch 
+                        ? 'bg-emerald-950/20 text-emerald-400 border-emerald-500/30' 
+                        : 'bg-slate-950 text-slate-500 border-slate-900'
+                    }`}
+                  >
+                    {prefResearch ? 'ACTIVE' : 'MUTED'}
+                  </button>
+                </div>
+
+                {/* 4. Fleet */}
+                <div className="flex items-start justify-between gap-4 pt-1">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-200 block uppercase">
+                      Fleet Movements
+                    </span>
+                    <p className="text-[10px] text-slate-500 leading-relaxed font-sans">
+                      Alerts for fleet docking, system recalls, relocations, or missions arrival.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => togglePref('fleet')}
+                    className={`py-1.5 px-3 rounded-lg border text-[10px] font-bold uppercase tracking-wider shrink-0 transition ${
+                      prefFleet 
+                        ? 'bg-emerald-950/20 text-emerald-400 border-emerald-500/30' 
+                        : 'bg-slate-950 text-slate-500 border-slate-900'
+                    }`}
+                  >
+                    {prefFleet ? 'ACTIVE' : 'MUTED'}
+                  </button>
+                </div>
+
+                {/* 5. Events */}
+                <div className="flex items-start justify-between gap-4 pt-1">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-200 block uppercase">
+                      Events & News Updates
+                    </span>
+                    <p className="text-[10px] text-slate-500 leading-relaxed font-sans">
+                      Server-wide galaxy expansion events, sector scans, global broadcasts, or server news.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => togglePref('events')}
+                    className={`py-1.5 px-3 rounded-lg border text-[10px] font-bold uppercase tracking-wider shrink-0 transition ${
+                      prefEvents 
+                        ? 'bg-emerald-950/20 text-emerald-400 border-emerald-500/30' 
+                        : 'bg-slate-950 text-slate-500 border-slate-900'
+                    }`}
+                  >
+                    {prefEvents ? 'ACTIVE' : 'MUTED'}
+                  </button>
+                </div>
+
+                {/* 6. Economy */}
+                <div className="flex items-start justify-between gap-4 pt-1">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-200 block uppercase">
+                      Resource & Economy Alarms
+                    </span>
+                    <p className="text-[10px] text-slate-500 leading-relaxed font-sans">
+                      Warnings when repository siloes reach maximum capacity or when troops suffer attrition.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => togglePref('economy')}
+                    className={`py-1.5 px-3 rounded-lg border text-[10px] font-bold uppercase tracking-wider shrink-0 transition ${
+                      prefEconomy 
+                        ? 'bg-emerald-950/20 text-emerald-400 border-emerald-500/30' 
+                        : 'bg-slate-950 text-slate-500 border-slate-900'
+                    }`}
+                  >
+                    {prefEconomy ? 'ACTIVE' : 'MUTED'}
+                  </button>
+                </div>
+
+              </div>
+
+              {/* Battery optimization detection and guidance */}
+              <div className="p-3 bg-amber-950/20 border border-amber-500/30 rounded-xl text-[10.5px] leading-relaxed text-amber-400 space-y-1.5 font-sans mt-3">
+                <span className="font-bold flex items-center gap-1 uppercase tracking-wide">
+                  <AlertTriangle size={12} className="animate-pulse text-amber-400" />
+                  Android Battery Optimization Guidance
+                </span>
+                <p>
+                  Android's battery saving mode blocks background transmissions, delaying critical attack notifications. To guarantee real-time delivery and protect your outposts, please exclude the app:
+                </p>
+                <ol className="list-decimal pl-4 space-y-0.5 font-mono text-[9.5px] text-slate-400">
+                  <li>Navigate to phone <strong>Settings</strong> &rarr; <strong>Apps</strong> &rarr; <strong>Space Station Commander</strong>.</li>
+                  <li>Tap <strong>Battery</strong> or <strong>Battery Optimization</strong>.</li>
+                  <li>Change option to <strong>Unrestricted</strong> or <strong>Do Not Optimize</strong>.</li>
+                </ol>
+              </div>
+
+              {/* Permission & Test Sync Button */}
+              <div className="flex items-center justify-between pt-2 border-t border-[#1E293B]/40">
+                <span className="text-[10px] text-slate-400 font-sans">Need to verify connection?</span>
+                <button
+                  onClick={async () => {
+                    const isGranted = await requestNotificationPermission();
+                    if (isGranted) {
+                      showToast("📱 Mobile Notifications enabled! Chime test queued.", "success");
+                      sendMobileNotification(
+                        "📡 Command Link Active", 
+                        "System keys verified! Tactical system notices will propagate directly here."
+                      );
+                    } else {
+                      showToast("❌ Permission denied. Enable manually in App Settings.", "error");
+                    }
+                  }}
+                  className="py-1.5 px-3 bg-cyan-950/25 hover:bg-cyan-950/45 text-cyan-400 border border-cyan-500/30 rounded-lg text-[10px] font-bold uppercase tracking-wider transition"
+                >
+                  Test Connection
+                </button>
+              </div>
+
+            </div>
+          )}
 
               {/* Account and maintenance action cards */}
               <div className="pt-4 border-t border-[#1E293B]/60 space-y-3.5">

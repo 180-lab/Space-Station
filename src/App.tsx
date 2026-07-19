@@ -146,6 +146,7 @@ export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const [newAccountEmail, setNewAccountEmail] = useState('');
   const [newAccountName, setNewAccountName] = useState('');
+  const [googleIdToken, setGoogleIdToken] = useState<string | null>(null);
   const [showGPGSSimulator, setShowGPGSSimulator] = useState(false);
   const [deviceGoogleAccounts, setDeviceGoogleAccounts] = useState<{ email: string; name: string }[]>(() => {
     try {
@@ -259,6 +260,16 @@ export default function App() {
               });
               const data = await safeParseJson(res);
               if (res.ok) {
+                if (data.unregistered) {
+                  setNewAccountEmail(data.email || '');
+                  setNewAccountName(data.name || (data.email ? data.email.split('@')[0] : ''));
+                  setGoogleIdToken(idToken);
+                  setGoogleFlowStep('register');
+                  setGoogleDialogMode('add');
+                  setShowGoogleDialog(true);
+                  showToast("New Google account detected. Let's register your Commander profile!", 'info');
+                  return;
+                }
                 localStorage.setItem('moonbase_userId', data.player.id);
                 setUserId(data.player.id);
                 setPlayer(data.player);
@@ -319,6 +330,14 @@ export default function App() {
               });
               const data = await safeParseJson(res);
               if (res.ok) {
+                if (data.unregistered) {
+                  setNewAccountEmail(data.email || '');
+                  setNewAccountName(data.name || (data.email ? data.email.split('@')[0] : ''));
+                  setGoogleIdToken(idToken);
+                  setGoogleFlowStep('register');
+                  showToast("New Google account detected. Let's register your Commander profile!", 'info');
+                  return;
+                }
                 localStorage.setItem('moonbase_userId', data.player.id);
                 setUserId(data.player.id);
                 setPlayer(data.player);
@@ -1733,6 +1752,16 @@ export default function App() {
 
       const data = await safeParseJson(res);
       if (res.ok) {
+        if (data.unregistered) {
+          setNewAccountEmail(data.email || email || '');
+          setNewAccountName(data.name || username || '');
+          setGoogleIdToken(idToken || null);
+          setGoogleFlowStep('register');
+          setGoogleDialogMode('add');
+          setShowGoogleDialog(true);
+          showToast("New Google account detected. Let's register your Commander profile!", 'info');
+          return;
+        }
         localStorage.setItem('moonbase_userId', data.player.id);
         setUserId(data.player.id);
         setPlayer(data.player);
@@ -1759,7 +1788,7 @@ export default function App() {
   };
 
   // Auth: Google Sign-In
-  const handleGoogleSignIn = async (email: string, selectName?: string, selectFaction?: string) => {
+  const handleGoogleSignIn = async (email: string, selectName?: string, selectFaction?: string, idToken?: string | null) => {
     try {
       const res = await fetch('/api/auth/google', {
         method: 'POST',
@@ -1769,7 +1798,8 @@ export default function App() {
         body: JSON.stringify({
           email,
           username: selectName,
-          faction: selectFaction || faction
+          faction: selectFaction || faction,
+          idToken: idToken || undefined
         })
       });
       const data = await safeParseJson(res);
@@ -3164,7 +3194,7 @@ export default function App() {
                             }
                             setIsCheckingEmail(true);
                             try {
-                              await handleGoogleSignIn(newAccountEmail, newAccountName.trim(), googleRegFaction);
+                              await handleGoogleSignIn(newAccountEmail, newAccountName.trim(), googleRegFaction, googleIdToken);
                             } finally {
                               setIsCheckingEmail(false);
                             }

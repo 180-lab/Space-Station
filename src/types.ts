@@ -127,6 +127,14 @@ export interface PlayerProfile {
   renameCount?: number;
   isChatBlocked?: boolean;
   blockedPlayers?: string[];
+  notificationPreferences?: {
+    incomingAttacks: boolean;
+    construction: boolean;
+    research: boolean;
+    fleet: boolean;
+    events: boolean;
+    economy: boolean;
+  };
 }
 
 export interface CommandMessage {
@@ -253,6 +261,7 @@ export interface BattleReport {
     levelsDestroyed: number;
     previousLevel: number;
     newLevel: number;
+    remainingPercentage?: number;
   }[];
   attackHpKilled: number;
   defenceHpKilled: number;

@@ -1065,7 +1065,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
           <div className="border border-[#1E293B] bg-[#0A0F1D]/80 backdrop-blur-md rounded-xl overflow-hidden mt-4">
             <div 
               onClick={() => setIsRadarTransitsMinimized(!isRadarTransitsMinimized)}
-              className="p-5 border-b border-[#1E293B]/70 bg-black/40 flex items-center justify-between text-left cursor-pointer select-none hover:bg-black/50 transition duration-150"
+              className="p-5 border-b border-[#1E293B]/70 bg-black/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left cursor-pointer select-none hover:bg-black/50 transition duration-150"
             >
               <div className="flex items-center gap-2">
                 <span className="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.5)]" />

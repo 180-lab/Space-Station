@@ -1148,7 +1148,7 @@ function createInitialPlanet(
 
 // Apply bomber tank demolition damage
 function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarget: string) {
-  const buildingDamageReports: { buildingName: string; levelsDestroyed: number; previousLevel: number; newLevel: number }[] = [];
+  const buildingDamageReports: { buildingName: string; levelsDestroyed: number; previousLevel: number; newLevel: number; remainingPercentage?: number }[] = [];
   if (numTanks <= 0 || !defPlanet) return buildingDamageReports;
 
   let target = chosenTarget || "random";
@@ -1209,7 +1209,8 @@ function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarg
         buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName === "bunker" ? "Bunker" : finalName === "magneticShield" ? "Magnetic Shield" : finalName,
         levelsDestroyed: 0,
         previousLevel: prevLvl,
-        newLevel: prevLvl
+        newLevel: prevLvl,
+        remainingPercentage: Math.max(0, Math.min(100, Math.round(computedHealth)))
       });
     } else {
       const excessDamage = Math.abs(computedHealth);
@@ -1226,7 +1227,8 @@ function applyBomberDamage(defPlanet: ColonyPlanet, numTanks: number, chosenTarg
         buildingName: finalName === "commsHub" ? "Communications Hub" : finalName === "researchCenter" ? "Research Center" : finalName === "armyBase" ? "War Room" : finalName === "repository" ? "Silo" : finalName === "radar" ? "Radar Array" : finalName === "supplyNexus" ? "Supply Nexus" : finalName === "fabricator" ? "Fabricator" : finalName === "bunker" ? "Bunker" : finalName === "magneticShield" ? "Magnetic Shield" : finalName,
         levelsDestroyed: levelsLost,
         previousLevel: prevLvl,
-        newLevel: newLvl
+        newLevel: newLvl,
+        remainingPercentage: Math.max(0, Math.min(100, Math.round(newHealth)))
       });
     }
   }
@@ -1610,7 +1612,8 @@ function tickPlayerState(playerId: string, now: number): boolean {
                 mine.level === 1 ? "⚙️ Extractor Construction Completed" : "⚙️ Extractor Upgrade Completed",
                 mine.level === 1
                   ? `${name} (Slot ${mine.index + 1}) has successfully completed construction on ${planet.name}!`
-                  : `${name} (Slot ${mine.index + 1}) has successfully completed upgrading to Level ${mine.level} on ${planet.name}!`
+                  : `${name} (Slot ${mine.index + 1}) has successfully completed upgrading to Level ${mine.level} on ${planet.name}!`,
+                "construction"
               );
             }
           }
@@ -1725,7 +1728,8 @@ function tickPlayerState(playerId: string, now: number): boolean {
             sendNotificationWithFallback(
               player.id,
               "🏗️ Station Upgrade Completed",
-              `${name} has successfully completed upgrading to Level ${building.level} on ${planet.name}!`
+              `${name} has successfully completed upgrading to Level ${building.level} on ${planet.name}!`,
+              "construction"
             );
           }
         }
@@ -1754,7 +1758,8 @@ function tickPlayerState(playerId: string, now: number): boolean {
           sendNotificationWithFallback(
             player.id,
             "🔬 Research Project Completed",
-            `${name} has successfully reached Level ${targetLvl} in the Research Center of ${planet.name}!`
+            `${name} has successfully reached Level ${targetLvl} in the Research Center of ${planet.name}!`,
+            "research"
           );
         }
       }
@@ -1823,7 +1828,8 @@ function tickPlayerState(playerId: string, now: number): boolean {
                 sendNotificationWithFallback(
                   player.id,
                   "🏗️ Queue Upgrades Completed",
-                  `Your construction queue has completed. Final item: '${name}' successfully reached Level ${targetLvl} on ${planet.name}!`
+                  `Your construction queue has completed. Final item: '${name}' successfully reached Level ${targetLvl} on ${planet.name}!`,
+                  "construction"
                 );
               }
             } else {
@@ -1868,7 +1874,8 @@ function tickPlayerState(playerId: string, now: number): boolean {
               sendNotificationWithFallback(
                 player.id,
                 "🔬 Research Queue Completed",
-                `Your research queue has completed. Final item: '${name}' successfully reached Level ${targetLvl} in the Research Center of ${planet.name}!`
+                `Your research queue has completed. Final item: '${name}' successfully reached Level ${targetLvl} in the Research Center of ${planet.name}!`,
+                "research"
               );
             }
           } else {
@@ -1986,13 +1993,6 @@ function simulateMoonbaseCombat(
   const attackerLosses = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
   const defenderLosses = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
 
-  const defenderSalvaged = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
-  const attackerSalvaged = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
-
-  const rounds: BattleRound[] = [];
-  let attackHpKilled = 0;
-  let defenceHpKilled = 0;
-
   const attMult = 1.0 + (Math.min(20, attShieldLevel) / 20) * 0.15;
   const defMult = 1.0 + (Math.min(20, defShieldLevel) / 20) * 0.15;
 
@@ -2014,512 +2014,155 @@ function simulateMoonbaseCombat(
     if (spec) initialDefHp += count * Math.round(spec.defenceHp * 1.0);
   });
 
-  let attSurvivalFloor = 0;
-  let defSurvivalFloor = 0;
+  let winner: "attacker" | "defender" = "defender";
+  let attLossRate = 0;
+  let defLossRate = 0;
+
+  if (initialAttHp === 0 && initialDefHp === 0) {
+    winner = "defender";
+    attLossRate = 0;
+    defLossRate = 0;
+  } else if (initialAttHp === 0) {
+    winner = "defender";
+    attLossRate = 0;
+    defLossRate = 0;
+  } else if (initialDefHp === 0) {
+    winner = "attacker";
+    attLossRate = 0;
+    defLossRate = 0;
+  } else {
+    // Both sides have positive combat strength
+    const strongerHp = Math.max(initialAttHp, initialDefHp);
+    const weakerHp = Math.min(initialAttHp, initialDefHp);
+    const x = strongerHp / weakerHp; // x >= 1.0
+
+    // Ratio-based casualty curve formulas:
+    // Stronger: L_S(x) = 0.015 + 0.485 / (1 + 1.7(x-1) + 0.15(x-1)^2)
+    // Weaker: L_W(x) = 1.0 - 0.50 / x^1.8
+    const lS = 0.015 + 0.485 / (1.0 + 1.7 * (x - 1.0) + 0.15 * Math.pow(x - 1.0, 2));
+    const lW = 1.0 - 0.50 / Math.pow(x, 1.8);
+
+    if (initialAttHp > initialDefHp) {
+      winner = "attacker";
+      attLossRate = lS;
+      defLossRate = lW;
+    } else if (initialDefHp > initialAttHp) {
+      winner = "defender";
+      attLossRate = lW;
+      defLossRate = lS;
+    } else {
+      winner = "defender"; // Defender holds on equal strength
+      attLossRate = 0.50;
+      defLossRate = 0.50;
+    }
+  }
+
+  const getLossCount = (count: number, rate: number): number => {
+    if (count <= 0 || rate <= 0) return 0;
+    const rawLoss = count * rate;
+    let losses = Math.floor(rawLoss);
+    const fraction = rawLoss - losses;
+    if (Math.random() < fraction) {
+      losses++;
+    }
+    return Math.min(count, losses);
+  };
+
+  // 1. Calculate Attacker Losses
+  Object.keys(attackerLosses).forEach(tId => {
+    const initialCount = attTroops[tId] || 0;
+    const killed = getLossCount(initialCount, attLossRate);
+    attackerLosses[tId as keyof typeof attackerLosses] = killed;
+    attRemaining[tId as keyof typeof attRemaining] = Math.max(0, initialCount - killed);
+  });
+
+  // 2. Calculate Defender Losses (distributing proportionally between own and alliance troops)
+  Object.keys(defenderLosses).forEach(tId => {
+    const initialOwn = defTroops[tId] || 0;
+    const initialAlliance = allianceTroops?.[tId] || 0;
+    const totalDefCount = initialOwn + initialAlliance;
+
+    const killed = getLossCount(totalDefCount, defLossRate);
+    defenderLosses[tId as keyof typeof defenderLosses] = killed;
+
+    let ownKilled = 0;
+    let allianceKilled = 0;
+    if (totalDefCount > 0) {
+      const ownShare = Math.round((initialOwn / totalDefCount) * killed);
+      ownKilled = Math.min(initialOwn, ownShare);
+      allianceKilled = Math.min(initialAlliance, killed - ownKilled);
+    }
+
+    defOwnRemaining[tId] = Math.max(0, initialOwn - ownKilled);
+    defAllianceRemaining[tId] = Math.max(0, initialAlliance - allianceKilled);
+    defRemaining[tId as keyof typeof defRemaining] = Math.max(0, totalDefCount - killed);
+  });
+
+  // Calculate actual HP values killed for score updates
+  let attackHpKilled = 0;
+  Object.entries(attackerLosses).forEach(([tId, killed]) => {
+    if (killed > 0) {
+      const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+      const unitHp = spec ? Math.round(spec.defenceHp * attMult) : 100;
+      attackHpKilled += killed * unitHp;
+    }
+  });
+
+  let defenceHpKilled = 0;
+  Object.entries(defenderLosses).forEach(([tId, killed]) => {
+    if (killed > 0) {
+      const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
+      const initialOwn = defTroops[tId] || 0;
+      const initialAlliance = allianceTroops?.[tId] || 0;
+      const totalDefCount = initialOwn + initialAlliance;
+      const effectiveMult = totalDefCount > 0
+        ? (initialOwn * defMult + initialAlliance * 1.0) / totalDefCount
+        : defMult;
+      const unitHp = spec ? Math.round(spec.defenceHp * effectiveMult) : 100;
+      defenceHpKilled += killed * unitHp;
+    }
+  });
+
+  const rounds: BattleRound[] = [];
+  const roundLogs: string[] = [];
+
+  roundLogs.push(`--- COMBAT CYCLE 1 INITIATED ---`);
+  roundLogs.push(`Attackers throw Fleet Combat Strength of ${initialAttHp.toLocaleString()} into target coordinates.`);
+  roundLogs.push(`Defenders respond with Planetary Defense Strength of ${initialDefHp.toLocaleString()} total DEF.`);
 
   if (initialAttHp > 0 && initialDefHp > 0) {
-    // 1. Attacker protection: survives if defender HP is NOT > 250% of attacker HP (i.e. defender does not have > 150% more relevant HP)
-    const defToAttRatio = initialDefHp / initialAttHp;
-    if (defToAttRatio <= 2.5) {
-      attSurvivalFloor = Math.max(0.10, 0.40 * (2.5 - defToAttRatio) / 1.5);
-    }
-
-    // 2. Defender protection: survives if attacker HP is NOT > 250% of defender HP (i.e. attacker does not have > 150% more relevant HP)
-    const attToDefRatio = initialAttHp / initialDefHp;
-    if (attToDefRatio <= 2.5) {
-      defSurvivalFloor = Math.max(0.10, 0.40 * (2.5 - attToDefRatio) / 1.5);
-    }
+    const ratio = Math.max(initialAttHp, initialDefHp) / Math.min(initialAttHp, initialDefHp);
+    roundLogs.push(`Combat Ratio: ${ratio.toFixed(2)}x advantage for the ${initialAttHp > initialDefHp ? "Attacker" : "Defender"}.`);
+    roundLogs.push(`Mathematical casualty curves applied to distribute force attrition evenly across all units.`);
   }
 
-  // Targeting priority weights for Moonbase-style combat distribution
-  // High weights mean targeted first (acting as screen), lower weights mean targeted later
-  const TARGET_PRIORITIES = {
-    defender: 2.0,       // Interceptor: Vanguard defense screen
-    attacker: 2.0,       // Assault Drone: Aggressive frontline unit
-    drone: 0.8,          // Missile Tank: Heavy siege, protected backline
-    tank: 0.8,           // Disrupter: Armored bomber unit
-    looter: 0.3,         // Matter Extractor: Fragile utility ship
-    settlementShip: 0.2  // Settlement Ship: Extremely large, backline transport
-  };
-
-  const getActiveCombatShips = (troops: Record<string, number>) => {
-    return (Object.keys(troops) as (keyof typeof troops)[]).filter(k => troops[k] > 0);
-  };
-
-  for (let r = 1; r <= 1; r++) {
-    const roundLogs: string[] = [];
-    const totalAtt = Object.values(attRemaining).reduce((s, v) => s + v, 0);
-    const totalDef = Object.values(defRemaining).reduce((s, v) => s + v, 0);
-
-    if (totalAtt === 0 || totalDef === 0) {
-      break;
-    }
-
-    // Calculate base raw attack powers
-    let baseAttDamage = 0;
-    Object.entries(attRemaining).forEach(([tId, count]) => {
-      const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-      if (spec) baseAttDamage += count * spec.attackHp;
-    });
-
-    // As the defender being attacked, their offensive HP does not count under attack! Only their defense HP helps defend.
-    let baseDefDamage = 0;
-    Object.entries(defRemaining).forEach(([tId, count]) => {
-      const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-      if (spec) baseDefDamage += count * spec.defenceHp;
-    });
-
-    // MXIT Moonbase style combat randomness and variance (fuzzing of ±15%)
-    const attVariance = 0.85 + Math.random() * 0.30;
-    const defVariance = 0.85 + Math.random() * 0.30;
-
-    let attDamage = Math.round(baseAttDamage * attVariance);
-    let defDamage = Math.round(baseDefDamage * defVariance);
-
-    const activeAttTypes = getActiveCombatShips(attRemaining);
-    const activeDefTypes = getActiveCombatShips(defRemaining);
-
-    const roundAttLosses = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
-    const roundDefLosses = { defender: 0, attacker: 0, tank: 0, looter: 0, drone: 0, settlementShip: 0 };
-
-    roundLogs.push(`--- COMBAT CYCLE ${r} INITIATED ---`);
-    roundLogs.push(`Attackers throw ${attDamage.toLocaleString()} megawatt laser channels into target coordinates.`);
-    roundLogs.push(`Defenders are being attacked under siege. Their offensive HP does not count; only their defense HP (${baseDefDamage.toLocaleString()} total DEF) is channeled into ${defDamage.toLocaleString()} retaliatory counter-firepower.`);
-
-    // Distribute attacker damage onto defender troops
-    if (attDamage > 0 && activeDefTypes.length > 0) {
-      let damagePool = attDamage;
-      let remainingTargets = [...activeDefTypes];
-
-      // Keep distributing damage until pool is exhausted or all targets are destroyed
-      while (damagePool > 0 && remainingTargets.length > 0) {
-        // Calculate relative weights
-        let totalWeight = 0;
-        remainingTargets.forEach(tId => {
-          const qty = defRemaining[tId];
-          const prio = TARGET_PRIORITIES[tId as keyof typeof TARGET_PRIORITIES] || 1.0;
-          totalWeight += qty * prio;
-        });
-
-        if (totalWeight === 0) break;
-
-        let extraRedistributePool = 0;
-        const damageToApply: Record<string, number> = {};
-
-        // Calculate a targeted damage allocation
-        remainingTargets.forEach(tId => {
-          const qty = defRemaining[tId];
-          const prio = TARGET_PRIORITIES[tId as keyof typeof TARGET_PRIORITIES] || 1.0;
-          const share = (qty * prio) / totalWeight;
-          damageToApply[tId] = damagePool * share;
-        });
-
-        damagePool = 0; // Temporarily zeroed, will accumulate overflow
-
-        // Process actual casualties per troop type based on their unit defense stats
-        remainingTargets.forEach(tId => {
-          const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-          const totalSurviving = defOwnRemaining[tId] + defAllianceRemaining[tId];
-          const effectiveMult = totalSurviving > 0
-            ? (defOwnRemaining[tId] * defMult + defAllianceRemaining[tId] * 1.0) / totalSurviving
-            : defMult;
-          const unitHp = Math.round((spec ? spec.defenceHp : 100) * effectiveMult);
-          const currentCount = defRemaining[tId];
-          const allocatedDmg = damageToApply[tId];
-
-          // How many die directly
-          let killed = Math.floor(allocatedDmg / unitHp);
-          const fractionalDmg = allocatedDmg % unitHp;
-
-          // Probabilistic spillover chance to kill one more unit
-          if (fractionalDmg > 0 && killed < currentCount) {
-            const killChance = fractionalDmg / unitHp;
-            if (Math.random() < killChance) {
-              killed++;
-            }
-          }
-
-          killed = Math.min(currentCount, killed);
-
-          if (killed > 0) {
-            roundDefLosses[tId] += killed;
-
-            // Distribute killed units between defender own and alliance members proportionally
-            const totalSurv = defOwnRemaining[tId] + defAllianceRemaining[tId];
-            if (totalSurv > 0) {
-              const defenderShare = Math.round((defOwnRemaining[tId] / totalSurv) * killed);
-              const defenderKilled = Math.min(defOwnRemaining[tId], defenderShare);
-              const allianceKilled = Math.min(defAllianceRemaining[tId], killed - defenderKilled);
-              
-              defOwnRemaining[tId] -= defenderKilled;
-              defAllianceRemaining[tId] -= allianceKilled;
-            }
-
-            defenderLosses[tId] += killed;
-            defRemaining[tId] -= killed;
-            defenceHpKilled += killed * unitHp;
-
-            // If some damage was allocated but exceeded vital HP of all surviving units of this type,
-            // feed the excess juice back into the pool for remaining targets!
-            const usedDamage = killed * unitHp;
-            if (allocatedDmg > usedDamage) {
-              extraRedistributePool += (allocatedDmg - usedDamage);
-            }
-          }
-        });
-
-        // Any leftover damage and leftover targets get run in the next redistribution loop
-        damagePool = extraRedistributePool;
-        remainingTargets = getActiveCombatShips(defRemaining);
-      }
-    }
-
-    // Distribute defender damage onto attacker troops
-    if (defDamage > 0 && activeAttTypes.length > 0) {
-      let damagePool = defDamage;
-      let remainingTargets = [...activeAttTypes];
-
-      while (damagePool > 0 && remainingTargets.length > 0) {
-        let totalWeight = 0;
-        remainingTargets.forEach(tId => {
-          const qty = attRemaining[tId];
-          const prio = TARGET_PRIORITIES[tId as keyof typeof TARGET_PRIORITIES] || 1.0;
-          totalWeight += qty * prio;
-        });
-
-        if (totalWeight === 0) break;
-
-        let extraRedistributePool = 0;
-        const damageToApply: Record<string, number> = {};
-
-        remainingTargets.forEach(tId => {
-          const qty = attRemaining[tId];
-          const prio = TARGET_PRIORITIES[tId as keyof typeof TARGET_PRIORITIES] || 1.0;
-          const share = (qty * prio) / totalWeight;
-          damageToApply[tId] = damagePool * share;
-        });
-
-        damagePool = 0;
-
-        remainingTargets.forEach(tId => {
-          const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-          const unitHp = Math.round((spec ? spec.defenceHp : 100) * attMult);
-          const currentCount = attRemaining[tId];
-          const allocatedDmg = damageToApply[tId];
-
-          let killed = Math.floor(allocatedDmg / unitHp);
-          const fractionalDmg = allocatedDmg % unitHp;
-
-          if (fractionalDmg > 0 && killed < currentCount) {
-            const killChance = fractionalDmg / unitHp;
-            if (Math.random() < killChance) {
-              killed++;
-            }
-          }
-
-          killed = Math.min(currentCount, killed);
-
-          if (killed > 0) {
-            roundAttLosses[tId] += killed;
-            attackerLosses[tId] += killed;
-            attRemaining[tId] -= killed;
-            attackHpKilled += killed * unitHp;
-
-            const usedDamage = killed * unitHp;
-            if (allocatedDmg > usedDamage) {
-              extraRedistributePool += (allocatedDmg - usedDamage);
-            }
-          }
-        });
-
-        damagePool = extraRedistributePool;
-        remainingTargets = getActiveCombatShips(attRemaining);
-      }
-    }
-
-    const attKilledText = Object.entries(roundAttLosses)
-      .filter(([_, qty]) => qty > 0)
-      .map(([tId, qty]) => `${qty} ${TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.name || tId}`)
-      .join(", ");
-    const defKilledText = Object.entries(roundDefLosses)
-      .filter(([_, qty]) => qty > 0)
-      .map(([tId, qty]) => `${qty} ${TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.name || tId}`)
-      .join(", ");
-
-    if (attKilledText) {
-      roundLogs.push(`Attacker casualties: ${attKilledText}.`);
-    } else {
-      roundLogs.push(`Attacker structural shields held perfectly.`);
-    }
-
-    if (defKilledText) {
-      roundLogs.push(`Defender casualties: ${defKilledText}.`);
-    } else {
-      roundLogs.push(`Defender defense line remained impenetrable.`);
-    }
-
-    rounds.push({
-      round: r,
-      logs: roundLogs,
-      attackerRemaining: { ...attRemaining },
-      defenderRemaining: { ...defRemaining }
-    });
-  }
-
-  // Apply HP percentage survival protection floors
-  const safetyLogs: string[] = [];
-  if (attSurvivalFloor > 0) {
-    let protectionTriggered = false;
-    Object.entries(attTroops).forEach(([tId, initialCount]) => {
-      if (initialCount > 0) {
-        const minSurviving = Math.ceil(initialCount * attSurvivalFloor);
-        if (attRemaining[tId] < minSurviving) {
-          const shortage = minSurviving - attRemaining[tId];
-          attRemaining[tId] = minSurviving;
-          attackerLosses[tId] = Math.max(0, attackerLosses[tId] - shortage);
-          const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-          const unitHp = spec ? Math.round(spec.defenceHp * attMult) : 10;
-          attackHpKilled = Math.max(0, attackHpKilled - shortage * unitHp);
-          protectionTriggered = true;
-        }
-      }
-    });
-    if (protectionTriggered) {
-      safetyLogs.push(`🛡️ [Tactical Deflection Force] Attacker had ${(attSurvivalFloor * 100).toFixed(1)}% HP advantage! Survival security field guaranteed that at least ${(attSurvivalFloor * 100).toFixed(1)}% of original squads survive.`);
-    }
-  }
-
-  if (defSurvivalFloor > 0) {
-    let protectionTriggered = false;
-    const initialDefTroops: Record<string, number> = {};
-    Object.keys(defOwnRemaining).forEach(tId => {
-      initialDefTroops[tId] = (defTroops[tId] || 0) + (defAllianceRemaining[tId] ? (allianceTroops?.[tId] || 0) : 0);
-    });
-
-    Object.entries(initialDefTroops).forEach(([tId, initialCount]) => {
-      if (initialCount > 0) {
-        const minSurviving = Math.ceil(initialCount * defSurvivalFloor);
-        if (defRemaining[tId] < minSurviving) {
-          const shortage = minSurviving - defRemaining[tId];
-          defRemaining[tId] = minSurviving;
-          defenderLosses[tId] = Math.max(0, defenderLosses[tId] - shortage);
-
-          // Distribute the restored units proportionally based on initial counts
-          const initialOwn = defTroops[tId] || 0;
-          const initialAlliance = allianceTroops?.[tId] || 0;
-          const initialTotal = initialOwn + initialAlliance;
-          let ownRestored = shortage;
-          let allianceRestored = 0;
-          if (initialTotal > 0) {
-            const ownShare = Math.round((initialOwn / initialTotal) * shortage);
-            ownRestored = Math.min(initialOwn - defOwnRemaining[tId], ownShare);
-            allianceRestored = shortage - ownRestored;
-          }
-          defOwnRemaining[tId] += ownRestored;
-          defAllianceRemaining[tId] += allianceRestored;
-
-          const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-          // Use weighted average mult for the restored units
-          const totalSurviving = defOwnRemaining[tId] + defAllianceRemaining[tId];
-          const effectiveMult = totalSurviving > 0
-            ? (defOwnRemaining[tId] * defMult + defAllianceRemaining[tId] * 1.0) / totalSurviving
-            : defMult;
-          const unitHp = spec ? Math.round(spec.defenceHp * effectiveMult) : 10;
-
-          defenceHpKilled = Math.max(0, defenceHpKilled - shortage * unitHp);
-          protectionTriggered = true;
-        }
-      }
-    });
-    if (protectionTriggered) {
-      safetyLogs.push(`🛡️ [Tactical Deflection Force] Defender had ${(defSurvivalFloor * 100).toFixed(1)}% HP advantage! Survival security field guaranteed that at least ${(defSurvivalFloor * 100).toFixed(1)}% of original squads survive.`);
-    }
-  }
-
-  if (safetyLogs.length > 0 && rounds.length > 0) {
-    rounds[rounds.length - 1].logs.push(...safetyLogs);
-  }
-
-  // MXIT Moonbase Salvage Field Recovery Protocol!
-  // In classic Moonbase: Survivors are salvaged and patched back together from the wreckage.
-  // Defender recovery rate: 20% (on-planet orbital repair systems).
-  // Attacker recovery rate: 10% (on-board tactical salvage bays).
-  const salvageLogs: string[] = [];
-
-  Object.entries(defenderLosses).forEach(([tId, count]) => {
-    if (count > 0) {
-      // 20% chance to retrieve each destroyed ship
-      let saved = 0;
-      for (let i = 0; i < count; i++) {
-        if (Math.random() < 0.20) saved++;
-      }
-      if (saved > 0) {
-        defenderSalvaged[tId] = saved;
-        // Re-add to surviving troops
-        defRemaining[tId] += saved;
-        // Subtract from overall recorded losses so they survive
-        defenderLosses[tId] -= saved;
-      }
-    }
-  });
-
-  Object.entries(attackerLosses).forEach(([tId, count]) => {
-    if (count > 0) {
-      // 10% chance to retrieve each destroyed ship
-      let saved = 0;
-      for (let i = 0; i < count; i++) {
-        if (Math.random() < 0.10) saved++;
-      }
-      if (saved > 0) {
-        attackerSalvaged[tId] = saved;
-        // Re-add to surviving troops
-        attRemaining[tId] += saved;
-        // Subtract from overall recorded losses so they survive
-        attackerLosses[tId] -= saved;
-      }
-    }
-  });
-
-  // Generate beautiful salvage reporting messages to attach to the final round logs!
-  const defSalvagedText = Object.entries(defenderSalvaged)
+  const attKilledText = Object.entries(attackerLosses)
+    .filter(([_, qty]) => qty > 0)
+    .map(([tId, qty]) => `${qty} ${TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.name || tId}`)
+    .join(", ");
+  const defKilledText = Object.entries(defenderLosses)
     .filter(([_, qty]) => qty > 0)
     .map(([tId, qty]) => `${qty} ${TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.name || tId}`)
     .join(", ");
 
-  const attSalvagedText = Object.entries(attackerSalvaged)
-    .filter(([_, qty]) => qty > 0)
-    .map(([tId, qty]) => `${qty} ${TROOP_SPECS[tId as keyof typeof TROOP_SPECS]?.name || tId}`)
-    .join(", ");
-
-  if (defSalvagedText || attSalvagedText) {
-    salvageLogs.push(`=== BATTLEFIELD ORBIT RECOVERY REPORT ===`);
-    if (defSalvagedText) {
-      salvageLogs.push(`[Nano-Salvage Array] Planetary defense rigs gathered scrap, reconstructing: ${defSalvagedText} for the Defender.`);
-    }
-    if (attSalvagedText) {
-      salvageLogs.push(`[Tactical Medical Bay] Offside carrier teams salvaged and re-launched: ${attSalvagedText} for the Attacker.`);
-    }
-    // Append the combat salvage overview to the final round's logs
-    if (rounds.length > 0) {
-      rounds[rounds.length - 1].logs.push(...salvageLogs);
-    }
-  }
-
-  // 150% involved HP complete annihilation overwhelm rule
-  if (initialAttHp > 2.5 * initialDefHp && initialDefHp > 0) {
-    // Defender losses set to initial counts, no survivors
-    Object.entries(defTroops).forEach(([tId, count]) => {
-      defRemaining[tId as keyof typeof defRemaining] = 0;
-      defenderLosses[tId as keyof typeof defenderLosses] = count;
-    });
-    Object.keys(defOwnRemaining).forEach(tId => {
-      defOwnRemaining[tId] = 0;
-      defAllianceRemaining[tId] = 0;
-    });
-    defenceHpKilled = initialDefHp;
-    if (rounds.length > 0) {
-      rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Attacker's initial force HP of ${initialAttHp.toLocaleString()} exceeded 150% more than the defender's total involved HP (${initialDefHp.toLocaleString()}). Absolute overwhelm triggered; all defender defending forces have been wiped out with ZERO survivors!`);
-    }
-  } else if (initialDefHp > 2.5 * initialAttHp && initialAttHp > 0) {
-    // Attacker losses set to initial counts, no survivors
-    Object.entries(attTroops).forEach(([tId, count]) => {
-      attRemaining[tId as keyof typeof attRemaining] = 0;
-      attackerLosses[tId as keyof typeof attackerLosses] = count;
-    });
-    attackHpKilled = initialAttHp;
-    if (rounds.length > 0) {
-      rounds[rounds.length - 1].logs.push(`💥 [TACTICAL OVERWHELM] Defender's initial force HP of ${initialDefHp.toLocaleString()} exceeded 150% more than the attacker's total involved HP (${initialAttHp.toLocaleString()}). Absolute overwhelm triggered; all attacking squadron forces have been wiped out with ZERO survivors!`);
-    }
+  if (attKilledText) {
+    roundLogs.push(`Attacker casualties: ${attKilledText}.`);
   } else {
-    // Neither side has more than 150% more relevant HP involved, so neither side can lose all units!
-    if (initialAttHp > 0 && initialDefHp > 0) {
-      const finalAttCountTemp = Object.values(attRemaining).reduce((s, v) => s + v, 0);
-      const finalDefCountTemp = Object.values(defRemaining).reduce((s, v) => s + v, 0);
-
-      if (finalDefCountTemp === 0) {
-        // Defender must not lose all units. Restore at least 10% of each initial troop type (rounded up, so at least 1 unit)
-        Object.entries(defTroops).forEach(([tId, count]) => {
-          if (count > 0) {
-            const minQty = Math.max(1, Math.ceil(count * 0.10));
-            defRemaining[tId as keyof typeof defRemaining] = minQty;
-            defenderLosses[tId as keyof typeof defenderLosses] = Math.max(0, count - minQty);
-
-            // Distribute the restored units proportionally based on initial counts
-            const initialOwn = defTroops[tId] || 0;
-            const initialAlliance = allianceTroops?.[tId] || 0;
-            const initialTotal = initialOwn + initialAlliance;
-            let ownRestored = minQty;
-            let allianceRestored = 0;
-            if (initialTotal > 0) {
-              const ownShare = Math.round((initialOwn / initialTotal) * minQty);
-              ownRestored = Math.min(initialOwn, ownShare);
-              allianceRestored = minQty - ownRestored;
-            }
-            defOwnRemaining[tId] = ownRestored;
-            defAllianceRemaining[tId] = allianceRestored;
-          }
-        });
-        if (rounds.length > 0) {
-          rounds[rounds.length - 1].logs.push(`🛡️ [MINIMUM SAFETY SECURITY] Because the attacker did not have >150% more relevant HP involved, defender was saved from total annihilation by local garrison shields!`);
-        }
-      }
-
-      if (finalAttCountTemp === 0) {
-        // Attacker must not lose all units. Restore at least 10% of each initial troop type (rounded up, so at least 1 unit)
-        Object.entries(attTroops).forEach(([tId, count]) => {
-          if (count > 0) {
-            const minQty = Math.max(1, Math.ceil(count * 0.10));
-            attRemaining[tId as keyof typeof attRemaining] = minQty;
-            attackerLosses[tId as keyof typeof attackerLosses] = Math.max(0, count - minQty);
-          }
-        });
-        if (rounds.length > 0) {
-          rounds[rounds.length - 1].logs.push(`🛡️ [MINIMUM SAFETY SECURITY] Because the defender did not have >150% more relevant HP involved, attacker was saved from total annihilation by tactical jump shields!`);
-        }
-      }
-    }
+    roundLogs.push(`Attacker structural shields held perfectly.`);
   }
 
-  const finalAttCount = Object.values(attRemaining).reduce((s, v) => s + v, 0);
-  const finalDefCount = Object.values(defRemaining).reduce((s, v) => s + v, 0);
-
-  const finalAttHp = Object.entries(attRemaining).reduce((sum, [tId, qty]) => {
-    const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-    const totalUnitHP = spec ? spec.defenceHp : 0;
-    return sum + qty * Math.round(totalUnitHP * attMult);
-  }, 0);
-
-  const finalDefHp = Object.entries(defRemaining).reduce((sum, [tId, qty]) => {
-    const spec = TROOP_SPECS[tId as keyof typeof TROOP_SPECS];
-    const totalUnitHP = spec ? spec.defenceHp : 0;
-    
-    // Proportional calculation of surviving HP based on shield-boosting rules
-    const ownCount = defOwnRemaining[tId] || 0;
-    const allianceCount = defAllianceRemaining[tId] || 0;
-    
-    const ownHP = ownCount * Math.round(totalUnitHP * defMult);
-    const allianceHP = allianceCount * Math.round(totalUnitHP * 1.0);
-    return sum + ownHP + allianceHP;
-  }, 0);
-
-  let winner: "attacker" | "defender" = "defender";
-  if (finalAttCount === 0 && finalDefCount > 0) {
-    winner = "defender";
-  } else if (finalDefCount === 0 && finalAttCount > 0) {
-    winner = "attacker";
-  } else if (finalAttCount === 0 && finalDefCount === 0) {
-    // Both sides completely wiped out, defender holds the sector
-    winner = "defender";
+  if (defKilledText) {
+    roundLogs.push(`Defender casualties: ${defKilledText}.`);
   } else {
-    // Both sides have surviving forces, compare remaining HP
-    if (finalAttHp > finalDefHp) {
-      winner = "attacker";
-    } else if (finalAttHp < finalDefHp) {
-      winner = "defender";
-    } else {
-      winner = finalAttCount >= finalDefCount ? "attacker" : "defender";
-    }
+    roundLogs.push(`Defender defense line remained impenetrable.`);
   }
+
+  rounds.push({
+    round: 1,
+    logs: roundLogs,
+    attackerRemaining: { ...attRemaining },
+    defenderRemaining: { ...defRemaining }
+  });
 
   return {
     winner,
@@ -2719,7 +2362,8 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
         sendNotificationWithFallback(
           fleet.senderId,
           "🚀 Fleet Relocation Completed",
-          `Your relocation fleet has completed transit and safely landed at '${targetPlanet.name}'.`
+          `Your relocation fleet has completed transit and safely landed at '${targetPlanet.name}'.`,
+          "fleet"
         );
       } else {
         // If they don't own the target planet, return troops home
@@ -2833,7 +2477,8 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
     sendNotificationWithFallback(
       report.attackerId,
       "📡 Intelligence Sweep Complete",
-      `Your recon drones have returned orbital scanner data of Commander ${report.defenderName || "Unknown"}'s station.`
+      `Your recon drones have returned orbital scanner data of Commander ${report.defenderName || "Unknown"}'s station.`,
+      "fleet"
     );
 
     // Notify defending player of unauthorized scans
@@ -2841,7 +2486,8 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       sendNotificationWithFallback(
         report.defenderId,
         "⚠️ SENSORS ALERT: Scanner Detected",
-        `Proximity alarms triggered: An unauthorized scouting drone sent by Commander ${report.attackerName} has completed a scan of your station!`
+        `Proximity alarms triggered: An unauthorized scouting drone sent by Commander ${report.attackerName} has completed a scan of your station!`,
+        "military"
       );
     }
 
@@ -3072,13 +2718,9 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       });
     }
 
-    // Award scoring for actual units destroyed on both sides (loser of the attack does not get points)
-    if (combat.winner === "attacker") {
-      attacker.scores.attack += combat.defenceHpKilled;
-    }
-    if (combat.winner === "defender") {
-      defender.scores.defence += combat.attackHpKilled;
-    }
+    // Award scoring for actual units destroyed on both sides (amount of HP killed in the battle report)
+    attacker.scores.attack += combat.defenceHpKilled;
+    defender.scores.defence += combat.attackHpKilled;
 
     // Loot calculations (only if attacker won and has loot space)
     const loot = { water: 0, plasma: 0, fuel: 0, food: 0, respirant: 0 };
@@ -3163,7 +2805,8 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
       combat.winner === "attacker" ? "🏆 Raid Victory!" : "❌ Raid Repelled",
       combat.winner === "attacker" 
         ? `Your raid on Commander ${report.defenderName}'s station was successful! Plundered ${lootSumTotal.toLocaleString()} resources.`
-        : `Your raiding fleet on Commander ${report.defenderName}'s station was defeated.`
+        : `Your raiding fleet on Commander ${report.defenderName}'s station was defeated.`,
+      "military"
     );
 
     // Notify the defender
@@ -3173,7 +2816,8 @@ function resolveFleetMission(fleet: FleetMission, now: number, remainingFleets: 
         combat.winner === "attacker" ? "🚨 STATION BREACH ALERT!" : "🛡️ Station Defended!",
         combat.winner === "attacker"
           ? `Commander ${report.attackerName} breached your defenses, plundering ${lootSumTotal.toLocaleString()} resources!`
-          : `Your security systems successfully repelled a raid by Commander ${report.attackerName}!`
+          : `Your security systems successfully repelled a raid by Commander ${report.attackerName}!`,
+        "attacks"
       );
     }
 
@@ -3365,16 +3009,28 @@ function getFirebaseAdmin(): App | null {
  * Sends a notification using active SSE stream. Falls back to a high-priority, system-level FCM push notification
  * via firebase-admin if the active SSE connection is silent or breaks (is inactive).
  */
-function sendNotificationWithFallback(userId: string, title: string, body: string) {
+function sendNotificationWithFallback(userId: string, title: string, body: string, category: string = "events") {
   if (userId && userId.startsWith('ai_')) {
     return; // Silently ignore artificial intelligence synthetic players
   }
+
+  const player = state.players[userId];
+  if (player && player.notificationPreferences) {
+    const prefs = player.notificationPreferences;
+    if (category === "attacks" && prefs.incomingAttacks === false) return;
+    if (category === "construction" && prefs.construction === false) return;
+    if (category === "research" && prefs.research === false) return;
+    if (category === "fleet" && prefs.fleet === false) return;
+    if (category === "events" && prefs.events === false) return;
+    if (category === "economy" && prefs.economy === false) return;
+  }
+
   const activeSse = activeSseClients.get(userId);
   
   if (activeSse) {
     console.log(`[Notifications] Active SSE client found for user ${userId}. Dispatching live event.`);
     try {
-      activeSse.write(`data: ${JSON.stringify({ title, body, timestamp: Date.now() })}\n\n`);
+      activeSse.write(`data: ${JSON.stringify({ title, body, category, timestamp: Date.now() })}\n\n`);
       return;
     } catch (err) {
       console.warn(`[Notifications] Failed to write to active SSE stream for ${userId}. Connection probably broke. Falling back to FCM.`, err);
@@ -3384,10 +3040,13 @@ function sendNotificationWithFallback(userId: string, title: string, body: strin
 
   // Fallback: SSE went silent or is inactive. Look up FCM token
   console.log(`[Notifications] User ${userId} has no active real-time SSE stream. Executing FCM push notification fallback...`);
-  const player = state.players[userId];
   if (player && player.fcmToken) {
     const adminApp = getFirebaseAdmin();
     if (adminApp) {
+      const priorityVal = (category === "attacks" || category === "military" || category === "fleet") ? "high" : "normal";
+      const channelIdVal = category || "events";
+      const soundVal = category === "attacks" ? "siren" : "default";
+
       const message = {
         token: player.fcmToken,
         notification: {
@@ -3395,20 +3054,26 @@ function sendNotificationWithFallback(userId: string, title: string, body: strin
           body: body
         },
         android: {
-          priority: "high" as const
+          priority: priorityVal as "high" | "normal",
+          notification: {
+            channelId: channelIdVal,
+            sound: soundVal
+          }
         },
         apns: {
           payload: {
             aps: {
               contentAvailable: true,
-              sound: "default"
+              sound: category === "attacks" ? "siren.caf" : "default",
+              badge: 1
             }
           }
         },
         data: {
           click_action: "FLUTTER_NOTIFICATION_CLICK",
           title: title,
-          body: body
+          body: body,
+          category: channelIdVal
         }
       };
 
@@ -3797,7 +3462,7 @@ app.post("/api/auth/google", async (req, res) => {
 
       // 2. Find by matching username (case-insensitive)
       if (!player) {
-        const defaultName = name || email.split("@")[0];
+        const defaultName = username || name || email.split("@")[0];
         player = Object.values(state.players).find(
           p => p.username && (
             p.username.toLowerCase() === email.toLowerCase() ||
@@ -3824,13 +3489,17 @@ app.post("/api/auth/google", async (req, res) => {
       return res.json({ player, isNew: false });
     }
 
+    if (!username) {
+      return res.json({ unregistered: true, email, name, idToken });
+    }
+
     // Initialize new baseline profile
     const factions = ["Solar Federation", "Nexus Syndicate", "Eclipse Vanguard"];
     const factionColors = ["#00F0FF", "#FF007A", "#FFC700"];
-    const selectFaction = factions[0];
-    const selectColor = factionColors[0];
+    const selectFaction = faction || factions[0];
+    const selectColor = selectFaction === "Nexus Syndicate" ? factionColors[1] : selectFaction === "Eclipse Vanguard" ? factionColors[2] : factionColors[0];
 
-    const defaultUsername = getUniqueUsername(name || (email ? email.split("@")[0] : `Commander_${uid.substring(0, 5)}`));
+    const defaultUsername = getUniqueUsername(username || name || (email ? email.split("@")[0] : `Commander_${uid.substring(0, 5)}`));
 
     // Create initial starting planet
     const limit = getCurrentMapLimits();
@@ -5992,6 +5661,15 @@ app.post("/api/fleet/send", (req, res) => {
   state.fleets.push(mission);
   saveState();
 
+  if (missionType === "attack" && resolvedTargetId && resolvedTargetId !== "habitable") {
+    sendNotificationWithFallback(
+      resolvedTargetId,
+      "🚨 IMMEDIATE ALERT: INCOMING HOSTILE FLEET DETECTION!",
+      `Warning: Commander ${p.username} has launched a hostile attack fleet targeting your station! Proximity trackers estimate zero-hour impact in ${Math.round(travelTimeMs / 1000 / 60)} minutes. Activate magnetic shields immediately!`,
+      "attacks"
+    );
+  }
+
   res.json({ player: p, success: true, fleets: state.fleets });
 });
 
@@ -6410,6 +6088,48 @@ app.post("/api/player/settings", (req, res) => {
 
   saveState();
   res.json({ player: p, success: true });
+});
+
+// Get notification preferences
+app.get("/api/player/notification-preferences", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  if (!p.notificationPreferences) {
+    p.notificationPreferences = {
+      incomingAttacks: true,
+      construction: true,
+      research: true,
+      fleet: true,
+      events: true,
+      economy: true
+    };
+  }
+
+  res.json({ success: true, preferences: p.notificationPreferences });
+});
+
+// Update notification preferences
+app.post("/api/player/notification-preferences", (req, res) => {
+  const p = getLoggedPlayer(req);
+  if (!p) return res.status(401).json({ error: "Unauthenticated" });
+
+  const { preferences } = req.body;
+  if (!preferences || typeof preferences !== "object") {
+    return res.status(400).json({ error: "Invalid preferences payload" });
+  }
+
+  p.notificationPreferences = {
+    incomingAttacks: preferences.incomingAttacks !== false,
+    construction: preferences.construction !== false,
+    research: preferences.research !== false,
+    fleet: preferences.fleet !== false,
+    events: preferences.events !== false,
+    economy: preferences.economy !== false
+  };
+
+  saveState();
+  res.json({ success: true, preferences: p.notificationPreferences });
 });
 
 // Manually unload resources from a docked reserve fleet to planet
@@ -7785,7 +7505,8 @@ app.post("/api/messages/send", (req, res) => {
   sendNotificationWithFallback(
     receiver.id, 
     "📬 New Secure Message", 
-    `Commander ${p.username} sent you a message: ${content.trim().substring(0, 60)}${content.trim().length > 60 ? "..." : ""}`
+    `Commander ${p.username} sent you a message: ${content.trim().substring(0, 60)}${content.trim().length > 60 ? "..." : ""}`,
+    "events"
   );
 
   saveState();
@@ -8202,7 +7923,8 @@ app.post("/api/players/report", (req, res) => {
     sendNotificationWithFallback(
       admin.id,
       "🚨 Incident Report Submitted",
-      `Reported: ${targetPlayer.username} by ${p.username}. Statement: ${reason.trim().substring(0, 30)}...`
+      `Reported: ${targetPlayer.username} by ${p.username}. Statement: ${reason.trim().substring(0, 30)}...`,
+      "events"
     );
   });
 
