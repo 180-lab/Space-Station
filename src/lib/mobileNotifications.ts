@@ -13,14 +13,31 @@ export const isCapacitorActive = (): boolean => {
  */
 export const requestNotificationPermission = async (): Promise<boolean> => {
   if (!isCapacitorActive()) {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'granted') {
-        return true;
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        let permission: NotificationPermission = 'default';
+        try {
+          permission = Notification.permission;
+        } catch (e) {
+          console.warn('[Notifications] Cannot read Notification.permission in this sandbox/iframe environment:', e);
+          return false;
+        }
+
+        if (permission === 'granted') {
+          return true;
+        }
+        if (permission !== 'denied') {
+          try {
+            const res = await Notification.requestPermission();
+            return res === 'granted';
+          } catch (e) {
+            console.warn('[Notifications] Notification.requestPermission is blocked or failed in this sandbox/iframe environment:', e);
+            return false;
+          }
+        }
       }
-      if (Notification.permission !== 'denied') {
-        const res = await Notification.requestPermission();
-        return res === 'granted';
-      }
+    } catch (err) {
+      console.warn('[Notifications] Error requesting web notification permission:', err);
     }
     return false;
   }
@@ -46,23 +63,35 @@ export const sendMobileNotification = async (title: string, body: string, custom
   console.log(`[Notification Dispatcher] Triggering alert: "${title}" => "${body}"`);
 
   if (!isCapacitorActive()) {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'granted') {
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        let permission: NotificationPermission = 'default';
         try {
-          new Notification(title, { body });
+          permission = Notification.permission;
+        } catch (e) {
+          console.warn('[Notifications] Cannot read Notification.permission in this sandbox/iframe context:', e);
           return;
-        } catch (err) {
-          console.warn('[Notifications] Web standard constructor rejected, trying ServiceWorker context:', err);
-          if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
-            navigator.serviceWorker.ready.then((reg) => {
-              reg.showNotification(title, { body });
-            }).catch(() => {});
-            return;
-          }
         }
-      } else {
-        console.log('[Notifications] Web push disabled: permission is', Notification.permission);
+
+        if (permission === 'granted') {
+          try {
+            new Notification(title, { body });
+            return;
+          } catch (err) {
+            console.warn('[Notifications] Web standard constructor rejected, trying ServiceWorker context:', err);
+            if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+              navigator.serviceWorker.ready.then((reg) => {
+                reg.showNotification(title, { body });
+              }).catch(() => {});
+              return;
+            }
+          }
+        } else {
+          console.log('[Notifications] Web push disabled: permission is', permission);
+        }
       }
+    } catch (err) {
+      console.warn('[Notifications] Web standard notification send rejected:', err);
     }
     return;
   }
