@@ -768,7 +768,7 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   const armyBaseLevel = activePlanet.buildings.armyBase?.level || 0;
 
   return (
-    <div className="space-y-1.5 pb-24">
+    <div className="space-y-1.5 pb-0">
       {/* Army Base Upgrade Header Panel */}
       {activePlanet.buildings?.armyBase && (
         <div className="p-4 bg-[#0A0F1D]/80 border border-[#1E293B] rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

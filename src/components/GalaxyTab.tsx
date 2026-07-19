@@ -1064,7 +1064,7 @@ export const GalaxyTab: React.FC<GalaxyTabProps> = ({
 
   // Leaderboard formatting helpers
   const rankedState = Object.values(alliances) as Alliance[];  return (
-    <div className="space-y-1.5 pb-24 font-mono">
+    <div className="space-y-1.5 pb-0 font-mono">
       {/* Visual Navigation Pill Bars or Header depending on Radar View vs Galaxy view */}
       {isDirectRadarView ? (
         <div className="flex items-center justify-between bg-[#0A0F1D]/90 backdrop-blur-sm p-4 rounded-xl border border-[#1E293B] shrink-0 font-mono text-xs">

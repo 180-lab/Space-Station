@@ -442,7 +442,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-1.5 font-mono animate-fade-in pb-16">
+    <div className="max-w-4xl mx-auto space-y-1.5 font-mono animate-fade-in pb-0">
       {/* Header Banner */}
       <div className="p-6 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
         <div className="space-y-1">

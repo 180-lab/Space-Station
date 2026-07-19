@@ -3377,7 +3377,7 @@ export default function App() {
     : 10000;
 
   return (
-    <div className={`min-h-screen max-w-full overflow-x-hidden font-sans bg-[#05070A] text-slate-350 selection:bg-cyan-500/25 pb-24 theme-${theme} ${isVibrating ? (vibrateIntensity === 'heavy' ? 'animate-vibrate-heavy' : 'animate-vibrate') : ''}`}>
+    <div className={`min-h-screen max-w-full overflow-x-hidden font-sans bg-[#05070A] text-slate-350 selection:bg-cyan-500/25 pb-0 theme-${theme} ${isVibrating ? (vibrateIntensity === 'heavy' ? 'animate-vibrate-heavy' : 'animate-vibrate') : ''}`}>
       <ClickFeedbackLoader />
       
       {/* Toast Notice alerts */}
@@ -3799,7 +3799,7 @@ export default function App() {
       )}
 
       {/* Screen view router container */}
-      <main className={`max-w-5xl mx-auto px-4 ${layoutMode === 'datasaving' ? 'pt-1.5' : 'pt-3'} pb-24 animate-fade-in animate-duration-500`}>
+      <main className={`max-w-5xl mx-auto px-4 ${layoutMode === 'datasaving' ? 'pt-1.5' : 'pt-3'} pb-20 animate-fade-in animate-duration-500`}>
         {activeTab === 'explore' && player && (() => {
           const sortedByPopulation = [...playersList].sort((a, b) => b.scores.population - a.scores.population);
           const populationRank = sortedByPopulation.findIndex(p => p.id === player.id) + 1 || 1;

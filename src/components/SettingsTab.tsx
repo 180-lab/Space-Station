@@ -833,7 +833,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-1.5 font-mono animate-fade-in pb-16 text-left">
+    <div className="max-w-4xl mx-auto space-y-1.5 font-mono animate-fade-in pb-0 text-left">
       {/* Header Banner */}
       <div className="p-4 bg-[#0A0F1D]/90 border border-[#1E293B] rounded-xl flex justify-between items-center shadow-xl">
         <h2 className="text-xs font-black text-white tracking-widest uppercase">TRANSMISSION LINK SETTINGS</h2>

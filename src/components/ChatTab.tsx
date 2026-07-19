@@ -49,7 +49,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto flex flex-col font-mono animate-fade-in pb-4">
+    <div className="max-w-4xl mx-auto flex flex-col font-mono animate-fade-in pb-0">
       {historyPage === 0 ? (
         <>
           {/* Active Chat Header */}

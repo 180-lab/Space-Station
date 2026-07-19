@@ -642,7 +642,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
     const resKeys: ResourceType[] = ['water', 'plasma', 'fuel', 'food', 'respirant'];
 
     return (
-      <div className="space-y-4 pb-24" id="explore-tab-datasaving-view">
+      <div className="space-y-4 pb-0" id="explore-tab-datasaving-view">
         {/* Alerts HUD / Status header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#070c19]/90 border border-slate-800 rounded-xl text-left">
           <div className="text-left flex items-center gap-2">
@@ -1323,7 +1323,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
   }
 
   return (
-    <div className="space-y-1.5 pb-24" id="explore-tab-view">
+    <div className="space-y-1.5 pb-0" id="explore-tab-view">
       {/* Your Resource Count */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
         {[
