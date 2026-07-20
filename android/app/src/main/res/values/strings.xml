@@ -4,5 +4,5 @@
     <string name="title_activity_main">Space Station Commander</string>
     <string name="package_name">com.galactose.tacticalgame</string>
     <string name="custom_url_scheme">com.galactose.tacticalgame</string>
-    <string name="server_client_id">592965643440-qf9d3vj67gksisdt9nd0m892l49n44b6.apps.googleusercontent.com</string>
+    <string name="server_client_id">40626426948-e8t8qvnf9voo96ceud23kkn5pgufvfm9.apps.googleusercontent.com</string>
 </resources>

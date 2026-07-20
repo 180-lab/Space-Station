@@ -50,31 +50,44 @@ jobs:
           cd android
           gradle wrapper
 
-      - name: Build Android APK & AAB with Gradle
+      - name: Build Android APK with Gradle
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug bundleRelease --stacktrace --no-daemon
+          ./gradlew assembleDebug --stacktrace --no-daemon
 
-      - name: Rename Artifacts for Release
+      - name: Save APK Artifact
         run: |
-          # Rename the debug APK
-          mv android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/SpaceStationCommander.apk
-          
-          # Find and copy the built AAB (could be signed or unsigned)
-          cp android/app/build/outputs/bundle/release/app-release*.aab android/app/build/outputs/bundle/release/SpaceStationCommander.aab
+          mkdir -p build-artifacts
+          mv android/app/build/outputs/apk/debug/app-debug.apk build-artifacts/SpaceStationCommander.apk
+
+      - name: Clean Gradle Build Tree
+        run: |
+          cd android
+          ./gradlew clean --no-daemon
+
+      - name: Build Android AAB with Gradle
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease --stacktrace --no-daemon
+
+      - name: Save AAB Artifact
+        run: |
+          mkdir -p build-artifacts
+          cp android/app/build/outputs/bundle/release/app-release*.aab build-artifacts/SpaceStationCommander.aab || cp android/app/build/outputs/bundle/release/app-release.aab build-artifacts/SpaceStationCommander.aab
 
       - name: Upload Downloadable APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SpaceStationCommander-APK
-          path: android/app/build/outputs/apk/debug/SpaceStationCommander.apk
+          path: build-artifacts/SpaceStationCommander.apk
           retention-days: 7
 
       - name: Upload Downloadable AAB Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SpaceStationCommander-AAB
-          path: android/app/build/outputs/bundle/release/SpaceStationCommander.aab
+          path: build-artifacts/SpaceStationCommander.aab
           retention-days: 7
 
