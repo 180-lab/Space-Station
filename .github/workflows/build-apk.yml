@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK & AAB
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   build_apk:
-    name: Build Android App (APK)
+    name: Build Android App (APK & AAB)
     runs-on: ubuntu-latest
 
     steps:
@@ -56,9 +56,19 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace --no-daemon
 
-      - name: Rename APK for Release
+      - name: Build Android AAB with Gradle
         run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease --stacktrace --no-daemon
+
+      - name: Rename Artifacts for Release
+        run: |
+          # Rename the debug APK
           mv android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/SpaceStationCommander.apk
+          
+          # Find and copy the built AAB (could be signed or unsigned)
+          cp android/app/build/outputs/bundle/release/app-release*.aab android/app/build/outputs/bundle/release/SpaceStationCommander.aab
 
       - name: Upload Downloadable APK Artifact
         uses: actions/upload-artifact@v4
@@ -66,3 +76,11 @@ jobs:
           name: SpaceStationCommander-APK
           path: android/app/build/outputs/apk/debug/SpaceStationCommander.apk
           retention-days: 7
+
+      - name: Upload Downloadable AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpaceStationCommander-AAB
+          path: android/app/build/outputs/bundle/release/SpaceStationCommander.aab
+          retention-days: 7
+
