@@ -1714,18 +1714,23 @@ export default function App() {
       showToast('Opening Google Account Picker...', 'info');
       
       try {
+        const activeClientId = googleClientId || '40626426948-e8t8qvnf9voo96ceud23kkn5pgufvfm9.apps.googleusercontent.com';
+        console.log('Initializing GoogleAuth with Client ID:', activeClientId);
         GoogleAuth.initialize({
-          clientId: googleClientId || '592965643440-qf9d3vj67gksisdt9nd0m892l49n44b6.apps.googleusercontent.com',
+          clientId: activeClientId,
           scopes: ['profile', 'email'],
           grantOfflineAccess: true,
         });
       } catch (initErr) {
-        console.warn('GoogleAuth init warning:', initErr);
+        console.warn('GoogleAuth init warning (this is normal if already initialized):', initErr);
       }
 
+      console.log('Triggering GoogleAuth.signIn()...');
       const googleUser: any = await GoogleAuth.signIn();
+      console.log('GoogleAuth.signIn() successful, returned user data:', JSON.stringify(googleUser));
+      
       if (!googleUser) {
-        showToast('Google Sign-In was cancelled or failed.', 'error');
+        showToast('Google Sign-In was cancelled or failed (No user returned).', 'error');
         return;
       }
 
@@ -1733,8 +1738,10 @@ export default function App() {
       const email = googleUser.email;
       const username = googleUser.displayName || googleUser.givenName || (email ? email.split('@')[0] : '');
 
+      console.log(`Extracted identity - Email: ${email}, ID Token present: ${!!idToken}`);
+
       if (!idToken && !email) {
-        showToast('Failed to retrieve credentials from Google account.', 'error');
+        showToast('Failed to retrieve credentials from Google account (Missing token & email).', 'error');
         return;
       }
 
@@ -1778,14 +1785,22 @@ export default function App() {
           setShowInitialStationNaming(true);
         }
       } else {
-        showToast(data.error || 'Identity keys verification rejected.', 'error');
+        showToast(data.error || 'Identity keys verification rejected by server.', 'error');
       }
     } catch (err: any) {
-      console.error('Native Google Sign-In Error:', err);
+      console.error('Native Google Sign-In Exception:', err);
+      let errorMsg = '';
+      try {
+        errorMsg = typeof err === 'object' ? JSON.stringify(err) : String(err);
+      } catch (e) {
+        errorMsg = String(err);
+      }
+      
+      // If the error contains cancellation codes
       if (err.message && (err.message.includes('cancel') || err.message.includes('12501') || err.message.includes('picker'))) {
         showToast('Google Sign-In cancelled.', 'info');
       } else {
-        showToast(`Google Sign-In failed: ${err.message || err}`, 'error');
+        showToast(`Google Sign-In exception: ${err.message || errorMsg}`, 'error');
       }
     }
   };

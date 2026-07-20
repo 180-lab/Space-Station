@@ -296,7 +296,7 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
 
     setConfirmModal({
       title: 'CONFIRM QUEUE DE-AUTHORIZATION',
-      message: `Are you sure you want to de-authorize and cancel the queued upgrade for ${bName} to level ${q.targetLevel}? You will receive a refund of 100% of the resource costs and ${costRefund} Space Gold (60% refund).`,
+      message: `Are you sure you want to de-authorize and cancel the queued upgrade for ${bName} to level ${q.targetLevel}? You will receive a refund of 100% of the resource costs and ${costRefund} Space Gold.`,
       onConfirm: async () => {
         setIsTransmitting(true);
         try {
