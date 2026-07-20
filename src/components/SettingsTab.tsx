@@ -14,7 +14,6 @@ import {
   CheckCircle,
   HelpCircle,
   Search,
-  Laptop,
   User,
   Home,
   Check,
@@ -1404,6 +1403,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
             </div>
           )}
+
+
 
               {/* Account and maintenance action cards */}
               <div className="pt-4 border-t border-[#1E293B]/60 space-y-3.5">

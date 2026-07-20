@@ -86,6 +86,10 @@ try {
     const originalFetch = window.fetch;
     const customFetch = function (input: RequestInfo | URL, init?: RequestInit) {
       let targetInput = input;
+      let controller: AbortController | null = null;
+      let timeoutId: any = null;
+      let finalInit = init;
+
       if (typeof targetInput === 'string' && targetInput.startsWith('/api')) {
         const defaultBackend = isCapacitor
           ? (import.meta.env.VITE_API_BASE_URL || 'http://102.133.160.133:3000')
@@ -107,8 +111,39 @@ try {
         const prefixMatch = (!backendUrl && typeof window !== 'undefined') ? window.location.pathname.match(/^\/(\d+)(?:\/|$)/) : null;
         const prefix = prefixMatch ? `/${prefixMatch[1]}` : '';
         targetInput = `${cleanBase}${prefix}${targetInput}`;
+
+        // On native app platforms (Capacitor), add a connection timeout safety layer
+        if (isCapacitor) {
+          controller = new AbortController();
+          finalInit = {
+            ...(init || {}),
+            signal: controller.signal
+          };
+          timeoutId = setTimeout(() => {
+            if (controller) {
+              controller.abort();
+            }
+          }, 15000); // 15-second connection timeout
+        }
       }
-      return originalFetch(targetInput, init);
+
+      const p = originalFetch(targetInput, finalInit);
+      if (timeoutId) {
+        return p.then(
+          (res) => {
+            clearTimeout(timeoutId);
+            return res;
+          },
+          (err) => {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') {
+              throw new Error('Quantum signal timed out!');
+            }
+            throw err;
+          }
+        );
+      }
+      return p;
     };
 
     if (!desc || desc.configurable) {

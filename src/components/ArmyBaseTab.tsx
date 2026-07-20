@@ -37,7 +37,8 @@ import {
   Rocket,
   ChevronDown,
   ChevronUp,
-  Upload
+  Upload,
+  Compass
 } from 'lucide-react';
 
 interface ArmyBaseTabProps {
@@ -76,6 +77,7 @@ interface ArmyBaseTabProps {
   maxCoord?: number;
   onUpgradeBuilding?: (buildingKey: string) => void;
   layoutMode?: 'classic' | 'datasaving';
+  onReturnToBase?: () => void;
 }
 
 const TROOP_DETAILS = {
@@ -183,7 +185,8 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
   onRerouteFleet,
   maxCoord = 100,
   onUpgradeBuilding,
-  layoutMode = 'classic'
+  layoutMode = 'classic',
+  onReturnToBase
 }) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({
     defender: 0,
@@ -2950,6 +2953,18 @@ export const ArmyBaseTab: React.FC<ArmyBaseTabProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {onReturnToBase && (
+        <button
+          type="button"
+          onClick={onReturnToBase}
+          className="fixed right-6 sm:right-8 bottom-20 z-50 flex items-center justify-center gap-2.5 px-5 py-4 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_20px_rgba(6,182,212,0.6)] transition duration-150 active:scale-95 group cursor-pointer animate-bounce"
+          title="Back to Station Base"
+        >
+          <Compass size={18} className="animate-spin-slow group-hover:rotate-45 transition-transform" />
+          <span className="text-xs uppercase tracking-widest font-black inline font-mono">RETURN TO BASE</span>
+        </button>
       )}
 
     </div>

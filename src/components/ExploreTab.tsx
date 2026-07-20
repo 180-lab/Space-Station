@@ -282,6 +282,52 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
     }
   };
 
+  const cancelQueueItem = async (index: number) => {
+    if (isTransmitting) return;
+    const q = (activePlanet.upgradeQueue || [])[index];
+    if (!q) return;
+
+    const goldCost = q.spaceGoldCost !== undefined ? q.spaceGoldCost : 15;
+    const costRefund = Math.round(goldCost * 0.6);
+
+    const bName = q.type === 'mine'
+      ? `${q.key.toUpperCase()} Extractor #${q.mineIndex! + 1}`
+      : q.key.toUpperCase();
+
+    setConfirmModal({
+      title: 'CONFIRM QUEUE DE-AUTHORIZATION',
+      message: `Are you sure you want to de-authorize and cancel the queued upgrade for ${bName} to level ${q.targetLevel}? You will receive a refund of 100% of the resource costs and ${costRefund} Space Gold (60% refund).`,
+      onConfirm: async () => {
+        setIsTransmitting(true);
+        try {
+          const res = await fetch('/api/upgrade/queue/cancel', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': player.id
+            },
+            body: JSON.stringify({
+              planetId: activePlanet.id,
+              queueIndex: index,
+              queueType: 'upgrade'
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            showToast?.(data.error || 'Failed to cancel queued item.', 'error');
+            return;
+          }
+          showToast?.(`Queued upgrade cancelled. Resources and ${costRefund} Space Gold refunded!`, 'success');
+          onRefreshState?.();
+        } catch {
+          showToast?.('Connection error cancelling upgrade.', 'error');
+        } finally {
+          setIsTransmitting(false);
+        }
+      }
+    });
+  };
+
   // Check if any upgrade is active right now on this planet
   const isAnyUpgradeInProgress = 
     Object.values(activePlanet.buildings).some((b: any) => b.isUpgrading) ||
@@ -715,9 +761,18 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                     ? `${q.key.toUpperCase()} Pump #${(q.mineIndex || 0) + 1}`
                     : q.key.toUpperCase();
                   return (
-                    <div key={`queue-ds-${index}`} className="flex items-center justify-between bg-slate-900/30 p-1.5 px-2.5 border border-slate-800 rounded-lg">
+                    <div key={`queue-ds-${index}`} className="flex items-center justify-between bg-slate-900/30 p-1.5 px-2.5 border border-slate-800 rounded-lg font-mono">
                       <span className="text-slate-400">#{index + 1} QUEUED: {bName} &rarr; Lv. {q.targetLevel}</span>
-                      <span className="text-slate-500">⏳ {q.targetLevel * (q.type === 'building' ? 2 : 1)}m</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-500">⏳ {q.targetLevel * (q.type === 'building' ? 2 : 1)}m</span>
+                        <button
+                          type="button"
+                          onClick={() => cancelQueueItem(index)}
+                          className="px-1.5 py-0.5 text-[8.5px] font-bold text-red-450 hover:text-red-300 border border-red-500/10 hover:border-red-500/30 bg-red-950/10 rounded cursor-pointer transition font-mono uppercase"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -2272,7 +2327,13 @@ export const ExploreTab: React.FC<ExploreTabProps> = ({
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-slate-400 font-bold font-mono">⏳ {durationMins}m</span>
-                          <span className="text-[9px] text-slate-500 border border-slate-800 px-1.5 py-0.5 rounded uppercase">Pending</span>
+                          <button
+                            type="button"
+                            onClick={() => cancelQueueItem(index)}
+                            className="px-2 py-1 text-[9.5px] font-bold text-red-400 hover:text-red-300 border border-red-500/10 hover:border-red-500/30 bg-red-950/10 rounded cursor-pointer transition font-mono uppercase"
+                          >
+                            Cancel
+                          </button>
                         </div>
                       </div>
                     );

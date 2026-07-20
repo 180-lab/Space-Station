@@ -3885,6 +3885,7 @@ export default function App() {
             onRerouteFleet={handleRerouteFleet}
             maxCoord={maxCoord}
             layoutMode={layoutMode}
+            onReturnToBase={() => setActiveTab('explore')}
           />
         )}
 

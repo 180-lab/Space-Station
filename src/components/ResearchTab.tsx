@@ -382,32 +382,44 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
 
   const cancelQueueItem = async (index: number) => {
     if (isResearching || isUpgrading) return;
-    setIsResearching(true);
-    try {
-      const res = await fetch('/api/upgrade/queue/cancel', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': player.id
-        },
-        body: JSON.stringify({
-          planetId: activePlanet.id,
-          queueIndex: index,
-          queueType: 'research'
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.error || 'Failed to cancel queued item.', 'error');
-        return;
+    const q = activePlanet.researchQueue?.[index];
+    if (!q) return;
+
+    const goldCost = q.spaceGoldCost !== undefined ? q.spaceGoldCost : 25;
+    const costRefund = Math.round(goldCost * 0.6);
+
+    setConfirmModal({
+      title: 'CONFIRM QUEUE DE-AUTHORIZATION',
+      message: `Are you sure you want to de-authorize and cancel the queued upgrade for ${q.key.replace(/_/g, ' ').toUpperCase()} to level ${q.targetLevel}? You will receive a refund of 100% of the resource costs and ${costRefund} Space Gold (60% refund).`,
+      onConfirm: async () => {
+        setIsResearching(true);
+        try {
+          const res = await fetch('/api/upgrade/queue/cancel', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': player.id
+            },
+            body: JSON.stringify({
+              planetId: activePlanet.id,
+              queueIndex: index,
+              queueType: 'research'
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            showToast(data.error || 'Failed to cancel queued item.', 'error');
+            return;
+          }
+          showToast(`Queued project cancelled. Resources and ${costRefund} Space Gold refunded!`, 'success');
+          if (onRefreshState) onRefreshState();
+        } catch {
+          showToast('Connection error cancelling project.', 'error');
+        } finally {
+          setIsResearching(false);
+        }
       }
-      showToast('Queued project cancelled. Resources and 60% Space Gold refunded!', 'success');
-      if (onRefreshState) onRefreshState();
-    } catch {
-      showToast('Connection error cancelling project.', 'error');
-    } finally {
-      setIsResearching(false);
-    }
+    });
   };
 
   const handleCompleteBuildingUpgrade = async () => {
