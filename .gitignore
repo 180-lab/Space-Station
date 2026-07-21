@@ -1,6 +1,7 @@
 node_modules/
 build/
-# dist/
+dist/
+galaxy_state.json
 coverage/
 .DS_Store
 *.log
