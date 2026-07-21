@@ -57,6 +57,10 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     return localStorage.getItem(`moonbase_tutorial_permanently_closed_${player.id}`) === 'true';
   });
 
+  const [currentTaskIndex, setCurrentTaskIndex] = useState<number | null>(null);
+
+  const isAdmin = (player.googleEmail && (player.googleEmail.toLowerCase() === 'banele180@gmail.com' || player.googleEmail.toLowerCase() === 'banzz1918@gmail.com')) || player.username?.toLowerCase() === 'admin';
+
   const handleCloseWelcome = () => {
     localStorage.setItem(`moonbase_welcome_closed_${player.id}`, 'true');
     setIsWelcomeClosed(true);
@@ -690,15 +694,22 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
   // Find the user's current ACTIVE tutorial task (first incomplete task)
   const activeTask = tasks.find((t) => !completedList.includes(t.id));
 
-  const maxResourceReward = activeTask 
-    ? Math.max(...Object.values(activeTask.rewards.resources).map((v) => v || 0)) 
+  // Find the index of the active task
+  const activeTaskIndex = activeTask ? tasks.indexOf(activeTask) : tasks.length - 1;
+
+  // Resolved current task index (use state if set, else activeTaskIndex)
+  const resolvedIndex = currentTaskIndex !== null ? currentTaskIndex : (activeTaskIndex >= 0 ? activeTaskIndex : 0);
+  const displayedTask = tasks[resolvedIndex];
+
+  const maxResourceReward = displayedTask 
+    ? Math.max(...Object.values(displayedTask.rewards.resources).map((v) => v || 0)) 
     : 0;
-  const hasSiloStorageIssue = activeTask 
+  const hasSiloStorageIssue = displayedTask 
     ? siloCapacity < maxResourceReward 
     : false;
 
-  // If all claims finished, proudly show completed state
-  if (!activeTask) {
+  // If all claims finished, proudly show completed state (unless admin is viewing/reviewing a task)
+  if (!activeTask && (!isAdmin || currentTaskIndex === null)) {
     return (
       <div className="bg-gradient-to-r from-emerald-950/40 to-cyan-950/30 border border-emerald-500/30 rounded-xl p-5 text-center font-mono text-slate-200 shadow-lg relative overflow-hidden transition-all duration-300 mb-6">
         <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none animate-pulse" />
@@ -723,6 +734,15 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
               >
                 Open Settings & Feedback ⚡
               </button>
+              {isAdmin && (
+                <button 
+                  type="button"
+                  onClick={() => setCurrentTaskIndex(0)}
+                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-extrabold uppercase text-[10px] tracking-widest rounded-lg cursor-pointer transition duration-150 block mx-auto hover:shadow-[0_0_15px_rgba(245,158,11,0.4)] border-0"
+                >
+                  🔍 Admin: Review/Scroll Tasks 🛠️
+                </button>
+              )}
               <button 
                 type="button"
                 onClick={handlePermanentClose}
@@ -737,7 +757,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
     );
   }
 
-  const isMet = checkObjectiveMet(activeTask);
+  const isMet = displayedTask ? checkObjectiveMet(displayedTask) : false;
 
   const handleClaimReward = async (taskId: number) => {
     setClaimingId(taskId);
@@ -814,9 +834,42 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
               STATION ROADMAP & CAMPAIGN
             </span>
             <h2 className="text-xs font-bold text-slate-150 uppercase tracking-tight flex items-center gap-1.5 leading-none mt-0.5">
-              Commander Academy: Task {activeTask.id}
+              Commander Academy: Task {displayedTask.id}
+              {activeTask && displayedTask.id !== activeTask.id && (
+                <span className="text-[9px] text-amber-400 font-extrabold animate-pulse">(PREVIEW)</span>
+              )}
             </h2>
           </div>
+
+          {/* Quick Header Nav Buttons for Admin */}
+          {isAdmin && (
+            <div className="flex items-center gap-1.5 ml-2 shrink-0">
+              <button
+                type="button"
+                disabled={resolvedIndex === 0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentTaskIndex(resolvedIndex - 1);
+                }}
+                className="px-2 py-0.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 text-amber-400 text-[10px] font-bold rounded border border-amber-500/20 cursor-pointer transition"
+                title="Previous Task"
+              >
+                ◀
+              </button>
+              <button
+                type="button"
+                disabled={resolvedIndex === tasks.length - 1}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentTaskIndex(resolvedIndex + 1);
+                }}
+                className="px-2 py-0.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 text-amber-400 text-[10px] font-bold rounded border border-amber-500/20 cursor-pointer transition"
+                title="Next Task"
+              >
+                ▶
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ProgressBar */}
@@ -859,8 +912,59 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
               {/* Task Detail and Instructions */}
               <div className="flex-1 text-left space-y-3">
                 
+                {/* Admin Navigation Controls inside expanded panel */}
+                {isAdmin && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-slate-900/90 border border-amber-500/30 mb-4 shadow-inner">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-amber-400 font-mono flex items-center gap-1">🛠️ ADMIN HIGH-COMMAND CONTROLS</span>
+                      <span className="text-[10px] text-slate-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-[#1E293B]/60">
+                        Viewing Task {displayedTask.id} / {tasks.length}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={resolvedIndex === 0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentTaskIndex(resolvedIndex - 1);
+                        }}
+                        className="px-3 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-slate-800 text-amber-300 text-[10px] font-bold rounded-lg border border-amber-500/20 cursor-pointer transition flex items-center gap-1"
+                      >
+                        ◀ Previous
+                      </button>
+                      
+                      {currentTaskIndex !== null && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCurrentTaskIndex(null);
+                          }}
+                          className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[9px] font-bold rounded border border-amber-500/30 cursor-pointer transition"
+                          title="Reset to your current actual active task"
+                        >
+                          Reset
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={resolvedIndex === tasks.length - 1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentTaskIndex(resolvedIndex + 1);
+                        }}
+                        className="px-3 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-slate-800 text-amber-300 text-[10px] font-bold rounded-lg border border-amber-500/20 cursor-pointer transition flex items-center gap-1"
+                      >
+                        Next ▶
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Optional Welcome Banner overlaying Task 1 */}
-                {activeTask.id === 1 && !isWelcomeClosed && (
+                {displayedTask.id === 1 && !isWelcomeClosed && (
                   <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-cyan-950/70 to-indigo-950/50 border border-cyan-500/30 text-left relative pr-10">
                     <button
                       type="button"
@@ -884,30 +988,32 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                      <span className="text-sm">{isMet ? '✓' : '●'}</span>
                   </div>
                   <div>
-                    <span className="text-[9px] uppercase font-bold text-amber-400 block tracking-wider">ACTIVE MISSION STATUS:</span>
+                    <span className="text-[9px] uppercase font-bold text-amber-400 block tracking-wider">
+                      {activeTask && displayedTask.id === activeTask.id ? 'ACTIVE MISSION STATUS:' : 'ROADMAP TASK ARCHIVE / PREVIEW:'}
+                    </span>
                     <h3 className="text-sm font-bold text-slate-200">
-                      {activeTask.title}
+                      {displayedTask.title}
                     </h3>
-                    {activeTask.id > 1 && activeTask.id < 30 && (
-                      <div className="my-1.5 px-2.5 py-1 text-[10px] bg-sky-500/15 text-sky-300 border border-sky-500/20 rounded-lg inline-flex items-center gap-1.5 font-bold uppercase tracking-wider animate-pulse">
+                    {displayedTask.id > 1 && displayedTask.id < 30 && (
+                      <div className="my-1.5 px-2.5 py-1 text-[10px] bg-sky-500/15 text-sky-300 border border-sky-500/20 rounded-lg inline-flex items-center gap-1.5 font-bold uppercase tracking-wider">
                         <span>📡 TARGET STATION: LATEST COLONY ({checkTargetPlanet.name})</span>
                       </div>
                     )}
                     <p className="text-xs text-slate-400 leading-relaxed mt-1">
-                      {activeTask.shortDesc}
+                      {displayedTask.shortDesc}
                     </p>
                   </div>
                 </div>
 
                 {/* Requirement Met Banner */}
                 {isMet ? (
-                  <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-950/60 to-emerald-900/10 border border-emerald-500/40 text-left space-y-1 animate-pulse">
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-950/60 to-emerald-900/10 border border-emerald-500/40 text-left space-y-1">
                     <span className="text-xs font-black text-emerald-400 uppercase tracking-widest block">🌟 TASK TARGET MET SUCCESSFULLY!</span>
                     <p className="text-xs text-slate-100 leading-relaxed font-sans font-bold">
-                      {activeTask.congratsMessage}
+                      {displayedTask.congratsMessage}
                     </p>
                     <p className="text-xs text-slate-350 italic text-[#a3f7bf]/80 mt-1">
-                      "{activeTask.encouragementQuote}"
+                      "{displayedTask.encouragementQuote}"
                     </p>
                   </div>
                 ) : (
@@ -916,13 +1022,13 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                       <span className="text-[10.5px] font-black tracking-wider text-amber-400 block mb-1 uppercase bg-amber-400/10 px-2.5 py-0.5 rounded border border-amber-400/20 w-fit">
                         🚨 OBJECTIVE REQUIREMENT:
                       </span>
-                      <span className="font-bold text-white text-xs leading-relaxed" dangerouslySetInnerHTML={{ __html: activeTask.requirementHtml }} />
+                      <span className="font-bold text-white text-xs leading-relaxed" dangerouslySetInnerHTML={{ __html: displayedTask.requirementHtml }} />
                     </div>
                     <div className="p-2.5 rounded-lg bg-pink-500/5 border border-pink-500/25">
                       <span className="text-[10.5px] font-black tracking-wider text-pink-400 block mb-1 uppercase bg-pink-400/10 px-2.5 py-0.5 rounded border border-pink-400/20 w-fit">
                         💡 HINT GUIDE:
                       </span>
-                      <p className="font-semibold text-slate-200 text-xs leading-relaxed">{activeTask.hint}</p>
+                      <p className="font-semibold text-slate-200 text-xs leading-relaxed">{displayedTask.hint}</p>
                     </div>
                   </div>
                 )}
@@ -932,10 +1038,10 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                   <div className="flex flex-wrap items-center gap-2.5">
                     <button
                       type="button"
-                      onClick={() => setActiveTab(activeTask.targetTab)}
+                      onClick={() => setActiveTab(displayedTask.targetTab)}
                       className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-950/90 to-cyan-900/80 hover:brightness-110 text-cyan-300 hover:text-white border border-cyan-500/40 rounded-lg text-[10px] font-bold tracking-wider uppercase transition cursor-pointer flex items-center gap-1.5"
                     >
-                      🚀 NAVIGATE TO {activeTask.targetTab === 'explore' ? 'HOME' : activeTask.targetTab === 'army' ? 'CMD' : activeTask.targetTab === 'galaxy' ? 'GLXY' : activeTask.targetTab === 'research' ? 'Res' : 'SETTINGS'}
+                      🚀 NAVIGATE TO {displayedTask.targetTab === 'explore' ? 'HOME' : displayedTask.targetTab === 'army' ? 'CMD' : displayedTask.targetTab === 'galaxy' ? 'GLXY' : displayedTask.targetTab === 'research' ? 'Res' : 'SETTINGS'}
                     </button>
                     <button
                       type="button"
@@ -957,7 +1063,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                       >
                         <div className="pt-2.5 border-t border-slate-800 text-[11px] text-slate-350 space-y-1.5 leading-relaxed text-left">
                           <span className="text-[9px] uppercase font-bold text-sky-400 block tracking-wider">Step-by-Step Instructions:</span>
-                          <p dangerouslySetInnerHTML={{ __html: activeTask.howToGetThere }} />
+                          <p dangerouslySetInnerHTML={{ __html: displayedTask.howToGetThere }} />
                         </div>
                       </motion.div>
                     )}
@@ -967,7 +1073,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                 {/* Commander TIP Area stating exact coordinates / how to locate */}
                 <div className="p-3 rounded-lg bg-[#060813]/60 border border-slate-800/60 text-[10px] leading-relaxed">
                   <span className="text-[9px] uppercase font-bold text-amber-500/90 block mb-0.5 tracking-wide">COMMANDER TIP / LOCATION:</span>
-                  <p className="text-slate-400">{activeTask.commanderTip}</p>
+                  <p className="text-slate-400">{displayedTask.commanderTip}</p>
                 </div>
 
               </div>
@@ -981,7 +1087,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                   
                   {/* Resource listing chips */}
                   <div className="flex flex-col gap-1.5">
-                    {Object.entries(activeTask.rewards.resources).map(([res, amount]) => (
+                    {Object.entries(displayedTask.rewards.resources).map(([res, amount]) => (
                       <div key={res} className="flex justify-between items-center text-[10px] px-2 py-1 rounded bg-[#090D1A] border border-white/[0.02]">
                         <span className="text-slate-400">{getRewardLabel(res as ResourceType)}</span>
                         <span className="font-bold text-cyan-400">+{amount.toLocaleString()}</span>
@@ -989,7 +1095,7 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                     ))}
                     <div className="flex justify-between items-center text-[10px] px-2 py-1 rounded bg-[#090D1A] border border-[#06b6d4]/10">
                       <span className="text-amber-400">🪙 Space Gold</span>
-                      <span className="font-black text-amber-400">+{activeTask.rewards.credits.toLocaleString()}</span>
+                      <span className="font-black text-amber-400">+{displayedTask.rewards.credits.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
@@ -1014,20 +1120,30 @@ export const CommanderTutorial: React.FC<CommanderTutorialProps> = ({
                   </div>
                 )}
 
-                {/* Claim Button */}
+                {/* Claim Button / Status */}
                 <div className="mt-4 pt-3 border-t border-[#1E293B]/60">
-                  {isMet ? (
-                    <button
-                      type="button"
-                      disabled={claimingId !== null}
-                      onClick={() => handleClaimReward(activeTask.id)}
-                      className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 active:scale-98 text-slate-900 font-extrabold rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.3)] border-0"
-                    >
-                      {claimingId ? 'CLAIMING CRATES...' : '🎁 CLAIM ACADEMY REWARD'}
-                    </button>
+                  {completedList.includes(displayedTask.id) ? (
+                    <div className="w-full py-2 text-center rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-[10px] text-emerald-400 font-black uppercase tracking-widest">
+                      ✓ TASK COMPLETED (REWARD CLAIMED)
+                    </div>
+                  ) : activeTask && displayedTask.id === activeTask.id ? (
+                    isMet ? (
+                      <button
+                        type="button"
+                        disabled={claimingId !== null}
+                        onClick={() => handleClaimReward(displayedTask.id)}
+                        className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 active:scale-98 text-slate-900 font-extrabold rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.3)] border-0"
+                      >
+                        {claimingId ? 'CLAIMING CRATES...' : '🎁 CLAIM ACADEMY REWARD'}
+                      </button>
+                    ) : (
+                      <div className="w-full py-2 text-center rounded-lg bg-slate-900 border border-[#1E293B] text-[10px] text-slate-400 uppercase tracking-widest font-bold animate-pulse">
+                        ● UNDERWAY (INCOMPLETE)
+                      </div>
+                    )
                   ) : (
-                    <div className="w-full py-2 text-center rounded-lg bg-slate-900 border border-[#1E293B] text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-                      ● UNDERWAY
+                    <div className="w-full py-2 text-center rounded-lg bg-slate-950 border border-amber-500/30 text-[10px] text-amber-500 uppercase tracking-widest font-bold">
+                      ● ADMIN PREVIEW MODE
                     </div>
                   )}
                 </div>
