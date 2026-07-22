@@ -7,3 +7,5 @@ coverage/
 *.log
 .env*
 !.env.example
+android/upload-keystore.jks
+android/keystore.properties
