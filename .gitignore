@@ -5,6 +5,10 @@ galaxy_state.json
 coverage/
 .DS_Store
 *.log
+*.pipe
+tsx-*
+node-compile-cache/
+*.hm
 .env*
 !.env.example
 android/upload-keystore.jks

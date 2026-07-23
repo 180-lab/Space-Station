@@ -15,18 +15,20 @@ setInterval(() => {
 
 let isRedisHealthy = false;
 
-// Hardcoded Cloud Redis credentials configured permanently
-// Disabling offline queue and configuring a fast connection timeout to avoid hanging the API server
+const redisHost = process.env.REDIS_HOST || 'note-believe-rosegold-84519.db.redis.io';
+const redisPort = parseInt(process.env.REDIS_PORT || '14372', 10);
+const redisPassword = process.env.REDIS_PASSWORD;
+
+// Cloud Redis credentials configuration with fail-fast timeouts and in-memory fallback
 export const redis = new Redis({
-  host: 'note-believe-rosegold-84519.db.redis.io',
-  port: 14372,
-  password: 'i73aF6P0isDnIWJTBq4X9Rw1oANUV9Ie',
+  host: redisHost,
+  port: redisPort,
+  password: redisPassword || 'i73aF6P0isDnIWJTBq4X9Rw1oANUV9Ie',
   lazyConnect: true, // Non-blocking lazy connection
   maxRetriesPerRequest: 1, // Fail fast on requests if connection drops
   connectTimeout: 1500, // Timeout connection after 1.5 seconds
   enableOfflineQueue: false, // DO NOT queue commands when connection is down - fail fast
   retryStrategy(times) {
-    // Limit retries to avoid endless connection attempts and log spam if Redis is permanently down in this environment
     if (times > 3) {
       return null; // Stop retrying
     }
