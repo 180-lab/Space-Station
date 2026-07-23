@@ -111,16 +111,29 @@ jobs:
           echo ""
           echo "First 5 lines of gradlew:"
           head -5 gradlew
-      - name: Build Android App with Gradle
-        env:
-          RELEASE_STORE_FILE: space-station-release.jks
-          RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - name: Verify Gradle Wrapper
         run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease bundleRelease --stacktrace --no-daemon
+         cd android
+
+         echo "===== Android directory ====="
+         ls -lah
+
+         echo ""
+         echo "===== Wrapper directory ====="
+         ls -lah gradle/wrapper
+
+         echo ""
+         echo "===== gradlew ====="
+         head -20 gradlew
+
+         echo ""
+         echo "===== Search for GradleWrapperMain ====="
+         jar tf gradle/wrapper/gradle-wrapper.jar | grep GradleWrapperMain || true
+
+         echo ""
+         echo "===== Run Gradle version ====="
+         chmod +x gradlew
+         ./gradlew --version
 
       - name: Save APK and AAB Artifacts
         run: |
