@@ -18,38 +18,28 @@ android {
     }
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
-def jksFile = null
-
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-    if (keystoreProperties['storeFile']) {
-        def f1 = file(keystoreProperties['storeFile'])
-        def f2 = rootProject.file(keystoreProperties['storeFile'])
-        if (f1.exists()) {
-            jksFile = f1
-        } else if (f2.exists()) {
-            jksFile = f2
-        }
-    }
-}
-
-if (jksFile == null && System.getenv("RELEASE_STORE_FILE") != null) {
-    def f1 = file(System.getenv("RELEASE_STORE_FILE"))
-    def f2 = rootProject.file(System.getenv("RELEASE_STORE_FILE"))
-    if (f1.exists() && f1.length() > 0) {
-        jksFile = f1
-    } else if (f2.exists() && f2.length() > 0) {
-        jksFile = f2
-    }
 }
 
 signingConfigs {
     release {
-        if (jksFile != null) {
-            storeFile jksFile
-            storePassword keystoreProperties['storePassword'] ?: System.getenv("RELEASE_STORE_PASSWORD")
-            keyAlias keystoreProperties['keyAlias'] ?: System.getenv("RELEASE_KEY_ALIAS")
-            keyPassword keystoreProperties['keyPassword'] ?: System.getenv("RELEASE_KEY_PASSWORD")
+        def ksPath = keystoreProperties['storeFile'] ?: System.getenv("RELEASE_STORE_FILE")
+        def ksStorePass = keystoreProperties['storePassword'] ?: System.getenv("RELEASE_STORE_PASSWORD")
+        def ksAlias = keystoreProperties['keyAlias'] ?: System.getenv("RELEASE_KEY_ALIAS")
+        def ksKeyPass = keystoreProperties['keyPassword'] ?: System.getenv("RELEASE_KEY_PASSWORD")
+
+        if (ksPath) {
+            def f1 = file(ksPath)
+            def f2 = rootProject.file(ksPath)
+            if (f1.exists() && f1.length() > 0) {
+                storeFile f1
+            } else if (f2.exists() && f2.length() > 0) {
+                storeFile f2
+            }
+            if (ksStorePass) storePassword ksStorePass
+            if (ksAlias) keyAlias ksAlias
+            if (ksKeyPass) keyPassword ksKeyPass
         }
     }
 }
@@ -58,7 +48,11 @@ signingConfigs {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 
-            if (jksFile != null) {
+            if (signingConfigs.release.storeFile != null && 
+                signingConfigs.release.storeFile.exists() && 
+                signingConfigs.release.storePassword != null && 
+                signingConfigs.release.keyAlias != null && 
+                signingConfigs.release.keyPassword != null) {
                 signingConfig signingConfigs.release
             } else {
                 signingConfig signingConfigs.debug

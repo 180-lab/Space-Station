@@ -56,20 +56,25 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > android/app/space-station-release.jks
-            echo "storeFile=app/space-station-release.jks" > android/keystore.properties
-            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD" >> android/keystore.properties
-            echo "keyAlias=$ANDROID_KEY_ALIAS" >> android/keystore.properties
-            echo "keyPassword=$ANDROID_KEY_PASSWORD" >> android/keystore.properties
-            echo "Keystore and signing properties successfully created."
-            ls -lh android/app/space-station-release.jks
+            echo "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > android/app/space-station-release.jks 2>/dev/null || echo "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > android/app/space-station-release.jks 2>/dev/null || true
+            if [ -s android/app/space-station-release.jks ]; then
+              echo "storeFile=space-station-release.jks" > android/keystore.properties
+              echo "storePassword=$ANDROID_KEYSTORE_PASSWORD" >> android/keystore.properties
+              echo "keyAlias=$ANDROID_KEY_ALIAS" >> android/keystore.properties
+              echo "keyPassword=$ANDROID_KEY_PASSWORD" >> android/keystore.properties
+              echo "Keystore successfully created at android/app/space-station-release.jks"
+              ls -lh android/app/space-station-release.jks
+            else
+              echo "Warning: Keystore base64 decoding produced empty file. Removing corrupt keystore."
+              rm -f android/app/space-station-release.jks
+            fi
           else
             echo "No ANDROID_KEYSTORE_BASE64 secret provided. Gradle will produce unsigned/debug-signed release artifacts."
           fi
 
       - name: Build Android App with Gradle
         env:
-          RELEASE_STORE_FILE: app/space-station-release.jks
+          RELEASE_STORE_FILE: space-station-release.jks
           RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -82,8 +87,13 @@ jobs:
         run: |
           mkdir -p build-artifacts
           echo "Searching for generated APK files..."
-          find android/ -name "*.apk"
-          APK_PATH=$(find android/ -name "*.apk" 2>/dev/null | head -n 1)
+          find android/app/build/outputs/ -name "*.apk"
+          
+          APK_PATH=$(find android/app/build/outputs/ -name "*release*.apk" 2>/dev/null | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH=$(find android/app/build/outputs/ -name "*.apk" 2>/dev/null | head -n 1)
+          fi
+
           if [ -n "$APK_PATH" ]; then
             echo "Found APK at $APK_PATH"
             cp "$APK_PATH" build-artifacts/SpaceStationCommander.apk
@@ -92,8 +102,13 @@ jobs:
           fi
 
           echo "Searching for generated AAB files..."
-          find android/ -name "*.aab"
-          AAB_PATH=$(find android/ -name "*.aab" 2>/dev/null | head -n 1)
+          find android/app/build/outputs/ -name "*.aab"
+          
+          AAB_PATH=$(find android/app/build/outputs/ -name "*release*.aab" 2>/dev/null | head -n 1)
+          if [ -z "$AAB_PATH" ]; then
+            AAB_PATH=$(find android/app/build/outputs/ -name "*.aab" 2>/dev/null | head -n 1)
+          fi
+
           if [ -n "$AAB_PATH" ]; then
             echo "Found AAB at $AAB_PATH"
             cp "$AAB_PATH" build-artifacts/SpaceStationCommander.aab
