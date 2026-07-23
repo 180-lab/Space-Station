@@ -72,9 +72,13 @@ jobs:
             echo "No ANDROID_KEYSTORE_BASE64 secret provided. Gradle will produce unsigned/debug-signed release artifacts."
           fi
 
+      - name: Debug Gradle Environment
+        run: |
+          echo "GRADLE_OPTS=$GRADLE_OPTS"
+          env | grep GRADLE || true
+
       - name: Build Android App with Gradle
         env:
-          GRADLE_OPTS: "-Xmx2048m -XX:MaxMetaspaceSize=512m -Dorg.gradle.daemon=false"
           RELEASE_STORE_FILE: space-station-release.jks
           RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -82,7 +86,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease bundleRelease --stacktrace
+          ./gradlew assembleRelease bundleRelease --stacktrace --no-daemon
 
       - name: Save APK and AAB Artifacts
         run: |
