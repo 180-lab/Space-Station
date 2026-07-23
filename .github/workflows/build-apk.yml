@@ -50,7 +50,18 @@ jobs:
 
       - name: Prepare Signing Config
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/space-station-release.jks
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/space-station-release.jks
+            cat <<EOF > android/keystore.properties
+storeFile=app/space-station-release.jks
+storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+EOF
+            echo "Keystore and signing properties successfully created."
+          else
+            echo "No ANDROID_KEYSTORE_BASE64 secret provided. Gradle will produce unsigned release artifacts."
+          fi
 
       - name: Build Android App with Gradle
         env:
@@ -67,18 +78,18 @@ jobs:
         run: |
           mkdir -p build-artifacts
           # Save APK
-          if [ -f "android/app/build/outputs/apk/release/app-release.apk" ]; then
-            cp android/app/build/outputs/apk/release/app-release.apk build-artifacts/SpaceStationCommander.apk
-          elif [ -f "android/app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
-            cp android/app/build/outputs/apk/release/app-release-unsigned.apk build-artifacts/SpaceStationCommander.apk
+          APK_PATH=$(find android/app/build/outputs/apk/ -name "*.apk" 2>/dev/null | head -n 1)
+          if [ -n "$APK_PATH" ]; then
+            echo "Found APK at $APK_PATH"
+            cp "$APK_PATH" build-artifacts/SpaceStationCommander.apk
           else
             echo "Error: Release APK not found!" && exit 1
           fi
           # Save AAB
-          if [ -f "android/app/build/outputs/bundle/release/app-release.aab" ]; then
-            cp android/app/build/outputs/bundle/release/app-release.aab build-artifacts/SpaceStationCommander.aab
-          elif [ -f "android/app/build/outputs/bundle/release/app-release-unsigned.aab" ]; then
-            cp android/app/build/outputs/bundle/release/app-release-unsigned.aab build-artifacts/SpaceStationCommander.aab
+          AAB_PATH=$(find android/app/build/outputs/bundle/ -name "*.aab" 2>/dev/null | head -n 1)
+          if [ -n "$AAB_PATH" ]; then
+            echo "Found AAB at $AAB_PATH"
+            cp "$AAB_PATH" build-artifacts/SpaceStationCommander.aab
           else
             echo "Error: Release AAB not found!" && exit 1
           fi

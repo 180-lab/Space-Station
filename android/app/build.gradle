@@ -18,17 +18,37 @@ android {
     }
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
+boolean hasSigning = false
 
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    if (keystoreProperties['storeFile'] && file(keystoreProperties['storeFile']).exists()) {
+        hasSigning = true
+    }
+}
+
+if (!hasSigning && System.getenv("RELEASE_STORE_FILE") != null) {
+    def envStoreFile = file(System.getenv("RELEASE_STORE_FILE"))
+    if (envStoreFile.exists() && envStoreFile.length() > 0) {
+        hasSigning = true
+    }
 }
 
 signingConfigs {
     release {
-        storeFile file(keystoreProperties['storeFile'])
-        storePassword keystoreProperties['storePassword']
-        keyAlias keystoreProperties['keyAlias']
-        keyPassword keystoreProperties['keyPassword']
+        if (hasSigning) {
+            if (keystorePropertiesFile.exists() && keystoreProperties['storeFile']) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            } else {
+                storeFile file(System.getenv("RELEASE_STORE_FILE"))
+                storePassword System.getenv("RELEASE_STORE_PASSWORD")
+                keyAlias System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword System.getenv("RELEASE_KEY_PASSWORD")
+            }
+        }
     }
 }
     buildTypes {
@@ -36,7 +56,9 @@ signingConfigs {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 
-            signingConfig signingConfigs.release
+            if (hasSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
     lint {
