@@ -76,6 +76,26 @@ jobs:
         run: |
           echo "GRADLE_OPTS=$GRADLE_OPTS"
           env | grep GRADLE || true
+          - name: Debug Gradle Wrapper
+            run: |
+              cd android
+              echo "Current directory:"
+              pwd
+              
+              echo "Android folder:"
+              ls -la
+
+              echo "Wrapper folder:"
+              ls -la gradle/wrapper
+
+             echo "gradlew size:"
+             wc -c gradlew
+
+             echo "gradle-wrapper.jar size:"
+             wc -c gradle/wrapper/gradle-wrapper.jar
+
+             echo "First 5 lines of gradlew:"
+             head -5 gradlew
 
       - name: Build Android App with Gradle
         env:
