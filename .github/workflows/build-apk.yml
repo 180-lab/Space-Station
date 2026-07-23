@@ -74,7 +74,7 @@ jobs:
 
       - name: Build Android App with Gradle
         env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx2048m -XX:MaxMetaspaceSize=512m' -Dorg.gradle.daemon=false"
+          GRADLE_OPTS: "-Xmx2048m -XX:MaxMetaspaceSize=512m -Dorg.gradle.daemon=false"
           RELEASE_STORE_FILE: space-station-release.jks
           RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
