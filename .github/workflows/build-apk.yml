@@ -77,7 +77,7 @@ jobs:
           echo "GRADLE_OPTS=$GRADLE_OPTS"
           env | grep GRADLE || true
           
-            - name: Debug Gradle Wrapper
+      - name: Debug Gradle Wrapper
         run: |
           cd android
 
