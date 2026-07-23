@@ -52,12 +52,10 @@ jobs:
         run: |
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/space-station-release.jks
-            cat <<EOF > android/keystore.properties
-storeFile=app/space-station-release.jks
-storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-EOF
+            echo "storeFile=app/space-station-release.jks" > android/keystore.properties
+            echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> android/keystore.properties
+            echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/keystore.properties
+            echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/keystore.properties
             echo "Keystore and signing properties successfully created."
           else
             echo "No ANDROID_KEYSTORE_BASE64 secret provided. Gradle will produce unsigned release artifacts."
