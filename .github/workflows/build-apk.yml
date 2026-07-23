@@ -49,16 +49,22 @@ jobs:
           npx cap sync android
 
       - name: Prepare Signing Config
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/space-station-release.jks
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > android/app/space-station-release.jks
             echo "storeFile=app/space-station-release.jks" > android/keystore.properties
-            echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> android/keystore.properties
-            echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/keystore.properties
-            echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/keystore.properties
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD" >> android/keystore.properties
+            echo "keyAlias=$ANDROID_KEY_ALIAS" >> android/keystore.properties
+            echo "keyPassword=$ANDROID_KEY_PASSWORD" >> android/keystore.properties
             echo "Keystore and signing properties successfully created."
+            ls -lh android/app/space-station-release.jks
           else
-            echo "No ANDROID_KEYSTORE_BASE64 secret provided. Gradle will produce unsigned release artifacts."
+            echo "No ANDROID_KEYSTORE_BASE64 secret provided. Gradle will produce unsigned/debug-signed release artifacts."
           fi
 
       - name: Build Android App with Gradle
@@ -75,7 +81,8 @@ jobs:
       - name: Save APK and AAB Artifacts
         run: |
           mkdir -p build-artifacts
-          # Save APK
+          echo "Searching for generated APK files..."
+          find android/ -name "*.apk"
           APK_PATH=$(find android/ -name "*.apk" 2>/dev/null | head -n 1)
           if [ -n "$APK_PATH" ]; then
             echo "Found APK at $APK_PATH"
@@ -83,7 +90,9 @@ jobs:
           else
             echo "Error: Release APK not found!" && exit 1
           fi
-          # Save AAB
+
+          echo "Searching for generated AAB files..."
+          find android/ -name "*.aab"
           AAB_PATH=$(find android/ -name "*.aab" 2>/dev/null | head -n 1)
           if [ -n "$AAB_PATH" ]; then
             echo "Found AAB at $AAB_PATH"
