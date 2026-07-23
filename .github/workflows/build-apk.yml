@@ -77,27 +77,40 @@ jobs:
           echo "GRADLE_OPTS=$GRADLE_OPTS"
           env | grep GRADLE || true
           
-      - name: Debug Gradle Wrapper
+            - name: Debug Gradle Wrapper
         run: |
-            cd android
-            echo "Current directory:"
-            pwd
-              
-            echo "Android folder:"
-            ls -la
+          cd android
 
-            echo "Wrapper folder:"
-            ls -la gradle/wrapper
- 
-            echo "gradlew size:"
-            wc -c gradlew
+          echo "Current directory:"
+          pwd
 
-            echo "gradle-wrapper.jar size:"
-            wc -c gradle/wrapper/gradle-wrapper.jar
+          echo ""
+          echo "Android folder:"
+          ls -lah
 
-            echo "First 5 lines of gradlew:"
-            head -5 gradlew
+          echo ""
+          echo "Wrapper folder:"
+          ls -lah gradle/wrapper
 
+          echo ""
+          echo "gradlew size:"
+          wc -c gradlew
+
+          echo ""
+          echo "gradle-wrapper.jar size:"
+          wc -c gradle/wrapper/gradle-wrapper.jar
+
+          echo ""
+          echo "jar file type:"
+          file gradle/wrapper/gradle-wrapper.jar || true
+
+          echo ""
+          echo "SHA256:"
+          sha256sum gradle/wrapper/gradle-wrapper.jar || true
+
+          echo ""
+          echo "First 5 lines of gradlew:"
+          head -5 gradlew
       - name: Build Android App with Gradle
         env:
           RELEASE_STORE_FILE: space-station-release.jks
