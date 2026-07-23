@@ -56,7 +56,7 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > android/app/space-station-release.jks 2>/dev/null || echo "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > android/app/space-station-release.jks 2>/dev/null || true
+            python3 -c "import base64, os; data=base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'].strip()); open('android/app/space-station-release.jks', 'wb').write(data)" 2>/dev/null || echo "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > android/app/space-station-release.jks 2>/dev/null || true
             if [ -s android/app/space-station-release.jks ]; then
               echo "storeFile=space-station-release.jks" > android/keystore.properties
               echo "storePassword=$ANDROID_KEYSTORE_PASSWORD" >> android/keystore.properties
