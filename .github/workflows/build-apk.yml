@@ -87,11 +87,11 @@ jobs:
         run: |
           mkdir -p build-artifacts
           echo "Searching for generated APK files..."
-          find android/app/build/outputs/ -name "*.apk"
+          find android/ -name "*.apk" 2>/dev/null || true
           
-          APK_PATH=$(find android/app/build/outputs/ -name "*release*.apk" 2>/dev/null | head -n 1)
+          APK_PATH=$(find android/ -name "*release*.apk" 2>/dev/null | head -n 1)
           if [ -z "$APK_PATH" ]; then
-            APK_PATH=$(find android/app/build/outputs/ -name "*.apk" 2>/dev/null | head -n 1)
+            APK_PATH=$(find android/ -name "*.apk" 2>/dev/null | head -n 1)
           fi
 
           if [ -n "$APK_PATH" ]; then
@@ -102,11 +102,11 @@ jobs:
           fi
 
           echo "Searching for generated AAB files..."
-          find android/app/build/outputs/ -name "*.aab"
+          find android/ -name "*.aab" 2>/dev/null || true
           
-          AAB_PATH=$(find android/app/build/outputs/ -name "*release*.aab" 2>/dev/null | head -n 1)
+          AAB_PATH=$(find android/ -name "*release*.aab" 2>/dev/null | head -n 1)
           if [ -z "$AAB_PATH" ]; then
-            AAB_PATH=$(find android/app/build/outputs/ -name "*.aab" 2>/dev/null | head -n 1)
+            AAB_PATH=$(find android/ -name "*.aab" 2>/dev/null | head -n 1)
           fi
 
           if [ -n "$AAB_PATH" ]; then
