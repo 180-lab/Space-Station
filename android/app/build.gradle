@@ -18,36 +18,38 @@ android {
     }
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
-boolean hasSigning = false
+def jksFile = null
 
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-    if (keystoreProperties['storeFile'] && file(keystoreProperties['storeFile']).exists()) {
-        hasSigning = true
+    if (keystoreProperties['storeFile']) {
+        def f1 = file(keystoreProperties['storeFile'])
+        def f2 = rootProject.file(keystoreProperties['storeFile'])
+        if (f1.exists()) {
+            jksFile = f1
+        } else if (f2.exists()) {
+            jksFile = f2
+        }
     }
 }
 
-if (!hasSigning && System.getenv("RELEASE_STORE_FILE") != null) {
-    def envStoreFile = file(System.getenv("RELEASE_STORE_FILE"))
-    if (envStoreFile.exists() && envStoreFile.length() > 0) {
-        hasSigning = true
+if (jksFile == null && System.getenv("RELEASE_STORE_FILE") != null) {
+    def f1 = file(System.getenv("RELEASE_STORE_FILE"))
+    def f2 = rootProject.file(System.getenv("RELEASE_STORE_FILE"))
+    if (f1.exists() && f1.length() > 0) {
+        jksFile = f1
+    } else if (f2.exists() && f2.length() > 0) {
+        jksFile = f2
     }
 }
 
 signingConfigs {
     release {
-        if (hasSigning) {
-            if (keystorePropertiesFile.exists() && keystoreProperties['storeFile']) {
-                storeFile file(keystoreProperties['storeFile'])
-                storePassword keystoreProperties['storePassword']
-                keyAlias keystoreProperties['keyAlias']
-                keyPassword keystoreProperties['keyPassword']
-            } else {
-                storeFile file(System.getenv("RELEASE_STORE_FILE"))
-                storePassword System.getenv("RELEASE_STORE_PASSWORD")
-                keyAlias System.getenv("RELEASE_KEY_ALIAS")
-                keyPassword System.getenv("RELEASE_KEY_PASSWORD")
-            }
+        if (jksFile != null) {
+            storeFile jksFile
+            storePassword keystoreProperties['storePassword'] ?: System.getenv("RELEASE_STORE_PASSWORD")
+            keyAlias keystoreProperties['keyAlias'] ?: System.getenv("RELEASE_KEY_ALIAS")
+            keyPassword keystoreProperties['keyPassword'] ?: System.getenv("RELEASE_KEY_PASSWORD")
         }
     }
 }
@@ -56,8 +58,10 @@ signingConfigs {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 
-            if (hasSigning) {
+            if (jksFile != null) {
                 signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
             }
         }
     }
