@@ -22,13 +22,7 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
-signingConfigs {
-    release {
-        // Populated dynamically below if credentials validate successfully
-    }
-}
-
-def configureReleaseSigning = {
+def getReleaseSigningDetails = {
     def ksPath = keystoreProperties['storeFile'] ?: System.getenv("RELEASE_STORE_FILE")
     def ksStorePass = keystoreProperties['storePassword'] ?: System.getenv("RELEASE_STORE_PASSWORD")
     def ksAlias = keystoreProperties['keyAlias'] ?: System.getenv("RELEASE_KEY_ALIAS")
@@ -36,7 +30,7 @@ def configureReleaseSigning = {
 
     if (!ksPath || !ksStorePass || !ksAlias || !ksKeyPass) {
         println "INFO: Incomplete release keystore configuration. Using debug signing."
-        return false
+        return null
     }
 
     def ksFile = file(ksPath)
@@ -46,7 +40,7 @@ def configureReleaseSigning = {
 
     if (!ksFile.exists() || ksFile.length() == 0) {
         println "INFO: Keystore file '${ksPath}' not found or empty. Using debug signing."
-        return false
+        return null
     }
 
     boolean isValid = false
@@ -71,31 +65,45 @@ def configureReleaseSigning = {
     }
 
     if (isValid) {
-        signingConfigs.release.storeFile = ksFile
-        signingConfigs.release.storePassword = ksStorePass
-        signingConfigs.release.keyAlias = ksAlias
-        signingConfigs.release.keyPassword = ksKeyPass
-        return true
+        return [
+            storeFile: ksFile,
+            storePassword: ksStorePass,
+            keyAlias: ksAlias,
+            keyPassword: ksKeyPass
+        ]
     } else {
         println "WARNING: Release keystore credentials or alias validation failed. Using debug signing."
-        return false
+        return null
     }
 }
 
-boolean hasValidReleaseSigning = configureReleaseSigning()
+def validReleaseConfig = getReleaseSigningDetails()
 
-    buildTypes {
+if (validReleaseConfig != null) {
+    signingConfigs {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-
-            if (hasValidReleaseSigning) {
-                signingConfig signingConfigs.release
-            } else {
-                signingConfig signingConfigs.debug
-            }
+            storeFile validReleaseConfig.storeFile
+            storePassword validReleaseConfig.storePassword
+            keyAlias validReleaseConfig.keyAlias
+            keyPassword validReleaseConfig.keyPassword
         }
     }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+} else {
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
     lint {
         checkReleaseBuilds false
         abortOnError false
