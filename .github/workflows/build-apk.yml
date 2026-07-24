@@ -1,0 +1,108 @@
+name: Build Android APK & AAB
+# Trigger build: July 20, 2026
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build_apk:
+    name: Build Android App (APK & AAB)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2.1'
+          cache-disabled: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Packages
+        run: |
+          npm ci
+
+      - name: Compile React Frontend
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+        run: |
+          npm run build
+
+      - name: Synchronize Capacitor Assets
+        run: |
+          npx cap sync android
+
+      - name: Prepare Signing Config
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/space-station-release.jks
+            echo "storeFile=app/space-station-release.jks" > android/keystore.properties
+            echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> android/keystore.properties
+            echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/keystore.properties
+            echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/keystore.properties
+            echo "Keystore and signing properties successfully created."
+          else
+            echo "No ANDROID_KEYSTORE_BASE64 secret provided. Gradle will produce unsigned release artifacts."
+          fi
+
+      - name: Build Android App with Gradle
+        env:
+          RELEASE_STORE_FILE: app/space-station-release.jks
+          RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease --stacktrace --no-daemon
+
+      - name: Save APK and AAB Artifacts
+        run: |
+          mkdir -p build-artifacts
+          # Save APK
+          APK_PATH=$(find android/ -name "*.apk" 2>/dev/null | head -n 1)
+          if [ -n "$APK_PATH" ]; then
+            echo "Found APK at $APK_PATH"
+            cp "$APK_PATH" build-artifacts/SpaceStationCommander.apk
+          else
+            echo "Error: Release APK not found!" && exit 1
+          fi
+          # Save AAB
+          AAB_PATH=$(find android/ -name "*.aab" 2>/dev/null | head -n 1)
+          if [ -n "$AAB_PATH" ]; then
+            echo "Found AAB at $AAB_PATH"
+            cp "$AAB_PATH" build-artifacts/SpaceStationCommander.aab
+          else
+            echo "Error: Release AAB not found!" && exit 1
+          fi
+
+      - name: Upload Downloadable APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpaceStationCommander-APK
+          path: build-artifacts/SpaceStationCommander.apk
+          retention-days: 7
+
+      - name: Upload Downloadable AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpaceStationCommander-AAB
+          path: build-artifacts/SpaceStationCommander.aab
+          retention-days: 7
+

@@ -3004,10 +3004,34 @@ function getFirebaseAdmin(): App | null {
       return firebaseAdminApp;
     }
 
+    let parsedServiceAccount: any = null;
+
     if (serviceAccountVar) {
-      const serviceAccount = JSON.parse(serviceAccountVar);
+      try {
+        const trimmed = serviceAccountVar.trim();
+        if (trimmed.startsWith('{')) {
+          parsedServiceAccount = JSON.parse(trimmed);
+        } else {
+          // Try regex to extract JSON object inside string
+          const jsonMatch = serviceAccountVar.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            parsedServiceAccount = JSON.parse(jsonMatch[0]);
+          } else {
+            // Try base64 decode
+            const decoded = Buffer.from(trimmed, 'base64').toString('utf-8');
+            if (decoded.trim().startsWith('{')) {
+              parsedServiceAccount = JSON.parse(decoded.trim());
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[Firebase Admin] FIREBASE_SERVICE_ACCOUNT in environment is not raw JSON, falling back to Project ID config.");
+      }
+    }
+
+    if (parsedServiceAccount && (parsedServiceAccount.project_id || parsedServiceAccount.client_email)) {
       firebaseAdminApp = initializeApp({
-        credential: cert(serviceAccount)
+        credential: cert(parsedServiceAccount)
       });
       console.log("[Firebase Admin] Initialized with Service Account cert.");
     } else if (projectId) {
@@ -3016,7 +3040,7 @@ function getFirebaseAdmin(): App | null {
       });
       console.log(`[Firebase Admin] Initialized with Project ID: ${projectId}`);
     } else {
-      console.warn("[Firebase Admin] Missing FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID in environment. FCM notifications will be simulated / logged in development.");
+      console.warn("[Firebase Admin] Missing FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID in environment.");
     }
   } catch (err) {
     console.error("[Firebase Admin] Error initializing Firebase Admin SDK:", err);

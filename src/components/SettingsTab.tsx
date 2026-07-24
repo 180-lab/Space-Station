@@ -1624,8 +1624,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
  
         {showSync && (
           <div className="space-y-5 pt-2 animate-fade-in">
-            {/* Bento Grid: 2 Columns on desktop, 1 on mobile */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Single column container */}
+            <div className="grid grid-cols-1 gap-4">
               
               {/* Column 1: Google account sync status */}
               <div className="space-y-3.5 bg-slate-950/60 p-4 border border-slate-800/80 rounded-xl flex flex-col justify-between text-left">
@@ -1680,43 +1680,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   )}
                 </div>
               </div>
- 
-              {/* Column 2: Cryptographic Core Security Signature */}
-              <div className="space-y-3.5 bg-slate-950/60 p-4 border border-slate-800/80 rounded-xl flex flex-col justify-between text-left">
-                <div className="space-y-1.5 text-left">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">CRYPTOGRAPHIC SIGNATURE</span>
-                  </div>
-                  <h4 className="text-xs font-bold text-white uppercase font-mono">Tactical Terminal Key</h4>
-                  <p className="text-[10.5px] text-slate-400 leading-relaxed font-sans">
-                    This is your unique command cipher. Keep it secure as a backup or to request manual station recovery.
-                  </p>
-                </div>
- 
-                <div className="space-y-2.5 text-left">
-                  <div className="flex items-center gap-1 bg-[#02050B] border border-slate-800/60 rounded-lg p-2.5 font-mono text-[9px] text-cyan-300 break-all select-all relative group">
-                    <span className="flex-1 select-all">{player.id}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(player.id);
-                        showToast("Cryptographic station key copied to clipboard!", "success");
-                      }}
-                      className="px-2 py-1 bg-cyan-950/40 border border-cyan-500/20 rounded hover:bg-cyan-500/20 text-[8px] uppercase tracking-wider font-extrabold cursor-pointer transition shrink-0 ml-1.5"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                  <div className="text-[9.5px] text-amber-500 font-mono flex items-start gap-1 bg-amber-950/10 border border-amber-950/30 p-2 rounded-lg text-left">
-                    <span className="shrink-0 font-bold select-none">⚠️</span>
-                    <p className="leading-relaxed font-sans">
-                      <strong>SECURITY PROTOCOL:</strong> Do not share this key with anyone. Anyone with this key can command your space fleets and consume resources.
-                    </p>
-                  </div>
-                </div>
-              </div>
- 
+
             </div>
           </div>
         )}
